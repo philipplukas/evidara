@@ -43,7 +43,7 @@ report from whatever JSON is present, marking anything missing rather than omitt
 | `generator.py` | sequences, speakers (group and groupoid), datasets, the identifiability twin |
 | `analysis/` | the inference side — **never imports a generator module** (enforced by a test) |
 | `experiments/` | one script per experiment, each writing a figure + JSON |
-| `tests/` | 80+ tests pinning the generator's exactness and the oracle discipline |
+| `tests/` | 93 tests pinning the generator's exactness and the oracle discipline |
 
 `analysis/` carries two modules beyond the four the specification names — `kernels.py`
 (parametric kernel families) and `recognizers.py` (the three recognisers) — both split out
@@ -116,7 +116,7 @@ has a small discontinuity at each segment boundary; that is what a phone-local c
 **The identifiability twin.** For `h(u) = P u + p`, `generator.affine_twin_world` builds a
 second world with targets `h(u_q)`, matrices `P M P^-1, P C P^-1, P K P^-1`, and
 `Phi_2 = Phi . h^-1` (computed exactly inside the polynomial family). The two emit
-**bit-identical** clean acoustics from latents that differ by 40%.
+**bit-identical** clean acoustics (max difference 1.8e-14) from latents that differ by 42%.
 
 ## What the experiments found
 
@@ -133,17 +133,19 @@ Short version; `results/SYNTHETIC_SPEECH_REPORT.md` has the numbers and the cont
   energy because the two damped responses are nearly collinear curves, so it drops below a
   permuted-label null as soon as noise is non-trivial.
 - **The commonly assumed exponential kernel is measurably wrong**, and it shows up in
-  extrapolation rather than in fit: ~20x worse than a second-order family when asked to
-  predict the last 40% of a window it was not fitted on. A smoothing spline fits best
-  in-sample and extrapolates catastrophically.
+  extrapolation rather than in fit: rmse 0.246 against 0.009 for a two-real-pole family
+  (28x worse) when asked to predict the last 40% of a window it was not fitted on, while
+  the two are within a factor of ten *inside* the fitted window. A smoothing spline fits
+  best in-sample and extrapolates catastrophically (36.3).
 - **The temporal inverse problem is easy; the acoustic one is not.** With `Phi` known,
   inversion is essentially exact. Blind of `Phi`, local PCA recovers the tangent *subspace*
   but not the Jacobian, and the blind latent is a linear reparameterisation of the true one
   — 1.19 direct error, 0.05 after an affine map.
 - **The dynamics are identifiable; the standard recipe is what fails.** Fitting the forward
-  model to trajectories recovers `A_u` to ~1% at working noise. Smoothing-then-differentiating
-  the same data is off by ~26%, and its answer moves by up to 20x across reasonable
-  Savitzky-Golay settings.
+  model to trajectories recovers `A_u` to 0.7% at working noise (0.01% in the noiseless
+  limit). Smoothing-then-differentiating the same data is off by 11% on the *best* of four
+  Savitzky-Golay settings, and its answer moves by 15x across them — so a single
+  undocumented smoothing choice is worth more than the noise level.
 - **Latent coordinates are not identifiable and the poles are** — measured, not asserted.
   The twin worlds are statistically indistinguishable at the nominal rate while a
   positive control (a genuinely different world) is rejected every time.
