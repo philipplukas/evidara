@@ -1,0 +1,81 @@
+{
+  "name": "07_speaker_variation",
+  "title": "Experiment 7 -- group versus groupoid",
+  "figures": [
+    "group_vs_groupoid.pdf"
+  ],
+  "scalars": {
+    "n_sequences": 900,
+    "n_speakers": 12,
+    "noise_scale": 0.1,
+    "groupoid_phone_deviation_mean_abs": 0.07604712853141546,
+    "speaker_deviation_mean_abs": 0.09176286056065515,
+    "group_world_phone_deviation (should be 0)": 1.1102230246251565e-16
+  },
+  "tables": {
+    "A: group": {
+      "rmse_G": 0.019975006238716415,
+      "rmse_Gpd": 0.01995198526872124,
+      "ratio": 1.0011538185140534,
+      "n_params": {
+        "G": 144,
+        "Gpd": 432
+      }
+    },
+    "B: groupoid": {
+      "rmse_G": 0.05182799685898218,
+      "rmse_Gpd": 0.019967592180515987,
+      "ratio": 2.5956057390612672,
+      "n_params": {
+        "G": 144,
+        "Gpd": 432
+      }
+    },
+    "ratio_vs_noise": {
+      "0.1": {
+        "A: group": 1.0011538185140534,
+        "B: groupoid": 2.5956057390612672,
+        "excess": 2.592614332644462
+      },
+      "0.3": {
+        "A: group": 0.997267767495903,
+        "B: groupoid": 1.3155540259488003,
+        "excess": 1.3191582730605047
+      }
+    }
+  },
+  "findings": [
+    {
+      "question": "Does a global-group speaker model fail systematically on groupoid data?",
+      "ground_truth": {
+        "dataset A": "g_{r,q} = g_r for every phone",
+        "dataset B": "g_{r,q} varies by phone, with deviations zero-mean across phones"
+      },
+      "estimate": {
+        "held-out error ratio G/Gpd on group data": 1.0012,
+        "held-out error ratio G/Gpd on groupoid data": 2.5956,
+        "excess": 2.5926
+      },
+      "error": 1.592614332644462,
+      "status": "IDENTIFIABLE",
+      "control": "the same comparison on group data gives 1.001, which is what Gpd's 3x parameter count buys on its own",
+      "notes": "Model G loses 160% held-out accuracy on groupoid data against 0% on group data. The gap is the phone-local part of the chart, and it cannot be absorbed by a per-speaker map at any sample size, because the phone deviations are constructed to average to zero across phones.",
+      "error_label": "excess ratio above the group-data baseline"
+    },
+    {
+      "question": "Does that conclusion survive changes in observation noise?",
+      "ground_truth": {
+        "phone deviation magnitude": 0.07604712853141546
+      },
+      "estimate": {
+        "0.1": 2.593,
+        "0.3": 1.319
+      },
+      "error": null,
+      "status": "IDENTIFIABLE",
+      "control": "the group world is re-fitted at every noise level as its own baseline",
+      "notes": "the excess ratio shrinks as noise grows: at high noise the residual is dominated by observation noise that neither model can explain, so the *ratio* compresses towards 1 even though the structural mismatch is unchanged. A ratio reported without its noise level is not interpretable.",
+      "error_label": "n/a (ratio by noise level)"
+    }
+  ]
+}

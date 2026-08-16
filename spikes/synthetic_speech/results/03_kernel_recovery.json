@@ -1,0 +1,350 @@
+{
+  "name": "03_kernel_recovery",
+  "title": "Experiment 3 -- recover the temporal kernel",
+  "figures": [
+    "kernel_recovery.pdf"
+  ],
+  "scalars": {
+    "n_sequences": 4000,
+    "noise_scale": 0.1,
+    "snr_db": 15.93624714147446,
+    "ground_truth_modes": "mode 0: omega_n=30.000 rad/s, zeta=1.1667 (overdamped); mode 1: omega_n=25.000 rad/s, zeta=1.0000 (critically damped)",
+    "ground_truth_omega": [
+      30.0,
+      25.0
+    ],
+    "ground_truth_zeta": [
+      1.16666667,
+      1.0
+    ],
+    "rank1_variance_explained_R_1": 0.999544456045591
+  },
+  "tables": {
+    "family_comparison": [
+      {
+        "family": "exponential",
+        "k": 2,
+        "train_rmse": 0.029906140666528455,
+        "train_r2": 0.9888018455452484,
+        "AIC": -495.7806991210983,
+        "BIC": -487.41822389275217,
+        "test_rmse": 0.030820249237125875,
+        "test_r2": 0.9881705390371834,
+        "test_nll": -247.27737948659117,
+        "extrap_rmse": 0.24548562161762613
+      },
+      {
+        "family": "double_exponential",
+        "k": 4,
+        "train_rmse": 0.0028593210564663066,
+        "train_r2": 0.9998976349848868,
+        "AIC": -1055.1758100732304,
+        "BIC": -1041.2383513593202,
+        "test_rmse": 0.003213618886108289,
+        "test_r2": 0.9998713880258351,
+        "test_nll": -518.5702877759902,
+        "extrap_rmse": 0.008805853528823985
+      },
+      {
+        "family": "critically_damped",
+        "k": 2,
+        "train_rmse": 0.0039886967968984855,
+        "train_r2": 0.9998008007225674,
+        "AIC": -979.284524530901,
+        "BIC": -970.9220493025548,
+        "test_rmse": 0.0036936711988425023,
+        "test_r2": 0.999830093838442,
+        "test_nll": -501.86350529753497,
+        "extrap_rmse": 0.020497053428456917
+      },
+      {
+        "family": "underdamped",
+        "k": 3,
+        "train_rmse": 0.004002929812988616,
+        "train_r2": 0.9997993765656799,
+        "AIC": -976.429647885613,
+        "BIC": -965.2796809144849,
+        "test_rmse": 0.003704726064757645,
+        "test_r2": 0.9998290752850736,
+        "test_nll": -501.504891168057,
+        "extrap_rmse": 0.020720630595323485
+      },
+      {
+        "family": "second_order_free",
+        "k": 3,
+        "train_rmse": 0.002862952915658494,
+        "train_r2": 0.9998973747752601,
+        "AIC": -1056.8711597445629,
+        "BIC": -1045.7211927734347,
+        "test_rmse": 0.0031961732348023803,
+        "test_r2": 0.9998727806175122,
+        "test_nll": -519.2235018854541,
+        "extrap_rmse": 0.01004714525441453
+      },
+      {
+        "family": "spline",
+        "k": 122,
+        "train_rmse": 0.001556870493315888,
+        "train_r2": 0.9999696519573755,
+        "AIC": null,
+        "BIC": null,
+        "test_rmse": 0.003750892609835471,
+        "test_r2": 0.9998247887762219,
+        "test_nll": -500.0187485796195,
+        "extrap_rmse": 36.26262520580412
+      }
+    ],
+    "modal_identification": {
+      "1": {
+        "omega": [
+          27.44736031358137
+        ],
+        "zeta": [
+          1.0962789982582763
+        ],
+        "residual_rmse": 0.004729702732693376,
+        "n_params": 11
+      },
+      "2": {
+        "omega": [
+          29.226709736856105,
+          25.08808625038536
+        ],
+        "zeta": [
+          1.1486307875510784,
+          1.008521473942706
+        ],
+        "residual_rmse": 0.0024451411527241793,
+        "n_params": 22
+      },
+      "3": {
+        "omega": [
+          55.16365819674262,
+          33.52761018527034,
+          19.58070279716101
+        ],
+        "zeta": [
+          0.928714385636792,
+          1.225376007386464,
+          1.3340774295214742e-10
+        ],
+        "residual_rmse": 0.0024298919938152796,
+        "n_params": 33
+      }
+    },
+    "modal_recovery_vs_noise": {
+      "0.003": {
+        "omega_by_replicate": [
+          [
+            30.038346623781724,
+            24.90462139471046
+          ],
+          [
+            30.077811447657822,
+            24.88437192812199
+          ],
+          [
+            30.062067575508475,
+            24.873861844520018
+          ],
+          [
+            30.044477234489015,
+            24.881215989527863
+          ],
+          [
+            30.019987878093886,
+            24.838935363423797
+          ],
+          [
+            30.080227620102796,
+            24.895916321149087
+          ]
+        ],
+        "max_rel_err_median": 0.0034670675691815585,
+        "max_rel_err_worst": 0.004156080469575528,
+        "pole_rel_err_median": 0.02225418862249056,
+        "n_replicates": 6,
+        "snr_db": 46.39382204708121
+      },
+      "0.01": {
+        "omega_by_replicate": [
+          [
+            29.98485862336697,
+            24.9830765392315
+          ],
+          [
+            30.118585809390943,
+            24.914972692540346
+          ],
+          [
+            30.064789179363817,
+            24.879354036843438
+          ],
+          [
+            30.006128088616617,
+            24.903670933396405
+          ],
+          [
+            29.927264993720378,
+            24.761653319940685
+          ],
+          [
+            30.12625894075097,
+            24.952648423091013
+          ]
+        ],
+        "max_rel_err_median": 0.0036216576637384526,
+        "max_rel_err_worst": 0.006381300604046906,
+        "pole_rel_err_median": 0.03300016995791634,
+        "n_replicates": 6,
+        "snr_db": 35.93624714147446
+      },
+      "0.03": {
+        "omega_by_replicate": [
+          [
+            29.824661476108492,
+            25.21777842598382
+          ],
+          [
+            30.246386941968616,
+            25.007291087510456
+          ],
+          [
+            30.07275009870865,
+            24.895401044924412
+          ],
+          [
+            29.89652274683061,
+            24.9667247995537
+          ],
+          [
+            29.682971945048514,
+            24.531919746177582
+          ],
+          [
+            30.265355411920623,
+            25.113094054218216
+          ]
+        ],
+        "max_rel_err_median": 0.008048674237387908,
+        "max_rel_err_worst": 0.014476796848066374,
+        "pole_rel_err_median": 0.053832521338074535,
+        "n_replicates": 6,
+        "snr_db": 26.39382204708121
+      },
+      "0.1": {
+        "omega_by_replicate": [
+          [
+            29.11000301562497,
+            26.232051603869312
+          ],
+          [
+            30.87115579302978,
+            25.38487647309866
+          ],
+          [
+            56.29485379695193,
+            25.471257187585095
+          ],
+          [
+            29.511458076864166,
+            25.1759117559913
+          ],
+          [
+            29.036389455625756,
+            23.6498106399163
+          ],
+          [
+            55.41309849979923,
+            25.83002942278211
+          ]
+        ],
+        "max_rel_err_median": 0.040783007099648,
+        "max_rel_err_worst": 0.6734503374974004,
+        "pole_rel_err_median": 0.16727263046158036,
+        "n_replicates": 6,
+        "snr_db": 15.93624714147446
+      },
+      "0.3": {
+        "omega_by_replicate": [
+          [
+            29.35979990124376,
+            29.343683982631184
+          ],
+          [
+            36.374495966718506,
+            26.592894085993848
+          ],
+          [
+            57.02723300596236,
+            25.116284932447815
+          ],
+          [
+            28.381516975999595,
+            25.714420519694915
+          ],
+          [
+            28.209768964153696,
+            21.07606640477621
+          ],
+          [
+            54.43432058941544,
+            26.286615510204843
+          ]
+        ],
+        "max_rel_err_median": 0.16489526167650198,
+        "max_rel_err_worst": 0.6921029233343343,
+        "pole_rel_err_median": 0.35100979509883046,
+        "n_replicates": 6,
+        "snr_db": 6.393822047081211
+      }
+    }
+  },
+  "findings": [
+    {
+      "question": "Which rank-1 kernel family best describes the leading temporal component?",
+      "ground_truth": {
+        "true kernels": "a mixture of one overdamped (zeta=7/6, omega=30) and one critically damped (zeta=1, omega=25) rise",
+        "so the correct rank-1 answer is": "none of them exactly"
+      },
+      "estimate": {
+        "best on held-out segments": "second_order_free (rmse 3.20e-03)",
+        "best on temporal extrapolation": "double_exponential (rmse 8.81e-03)",
+        "best by BIC": "second_order_free"
+      },
+      "error": 0.008475091599550906,
+      "status": "PARTIALLY IDENTIFIABLE",
+      "control": "the spline baseline, which fits anything and extrapolates nothing",
+      "notes": "the exponential family is the one most often assumed and it is measurably wrong here: its extrapolation rmse is 2.45e-01 against 8.81e-03 for double_exponential. A single exponential cannot have zero initial slope, and every second-order response does.",
+      "error_label": "extrapolation rmse relative to the extrapolated signal scale"
+    },
+    {
+      "question": "Can the generating modes (omega, zeta) be recovered without assuming rank 1?",
+      "ground_truth": {
+        "omega": [
+          30.0,
+          25.0
+        ],
+        "zeta": [
+          1.1666666666666667,
+          1.0
+        ]
+      },
+      "estimate": {
+        "omega": [
+          29.226709736856105,
+          25.08808625038536
+        ],
+        "zeta": [
+          1.1486307875510784,
+          1.008521473942706
+        ]
+      },
+      "error": 0.019929992532552825,
+      "status": "IDENTIFIABLE",
+      "control": "a 3-mode fit adds a spurious mode (omega=55.2, zeta=0.93) that absorbs the acoustic nonlinearity",
+      "notes": "residual rmse: 1 mode 4.730e-03, 2 modes 2.445e-03 (1.93x), 3 modes 2.430e-03 (1.01x). Recovery within 5% on every replicate happens at noise scales [0.003, 0.01, 0.03] (of [0.003, 0.01, 0.03, 0.1, 0.3]); median error by scale: {0.003: 0.003, 0.01: 0.004, 0.03: 0.008, 0.1: 0.041, 0.3: 0.165}, worst-case {0.003: 0.004, 0.01: 0.006, 0.03: 0.014, 0.1: 0.673, 0.3: 0.692}. The optimiser is stable across restarts, so that spread is the *problem* being weakly identified: at noise 0.1 two very different pole pairs fit equally well to 4 significant figures. No SVD component equals a physical mode either -- singular vectors are orthogonal and the true modes are not -- so this needs the variable-projection fit, not the SVD.",
+      "error_label": "max relative error over (omega, zeta)"
+    }
+  ]
+}

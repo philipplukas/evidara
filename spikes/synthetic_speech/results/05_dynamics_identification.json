@@ -1,0 +1,391 @@
+{
+  "name": "05_dynamics_identification",
+  "title": "Experiment 5 -- recover the dynamics",
+  "figures": [
+    "dynamics_recovery.pdf"
+  ],
+  "scalars": {
+    "n_sequences": 4000,
+    "ground_truth_A_u": [
+      [
+        -900.0,
+        0.0
+      ],
+      [
+        0.0,
+        -625.0
+      ]
+    ],
+    "ground_truth_A_v": [
+      [
+        -70.0,
+        0.0
+      ],
+      [
+        0.0,
+        -50.0
+      ]
+    ],
+    "ground_truth_poles": [
+      -53.027756377319946,
+      -25.000000000000004,
+      -25.000000000000004,
+      -16.972243622680054
+    ],
+    "smoothing_swept": [
+      "window=21, polyorder=3",
+      "window=41, polyorder=4",
+      "window=61, polyorder=4",
+      "window=81, polyorder=5"
+    ],
+    "edge_margin_frames": 25
+  },
+  "tables": {
+    "estimator_accel": {
+      "0.001": {
+        "A_u_err": 0.002032514758295861,
+        "A_v_err": 0.001521308442932946,
+        "theta_err": 1.7575793618255192e-05,
+        "pole_err": 0.013795693353612467,
+        "best_smoother": "41/4",
+        "worst_over_smoothers": 0.031442989697971796,
+        "r2": 0.9999421788073284
+      },
+      "0.03": {
+        "A_u_err": 0.021077881097581002,
+        "A_v_err": 0.021403470445441015,
+        "theta_err": 0.0009519958536047557,
+        "pole_err": 0.04161177546509668,
+        "best_smoother": "81/5",
+        "worst_over_smoothers": 0.09099907285770428,
+        "r2": 0.9974766192742545
+      },
+      "0.1": {
+        "A_u_err": 0.10750021269694761,
+        "A_v_err": 0.10762469715927515,
+        "theta_err": 0.0023902768377251473,
+        "pole_err": 0.05082231542859083,
+        "best_smoother": "61/4",
+        "worst_over_smoothers": 0.4749694737808455,
+        "r2": 0.9287232112523544
+      },
+      "0.3": {
+        "A_u_err": 0.39613507247541535,
+        "A_v_err": 0.4028716196477228,
+        "theta_err": 0.015761841615538914,
+        "pole_err": 0.2211068255730418,
+        "best_smoother": "61/4",
+        "worst_over_smoothers": 0.7820882422859463,
+        "r2": 0.5976095599095808
+      },
+      "1.0": {
+        "A_u_err": 0.6687933135141122,
+        "A_v_err": 0.6599378596269091,
+        "theta_err": 0.09311541181619834,
+        "pole_err": 0.5593105277515051,
+        "best_smoother": "81/5",
+        "worst_over_smoothers": 1.236008043759281,
+        "r2": 0.3510418198309192
+      }
+    },
+    "estimator_discrete": {
+      "0.001": {
+        "A_u_err": 0.0010488078549387022,
+        "A_v_err": 0.0009264844757093067,
+        "theta_err": null,
+        "pole_err": 0.0006003952646264643,
+        "best_smoother": "21/3",
+        "worst_over_smoothers": 0.028173625368962427,
+        "r2": 0.9999997789586923
+      },
+      "0.03": {
+        "A_u_err": 0.018081497895960977,
+        "A_v_err": 0.016954446985209023,
+        "theta_err": null,
+        "pole_err": 0.042658773049150715,
+        "best_smoother": "81/5",
+        "worst_over_smoothers": 0.26892485801228383,
+        "r2": 0.9999978626080102
+      },
+      "0.1": {
+        "A_u_err": 0.05599792500562926,
+        "A_v_err": 0.053796332066705546,
+        "theta_err": null,
+        "pole_err": 0.07625262854529435,
+        "best_smoother": "61/4",
+        "worst_over_smoothers": 1.3061214755937953,
+        "r2": 0.9999753897677313
+      },
+      "0.3": {
+        "A_u_err": 0.13316024993450556,
+        "A_v_err": 0.12288798973638504,
+        "theta_err": null,
+        "pole_err": 0.18607021512636943,
+        "best_smoother": "61/4",
+        "worst_over_smoothers": 2.3345009128417895,
+        "r2": 0.9997782423789431
+      },
+      "1.0": {
+        "A_u_err": 0.20924401983559415,
+        "A_v_err": 0.16971333238175546,
+        "theta_err": null,
+        "pole_err": 0.2453522815058785,
+        "best_smoother": "61/4",
+        "worst_over_smoothers": 3.80838691507802,
+        "r2": 0.9975610967621587
+      }
+    },
+    "estimator_trajectory": {
+      "0.001": {
+        "A_u_err": 6.812685447560823e-05,
+        "A_v_err": 7.675810903260413e-05,
+        "theta_err": 7.466614813636156e-06,
+        "pole_err": 7.39222546493828e-05,
+        "best_smoother": "none (no differentiation)",
+        "worst_over_smoothers": 7.675810903260413e-05,
+        "residual_rmse": 1.2772542135178308e-05
+      },
+      "0.03": {
+        "A_u_err": 0.0020458693130654395,
+        "A_v_err": 0.0023054328905183995,
+        "theta_err": 0.0002243130769201725,
+        "pole_err": 0.002206238661583527,
+        "best_smoother": "none (no differentiation)",
+        "worst_over_smoothers": 0.0023054328905183995,
+        "residual_rmse": 0.0003831758981759869
+      },
+      "0.1": {
+        "A_u_err": 0.00682261141762629,
+        "A_v_err": 0.007692452638272948,
+        "theta_err": 0.0007502457627935998,
+        "pole_err": 0.007273454616610061,
+        "best_smoother": "none (no differentiation)",
+        "worst_over_smoothers": 0.007692452638272948,
+        "residual_rmse": 0.0012772522923356047
+      },
+      "0.3": {
+        "A_u_err": 0.020494212344788515,
+        "A_v_err": 0.02314341051240148,
+        "theta_err": 0.0022734439846698717,
+        "pole_err": 0.02119203069239001,
+        "best_smoother": "none (no differentiation)",
+        "worst_over_smoothers": 0.02314341051240148,
+        "residual_rmse": 0.003831752796558962
+      },
+      "1.0": {
+        "A_u_err": 0.06854738665282951,
+        "A_v_err": 0.07788248212586756,
+        "theta_err": 0.007846186460545083,
+        "pole_err": 0.06526548769967701,
+        "best_smoother": "none (no differentiation)",
+        "worst_over_smoothers": 0.07788248212586756,
+        "residual_rmse": 0.012772530500414494
+      }
+    },
+    "smoothing_sensitivity": {
+      "0.001": {
+        "21/3": {
+          "accel": 0.02774288373930242,
+          "discrete": 0.0010488078549387022
+        },
+        "41/4": {
+          "accel": 0.002032514758295861,
+          "discrete": 0.001059340952376037
+        },
+        "61/4": {
+          "accel": 0.031442989697971796,
+          "discrete": 0.028173625368962427
+        },
+        "81/5": {
+          "accel": 0.02082367076742376,
+          "discrete": 0.006664125476323704
+        }
+      },
+      "0.03": {
+        "21/3": {
+          "accel": 0.09099907285770428,
+          "discrete": 0.26892485801228383
+        },
+        "41/4": {
+          "accel": 0.031179331455946455,
+          "discrete": 0.018549086086558912
+        },
+        "61/4": {
+          "accel": 0.029157804666533834,
+          "discrete": 0.02454966420670006
+        },
+        "81/5": {
+          "accel": 0.021403470445441015,
+          "discrete": 0.018081497895960977
+        }
+      },
+      "0.1": {
+        "21/3": {
+          "accel": 0.4749694737808455,
+          "discrete": 1.3061214755937953
+        },
+        "41/4": {
+          "accel": 0.16330668203525014,
+          "discrete": 0.10950901331525502
+        },
+        "61/4": {
+          "accel": 0.10762469715927515,
+          "discrete": 0.05599792500562926
+        },
+        "81/5": {
+          "accel": 0.11221523056301475,
+          "discrete": 0.07503702294231111
+        }
+      },
+      "0.3": {
+        "21/3": {
+          "accel": 0.7820882422859463,
+          "discrete": 2.3345009128417895
+        },
+        "41/4": {
+          "accel": 0.43220662735924975,
+          "discrete": 0.39583262359873955
+        },
+        "61/4": {
+          "accel": 0.4028716196477228,
+          "discrete": 0.13316024993450556
+        },
+        "81/5": {
+          "accel": 0.40434982109064416,
+          "discrete": 0.20327387494803895
+        }
+      },
+      "1.0": {
+        "21/3": {
+          "accel": 1.236008043759281,
+          "discrete": 3.80838691507802
+        },
+        "41/4": {
+          "accel": 0.7647685145568466,
+          "discrete": 0.976519847768031
+        },
+        "61/4": {
+          "accel": 0.7077986663526494,
+          "discrete": 0.20924401983559415
+        },
+        "81/5": {
+          "accel": 0.6687933135141122,
+          "discrete": 0.29911696519240377
+        }
+      }
+    },
+    "control_first_order_r2": {
+      "0.001": 0.9911617676274515,
+      "0.03": 0.9910442304446891,
+      "0.1": 0.9900907132474862,
+      "0.3": 0.982193384790821,
+      "1.0": 0.9010920227726816
+    }
+  },
+  "findings": [
+    {
+      "question": "Are A_u = -M^-1 K and A_v = -M^-1 C recoverable from acoustics (with Phi known)?",
+      "ground_truth": {
+        "A_u": [
+          [
+            -900.0,
+            0.0
+          ],
+          [
+            0.0,
+            -625.0
+          ]
+        ],
+        "A_v": [
+          [
+            -70.0,
+            0.0
+          ],
+          [
+            0.0,
+            -50.0
+          ]
+        ]
+      },
+      "estimate": {
+        "trajectory fit": {
+          "A_u": 0.00682261141762629,
+          "A_v": 0.007692452638272948
+        },
+        "discrete state map": {
+          "A_u": 0.05599792500562926,
+          "A_v": 0.053796332066705546
+        },
+        "acceleration regression": {
+          "A_u": 0.10750021269694761,
+          "A_v": 0.10762469715927515
+        }
+      },
+      "error": 0.007692452638272948,
+      "status": "IDENTIFIABLE",
+      "control": "noiseless limit: trajectory fit reaches 6.8e-05",
+      "notes": "the dynamics are identifiable; the standard recipe is what fails. At noise 0.1 the acceleration regression is off by 11% and the trajectory fit by 0.7% on the same data. Each numerical derivative multiplies noise by ~1/dt and biases the regression by errors-in-variables, so a method that never differentiates is not a refinement here -- it is the difference between an answer and no answer.",
+      "error_label": "max relative error, trajectory fit at noise 0.1"
+    },
+    {
+      "question": "How much does the smoothing choice move the acceleration-regression answer?",
+      "ground_truth": {
+        "A_u": [
+          [
+            -900.0,
+            0.0
+          ],
+          [
+            0.0,
+            -625.0
+          ]
+        ]
+      },
+      "estimate": {
+        "noise 0.001": "best 0.002, worst 0.031",
+        "noise 0.03": "best 0.021, worst 0.091",
+        "noise 0.1": "best 0.108, worst 0.475",
+        "noise 0.3": "best 0.403, worst 0.782",
+        "noise 1.0": "best 0.669, worst 1.236"
+      },
+      "error": 15.469993302451991,
+      "status": "PARTIALLY IDENTIFIABLE",
+      "control": "the trajectory fit, which has no smoothing parameter at all",
+      "notes": "across Savitzky-Golay settings ['21/3', '41/4', '61/4', '81/5'] the error varies by up to 15.5x. Reported numbers above use the *best* setting per noise level, which flatters the method; an honest single-shot user would have to pick blind. This is why the smoothing sweep is part of the result and not an appendix.",
+      "error_label": "worst/best ratio across the four smoothers"
+    },
+    {
+      "question": "Are the transition targets theta recovered as a by-product?",
+      "ground_truth": {
+        "theta": "6 transition targets, from alpha and the phone targets"
+      },
+      "estimate": {
+        "trajectory fit": 0.0007502457627935998,
+        "acceleration regression": 0.0023902768377251473
+      },
+      "error": 0.0007502457627935998,
+      "status": "IDENTIFIABLE",
+      "control": "the per-transition intercept is the only place theta can enter, so a single shared intercept would bias A_u -- that variant is not fitted here for exactly that reason",
+      "notes": "theta is far better determined than A_u: it is a location parameter read off where the trajectory is heading, while A_u is a curvature parameter read off how fast it gets there.",
+      "error_label": "relative error at noise 0.1"
+    },
+    {
+      "question": "Control -- does a first-order model fit the data?",
+      "ground_truth": {
+        "model order": 2
+      },
+      "estimate": {
+        "noise 0.001": 0.9912,
+        "noise 0.03": 0.991,
+        "noise 0.1": 0.9901,
+        "noise 0.3": 0.9822,
+        "noise 1.0": 0.9011
+      },
+      "error": null,
+      "status": "NON-IDENTIFIABLE",
+      "control": "this is the control",
+      "notes": "a first-order law reaches R^2 = 0.9912 in the noiseless limit. It is not a *bad* fit by R^2, which is the point: goodness of fit does not diagnose model order here. The residual poles do.",
+      "error_label": "n/a (R^2 of the wrong model)"
+    }
+  ]
+}

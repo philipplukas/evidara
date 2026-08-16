@@ -1,0 +1,154 @@
+{
+  "name": "09_assumption_stress_test",
+  "title": "Experiment 9 -- assumption stress test",
+  "figures": [
+    "assumption_stress_test.pdf"
+  ],
+  "scalars": {
+    "n_sequences": 500,
+    "noise_scale": 0.1
+  },
+  "tables": {
+    "1 wrong dynamics": {
+      "control (linear)": {
+        "pole_error": 0.056709006855571543,
+        "residual_rmse": 0.004034024174184228,
+        "residual_lag1_autocorr": 0.11340330681147384
+      },
+      "violated (cubic stiffness)": {
+        "pole_error": 0.41927691783796317,
+        "residual_rmse": 0.0050319442790748015,
+        "residual_lag1_autocorr": 0.28595961091465927
+      }
+    },
+    "2 wrong kernel": {
+      "control (2 modes fitted)": {
+        "residual_rmse": 0.0072520800617477165,
+        "omega": [
+          27.86046798705453,
+          20.80709928182065
+        ]
+      },
+      "violated (1 mode fitted)": {
+        "residual_rmse": 0.008197062815698326,
+        "omega": [
+          27.519966103582753
+        ],
+        "residual_lag1_autocorr": 0.1533205375336722
+      }
+    },
+    "3 wrong noise": {
+      "control (correct Sigma)": {
+        "accuracy": 0.9996
+      },
+      "violated (isotropic Sigma)": {
+        "accuracy": 0.8892
+      }
+    },
+    "4 wrong speaker geometry": {
+      "control (group world)": {
+        "held_out_rmse": 0.02416109876302439,
+        "regime": "group"
+      },
+      "violated (groupoid world)": {
+        "held_out_rmse": 0.06348694882340453,
+        "regime": "group"
+      }
+    },
+    "5 wrong acoustic map": {
+      "control (true Phi)": {
+        "pole_error": 0.08665209336811903,
+        "residual_rmse": 0.004987822757925027
+      },
+      "violated (linear Phi)": {
+        "pole_error": 0.10006350330461133,
+        "residual_rmse": 0.004217724173795498
+      }
+    },
+    "6 wrong dimensionality": {
+      "control (d = 5 assumed)": {
+        "retained_dim_reconstruction_rmse": 0.0027628473514101095,
+        "pole_error_all_10": 3.360923803370727,
+        "n_poles": 10
+      },
+      "violated (d = 2 assumed)": {
+        "retained_dim_reconstruction_rmse": 0.0028988167613833798,
+        "pole_error_best_subset": 0.24562789898369738,
+        "n_poles": 4,
+        "caveat": "the best-subset pole score is generous by construction: it rewards the model for describing 4 of the 10 true poles and ignores the 6 it cannot represent"
+      }
+    }
+  },
+  "findings": [
+    {
+      "question": "What happens under: 1 wrong dynamics?",
+      "ground_truth": {
+        "control value of relative pole error": 0.05671
+      },
+      "estimate": {
+        "violated value of relative pole error": 0.41928
+      },
+      "error": 6.393480173366324,
+      "status": "MIS-SPECIFIED",
+      "control": "control (linear)",
+      "notes": "relative pole error goes 0.05671 -> 0.4193. the linear fit still converges and still reports a plausible second-order system; the warning is in the residual, which stops looking like noise (see the right-hand panel)",
+      "error_label": "relative change in relative pole error"
+    },
+    {
+      "question": "What happens under: 2 wrong kernel?",
+      "ground_truth": {
+        "control value of residual rmse": 0.00725
+      },
+      "estimate": {
+        "violated value of residual rmse": 0.0082
+      },
+      "error": 0.13030506363754532,
+      "status": "MIS-SPECIFIED",
+      "control": "control (2 modes fitted)",
+      "notes": "residual rmse goes 0.007252 -> 0.008197. a one-mode fit absorbs the missing mode into a compromise pole, so the reported time constant is wrong while the fit still looks good",
+      "error_label": "relative change in residual rmse"
+    },
+    {
+      "question": "What happens under: 3 wrong noise?",
+      "ground_truth": {
+        "control value of classification accuracy": 0.9996
+      },
+      "estimate": {
+        "violated value of classification accuracy": 0.8892
+      },
+      "error": 0.11044417767106848,
+      "status": "MIS-SPECIFIED",
+      "control": "control (correct Sigma)",
+      "notes": "classification accuracy goes 0.9996 -> 0.8892. an isotropic likelihood mis-weights the correlated directions and loses accuracy with no diagnostic at all -- the model never sees its own mis-specification",
+      "error_label": "relative change in classification accuracy"
+    },
+    {
+      "question": "What happens under: 4 wrong speaker geometry?",
+      "ground_truth": {
+        "control value of held-out rmse": 0.02416
+      },
+      "estimate": {
+        "violated value of held-out rmse": 0.06349
+      },
+      "error": 1.6276515586519413,
+      "status": "MIS-SPECIFIED",
+      "control": "control (group world)",
+      "notes": "held-out rmse goes 0.02416 -> 0.06349. a global chart cannot absorb phone-local deviations that average to zero across phones, so the error is systematic rather than noisy",
+      "error_label": "relative change in held-out rmse"
+    },
+    {
+      "question": "What happens under: 5 wrong acoustic map?",
+      "ground_truth": {
+        "control value of relative pole error": 0.08665
+      },
+      "estimate": {
+        "violated value of relative pole error": 0.10006
+      },
+      "error": 0.15477306335251922,
+      "status": "MIS-SPECIFIED",
+      "control": "control (true Phi)",
+      "notes": "relative pole error goes 0.08665 -> 0.1001. a linear inverse of a saturating map warps the latent nonlinearly in time, which the dynamics fit then reads as the wrong damping",
+      "error_label": "relative change in relative pole error"
+    }
+  ]
+}

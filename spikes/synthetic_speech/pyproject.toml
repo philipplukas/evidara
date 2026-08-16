@@ -1,0 +1,30 @@
+[project]
+name = "synthetic-speech-dynamics"
+version = "0.1.0"
+description = "A mathematically controlled laboratory for testing a structural framework for speech dynamics."
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "pandas>=2.2",
+    "matplotlib>=3.9",
+    "scikit-learn>=1.5",
+]
+
+[tool.setuptools]
+py-modules = []
+packages = []
+
+[project.optional-dependencies]
+torch = ["torch>=2.4"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,268 @@
+{
+  "name": "08_asr_comparison",
+  "title": "Experiment 8 -- structured vs generic recognition",
+  "figures": [
+    "asr_sample_efficiency.pdf",
+    "asr_unseen_speaker.pdf",
+    "asr_unseen_transition.pdf"
+  ],
+  "scalars": {
+    "gru_available": true,
+    "sample_sizes": [
+      100,
+      1000
+    ],
+    "held_out_transition": "B->C",
+    "held_out_speaker": 7,
+    "test_segment_counts": {
+      "interpolation": 2000,
+      "unseen transition": 661,
+      "unseen speaker": 401
+    }
+  },
+  "tables": {
+    "N=100": {
+      "A frame-independent": {
+        "interpolation": 0.7765,
+        "unseen transition": 0.0,
+        "unseen speaker": 0.57356608478803
+      },
+      "C structured": {
+        "interpolation": 0.8335,
+        "unseen transition": 0.7700453857791225,
+        "unseen speaker": 0.3740648379052369
+      },
+      "C' structured, randomised dynamics": {
+        "interpolation": 0.8395,
+        "unseen transition": 0.8638426626323752,
+        "unseen speaker": 0.3740648379052369
+      },
+      "C'' structured, no anticipation": {
+        "interpolation": 0.6055,
+        "unseen transition": 0.0,
+        "unseen speaker": 0.5860349127182045
+      },
+      "B GRU": {
+        "interpolation": 0.8985,
+        "unseen transition": 0.0,
+        "unseen speaker": 0.5635910224438903
+      }
+    },
+    "N=1000": {
+      "A frame-independent": {
+        "interpolation": 0.8625,
+        "unseen transition": 0.0,
+        "unseen speaker": 0.5760598503740648
+      },
+      "C structured": {
+        "interpolation": 0.8355,
+        "unseen transition": 0.8169440242057489,
+        "unseen speaker": 0.3740648379052369
+      },
+      "C' structured, randomised dynamics": {
+        "interpolation": 0.8445,
+        "unseen transition": 0.8638426626323752,
+        "unseen speaker": 0.3740648379052369
+      },
+      "C'' structured, no anticipation": {
+        "interpolation": 0.6055,
+        "unseen transition": 0.0,
+        "unseen speaker": 0.5860349127182045
+      },
+      "B GRU": {
+        "interpolation": 0.962,
+        "unseen transition": 0.0,
+        "unseen speaker": 0.7256857855361596
+      }
+    },
+    "noise_sweep_N1000": {
+      "0.3": {
+        "A frame-independent": {
+          "interpolation": 0.8625,
+          "unseen transition": 0.0,
+          "unseen speaker": 0.5760598503740648
+        },
+        "C structured": {
+          "interpolation": 0.8355,
+          "unseen transition": 0.8169440242057489,
+          "unseen speaker": 0.3740648379052369
+        },
+        "C' structured, randomised dynamics": {
+          "interpolation": 0.8445,
+          "unseen transition": 0.8638426626323752,
+          "unseen speaker": 0.3740648379052369
+        },
+        "C'' structured, no anticipation": {
+          "interpolation": 0.6055,
+          "unseen transition": 0.0,
+          "unseen speaker": 0.5860349127182045
+        },
+        "B GRU": {
+          "interpolation": 0.962,
+          "unseen transition": 0.0,
+          "unseen speaker": 0.7256857855361596
+        }
+      },
+      "1.0": {
+        "A frame-independent": {
+          "interpolation": 0.785,
+          "unseen transition": 0.0,
+          "unseen speaker": 0.48877805486284287
+        },
+        "C structured": {
+          "interpolation": 0.82,
+          "unseen transition": 0.7685325264750378,
+          "unseen speaker": 0.3740648379052369
+        },
+        "C' structured, randomised dynamics": {
+          "interpolation": 0.8135,
+          "unseen transition": 0.8320726172465961,
+          "unseen speaker": 0.3765586034912718
+        },
+        "C'' structured, no anticipation": {
+          "interpolation": 0.5785,
+          "unseen transition": 0.0,
+          "unseen speaker": 0.5087281795511222
+        },
+        "B GRU": {
+          "interpolation": 0.85,
+          "unseen transition": 0.0,
+          "unseen speaker": 0.6683291770573566
+        }
+      }
+    },
+    "distribution_shift": {
+      "A frame-independent": 0.6185,
+      "C structured": 0.743,
+      "C' structured, randomised dynamics": 0.703,
+      "C'' structured, no anticipation": 0.4515,
+      "B GRU": 0.685
+    },
+    "ablation_gaps": {
+      "vs randomised dynamics by N": {
+        "100": -0.006000000000000005,
+        "1000": -0.009000000000000008
+      },
+      "vs no anticipation by N": {
+        "100": 0.22799999999999998,
+        "1000": 0.22999999999999998
+      },
+      "vs randomised dynamics by noise": {
+        "0.3": -0.009000000000000008,
+        "1.0": 0.00649999999999995
+      }
+    }
+  },
+  "findings": [
+    {
+      "question": "In distribution, does the structured model beat a generic temporal model?",
+      "ground_truth": {
+        "chance": 0.167
+      },
+      "estimate": {
+        "A frame-independent": 0.8625,
+        "C structured": 0.8355,
+        "C' structured, randomised dynamics": 0.8445,
+        "C'' structured, no anticipation": 0.6055,
+        "B GRU": 0.962
+      },
+      "error": 0.12649999999999995,
+      "status": "PARTIALLY IDENTIFIABLE",
+      "control": "chance is 0.167; both models are far above it",
+      "notes": "this is the number the framework should NOT be sold on. In distribution the two are close, which is the expected result if the generic model simply learns the same trajectories without the parameterisation.",
+      "error_label": "accuracy gap, structured minus generic"
+    },
+    {
+      "question": "Does the structured model transfer to a transition never seen in training?",
+      "ground_truth": {
+        "held-out class": "B->C"
+      },
+      "estimate": {
+        "A frame-independent": 0.0,
+        "C structured": 0.8169440242057489,
+        "C' structured, randomised dynamics": 0.8638426626323752,
+        "C'' structured, no anticipation": 0.0,
+        "B GRU": 0.0
+      },
+      "error": 0.8169440242057489,
+      "status": "IDENTIFIABLE",
+      "control": "the same models on the interpolation split, where all classes were seen",
+      "notes": "the discriminative baselines have the class in their output space but no examples of it, so they cannot place it -- this is a statement about representation, not about optimisation, and it should be read that way. The structured model *constructs* the class from its two phone targets and an alpha prior, which is the only reason it can score above chance here.",
+      "error_label": "accuracy on the unseen transition (higher is better)"
+    },
+    {
+      "question": "Does the structured model degrade less on an unseen speaker?",
+      "ground_truth": {
+        "speaker": 7,
+        "chart": "affine, unseen in training"
+      },
+      "estimate": {
+        "A frame-independent": {
+          "interpolation": 0.8625,
+          "unseen speaker": 0.5760598503740648
+        },
+        "C structured": {
+          "interpolation": 0.8355,
+          "unseen speaker": 0.3740648379052369
+        },
+        "C' structured, randomised dynamics": {
+          "interpolation": 0.8445,
+          "unseen speaker": 0.3740648379052369
+        },
+        "C'' structured, no anticipation": {
+          "interpolation": 0.6055,
+          "unseen speaker": 0.5860349127182045
+        },
+        "B GRU": {
+          "interpolation": 0.962,
+          "unseen speaker": 0.7256857855361596
+        }
+      },
+      "error": 0.4614351620947631,
+      "status": "PARTIALLY IDENTIFIABLE",
+      "control": "the interpolation split for the same model",
+      "notes": "drop for the generic model: 0.236; for the structured model: 0.461. Both are zero-shot -- no adaptation data from the new speaker is given to anyone.",
+      "error_label": "accuracy drop from interpolation to unseen speaker (structured)"
+    },
+    {
+      "question": "ABLATION -- is it the dynamics that carry the structured model?",
+      "ground_truth": {
+        "randomised-dynamics ablation": "A_u, A_v replaced by a random stable system, targets and alpha untouched",
+        "no-anticipation ablation": "alpha forced to 0, dynamics untouched"
+      },
+      "estimate": {
+        "gap vs randomised dynamics": {
+          "N=100": -0.006,
+          "N=1000": -0.009
+        },
+        "gap vs no anticipation": {
+          "N=100": 0.228,
+          "N=1000": 0.23
+        }
+      },
+      "error": -0.006000000000000005,
+      "status": "NO EFFECT (negative result)",
+      "control": "the no-anticipation ablation, which changes the targets instead of the dynamics",
+      "notes": "randomising the dynamics costs at most -0.006 accuracy, and removing anticipation costs 0.230. On this task the discriminative information is in WHERE the trajectory is heading, not in HOW it gets there: a random stable system still settles on the right theta, so the class templates stay separable. Across noise levels the dynamics gap is {0.3: -0.009, 1.0: 0.006}, so this is not an artefact of an easy SNR. The honest reading is that this experiment supports the *gesture* layer of the factorisation and does not, on its own, support the *time* layer -- a task that resolves the trajectory shape rather than its endpoint would be needed for that.",
+      "error_label": "largest accuracy gap, correct dynamics minus randomised"
+    },
+    {
+      "question": "Does the structured model hold up under a test-time change of speaker charts?",
+      "ground_truth": {
+        "test speakers": "new affine charts, larger deviation than training"
+      },
+      "estimate": {
+        "A frame-independent": 0.6185,
+        "C structured": 0.743,
+        "C' structured, randomised dynamics": 0.703,
+        "C'' structured, no anticipation": 0.4515,
+        "B GRU": 0.685
+      },
+      "error": 0.05799999999999994,
+      "status": "PARTIALLY IDENTIFIABLE",
+      "control": "the interpolation split, which shares the training speaker charts",
+      "notes": "the models are trained once and tested on a world whose speaker charts they never saw.",
+      "error_label": "accuracy gap, structured minus generic, under shift"
+    }
+  ]
+}

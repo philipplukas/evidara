@@ -1,0 +1,163 @@
+{
+  "name": "01_temporal_effect",
+  "title": "Experiment 1 -- is there a temporal effect?",
+  "figures": [
+    "temporal_effect.pdf",
+    "temporal_effect_conditions.pdf"
+  ],
+  "scalars": {
+    "n_sequences": 2000,
+    "noise_scale": 0.3,
+    "snr": {
+      "signal_var_mean": 0.40197346302386655,
+      "noise_var_mean": 0.09900000000000002,
+      "snr_mean": 4.372991192562147,
+      "snr_db": 6.407786026534526,
+      "snr_min_dim": 2.6568160787072292
+    },
+    "segments_per_transition": [
+      1640,
+      1684
+    ],
+    "ground_truth_alpha_AB_AC": [
+      0.35,
+      0.2
+    ],
+    "ground_truth_delta_theta": [
+      0.43,
+      -0.095
+    ],
+    "predicted_asymptotic_peak_|DPhi . dtheta|": 0.525
+  },
+  "tables": {
+    "III transition-dependent": {
+      "crit": 3.913101834235492,
+      "peak": 0.5062596003338642,
+      "peak_z": 55.35925650935721,
+      "frac_frames_significant": 0.9303482587064676,
+      "first_significant_ms": 13.000000000000002,
+      "perm_statistic": 0.6772981345468353,
+      "perm_p": 0.001996007984031936,
+      "perm_null_q95": 0.062353154336520195,
+      "n": [
+        1640,
+        1684
+      ]
+    },
+    "II shared anticipation": {
+      "crit": 3.91310183423538,
+      "peak": 0.6072078973785725,
+      "peak_z": 66.3490025153349,
+      "frac_frames_significant": 0.9353233830845771,
+      "first_significant_ms": 11.0,
+      "perm_statistic": 0.832039728830853,
+      "perm_p": 0.001996007984031936,
+      "perm_null_q95": 0.06184976993785067,
+      "n": [
+        1640,
+        1684
+      ]
+    },
+    "I no anticipation (static)": {
+      "crit": 3.9131018342354302,
+      "peak": 0.04128791167581335,
+      "peak_z": 3.238846605080804,
+      "frac_frames_significant": 0.0,
+      "first_significant_ms": null,
+      "perm_statistic": 0.050956617638337594,
+      "perm_p": 0.2994011976047904,
+      "perm_null_q95": 0.0593476587940074,
+      "n": [
+        1640,
+        1684
+      ]
+    },
+    "I no anticipation (dynamic)": {
+      "crit": 3.837126514910157,
+      "peak": 0.041026079977504654,
+      "peak_z": 3.196561458396953,
+      "frac_frames_significant": 0.0,
+      "first_significant_ms": null,
+      "perm_statistic": 0.05100386232743956,
+      "perm_p": 0.8003992015968064,
+      "perm_null_q95": 0.10547861601395543,
+      "n": [
+        1640,
+        1684
+      ]
+    }
+  },
+  "findings": [
+    {
+      "question": "Does a transition-dependent target produce a measurable acoustic contrast?",
+      "ground_truth": {
+        "alpha_AB": 0.35,
+        "alpha_AC": 0.2,
+        "delta_theta": [
+          0.43,
+          -0.09500000000000001
+        ]
+      },
+      "estimate": {
+        "peak_|dS|": 0.5062596003338642,
+        "peak_z": 55.35925650935721
+      },
+      "error": 0.03569599936406825,
+      "status": "IDENTIFIABLE",
+      "control": "condition I (dynamic): peak |dS| = 0.0410 with a moving trajectory",
+      "notes": "permutation p = 0.0020; the sup-t band (simultaneous over all 201 frames and 3 dimensions) excludes zero on 93% of frames, first at 13 ms -- long before the target is reached",
+      "error_label": "relative error of peak vs DPhi . dtheta"
+    },
+    {
+      "question": "Control -- does the contrast vanish under I no anticipation (static)?",
+      "ground_truth": {
+        "delta_theta": [
+          0.0,
+          0.0
+        ]
+      },
+      "estimate": {
+        "peak_|dS|": 0.04128791167581335,
+        "peak_z": 3.238846605080804
+      },
+      "error": 0.08155482216749098,
+      "status": "NO EFFECT (as designed)",
+      "control": "this is the control",
+      "notes": "permutation p = 0.299; sup-t band flags 0.0% of frames. The residual peak is the noise floor: max of 603 correlated mean-differences at this sample size.",
+      "error_label": "peak relative to the hypothesis condition"
+    },
+    {
+      "question": "Control -- does the contrast vanish under I no anticipation (dynamic)?",
+      "ground_truth": {
+        "delta_theta": [
+          0.0,
+          0.0
+        ]
+      },
+      "estimate": {
+        "peak_|dS|": 0.041026079977504654,
+        "peak_z": 3.196561458396953
+      },
+      "error": 0.08103763355884824,
+      "status": "NO EFFECT (as designed)",
+      "control": "this is the control",
+      "notes": "permutation p = 0.800; sup-t band flags 0.0% of frames. The residual peak is the noise floor: max of 603 correlated mean-differences at this sample size.",
+      "error_label": "peak relative to the hypothesis condition"
+    },
+    {
+      "question": "Can a shared-alpha world be told apart from a transition-dependent one by the contrast alone?",
+      "ground_truth": {
+        "alpha_shared": 0.3
+      },
+      "estimate": {
+        "peak_|dS| shared": 0.6072078973785725,
+        "peak_|dS| transition": 0.5062596003338642
+      },
+      "error": 0.1994002621938146,
+      "status": "PARTIALLY IDENTIFIABLE",
+      "control": "condition I",
+      "notes": "a non-zero contrast proves anticipation, not transition-specific anticipation: condition II also produces one, because theta_qB and theta_qC differ whenever alpha > 0 even with alpha held constant",
+      "error_label": "relative peak difference"
+    }
+  ]
+}

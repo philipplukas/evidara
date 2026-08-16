@@ -1,0 +1,153 @@
+{
+  "name": "06_identifiability",
+  "title": "Experiment 6 -- the identifiability test",
+  "figures": [
+    "identifiability.pdf"
+  ],
+  "scalars": {
+    "P": [
+      [
+        0.84187948,
+        0.10556595
+      ],
+      [
+        0.24285131,
+        0.61113608
+      ]
+    ],
+    "p": [
+      0.19191606,
+      0.06376453
+    ],
+    "n_sequences": 400,
+    "max|Phi_2(h(u)) - Phi_1(u)|": 9.159339953157541e-16,
+    "max|clean_1 - clean_2| per transition": 1.7569279364693102e-14,
+    "positive_control_marginal_test_p": 0.8756218905472637,
+    "latent_relative_gap": 0.4234950801507152,
+    "affine_reparam_residual": 0.057351365787970135,
+    "recovered_poles_model_1": [
+      -52.970243232062955,
+      -24.924264496903092,
+      -24.924264496903092,
+      -16.991083692620478
+    ],
+    "recovered_poles_model_2": [
+      -53.19663420397062,
+      -25.371967681363813,
+      -24.62278806700165,
+      -16.934180278506243
+    ],
+    "A_u_model_1": [
+      [
+        -900.02892536,
+        -0.71284063
+      ],
+      [
+        0.01218163,
+        -624.46634938
+      ]
+    ],
+    "A_u_model_2": [
+      [
+        -915.01949889,
+        49.14610298
+      ],
+      [
+        -83.73480492,
+        -610.55106351
+      ]
+    ],
+    "A_u_relative_difference": 0.09091083204779746
+  },
+  "tables": {
+    "two_sample_tests": {
+      "twin (model 1 vs model 2)": {
+        "median_p": 0.5174129353233831,
+        "min_p": 0.009950248756218905,
+        "rejection_rate_at_0_05": 0.2,
+        "median_statistic": 0.12411251509103301,
+        "median_null_q95": 0.14632271014170192,
+        "n_replicates": 5
+      },
+      "same world, different sample": {
+        "median_p": 0.2935323383084577,
+        "min_p": 0.18407960199004975,
+        "rejection_rate_at_0_05": 0.0,
+        "median_statistic": 0.1340389243951733,
+        "median_null_q95": 0.14811413481562233,
+        "n_replicates": 5
+      },
+      "positive control (shared alpha)": {
+        "median_p": 0.004975124378109453,
+        "min_p": 0.004975124378109453,
+        "rejection_rate_at_0_05": 1.0,
+        "median_statistic": 0.28497203772182583,
+        "median_null_q95": 0.14822980436050387,
+        "n_replicates": 5
+      }
+    }
+  },
+  "findings": [
+    {
+      "question": "Can an acoustic-only estimator distinguish two models related by a latent change of coordinates?",
+      "ground_truth": {
+        "the two worlds are observationally identical by construction": "max|clean_1 - clean_2| = 1.76e-14"
+      },
+      "estimate": {
+        "median permutation p": 0.5174129353233831,
+        "rejection rate at 0.05": 0.2,
+        "replicates": 5
+      },
+      "error": 1.7569279364693102e-14,
+      "status": "NON-IDENTIFIABLE",
+      "control": "positive control (shared-alpha world): rejects on 100% of replicates, median statistic 0.285 vs null 95th pct 0.148 -- the same test separates worlds that genuinely differ",
+      "notes": "the twin rejects on 20% of replicates and the same-world calibrator on 0%, both at the nominal 5% level. The two worlds are not merely hard to tell apart; they are the same distribution. Any estimator that reports 'the' latent coordinates is reporting its own initialisation. Note also that the transition-*blind* version of this test has no power at all against the positive control (p = 0.88): conditioning on the transition is what makes the comparison informative.",
+      "error_label": "max absolute difference of the clean acoustics"
+    },
+    {
+      "question": "Are the latent coordinates themselves recoverable?",
+      "ground_truth": {
+        "latent_2 = h(latent_1)": "P = [[0.842, 0.106], [0.243, 0.611]], p = [0.192, 0.064]"
+      },
+      "estimate": {
+        "latent relative gap": 0.4234950801507152,
+        "residual after best affine reparam": 0.057351365787970135
+      },
+      "error": 0.4234950801507152,
+      "status": "PARTIALLY IDENTIFIABLE",
+      "control": "the affine reparameterisation residual, which is the same quantity modulo h",
+      "notes": "the two latents differ by 42% and agree to 5.74e-02 once an affine map is allowed. The recoverable object is the equivalence class (Phi, F) / coordinate changes -- Hypothesis 2, measured.",
+      "error_label": "relative gap between the two latents"
+    },
+    {
+      "question": "What IS invariant -- do the two models share a recoverable quantity?",
+      "ground_truth": {
+        "true poles": [
+          -53.028,
+          -25.0,
+          -25.0,
+          -16.972
+        ]
+      },
+      "estimate": {
+        "model 1": [
+          -52.97,
+          -24.924,
+          -24.924,
+          -16.991
+        ],
+        "model 2": [
+          -53.197,
+          -25.372,
+          -24.623,
+          -16.934
+        ]
+      },
+      "error": 0.008929546748095873,
+      "status": "IDENTIFIABLE",
+      "control": "the state matrices themselves differ by 9%",
+      "notes": "a change of latent basis conjugates the state matrix, and conjugation preserves the spectrum. So the poles are the right thing to report, and A_u is not -- two estimators disagreeing about A_u may be describing exactly the same dynamics.",
+      "error_label": "relative difference between the two recovered pole sets"
+    }
+  ]
+}
