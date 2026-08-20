@@ -1,14 +1,14 @@
 """Finite reference semantics for Evidara Semantic Laboratory v0.5.
 
-This module is deliberately dependency-free. It is a small executable
+This module is deliberately dependency-free.  It is a small executable
 specification, not a production legal reasoner.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
-import json
 from typing import Any, Iterable, Mapping, Sequence
 
 
@@ -49,7 +49,11 @@ class Section:
         frozen = tuple(
             sorted((atom, tuple(sorted(set(props)))) for atom, props in values.items())
         )
-        return cls(context_id=context_id, values=frozen, evidence_refs=tuple(evidence_refs))
+        return cls(
+            context_id=context_id,
+            values=frozen,
+            evidence_refs=tuple(evidence_refs),
+        )
 
 
 @dataclass(frozen=True)
@@ -219,7 +223,9 @@ def validate_fixture(fixture: Fixture) -> None:
         if context_id not in fixture.contexts:
             raise SemanticLabError(f"section context {context_id!r} is unknown")
         if not set(section.as_mapping()) <= fixture.contexts[context_id].atoms:
-            raise SemanticLabError(f"section {context_id!r} assigns outside its context")
+            raise SemanticLabError(
+                f"section {context_id!r} assigns outside its context"
+            )
 
     for atom in fixture.facts:
         if atom not in all_atoms:
@@ -289,12 +295,15 @@ def matching_family(fixture: Fixture, parent_id: str) -> tuple[bool, tuple[str, 
 
 
 def glue(fixture: Fixture, parent_id: str) -> GlueResult:
-    """Glue named local sections over a finite cover.
+    """Glue the named local sections over a finite cover.
 
     For this reference sheaf, a section is a function from atoms to proposition
-    sets. Gluing means: every parent atom is covered, local sections agree on
-    overlaps, and the compatible local assignments are unioned. Function
-    extensionality makes that union unique.
+    sets.  Gluing therefore means:
+      1. every atom of the parent is covered;
+      2. local sections agree on pairwise overlaps;
+      3. take the union of the compatible local assignments.
+
+    Because functions are extensional, the compatible union is unique.
     """
 
     if not cover_is_valid(fixture, parent_id):
@@ -345,9 +354,9 @@ def infer(
 ) -> Section:
     """Compute a finite prioritized forward-chaining closure.
 
-    The highest-priority rule wins against an explicit contrary `NOT_<p>`.
-    Equal top priorities retain neither proposition, representing unresolved
-    conflict in this deliberately tiny reference semantics.
+    A proposition can be derived by multiple rules.  The highest priority rule
+    wins only against an explicit contrary `NOT_<p>` proposition.  Equal top
+    priorities retain neither proposition, representing an unresolved conflict.
     """
 
     selected = set(atoms) if atoms is not None else set(fixture.facts)
@@ -416,8 +425,14 @@ def infer(
         ),
         "derived",
     )
-    refs = tuple(dict.fromkeys(ref for rule in fixture.rules for ref in rule.evidence_refs))
-    return Section.from_mapping(context_id=context_id, values=states, evidence_refs=refs)
+    refs = tuple(
+        dict.fromkeys(ref for rule in fixture.rules for ref in rule.evidence_refs)
+    )
+    return Section.from_mapping(
+        context_id=context_id,
+        values=states,
+        evidence_refs=refs,
+    )
 
 
 def probe_signature(section: Section, probes: Sequence[Probe]) -> tuple[bool, ...]:
