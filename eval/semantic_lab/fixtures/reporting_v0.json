@@ -1,0 +1,196 @@
+{
+  "documents": [
+    {
+      "document_id": "doc_statute",
+      "title": "Toy reporting statute"
+    },
+    {
+      "document_id": "doc_judgment",
+      "title": "Toy emergency judgment"
+    }
+  ],
+  "canonical_sections": [
+    {
+      "section_id": "sec_duty",
+      "document_id": "doc_statute",
+      "content": "A bank with a material incident must report it."
+    },
+    {
+      "section_id": "sec_delay",
+      "document_id": "doc_statute",
+      "content": "Administrative delay is ordinarily permitted."
+    },
+    {
+      "section_id": "sec_emergency",
+      "document_id": "doc_judgment",
+      "content": "In an emergency, administrative delay is not permitted."
+    }
+  ],
+  "contexts": [
+    {
+      "id": "U",
+      "atoms": [
+        "zh_bank_ordinary",
+        "zh_bank_emergency",
+        "zh_nonbank_ordinary"
+      ]
+    },
+    {
+      "id": "A_bank",
+      "atoms": [
+        "zh_bank_ordinary",
+        "zh_bank_emergency"
+      ]
+    },
+    {
+      "id": "B_ordinary",
+      "atoms": [
+        "zh_bank_ordinary",
+        "zh_nonbank_ordinary"
+      ]
+    }
+  ],
+  "covers": {
+    "U": [
+      "A_bank",
+      "B_ordinary"
+    ]
+  },
+  "facts": {
+    "zh_bank_ordinary": [
+      "MATERIAL_INCIDENT"
+    ],
+    "zh_bank_emergency": [
+      "MATERIAL_INCIDENT"
+    ],
+    "zh_nonbank_ordinary": [
+      "MATERIAL_INCIDENT"
+    ]
+  },
+  "rules": [
+    {
+      "id": "R_DUTY",
+      "premises": [
+        "MATERIAL_INCIDENT"
+      ],
+      "conclusion": "OBLIGATORY_REPORT",
+      "atoms": [
+        "zh_bank_ordinary",
+        "zh_bank_emergency"
+      ],
+      "priority": 10,
+      "evidence_refs": [
+        {
+          "document_id": "doc_statute",
+          "section_id": "sec_duty"
+        }
+      ]
+    },
+    {
+      "id": "R_DELAY",
+      "premises": [
+        "OBLIGATORY_REPORT"
+      ],
+      "conclusion": "PERMITTED_ADMIN_DELAY",
+      "atoms": [
+        "zh_bank_ordinary",
+        "zh_bank_emergency"
+      ],
+      "priority": 10,
+      "evidence_refs": [
+        {
+          "document_id": "doc_statute",
+          "section_id": "sec_delay"
+        }
+      ]
+    },
+    {
+      "id": "R_EMERGENCY",
+      "premises": [
+        "OBLIGATORY_REPORT"
+      ],
+      "conclusion": "NOT_PERMITTED_ADMIN_DELAY",
+      "atoms": [
+        "zh_bank_emergency"
+      ],
+      "priority": 20,
+      "evidence_refs": [
+        {
+          "document_id": "doc_judgment",
+          "section_id": "sec_emergency"
+        }
+      ]
+    }
+  ],
+  "local_sections": [
+    {
+      "context": "A_bank",
+      "values": {
+        "zh_bank_ordinary": [
+          "MATERIAL_INCIDENT",
+          "OBLIGATORY_REPORT",
+          "PERMITTED_ADMIN_DELAY"
+        ],
+        "zh_bank_emergency": [
+          "MATERIAL_INCIDENT",
+          "OBLIGATORY_REPORT",
+          "NOT_PERMITTED_ADMIN_DELAY"
+        ]
+      },
+      "evidence_refs": [
+        {
+          "document_id": "doc_statute",
+          "section_id": "sec_duty"
+        },
+        {
+          "document_id": "doc_statute",
+          "section_id": "sec_delay"
+        },
+        {
+          "document_id": "doc_judgment",
+          "section_id": "sec_emergency"
+        }
+      ]
+    },
+    {
+      "context": "B_ordinary",
+      "values": {
+        "zh_bank_ordinary": [
+          "MATERIAL_INCIDENT",
+          "OBLIGATORY_REPORT",
+          "PERMITTED_ADMIN_DELAY"
+        ],
+        "zh_nonbank_ordinary": [
+          "MATERIAL_INCIDENT"
+        ]
+      },
+      "evidence_refs": [
+        {
+          "document_id": "doc_statute",
+          "section_id": "sec_duty"
+        },
+        {
+          "document_id": "doc_statute",
+          "section_id": "sec_delay"
+        }
+      ]
+    }
+  ],
+  "probes": [
+    {
+      "id": "bank_ordinary_has_duty",
+      "atom": "zh_bank_ordinary",
+      "proposition": "OBLIGATORY_REPORT"
+    },
+    {
+      "id": "bank_emergency_no_delay",
+      "atom": "zh_bank_emergency",
+      "proposition": "NOT_PERMITTED_ADMIN_DELAY"
+    },
+    {
+      "id": "nonbank_has_duty",
+      "atom": "zh_nonbank_ordinary",
+      "proposition": "OBLIGATORY_REPORT"
+    }
+  ]
+}
