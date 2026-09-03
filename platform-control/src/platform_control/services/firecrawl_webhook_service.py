@@ -496,12 +496,13 @@ class FirecrawlWebhookService:
 
     @staticmethod
     def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:
+        """The locator that document identity is keyed on — see
+        ``RunService._upstream_locator`` for why the no-URL case returns ``""`` rather
+        than a shared placeholder (#652, #806).
+        """
         metadata = artifact_metadata.get("metadata", {})
         return str(
-            artifact_metadata.get("url")
-            or metadata.get("sourceURL")
-            or metadata.get("url")
-            or "https://unknown.local/resource"
+            artifact_metadata.get("url") or metadata.get("sourceURL") or metadata.get("url") or ""
         )
 
     async def _resolve_authority_name(self, authority_id: str | None) -> str | None:

@@ -1,7 +1,7 @@
 # Projection Reindex & Backfill Runbook
 
 Owner: Platform team
-Last reviewed: 2026-07-13
+Last reviewed: 2026-09-03
 Last verified: Not yet verified
 Applies to: dev, staging, prod
 
@@ -196,14 +196,54 @@ read API wiring and re-run the backfill (it will overwrite the shells in place).
 ## Procedure: Reconcile — remove indexed documents canonical does not back
 
 **Use this when the index contains documents that canonical Delta no longer has** —
-duplicates from a pre-fix identity key, test artifacts, contentless stubs, anything
-a user can search for but the platform cannot account for.
+test artifacts, contentless stubs, orphans left by an earlier run, anything a user can
+search for but the platform cannot account for.
 
 The Delta backfill above cannot do this. It is idempotent **by upsert on
 `document_id`**, so it only ever adds or overwrites; a projection whose canonical row
 is gone survives every rebuild. Reconciliation is the other half of ADR-0005's
 "the index is derived from canonical": it diffs *index minus canonical* and de-indexes
 the remainder.
+
+### What reconcile can and cannot remove
+
+It removes **index-minus-canonical, and nothing else**. That boundary matters most for
+duplicates, where it is easy to assume more:
+
+| Case | Removable here? |
+|---|---|
+| Indexed document with no `published_documents` row | Yes — this is what the job is for |
+| Duplicate whose *stale* copy is index-only | Yes — the stale id is an orphan |
+| Duplicate where **both** ids have canonical rows | **No** — neither id is an orphan |
+
+The third row is the #652 case: the identity key changed, so a law acquired before the
+fix and again after it has two `document_id`s. If both were processed to canonical, both
+have `published_documents` rows, and **reconcile deletes neither**.
+
+> **Backfill + reconcile is not a duplicate remediation.** The backfill replays each
+> canonical row under the `document_id` *stored on the row* — it does not recompute
+> identity — so a rebuild reproduces both ids verbatim, and reconcile then finds no
+> orphan to remove. Running the pair on a canonical-side duplicate cleans up unrelated
+> orphans and leaves the duplicate exactly where it was.
+
+Removing a canonical-side duplicate is a different, heavier sequence, and it starts on
+the canonical side:
+
+1. Decide which `document_id` the **current** identity key mints (`_document_identity_key`
+   in `document_intelligence/pipeline.py` — it keys on the bundle's `upstream_locator`).
+2. Delete the stale document's rows from canonical Delta (`published_documents` **and**
+   `published_sections`).
+3. Reconcile — the stale id is now index-minus-canonical, so it becomes removable.
+4. Re-acquire the document through the platform if the surviving copy is not the one you
+   want to keep.
+
+Confirm which case you are in before planning the work — the dry run below lists exactly
+what is orphaned, and a duplicate that does not appear in `orphan_document_ids` is
+canonical-side:
+
+```bash
+document_intelligence_projection_reconcile | jq '.orphan_document_ids'
+```
 
 ```text
    canonical truth (Delta)        derived view (OpenSearch)
@@ -273,6 +313,8 @@ index is wrong:
 | Canonical enumerated 0 documents | Refuses outright. Check `DI_SURFACES_ROOT_URI` / `DI_S3_*`. |
 | Orphans exceed `--max-orphan-fraction` (default `0.25`) | Refuses and prints the diff. Raise the bound only after reading the dry-run list. |
 
+The fraction is of the *indexed* count, so a small index trips the bound early: 4 orphans
+out of 6 indexed documents is `0.67` and is refused, however obviously right the diff is.
 A large legitimate cleanup therefore needs the bound raised deliberately, e.g. the
 22-of-24 case above:
 
