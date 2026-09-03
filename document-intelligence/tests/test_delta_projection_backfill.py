@@ -514,10 +514,45 @@ class NativeDeltaFilesystemTests(unittest.TestCase):
         # Rooted at the table, because to_pyarrow_dataset() resolves fragments relatively.
         self.assertEqual(filesystem.base_path, "canonical/published_documents/")
 
-    def test_an_unresolvable_uri_falls_back_to_deltalake_s_own_handler(self) -> None:
+        # The type alone proves nothing — a filesystem pointed at real AWS is also an
+        # S3FileSystem. Assert the values that decide *which endpoint it talks to*.
+        resolved = filesystem.base_fs.__reduce__()[1][0]
+        self.assertEqual(resolved["endpoint_override"], "minio.evidara.svc:9000")
+        self.assertEqual(resolved["scheme"], "http")
+        self.assertEqual(resolved["region"], "us-east-1")
+        self.assertEqual(resolved["access_key"], "key")
+        self.assertEqual(resolved["secret_key"], "secret")
+
+    def test_an_https_endpoint_is_not_downgraded(self) -> None:
+        from document_intelligence.persist.sinks import delta_dataset_filesystem, delta_storage_options
+
+        options = delta_storage_options({"DI_S3_ENDPOINT_URL": "https://s3.example.test"})
+        filesystem = delta_dataset_filesystem("s3://canonical/published_documents", options)
+
+        resolved = filesystem.base_fs.__reduce__()[1][0]
+        self.assertEqual(resolved["scheme"], "https")
+        self.assertEqual(resolved["endpoint_override"], "s3.example.test")
+        # No DI_S3_ACCESS_KEY_ID / DI_S3_SECRET_ACCESS_KEY: leave pyarrow's own chain alone.
+        self.assertFalse(resolved["access_key"])
+
+    def test_only_the_measured_schemes_are_taken_over(self) -> None:
+        """Anything outside the allowlist keeps ``deltalake``'s handler.
+
+        Not a style preference. ``pyarrow.fs.FileSystem.from_uri`` resolves credentials through
+        the Google/AWS SDK chains, which ``object_store`` does not match: it will build a
+        ``GcsFileSystem`` for ``gs://`` with no GCP credentials and no error, turning a surface
+        that reads fine today into a 403 at scan time. Taking over a scheme we have not measured
+        trades a teardown abort for a read failure.
+        """
         from document_intelligence.persist.sinks import delta_dataset_filesystem
 
+        self.assertIsNone(delta_dataset_filesystem("gs://evidara-lakehouse/canonical/published_documents"))
+        self.assertIsNone(delta_dataset_filesystem("abfs://container/published_documents"))
         self.assertIsNone(delta_dataset_filesystem("nosuchscheme://bucket/table"))
+        # Real AWS S3: no endpoint override, so pyarrow's credential chain would differ from
+        # object_store's — and from_uri would additionally pay a network region lookup.
+        self.assertIsNone(delta_dataset_filesystem("s3://evidara-lakehouse/canonical"))
+        self.assertIsNone(delta_dataset_filesystem("s3://evidara-lakehouse/canonical", {}))
 
 
 if __name__ == "__main__":

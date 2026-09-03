@@ -135,6 +135,10 @@ Each `ExternalSecret` should report `SecretSynced`; each Deployment should reach
       `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh`.
 - [ ] **Broker integration test** (recommended before trusting cutover): run the
       opt-in real-NATS test — `cd document-intelligence && EVIDARA_NATS_IT=1 uv run --extra it pytest tests/test_nats_integration.py`.
+- [ ] **Object-store integration test** (recommended for the same reason): run the opt-in
+      MinIO test — `cd document-intelligence && EVIDARA_MINIO_IT=1 uv run --extra it --extra test pytest tests/test_delta_s3_integration.py`.
+      It is the only test that reads canonical Delta over `s3://` rather than a local path, so it is
+      what covers the MinIO branch of `delta_dataset_filesystem` (#825). CI does not run it.
 
 ## 8. Re-point CI smokes (optional)
 

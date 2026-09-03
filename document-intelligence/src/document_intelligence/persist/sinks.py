@@ -277,42 +277,69 @@ def delta_dataset_filesystem(uri: str, storage_options: Mapping[str, str] | None
     because the process then reaches shutdown sooner. Passing a native filesystem removes the
     Python callback from the scan entirely: 0/20 aborts on local, 0/20 on S3.
 
-    Returns ``None`` when no native filesystem can be built for the URI (unknown scheme, pyarrow
-    without that backend, anything unexpected). The caller then passes ``filesystem=None`` and
-    ``deltalake`` falls back to its own handler — i.e. today's behaviour, which reads correctly.
+    **Only the two shapes measured above are taken over**: a local path (bare or ``file://``) and
+    ``s3://`` / ``s3a://`` *with an explicit endpoint* in ``storage_options`` — i.e. MinIO, which
+    is what the self-hosted deployment runs. Everything else returns ``None`` and keeps
+    ``deltalake``'s own handler.
+
+    That allowlist is deliberate, and blanket ``pyarrow.fs.FileSystem.from_uri`` is not a
+    substitute for it. pyarrow resolves credentials through the Google/AWS SDK chains while
+    ``object_store`` (which ``deltalake`` uses) does not resolve identically: ``from_uri`` happily
+    constructs a ``GcsFileSystem`` for ``gs://`` with no GCP credentials present and no error, so a
+    surface that reads correctly today would get an unauthorized filesystem and 403 at scan time —
+    a hard read failure, not the harmless fallback this function promises. The same divergence
+    applies to ``abfs://`` and to real AWS ``s3://`` (``AWS_PROFILE`` / SSO / IMDS). ``from_uri``
+    on a bucket URI also costs a network round-trip for region resolution — measured at 4.1 s —
+    and ``_open_dataset`` is on the document service's per-request read path.
+
+    Returns ``None`` whenever a native filesystem cannot be built. The caller then passes
+    ``filesystem=None`` and ``deltalake`` falls back to its own handler — today's behaviour, which
+    reads correctly but can abort at teardown.
     """
+    scheme, separator, remainder = uri.partition("://")
+    if not separator:
+        scheme, remainder = "", uri
+
+    options = storage_options or {}
+    endpoint = (options.get("AWS_ENDPOINT_URL") or "").strip()
+    if scheme not in {"", "file"} and not (scheme in {"s3", "s3a"} and endpoint):
+        # Not a shape this function claims; deltalake's handler stays in charge. Not a warning:
+        # nothing is wrong, the allowlist simply does not cover this surface.
+        return None
+
     try:
         import pyarrow.fs as pa_fs
 
-        scheme, separator, remainder = uri.partition("://")
-        if not separator:
-            scheme, remainder = "", uri
+        if scheme in {"", "file"}:
+            filesystem, normalized_path = pa_fs.FileSystem.from_uri(uri if scheme else os.path.abspath(uri))
+            if not isinstance(filesystem, pa_fs.LocalFileSystem):
+                raise TypeError(f"expected a LocalFileSystem for {uri!r}, got {type(filesystem).__name__}")
+            return pa_fs.SubTreeFileSystem(normalized_path, filesystem)
 
-        options = storage_options or {}
-        endpoint = (options.get("AWS_ENDPOINT_URL") or "").strip()
-        if scheme in {"s3", "s3a"} and endpoint:
-            # MinIO / any S3-compatible endpoint: pyarrow will not pick this up from
-            # ``storage_options`` (those are ``deltalake``'s), so mirror them explicitly.
-            kwargs: dict[str, object] = {
-                "endpoint_override": endpoint.split("://", 1)[-1].rstrip("/"),
-                "scheme": "http" if endpoint.startswith("http://") else "https",
-            }
-            region = (options.get("AWS_REGION") or "").strip()
-            if region:
-                kwargs["region"] = region
-            access_key_id = (options.get("AWS_ACCESS_KEY_ID") or "").strip()
-            secret_access_key = (options.get("AWS_SECRET_ACCESS_KEY") or "").strip()
-            if access_key_id and secret_access_key:
-                kwargs["access_key"] = access_key_id
-                kwargs["secret_key"] = secret_access_key
-            # ``to_pyarrow_dataset`` resolves fragment paths relative to the table root, so the
-            # filesystem handed to it must be rooted there too.
-            return pa_fs.SubTreeFileSystem(remainder.strip("/"), pa_fs.S3FileSystem(**kwargs))
-
-        filesystem, normalized_path = pa_fs.FileSystem.from_uri(uri)
-        return pa_fs.SubTreeFileSystem(normalized_path, filesystem)
-    except Exception:  # pragma: no cover - any failure means "use deltalake's own handler"
-        logger.debug("delta_native_filesystem_unavailable", extra={"uri": uri}, exc_info=True)
+        # MinIO / any S3-compatible endpoint: pyarrow will not pick this up from
+        # ``storage_options`` (those are ``deltalake``'s), so mirror them explicitly.
+        kwargs: dict[str, object] = {
+            "endpoint_override": endpoint.split("://", 1)[-1].rstrip("/"),
+            # Same ``http://`` prefix test ``delta_storage_options`` uses for AWS_ALLOW_HTTP.
+            "scheme": "http" if endpoint.startswith("http://") else "https",
+        }
+        region = (options.get("AWS_REGION") or "").strip()
+        if region:
+            kwargs["region"] = region
+        access_key_id = (options.get("AWS_ACCESS_KEY_ID") or "").strip()
+        secret_access_key = (options.get("AWS_SECRET_ACCESS_KEY") or "").strip()
+        if access_key_id and secret_access_key:
+            kwargs["access_key"] = access_key_id
+            kwargs["secret_key"] = secret_access_key
+        # ``to_pyarrow_dataset`` resolves fragment paths relative to the table root, so the
+        # filesystem handed to it must be rooted there too.
+        return pa_fs.SubTreeFileSystem(remainder.strip("/"), pa_fs.S3FileSystem(**kwargs))
+    except Exception:
+        # This URI *was* on the allowlist and still could not be resolved — a renamed pyarrow
+        # kwarg, a missing backend, a malformed endpoint. Every read then silently reverts to the
+        # path that aborts at teardown, while the runbook tells the operator to treat a non-zero
+        # exit as real. That must never be a debug-level event.
+        logger.warning("delta_native_filesystem_unavailable", extra={"uri": uri}, exc_info=True)
         return None
 
 
