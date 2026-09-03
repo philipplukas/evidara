@@ -65,6 +65,7 @@ class DeltaOverMinioIntegrationTests(unittest.TestCase):
             env = self._environment(endpoint)
             self._write_corpus(env)
             self._assert_store_reads_over_s3(env)
+            self._assert_rescore_store_reads_over_s3(env)
             self._assert_entrypoint_exits_zero(env)
         finally:
             container.stop()
@@ -132,6 +133,51 @@ class DeltaOverMinioIntegrationTests(unittest.TestCase):
         self.assertIsNotNone(full)
         self.assertEqual(full["document_id"], self._result.document.document_id)
         self.assertEqual(len(full.get("sections") or []), len(self._result.sections))
+
+    def _assert_rescore_store_reads_over_s3(self, env: dict[str, str]) -> None:
+        """The rescore store must read the same surfaces over the same credentials (#847).
+
+        `_read_delta_rows` constructed `DeltaTable(uri)` with no `storage_options` at all,
+        so with only `DI_S3_*` set — the whole of the self-hosted configuration — every
+        rescore read failed:
+
+            OSError: Generic S3 error: ... the credential provider was not enabled:
+            no providers in chain provided credentials
+
+        The store resolves its options from the environment, which is what production
+        does, so this passes no options explicitly: reading them from `env` here would
+        test a path production never takes.
+        """
+        from document_intelligence.config.runtime import SurfaceUris
+        from document_intelligence.rescore import DeltaRescoreSurfaceStore
+
+        original = {key: os.environ.get(key) for key in env}
+        os.environ.update(env)
+        try:
+            store = DeltaRescoreSurfaceStore(
+                SurfaceUris(
+                    published_documents_uri=env["DI_PUBLISHED_DOCUMENTS_URI"],
+                    published_sections_uri=env["DI_PUBLISHED_SECTIONS_URI"],
+                    processing_manifests_uri=env["DI_PROCESSING_MANIFESTS_URI"],
+                )
+            )
+            document = store.get_document(self._result.document.document_id)
+            self.assertIsNotNone(document)
+            self.assertEqual(document["document_id"], self._result.document.document_id)
+            self.assertEqual(len(document.get("sections") or []), len(self._result.sections))
+
+            manifest = store.get_processing_manifest(self._result.manifest.processing_manifest_id)
+            self.assertIsNotNone(manifest)
+            self.assertEqual(
+                manifest["processing_manifest_id"],
+                self._result.manifest.processing_manifest_id,
+            )
+        finally:
+            for key, value in original.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def _assert_entrypoint_exits_zero(self, env: dict[str, str]) -> None:
         process_env = dict(os.environ, **env)

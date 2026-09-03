@@ -246,5 +246,132 @@ class _bundle:
             self._temp_dir.cleanup()
 
 
+class DeltaRescoreSurfaceStoreTests(unittest.TestCase):
+    """Cover the store the runtime actually builds (#847).
+
+    Every other test in this module drives ``rescore_targeted`` through
+    ``FakeRescoreStore``, so ``DeltaRescoreSurfaceStore`` — the only store
+    ``_store_from_settings`` ever constructs — was executed by nothing. That is how
+    ``_read_delta_rows`` shipped with no ``storage_options``: against MinIO reached
+    through ``DI_S3_*`` alone, which is the self-hosted deployment's entire
+    configuration, every rescore read failed with *"the credential provider was not
+    enabled: no providers in chain provided credentials"*.
+    """
+
+    def test_reads_a_real_delta_surface_end_to_end(self) -> None:
+        """A real write and a real read, not an assertion about a constructed object.
+
+        Local filesystem, so no credentials are involved — this pins the read path
+        itself (filters, revision ordering, the sections join) and exercises the local
+        branch of ``delta_dataset_filesystem`` now that one is passed.
+        """
+        import importlib.util
+        import sys
+
+        if importlib.util.find_spec("deltalake") is None:
+            self.skipTest("deltalake is not installed")
+
+        sys.path.insert(0, os.path.dirname(__file__))
+        from document_intelligence.config.runtime import SurfaceUris
+        from document_intelligence.persist.sinks import DeltaCanonicalSink
+        from document_intelligence.rescore import DeltaRescoreSurfaceStore
+        from test_adapters import build_processing_result
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            surface_uris = SurfaceUris.from_root_uri(temp_dir)
+            result = build_processing_result()
+            DeltaCanonicalSink(surface_uris.to_delta_sink_config()).persist(
+                result.document, result.sections, result.manifest
+            )
+
+            store = DeltaRescoreSurfaceStore(surface_uris)
+            document = store.get_document(result.document.document_id)
+            self.assertIsNotNone(document)
+            self.assertEqual(document["document_id"], result.document.document_id)
+            self.assertEqual(len(document.get("sections") or []), len(result.sections))
+
+            manifest = store.get_processing_manifest(result.manifest.processing_manifest_id)
+            self.assertIsNotNone(manifest)
+            self.assertEqual(
+                manifest["processing_manifest_id"],
+                result.manifest.processing_manifest_id,
+            )
+
+            self.assertIsNone(store.get_document("doc_01hx00000000000000000000zz"))
+
+    def test_every_surface_read_carries_the_s3_credentials(self) -> None:
+        """The credentials must reach ``DeltaTable`` on every surface, not just one.
+
+        The real proof is ``tests/test_delta_s3_integration.py``, which reads this store
+        over a live MinIO — no assertion about a constructed object can show that a read
+        succeeds. This is the part that runs without Docker: on the unfixed code
+        ``storage_options`` is absent from every call, which is the defect exactly.
+        """
+        import sys
+        import types
+
+        from document_intelligence.config.runtime import SurfaceUris
+        from document_intelligence.persist.sinks import delta_storage_options
+        from document_intelligence.rescore import DeltaRescoreSurfaceStore
+
+        environ = {
+            "DI_S3_ENDPOINT_URL": "http://minio.internal:9000",
+            "DI_S3_ACCESS_KEY_ID": "key",
+            "DI_S3_SECRET_ACCESS_KEY": "secret",
+            "DI_S3_REGION": "us-east-1",
+        }
+        expected = delta_storage_options(environ)
+        self.assertTrue(expected, "delta_storage_options must map DI_S3_* onto AWS_*")
+
+        seen: list[tuple[str, Any]] = []
+
+        class _StubDeltaTable:
+            def __init__(self, uri: str, **kwargs: Any) -> None:
+                seen.append((uri, kwargs.get("storage_options")))
+
+            def to_pyarrow_dataset(self, filesystem: Any = None) -> Any:
+                return self
+
+            def to_table(self, **kwargs: Any) -> Any:
+                return self
+
+            def to_pylist(self) -> list[dict[str, Any]]:
+                return []
+
+        stub = types.ModuleType("deltalake")
+        stub.DeltaTable = _StubDeltaTable
+        original_module = sys.modules.get("deltalake")
+        original_environ = {key: os.environ.get(key) for key in environ}
+        sys.modules["deltalake"] = stub
+        os.environ.update(environ)
+        try:
+            surface_uris = SurfaceUris.from_root_uri("s3://evidara-lakehouse/canonical")
+            store = DeltaRescoreSurfaceStore(surface_uris)
+            store.get_document("doc_01hx00000000000000000000zz")
+            store.get_processing_manifest("pm_01hx00000000000000000000zz")
+            store.get_commentary_insight("ins_01hx00000000000000000000zz")
+        finally:
+            if original_module is None:
+                del sys.modules["deltalake"]
+            else:
+                sys.modules["deltalake"] = original_module
+            for key, value in original_environ.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        self.assertEqual(
+            [uri for uri, _ in seen],
+            [
+                "s3://evidara-lakehouse/canonical/published_documents",
+                "s3://evidara-lakehouse/canonical/processing_manifests",
+                "s3://evidara-lakehouse/canonical/published_commentary_insights",
+            ],
+        )
+        for uri, options in seen:
+            self.assertEqual(options, expected, f"{uri} was read without S3 credentials")
+
+
 if __name__ == "__main__":
     unittest.main()

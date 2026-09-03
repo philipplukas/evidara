@@ -20,6 +20,7 @@ from document_intelligence.canonical.models import CommentaryInsight, Processing
 from document_intelligence.config.runtime import RuntimeSettings, SurfaceUris
 from document_intelligence.errors import ProcessingError
 from document_intelligence.ingest.loaders import BundleLoader
+from document_intelligence.persist.sinks import delta_dataset_filesystem, delta_storage_options
 from document_intelligence.processing_runtime import build_processing_pipeline
 
 logger = logging.getLogger(__name__)
@@ -42,10 +43,25 @@ class RescoreSurfaceStore(Protocol):
 
 
 class DeltaRescoreSurfaceStore:
-    """Read current target state from Delta-backed published surfaces."""
+    """Read current target state from Delta-backed published surfaces.
 
-    def __init__(self, surface_uris: SurfaceUris) -> None:
+    ``storage_options`` is what maps ``DI_S3_ENDPOINT_URL`` / ``DI_S3_ACCESS_KEY_ID`` /
+    ``DI_S3_SECRET_ACCESS_KEY`` onto the ``AWS_*`` keys ``object_store`` reads
+    (:func:`delta_storage_options`). Without it ``object_store`` falls back to its own
+    credential chain, which the self-hosted deployment does not populate — so every
+    read against ``s3://evidara-lakehouse/canonical/...`` failed with *"the credential
+    provider was not enabled: no providers in chain provided credentials"* (#847).
+    Resolved from the environment by default, exactly as ``DeltaPublishedDocumentStore``
+    and ``DeltaCanonicalSink`` do; pass an explicit mapping to override.
+    """
+
+    def __init__(
+        self,
+        surface_uris: SurfaceUris,
+        storage_options: Mapping[str, str] | None = None,
+    ) -> None:
         self._surface_uris = surface_uris
+        self._storage_options = delta_storage_options() if storage_options is None else storage_options
 
     def get_document(
         self,
@@ -56,7 +72,11 @@ class DeltaRescoreSurfaceStore:
         filters = [dataset_mod.field("document_id") == document_id]
         if processing_manifest_id is not None:
             filters.append(dataset_mod.field("processing_manifest_id") == processing_manifest_id)
-        rows = _read_delta_rows(self._surface_uris.published_documents_uri, filters)
+        rows = _read_delta_rows(
+            self._surface_uris.published_documents_uri,
+            filters,
+            storage_options=self._storage_options,
+        )
         if not rows:
             return None
         rows.sort(
@@ -80,6 +100,7 @@ class DeltaRescoreSurfaceStore:
         rows = _read_delta_rows(
             self._surface_uris.processing_manifests_uri,
             [dataset_mod.field("processing_manifest_id") == processing_manifest_id],
+            storage_options=self._storage_options,
         )
         if not rows:
             return None
@@ -92,6 +113,7 @@ class DeltaRescoreSurfaceStore:
         rows = _read_delta_rows(
             self._surface_uris.published_commentary_insights_uri,
             [dataset_mod.field("insight_id") == insight_id],
+            storage_options=self._storage_options,
         )
         if not rows:
             return None
@@ -105,6 +127,7 @@ class DeltaRescoreSurfaceStore:
                 dataset_mod.field("document_id") == document_id,
                 dataset_mod.field("processing_manifest_id") == processing_manifest_id,
             ],
+            storage_options=self._storage_options,
         )
         rows.sort(key=lambda row: (int(row.get("ordinal") or 0), str(row.get("section_id") or "")))
         return [dict(row) for row in rows]
@@ -382,13 +405,37 @@ def _insight_semantic(insight: Mapping[str, Any] | CommentaryInsight) -> tuple[A
     )
 
 
-def _read_delta_rows(uri: str, filters: list[Any]) -> list[dict[str, Any]]:
+def _read_delta_rows(
+    uri: str,
+    filters: list[Any],
+    *,
+    storage_options: Mapping[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Read the rows of one published Delta surface that match ``filters``.
+
+    Two arguments carry the whole weight of this function and neither used to be passed:
+
+    - ``storage_options`` are the credentials. Every other Delta reader in
+      document-intelligence threads them (``DeltaPublishedDocumentStore``,
+      ``DeltaCanonicalSink``); this one did not, so on the self-hosted deployment —
+      MinIO reached through ``DI_S3_*`` and nothing else — every rescore read failed
+      outright (#847). Not latent: that is the production configuration.
+    - ``filesystem`` is the native Arrow filesystem. Without it ``to_pyarrow_dataset()``
+      builds ``PyFileSystem(DeltaStorageHandler(...))`` and Arrow's C++ IO pool calls
+      back into Python during the scan; losing that race at interpreter shutdown aborts
+      the process with ``terminate called without an active exception`` *after* the work
+      succeeded (#825). :func:`delta_dataset_filesystem` returns ``None`` for any URI
+      shape it does not claim, and ``deltalake``'s own handler stays in charge.
+    """
     deltalake = importlib.import_module("deltalake")
     expr = filters[0]
     for item in filters[1:]:
         expr = expr & item
-    table = deltalake.DeltaTable(uri).to_pyarrow_dataset().to_table(filter=expr)
-    return table.to_pylist()
+    table_kwargs = {"storage_options": storage_options} if storage_options else {}
+    table = deltalake.DeltaTable(uri, **table_kwargs).to_pyarrow_dataset(
+        filesystem=delta_dataset_filesystem(uri, storage_options)
+    )
+    return table.to_table(filter=expr).to_pylist()
 
 
 def _mapping_from_first(*values: Any, field_name: str) -> Mapping[str, Any]:
