@@ -4080,7 +4080,7 @@ export interface components {
          * WizardRunState
          * @enum {string}
          */
-        WizardRunState: "DraftScope" | "DiscoveryPlan" | "PilotRun" | "HumanGateApproval" | "ScaledRun" | "ReviewRouting" | "FinalizePublish" | "MonitorAndDrift";
+        WizardRunState: "DraftScope" | "DiscoveryPlan" | "PilotRun" | "HumanGateApproval" | "ScaledRun" | "ReviewRouting" | "FinalizePublish" | "MonitorAndDrift" | "GateExpired";
         /** WizardRunStatusResponse */
         WizardRunStatusResponse: {
             /** Wizard Run Id */

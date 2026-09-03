@@ -95,6 +95,56 @@ class WizardStateActivities:
             await session.commit()
 
     @activity.defn
+    async def persist_wizard_outcome(
+        self,
+        wizard_run_id: str,
+        state_value: str,
+        failure_reason: str | None,
+        event: str,
+    ) -> None:
+        """Write the workflow's own view of where the run ended up (#560).
+
+        Before this existed, ``persist_pilot_completed`` was the *only* activity
+        that ever wrote ``WizardRun.state``. The API optimistically set
+        ``ScaledRun`` when it forwarded the approve signal, and the row then stayed
+        ``ScaledRun`` forever — whether the workflow finished, failed, or was still
+        running. The database and the workflow diverged permanently the moment
+        anything went wrong, and nothing said so.
+
+        Idempotent, so Temporal's retries are free: writing the same state twice is
+        a no-op and appends no second ledger event.
+        """
+        state = WizardRunState(state_value)
+        async with self.session_factory() as session:
+            wizard_run = await session.get(WizardRun, wizard_run_id)
+            if wizard_run is None:
+                raise RuntimeError(f"WizardRun not found: {wizard_run_id}")
+            if wizard_run.state is state and wizard_run.failure_reason == failure_reason:
+                return
+
+            now = datetime.now(UTC)
+            wizard_run.state = state
+            wizard_run.state_entered_at = now
+            wizard_run.failure_reason = failure_reason
+            ledger = await session.scalar(
+                select(WizardRunLedger).where(WizardRunLedger.wizard_run_id == wizard_run_id)
+            )
+            if ledger is not None:
+                transitions = dict(ledger.state_transitions or {})
+                events = list(transitions.get("events", []))
+                events.append(
+                    {
+                        "state": state.value,
+                        "entered_at": now.isoformat(),
+                        "event": event,
+                        **({"failure_reason": failure_reason} if failure_reason else {}),
+                    }
+                )
+                transitions["events"] = events
+                ledger.state_transitions = transitions
+            await session.commit()
+
+    @activity.defn
     async def fetch_scope_shards(self, wizard_run_id: str) -> list[str]:
         """Return the list of scope-shard keys for the given wizard run.
 

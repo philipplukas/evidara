@@ -9,6 +9,7 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
+    from platform_control.domain import WizardRunState
     from platform_control.temporal.activities import (
         RescoreFromCorrectionActivities,
         RetentionActivities,
@@ -38,6 +39,21 @@ class RescoreFromCorrectionInput:
 # Maximum number of drain-poll iterations before the workflow gives up waiting.
 # At a 30-minute poll interval this caps wait time at 24 hours.
 _MAX_DRAIN_POLLS = 48
+
+#: Versioning gate for the #560 human-gate hardening (timeout + terminal state).
+#:
+#: `workflow.patched` is what lets this land without breaking replay. Every
+#: recorded history in `tests/data/temporal_histories/` was written by the old
+#: code, which has no gate timer and no outcome activity; on replay `patched()`
+#: returns False for those histories, the legacy branch runs, and the command
+#: sequence still matches. New executions take the hardened branch and record the
+#: marker. `tests/unit/test_temporal_replay.py` demands exactly this rather than
+#: re-recording the fixtures.
+_GATE_HARDENING_PATCH = "wizard-gate-timeout-and-terminal-state"
+
+#: Fallback used when `wizard_human_gate_timeout_seconds` is not supplied at start
+#: (an execution started by older code, or a workflow driven directly in a test).
+_DEFAULT_GATE_TIMEOUT_SECONDS = 72 * 60 * 60
 
 
 @workflow.defn
@@ -124,14 +140,37 @@ class WizardRunWorkflow:
     this workflow mirrors scaled execution via ``ScopeShardWorkflow`` and
     ``ReviewDrainWorkflow`` children so parallel work and review draining can
     grow without bloating the parent.
+
+    **The human gate is bounded (#560).** It used to be an unbounded
+    ``wait_condition``: if nobody clicked approve or reject the execution stayed
+    open forever, the DB stayed at whatever the API optimistically wrote, and no
+    activity ever recorded a terminal state — so "waiting on an operator" and
+    "abandoned months ago" were indistinguishable in every surface. The gate now
+    expires into :attr:`WizardRunState.GATE_EXPIRED`, and the workflow writes its
+    own outcome at every exit. The timeout/fallback shape is the one already
+    proven in ``infra/coordinator/src/coordinator/workflows.py``.
     """
 
     def __init__(self) -> None:
         self._approved = False
         self._rejected = False
 
+    async def _persist_outcome(
+        self,
+        wizard_run_id: str,
+        state: str,
+        event: str,
+        failure_reason: str | None = None,
+    ) -> None:
+        await workflow.execute_activity_method(
+            WizardStateActivities.persist_wizard_outcome,
+            args=[wizard_run_id, state, failure_reason, event],
+            start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=RetryPolicy(maximum_attempts=5, backoff_coefficient=2.0),
+        )
+
     @workflow.run
-    async def run(self, wizard_run_id: str) -> str:
+    async def run(self, wizard_run_id: str, gate_timeout_seconds: int | None = None) -> str:
         # --- Pilot phase ---
         # Persist PilotRun → HumanGateApproval in the DB so the API reflects
         # the gate state before the operator is prompted.
@@ -142,9 +181,45 @@ class WizardRunWorkflow:
             retry_policy=RetryPolicy(maximum_attempts=5, backoff_coefficient=2.0),
         )
 
+        # Everything below this line that is new to #560 is gated on the patch, so
+        # histories recorded against the old code still replay. See the constant.
+        gate_hardened = workflow.patched(_GATE_HARDENING_PATCH)
+
         # --- Human gate ---
-        await workflow.wait_condition(lambda: self._approved or self._rejected)
+        if gate_hardened:
+            gate_timeout = timedelta(seconds=gate_timeout_seconds or _DEFAULT_GATE_TIMEOUT_SECONDS)
+            try:
+                await workflow.wait_condition(
+                    lambda: self._approved or self._rejected,
+                    timeout=gate_timeout,
+                )
+            except TimeoutError:
+                # The fallback is always "do not scale". Auto-approving a fan-out
+                # of crawls against live government portals because nobody
+                # answered is the one outcome that must never be reachable.
+                await self._persist_outcome(
+                    wizard_run_id,
+                    WizardRunState.GATE_EXPIRED.value,
+                    "gate_expired",
+                    failure_reason=(
+                        f"Human gate expired after {int(gate_timeout.total_seconds())}s "
+                        "with no approve or reject decision."
+                    ),
+                )
+                return "gate_expired"
+        else:
+            await workflow.wait_condition(lambda: self._approved or self._rejected)
+
         if self._rejected:
+            if gate_hardened:
+                # The API writes DiscoveryPlan when it forwards the signal, but the
+                # workflow must not depend on that having happened — a rejection
+                # arriving any other way left the row wherever it was.
+                await self._persist_outcome(
+                    wizard_run_id,
+                    WizardRunState.DISCOVERY_PLAN.value,
+                    "gate_rejected",
+                )
             return "rejected"
 
         info = workflow.info()
@@ -159,23 +234,45 @@ class WizardRunWorkflow:
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
-        await asyncio.gather(
-            *[
-                workflow.execute_child_workflow(
-                    ScopeShardWorkflow.run,
-                    args=[wizard_run_id, key, None],
-                    id=f"{parent_wf_id}__scope_shard_{_sanitize_shard_key(key)}",
-                    task_queue=tq,
+        try:
+            await asyncio.gather(
+                *[
+                    workflow.execute_child_workflow(
+                        ScopeShardWorkflow.run,
+                        args=[wizard_run_id, key, None],
+                        id=f"{parent_wf_id}__scope_shard_{_sanitize_shard_key(key)}",
+                        task_queue=tq,
+                    )
+                    for key in shard_keys
+                ]
+            )
+            await workflow.execute_child_workflow(
+                ReviewDrainWorkflow.run,
+                args=[wizard_run_id],
+                id=f"{parent_wf_id}__review_drain",
+                task_queue=tq,
+            )
+        except Exception as exc:
+            if gate_hardened:
+                # Leave the run where it is, but say why it stopped. A failed
+                # scaled run used to be indistinguishable from a running one.
+                await self._persist_outcome(
+                    wizard_run_id,
+                    WizardRunState.SCALED_RUN.value,
+                    "scaled_failed",
+                    failure_reason=f"Scaled run failed: {exc}",
                 )
-                for key in shard_keys
-            ]
-        )
-        await workflow.execute_child_workflow(
-            ReviewDrainWorkflow.run,
-            args=[wizard_run_id],
-            id=f"{parent_wf_id}__review_drain",
-            task_queue=tq,
-        )
+            raise
+
+        if gate_hardened:
+            # `ScaledRun -> ReviewRouting` on `scaled_completed`, guarded by
+            # `allShardWorkflowsTerminal` — which is exactly what the gather above
+            # having returned means. Until now nothing ever wrote this state.
+            await self._persist_outcome(
+                wizard_run_id,
+                WizardRunState.REVIEW_ROUTING.value,
+                "scaled_completed",
+            )
         return "scaled"
 
     @workflow.signal

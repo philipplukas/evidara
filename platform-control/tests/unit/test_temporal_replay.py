@@ -72,6 +72,16 @@ async def _persist_pilot_completed(wizard_run_id: str) -> None:
     return None
 
 
+@activity.defn(name="persist_wizard_outcome")
+async def _persist_wizard_outcome(
+    wizard_run_id: str,
+    state_value: str,
+    failure_reason: str | None,
+    event: str,
+) -> None:
+    return None
+
+
 @activity.defn(name="fetch_scope_shards")
 async def _fetch_scope_shards(wizard_run_id: str) -> list[str]:
     # Two shards, so the recorded parent history exercises the parallel
@@ -119,6 +129,7 @@ async def _run_targeted_rescore(payload: Any) -> dict[str, Any]:
 
 _STUB_ACTIVITIES = [
     _persist_pilot_completed,
+    _persist_wizard_outcome,
     _fetch_scope_shards,
     _run_shard_crawl,
     _report_shard_progress,

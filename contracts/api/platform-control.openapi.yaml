@@ -8220,6 +8220,7 @@ components:
       - ReviewRouting
       - FinalizePublish
       - MonitorAndDrift
+      - GateExpired
       title: WizardRunState
     WizardRunStatusResponse:
       properties:

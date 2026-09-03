@@ -85,6 +85,16 @@ class Settings(BaseSettings):
     )
     run_dispatch_backend: Literal["inline", "worker"] = "inline"
     wizard_orchestrator_backend: Literal["in_memory", "temporal"] = "in_memory"
+    wizard_human_gate_timeout_seconds: int = Field(
+        default=72 * 60 * 60,
+        gt=0,
+        description=(
+            "How long WizardRunWorkflow waits at the human gate before giving up and "
+            "recording the run as GateExpired (#560). There is deliberately no "
+            "auto-approve fallback: the only safe answer to 'nobody responded' is to "
+            "refuse to scale a crawl of live government portals."
+        ),
+    )
     temporal_namespace: str = "default"
     temporal_task_queue: str = "platform-control-wizard"
     temporal_target: str = "localhost:7233"

@@ -57,6 +57,7 @@ async def _async_main() -> None:
         workflows=ALL_WORKFLOWS,
         activities=[
             wizard_state_acts.persist_pilot_completed,
+            wizard_state_acts.persist_wizard_outcome,
             wizard_state_acts.fetch_scope_shards,
             scope_shard_acts.run_shard_crawl,
             scope_shard_acts.report_shard_progress,

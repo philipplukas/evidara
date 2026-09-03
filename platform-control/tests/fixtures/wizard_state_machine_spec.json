@@ -7,10 +7,11 @@
     "ScaledRun",
     "ReviewRouting",
     "FinalizePublish",
-    "MonitorAndDrift"
+    "MonitorAndDrift",
+    "GateExpired"
   ],
   "initial_state": "DraftScope",
-  "terminal_states": [],
+  "terminal_states": ["GateExpired"],
   "transitions": [
     {
       "from": "DraftScope",
@@ -41,6 +42,12 @@
       "event": "gate_rejected",
       "guard": "rejectionReason != null",
       "to": "DiscoveryPlan"
+    },
+    {
+      "from": "HumanGateApproval",
+      "event": "gate_expired",
+      "guard": "gateDeadlinePassed && decision == null",
+      "to": "GateExpired"
     },
     {
       "from": "ScaledRun",

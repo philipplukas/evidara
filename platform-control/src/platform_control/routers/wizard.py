@@ -39,6 +39,7 @@ def get_orchestrator() -> Orchestrator:
             namespace=settings.temporal_namespace,
             task_queue=settings.temporal_task_queue,
             target=settings.temporal_target,
+            human_gate_timeout_seconds=settings.wizard_human_gate_timeout_seconds,
         )
     return InMemoryOrchestrator()
 
