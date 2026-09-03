@@ -51,9 +51,11 @@ red**.
 
 4. **A guard that cannot fire in the gate documented to run it.** `scripts/ci_skip_guard.py:61-63`
    reads `os.environ["CI"]`; neither `scripts/check-platform-control.sh` nor
-   `scripts/check-document-intelligence.sh` sets it. No local invocation of the documented
+   `scripts/check-document-intelligence.sh` sets it, so no local invocation of the documented
    gate can fire the guard, in any combination of extras. #840 ran `461 passed, 11 skipped`,
-   `ruff` clean, and `exit 1` in CI (#863, open).
+   `ruff` clean, and `exit 1` in CI. #863 (merged 2026-09-03) took the second option in
+   commitment 4 below — the guard still cannot fire from those scripts, and the `CLAUDE.md`
+   gate table now says so and tells the reader to prefix `CI=true`.
 
 5. **A test whose interleaving was on the wrong side of the guard.** Reported in the review
    of #844: the first attempt at the lost-approval race committed the concurrent expiry
@@ -122,8 +124,8 @@ it.
 
 4. **A guard that cannot fire in the gate documented to run it is not a gate for that
    surface.** Either the gate invokes it under the conditions it needs, or the gate table
-   says plainly that it does not (#863's fix). A local gate quietly narrower than CI is the
-   defect class #664 and #688 already cost this repo twice.
+   says plainly that it does not and how to arm it — which is what #863 did. A local gate
+   quietly narrower than CI is the defect class #664 and #688 already cost this repo twice.
 
 **Scope, stated narrowly on purpose.** This applies to *guards* — code whose only job is to
 refuse — not to the suite at large. Mutation is productive at a guard predicate and
@@ -178,5 +180,6 @@ no threshold.
   probe against an absent key, and the prefix rule
 - [ADR-0030](0030-acquisition-provider-enablement-lifecycle.md) §5 — a skipped gate is
   unverified, not verified-and-green (#744)
-- #832 (the `blocker` keying, caught in review), #834, #840, #844, #858, #862, #863, #864
+- #832 (the `blocker` keying, caught in review), #834, #840, #844, #862, #864 — and
+  #858 / #863, both merged 2026-09-03
 - `.claude/workflows/README.md` — the mutation harness and its baseline requirement

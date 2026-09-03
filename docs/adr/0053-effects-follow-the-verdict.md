@@ -10,27 +10,34 @@ Proposed
 
 ## Context
 
-### A run can fail after its documents are already in the corpus
+### A run could fail after its documents were already in the corpus
 
-`_dispatch_run` on current `main` does four things in this order
-(`platform-control/src/platform_control/services/run_service.py`):
+Until #858 merged on 2026-09-03, `_dispatch_run`
+(`platform-control/src/platform_control/services/run_service.py`) did four things in this
+order:
 
-1. persists the provider's inline resources and builds the bundle events (`:1320-1344`),
-2. sets `run.status = RunStatus.COMPLETED` (`:1345`),
-3. **then** — if the provider returned an `inline_failure_reason` — sets
-   `run.status = RunStatus.FAILED` (`:1348-1353`),
-4. and the batch is handed to `_publish_pending_dispatch_events` (`:1736`), which iterates
-   `pending.raw_artifact_ids` and `pending.bundle_events` and publishes every one. **There is
-   no reference to `run.status` anywhere in that function.**
+1. persisted the provider's inline resources and built the bundle events,
+2. set `run.status = RunStatus.COMPLETED`,
+3. **then** — if the provider returned an `inline_failure_reason` — set
+   `run.status = RunStatus.FAILED`,
+4. and handed the batch to `_publish_pending_dispatch_events`, which iterated
+   `pending.raw_artifact_ids` and `pending.bundle_events` and published every one. **There
+   was no reference to `run.status` anywhere in that function**, at any of its three call
+   sites.
 
-So a run whose row reads FAILED has already published its documents. #858's verification
-found the three call sites (`:404`, `:651`, `:776`) and the reason it has not bitten: every
-provider gates its failure reason on `if not resources`, at eight named sites. #845 was the
-first provider to want the other combination — a capture that arrived *and* is not to be
-trusted, because the mirror diverged from its source — and fixed it provider-side, one
-provider at a time.
+So a run whose row read FAILED had already published its documents. #858's verification
+found the reason it had not bitten: every provider gates its failure reason on
+`if not resources`, at eight named sites. #845 was the first provider to want the other
+combination — a capture that arrived *and* is not to be trusted, because the mirror diverged
+from its source — and fixed it provider-side, one provider at a time.
 
 The label and the effect disagreed, and the label is what an operator reads.
+
+**Steps 2 and 3 are unchanged on `main` today** (`:1373`, then `:1376-1381`), and that is the
+point rather than an oversight: the fix #858 landed is a guard at step 4, where
+`_publish_pending_dispatch_events` now reads `run.status` as the first thing it does
+(`:1797-1804`) and routes a FAILED or unresolvable run to `_withhold_dispatch_publication`
+(`:1834`). The ordering inside `_dispatch_run` was never the invariant. The boundary was.
 
 ### Two more of the same shape
 
@@ -72,7 +79,7 @@ and why.
 read is a compare-and-set.** Four commitments.
 
 1. **Publication, not persistence, is the boundary into the corpus.** This is #858's
-   invariant, generalised. A document enters the corpus when its event is published, not when
+   invariant, generalised beyond the dispatch path it now holds. A document enters the corpus when its event is published, not when
    its row is written. Every path that emits an event resolves the current status of the
    thing it emits for, and refuses to emit for one that is terminal-failed — and refuses,
    too, when it cannot resolve that status, because an unresolvable status is not a pass.
@@ -156,8 +163,8 @@ read is a compare-and-set.** Four commitments.
 
 ## References
 
-- #853 (the defect), #858 (the worked instance, open) — the publication boundary and the
-  rollback decision
+- #853 (the defect), #858 (merged 2026-09-03) — the publication boundary and the rollback
+  decision this ADR generalises
 - #844 (open) — the read-modify-write across a network round trip, and the race test that
   passed on the unfixed code
 - #834 / #561 §3–§5 — the CAS writer, the `assert 2 == 12` mutation, and the uncapped
