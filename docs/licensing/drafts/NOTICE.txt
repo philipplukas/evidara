@@ -1,0 +1,20 @@
+Evidara
+Copyright 2026 Philipp Guldimann
+
+This product includes software developed by the Evidara project.
+
+---------------------------------------------------------------------------
+DRAFT — NOT IN EFFECT.
+
+This file is a template. It becomes real only when it is copied to the
+repository root alongside an Apache-2.0 LICENSE. It is meaningless without
+one: NOTICE has no legal effect under MIT, BSD, MPL, GPL, BSL or ELv2 —
+only Apache-2.0 section 4(d) requires it to be reproduced.
+
+Keep it SHORT. An Apache-2.0 NOTICE propagates: every downstream
+redistribution must carry it. It is for required attributions and
+legally-required notices only, NOT for the third-party dependency list.
+That list belongs in THIRD-PARTY-NOTICES.md, which does not propagate.
+
+Delete this block before use.
+---------------------------------------------------------------------------

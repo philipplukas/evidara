@@ -1,0 +1,73 @@
+Business Source License 1.1 — parameter block ONLY.
+
+DRAFT. NOT IN EFFECT. NOT THE LICENCE.
+
+Do not use this file as a LICENSE. BSL 1.1 is a template published by MariaDB
+Corporation Ab; its operative text must be obtained verbatim from the canonical
+source and must not be transcribed from memory:
+
+    https://mariadb.com/bsl11/
+
+What follows is the four-field parameter block that the canonical text requires
+the licensor to fill in, pre-filled with the values that would fit THIS project,
+so the decision is about the values rather than about the format.
+
+Every value below is a PROPOSAL. None has been chosen.
+
+---------------------------------------------------------------------------
+
+Licensor:             Philipp Guldimann
+
+Licensed Work:        Evidara
+                      The Licensed Work is (c) 2026 Philipp Guldimann
+
+Additional Use Grant: You may make production use of the Licensed Work,
+                      provided you do not offer it, or any derivative of it,
+                      to third parties as a hosted or managed legal research,
+                      legal search, or legal document intelligence service.
+
+                      [DECISION NEEDED. This clause is the whole licence.
+                      Alternatives commonly used:
+                        - non-production use only (the strictest reading);
+                        - production use below a named scale threshold
+                          (seats, requests/month, corpus size);
+                        - internal use only, no offering to third parties.
+                      The clause above bans only the competing-service case
+                      and permits a firm to self-host for its own lawyers,
+                      which is the shape that fits Q1/Q2 in the brief.]
+
+Change Date:          2030-01-01
+
+                      [DECISION NEEDED. BSL convention is four years after
+                      each release. A fixed date is simpler to administer for
+                      a single-author project than a rolling per-release date,
+                      and it is what MariaDB itself started with.]
+
+Change License:       Apache License, Version 2.0
+
+                      [The canonical text requires this to be GPL-compatible.
+                      Apache-2.0 qualifies and matches the brief's §4(a)
+                      recommendation, so a converted release and the extracted
+                      envelope repo would end up under the same terms.]
+
+---------------------------------------------------------------------------
+
+Notes before adopting BSL for this repository:
+
+1. BSL is NOT open source. It is not OSI-approved. Calling it open source in
+   marketing copy is the single most common mistake made with it, and
+   marketing/src/lib/content.ts requires an evidence code path for every
+   claim (ADR-0039) — a BSL claim would have to be worded accurately there.
+
+2. BSL applies per release. Each release carries its own Change Date, so a
+   release made in 2027 under a fixed 2030-01-01 Change Date converts sooner
+   after publication than one made in 2026. Decide fixed-vs-rolling before the
+   first release, not after.
+
+3. BSL says nothing about third-party components. THIRD-PARTY-NOTICES.md is
+   still required, and the LGPL/MPL obligations in the dependency inventory
+   are unaffected by it.
+
+4. If the WorkflowCommandEnvelope extraction in §4(a) of the brief goes ahead,
+   it must NOT be BSL. A schema nobody may use in production is a schema
+   nobody adopts.
