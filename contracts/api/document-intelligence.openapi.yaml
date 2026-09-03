@@ -14,8 +14,12 @@ info:
   contact:
     name: Evidara Team
   license:
+    # No SPDX `identifier` is declared. OpenAPI 3.1 requires `info.license.identifier`
+    # to be a valid SPDX licence expression when present, and `UNLICENSED` is npm
+    # vocabulary with no SPDX registration — it made these specs non-conformant.
+    # `name` alone is conformant and states only what is true today: no licence has
+    # been granted. Adding an identifier is a licence decision, not a spec fix.
     name: Proprietary
-    identifier: UNLICENSED
 
 servers:
   - url: http://localhost:8082

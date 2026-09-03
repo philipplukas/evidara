@@ -1,4 +1,11 @@
-version: "2.28.0"
+# 2.32.0: drops `info.license.identifier: UNLICENSED` from the three
+# hand-authored contracts. `UNLICENSED` is npm vocabulary with no SPDX
+# registration, and OpenAPI 3.1 requires `info.license.identifier` to be a
+# valid SPDX expression when present — so the field was non-conformant
+# regardless of which licence the project eventually adopts. `name:
+# Proprietary` is kept and is conformant on its own. No API shape changed, so
+# no `apis.*.version` moved.
+version: "2.32.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
