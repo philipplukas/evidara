@@ -46,8 +46,14 @@ from document_intelligence.normalize.html import (
 )
 from document_intelligence.normalize.ir import NormalizedDocumentIR
 from document_intelligence.normalize.pdf import normalize_pdf_document
+from document_intelligence.normalize.quarantine import (
+    QuarantineThresholds,
+    QuarantineVerdict,
+    assess_quarantine,
+)
 from document_intelligence.normalize.titles import is_placeholder_title
 from document_intelligence.normalize.xml import normalize_xml_document
+from document_intelligence.observability.metrics import record_quarantine
 from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
 from document_intelligence.persist.surfaces import PUBLISHED_DOCUMENTS, PUBLISHED_SECTIONS
 from document_intelligence.profiles.registry import resolve_selected_profiles
@@ -128,6 +134,7 @@ class ProcessingPipeline:
         llm_metadata_extractor: MetadataExtractor | None = None,
         enable_commentary_insights: bool = False,
         commentary_insight_min_confidence: float = 0.7,
+        quarantine_thresholds: QuarantineThresholds | None = None,
     ) -> None:
         if parser_backend not in {"legacy", "docling"}:
             raise ValueError("parser_backend must be one of: legacy, docling")
@@ -148,6 +155,9 @@ class ProcessingPipeline:
         self._llm_metadata_extractor = llm_metadata_extractor
         self._enable_commentary_insights = enable_commentary_insights
         self._commentary_insight_min_confidence = commentary_insight_min_confidence
+        # Defaults, not "off": ADR-0047's floors apply unless an operator narrows them, so
+        # a pipeline constructed without configuration still holds the invariant.
+        self._quarantine_thresholds = quarantine_thresholds or QuarantineThresholds()
 
     def process_event(self, event_data: dict[str, Any]) -> ProcessingResult:
         event = ArtifactBundleAvailableEvent.from_dict(event_data)
@@ -228,6 +238,32 @@ class ProcessingPipeline:
             selected_bundle.manifest,
             normalized_document,
         )
+
+        # ADR-0047's invariant, applied before anything downstream can treat this as a
+        # document. Placed here on purpose: extraction has happened (so the text-level
+        # question is answerable at all), and nothing has been built, validated or
+        # published yet (so refusing costs nothing). Acquisition could not ask this —
+        # `content_gate` abstains on `application/pdf` — and every structural check after
+        # this point is satisfied by an empty IR, which is exactly how a scanned ordinance
+        # became a canonical document with no text in it.
+        quarantine = assess_quarantine(
+            normalized_document=normalized_document,
+            content_type=primary_content_type,
+            thresholds=self._quarantine_thresholds.with_overrides(selected_bundle.manifest.di_overrides),
+        )
+        if quarantine.quarantined:
+            return self._quarantine_result(
+                quarantine=quarantine,
+                event=event,
+                selected_bundle=selected_bundle,
+                provenance=provenance,
+                document_id=document_id,
+                document_revision=document_revision,
+                processing_manifest_id=processing_manifest_id,
+                normalized_document=normalized_document,
+                status_events=status_events,
+            )
+
         sections = _build_sections(
             document_id=document_id,
             document_revision=document_revision,
@@ -346,6 +382,85 @@ class ProcessingPipeline:
             manifest=manifest,
             status_events=status_events,
             document_processed_event=document_processed_event,
+        )
+
+    def _quarantine_result(
+        self,
+        *,
+        quarantine: QuarantineVerdict,
+        event: ArtifactBundleAvailableEvent,
+        selected_bundle: SelectedArtifactBundle,
+        provenance: Provenance,
+        document_id: str,
+        document_revision: int,
+        processing_manifest_id: str,
+        normalized_document: NormalizedDocumentIR,
+        status_events: list[dict[str, Any]],
+    ) -> ProcessingResult:
+        """Terminate processing with a quarantined manifest and nothing published.
+
+        Three things are deliberately **not** done here, and each of them is the whole
+        point (ADR-0047):
+
+        - No ``document.processed`` event. That event is what the projection bridge
+          forwards to legal-search, so emitting one would put a document the corpus holds
+          no legal text for into search results — the confident fabrication ADR-0033
+          exists to prevent, arriving through the back door.
+        - No ``canonical_ready`` status event, and no canonical rows. The status flow ends
+          at ``processing``.
+        - No exception. A quarantined document did not *fail*: processing completed and
+          produced output we should not trust. Raising would route it to the DLQ, whose
+          remedy is replay, and replay changes nothing until someone implements the
+          missing class. Same queue shape, opposite remedy.
+
+        What *is* done is the record: a ``quarantined`` manifest row on the DI-owned
+        ``processing_manifests`` surface carrying the reason slug and the evidence, plus a
+        counter. A quarantine nobody can see is silent failure with extra steps.
+        """
+        selected_profiles = resolve_selected_profiles(
+            source_origin_kind=selected_bundle.manifest.source_origin_kind,
+            trust_tier=selected_bundle.manifest.trust_tier,
+            source_defaults=selected_bundle.manifest.source_defaults,
+            di_overrides=selected_bundle.manifest.di_overrides,
+            normalized_metadata=normalized_document.metadata,
+        )
+        manifest = ProcessingManifest(
+            processing_manifest_id=processing_manifest_id,
+            manifest_version=1,
+            document_id=document_id,
+            # The revision this manifestation *would* have taken. Nothing is published, so
+            # the number is not consumed: a later run that clears the floors re-derives the
+            # same revision from `published_documents`, which still has no row for it.
+            document_revision=document_revision,
+            processing_version=self._processing_version,
+            status="quarantined",
+            provenance=provenance,
+            input_bundle_manifest_ref=_manifest_ref_from_dict(event.payload.bundle_manifest_ref.to_dict()),
+            selected_profiles=selected_profiles.to_dict(),
+            reference_snapshot_set_ref=selected_bundle.manifest.reference_context.get("reference_snapshot_set_ref"),
+            document_count=0,
+            section_count=0,
+            citation_count=0,
+            failure=None,
+            quarantine=quarantine.as_record(),
+        )
+
+        validate_processing_manifest(manifest)
+        for status_event in status_events:
+            validate_event(status_event)
+
+        self._sink.persist_quarantine(manifest)
+        self._sink.record_status_events(status_events)
+        record_quarantine(quarantine.reason or "unknown")
+
+        return ProcessingResult(
+            document=None,
+            sections=[],
+            commentary_insights=[],
+            manifest=manifest,
+            status_events=status_events,
+            document_processed_event=None,
+            quarantine=manifest.quarantine,
         )
 
     def _extract_metadata_candidate(

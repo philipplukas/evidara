@@ -142,6 +142,39 @@ async def rescore_targeted(
             bundle_loader=bundle_loader,
         ).process_event(event_payload)
 
+        if candidate.is_quarantined:
+            # The re-extraction produced no document: this target's manifestation no longer
+            # clears ADR-0047's text-level floors. Return before `_target_changed`, which
+            # dereferences `candidate.document` and would otherwise raise `AttributeError`
+            # into the blanket handler below — a crash reported as a rescore failure, with
+            # the actual reason nowhere.
+            #
+            # Deliberately NOT persisting: a persisting pass would write a `quarantined`
+            # manifest while the previously published document row stays newest on the
+            # append-only surface, leaving the corpus serving text the manifest says we do
+            # not trust.
+            #
+            # The honest outcome here is `quarantined`, and this returns `failed` instead.
+            # That is a constraint, not a judgement: `CorrectionService.record_rescore_outcome`
+            # validates the outcome against {changed, unchanged, failed} and
+            # `temporal/activities.py:523-529` calls it *outside* its own try/except, so an
+            # unrecognised value raises `ValueError` out of the activity and fails the
+            # correction workflow — strictly worse than the recorded failure it replaces.
+            # Widening that enum is the same platform-control change the `quarantined`
+            # processing-status value needs; until then the reason lives in this log line.
+            logger.warning(
+                "targeted_rescore_quarantined",
+                extra={
+                    "target_entity_type": target_entity_type,
+                    "target_entity_id": target_entity_id,
+                    "correction_id": correction_id,
+                    "quarantine_reason": (candidate.quarantine or {}).get("reason"),
+                    "quarantine_detail": (candidate.quarantine or {}).get("detail"),
+                    "processing_manifest_id": candidate.manifest.processing_manifest_id,
+                },
+            )
+            return ("failed", None)
+
         if not _target_changed(target, candidate):
             return ("unchanged", None)
 
@@ -304,6 +337,13 @@ def _document_semantic(document: Mapping[str, Any]) -> tuple[Any, ...]:
 
 def _candidate_document_semantic(candidate: ProcessingResult) -> tuple[Any, ...]:
     document = candidate.document
+    if document is None:
+        # Unreachable via `rescore_targeted`, which returns on `is_quarantined` first. Kept
+        # as an explicit contract rather than an implicit one: `ProcessingResult.document` is
+        # `None` exactly when quarantined (ADR-0047), and this module runs behind a blanket
+        # `except Exception`, so an AttributeError here would surface as an unexplained
+        # "failed" rescore instead of a diagnosable error.
+        raise ValueError("cannot compare a quarantined candidate: no document was produced")
     return (
         document.title,
         document.document_type,

@@ -18,17 +18,23 @@ from document_intelligence.validate.schema_validation import (
 )
 from support import build_bundle_event, build_manifest_payload
 
+# Fixtures in this file are named "statute" and are fed to a pipeline that now asserts
+# they *are* law before admitting them (ADR-0047). They therefore carry real legal-text
+# markers and enough body to clear the floors — a fixture that could not pass the gate
+# would be testing normalisation of something the corpus must never hold.
 SAMPLE_HTML = """
 <html>
   <head>
     <title>Sample Statute</title>
   </head>
   <body>
-    <p>Introductory material before the first section.</p>
+    <p>Introductory material before the first section of this Act.</p>
     <h1>Section 1</h1>
-    <p>First section text.</p>
+    <p>Art. 1 Abs. 1 Dieses Gesetz regelt die Erhebung und Bearbeitung von Daten
+       durch die zustaendigen Behoerden des Bundes.</p>
     <h2>Section 2</h2>
-    <p>Second section text.</p>
+    <p>Art. 2 Abs. 1 Es gilt fuer alle Bundesstellen sowie fuer beauftragte Dritte,
+       soweit keine besonderen Bestimmungen entgegenstehen.</p>
   </body>
 </html>
 """
@@ -61,11 +67,12 @@ SAMPLE_MARKDOWN = """
 # Datenschutzgesetz
 
 ## Art. 1 Zweck
-Dieses Gesetz schützt personenbezogene Daten.
+Abs. 1 Dieses Gesetz schützt personenbezogene Daten vor missbräuchlicher Bearbeitung.
+Abs. 2 Es regelt die Rechte der betroffenen Personen gegenüber den Bundesstellen.
 
 ## Art. 2 Geltungsbereich
-- Es gilt für Bundesstellen.
-- Es gilt für beauftragte Dritte.
+- Es gilt für Bundesstellen und deren Organe.
+- Es gilt für beauftragte Dritte, soweit sie Daten im Auftrag bearbeiten.
 """
 
 
@@ -228,7 +235,15 @@ class ProcessingPipelineTests(unittest.TestCase):
             os.unlink(manifest_path)
 
     def test_processes_local_application_json_bundle_into_contract_valid_outputs(self) -> None:
-        sample_json = '{"name": "left-pad", "version": "1.3.0", "description": "String left pad"}'
+        # A JSON manifestation of a legal text, not a package manifest: the pipeline now
+        # refuses to publish a document whose extracted text is not law (ADR-0047), and a
+        # `package.json` fixture is precisely the kind of thing the corpus must not hold.
+        sample_json = (
+            '{"titel": "Datenschutzgesetz", '
+            '"art_1": "Art. 1 Abs. 1 Dieses Gesetz schuetzt personenbezogene Daten.", '
+            '"art_2": "Art. 2 Abs. 1 Es gilt fuer Bundesstellen und beauftragte Dritte.", '
+            '"art_3": "Art. 3 Abs. 1 Die betroffene Person kann jederzeit Auskunft verlangen."}'
+        )
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as json_handle:
             json_handle.write(sample_json)
             artifact_path = json_handle.name
@@ -260,7 +275,7 @@ class ProcessingPipelineTests(unittest.TestCase):
             result = pipeline.process_event(build_bundle_event(manifest_path))
 
             self.assertEqual(result.document.document_revision, 1)
-            self.assertIn("left-pad", result.document.body_text or result.document.full_text)
+            self.assertIn("Datenschutzgesetz", result.document.body_text or result.document.full_text)
             self.assertEqual(
                 [event["payload"]["status"] for event in result.status_events],
                 ["accepted", "processing", "canonical_ready"],
@@ -636,7 +651,9 @@ class ProcessingPipelineTests(unittest.TestCase):
             )
             self.assertEqual(result.document.title, "Sample Statute")
             self.assertEqual(result.document.metadata["normalizer"], "html_v1")
-            self.assertEqual(result.document.metadata["source_flavor"], "structured_html")
+            # `legal_html`, not `structured_html`: the fixture now carries the Art./Abs.
+            # markers a statute carries, which is what `_detect_html_source_flavor` keys on.
+            self.assertEqual(result.document.metadata["source_flavor"], "legal_html")
             self.assertIs(result.document.metadata.get("html_parse_used_fallback"), False)
         finally:
             os.unlink(artifact_path)
@@ -695,6 +712,12 @@ class ProcessingPipelineTests(unittest.TestCase):
         _draw(200, 138, "die Fuehrung des")
         _draw(45, 150, "Organisation", font="Helvetica-Bold", size=9)
         _draw(200, 156, "Hundeverzeichnisses und der Hundekontrolle.")
+        # Enough body below the splice region to clear ADR-0047's text-level floors. The
+        # splice geometry above is untouched — these lines sit in the same body column and
+        # carry the legal markers a real ordinance carries.
+        _draw(200, 186, "Art. 2 Abs. 1 Die Halterin oder der Halter meldet den Hund")
+        _draw(200, 204, "innert zehn Tagen der Gemeinde. Art. 3 Abs. 1 Die Gemeinde")
+        _draw(200, 222, "erhebt eine jaehrliche Abgabe nach Abs. 2 dieser Vorschrift.")
         canvas.showPage()
         canvas.save()
         pdf_buffer.close()

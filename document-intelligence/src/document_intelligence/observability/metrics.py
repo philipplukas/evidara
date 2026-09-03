@@ -24,6 +24,7 @@ __all__ = [
     "CONTENT_TYPE_LATEST",
     "record_message_outcome",
     "record_projection_outcome",
+    "record_quarantine",
     "render_latest",
 ]
 
@@ -38,6 +39,23 @@ _PROJECTION_FORWARDS = Counter(
     "document.processed events the projection bridge forwarded to legal-search, by terminal outcome.",
     ["outcome"],
 )
+
+
+_QUARANTINED = Counter(
+    "di_quarantined_documents_total",
+    "Manifestations withheld from the canonical corpus, by ADR-0047 reason slug.",
+    ["reason"],
+)
+
+
+def record_quarantine(reason: str) -> None:
+    """Count one quarantined manifestation (ADR-0047 §6).
+
+    The per-reason breakdown is the point, not the total: the slug decides which of the
+    ADR's two exits the cohort takes — fix our logic, or implement the missing class. A
+    bare count would say the corpus is losing documents without saying what to build.
+    """
+    _QUARANTINED.labels(reason=reason).inc()
 
 
 def record_message_outcome(service: str, outcome: str) -> None:

@@ -70,7 +70,10 @@ def _process_message(
     if publisher is not None:
         for status_event in result.status_events:
             publisher.publish_status_event(status_event)
-        publisher.publish_document_processed_event(result.document_processed_event)
+        # A quarantined result published nothing to canonical, so there is no
+        # `document.processed` event — see ADR-0047 and `ProcessingResult`.
+        if result.document_processed_event is not None:
+            publisher.publish_document_processed_event(result.document_processed_event)
 
 
 def main(argv: list[str] | None = None) -> int:

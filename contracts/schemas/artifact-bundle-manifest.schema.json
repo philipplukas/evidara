@@ -186,6 +186,16 @@
         "normalization_profile_ref": {
           "type": "string",
           "description": "Optional explicit normalization profile reference for difficult sources."
+        },
+        "quarantine_min_extracted_chars": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Per-source floor for ADR-0047's extracted-character check, overriding DI_QUARANTINE_MIN_EXTRACTED_CHARS. Per-source because the honest minimum for a cantonal act is not the honest minimum for a one-article communal ordinance, and a global floor that is too aggressive stalls ingestion."
+        },
+        "quarantine_min_legal_markers": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Per-source floor for ADR-0047's legal-marker check (Art./§/Abs./comma/cpv.), overriding DI_QUARANTINE_MIN_LEGAL_MARKERS. Shares the marker vocabulary and default (3) with acquisition_core.content_gate."
         }
       },
       "additionalProperties": false

@@ -72,6 +72,21 @@ _PROCESSING_MANIFESTS_DELTA_KEYS = frozenset(
         "canonical_ready_at",
     }
 )
+# Columns that exist only on a row nobody publishes: `failure` on a failed result,
+# `quarantine` on a withheld one (ADR-0047). They are deliberately NOT in the set above.
+#
+# `_delta_ready_rows` projects every row to *exactly* `always_present_keys`, so a column
+# outside that set is dropped on the way to Delta/Iceberg/Spark whatever the model carries
+# — which is how a quarantine reason survived in `InMemoryCanonicalSink` (every test) and
+# vanished in every deployed configuration. But putting them in the always-present set is
+# not the fix either: on a canonical-ready row both are `None`, PyArrow infers a `null`
+# column, and deltalake refuses the whole write with *"Invalid data type for Delta Lake:
+# Null"* — that would take the publish path down, not just the reason.
+#
+# So they are added to the projection **per batch, only when a row carries one**, exactly
+# as `extensions` is dropped from it when no row carries one. A present value is a real
+# struct, so Arrow types it, and `schema_mode="merge"` evolves the table on first sight.
+_PROCESSING_MANIFESTS_CONDITIONAL_KEYS = frozenset({"failure", "quarantine"})
 _PUBLISHED_COMMENTARY_INSIGHTS_DELTA_KEYS = frozenset(
     {
         "insight_id",
@@ -253,6 +268,15 @@ class CanonicalSink:
     ) -> None:
         raise NotImplementedError
 
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
+        """Record a quarantined result: the manifest row only, no canonical rows (ADR-0047).
+
+        The whole point is that no document and no sections are published — but the
+        judgment is still written down, with its reason, where an operator can group the
+        queue by it. A quarantine that leaves no row is silent failure with extra steps.
+        """
+        raise NotImplementedError
+
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
         raise NotImplementedError
 
@@ -300,6 +324,9 @@ class InMemoryCanonicalSink(CanonicalSink):
     ) -> None:
         self.published_documents.append(document)
         self.published_sections.extend(sections)
+        self.processing_manifests.append(manifest)
+
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
         self.processing_manifests.append(manifest)
 
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
@@ -359,6 +386,14 @@ class DeltaCanonicalSink(CanonicalSink):
             section_rows,
             always_present_keys=_PUBLISHED_SECTIONS_DELTA_KEYS,
         )
+        self._write_rows(
+            self._config.processing_manifests_uri,
+            [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
+        )
+
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
+        """Write the manifest row alone — no document, no sections (ADR-0047)."""
         self._write_rows(
             self._config.processing_manifests_uri,
             [_manifest_dict_for_delta(manifest)],
@@ -591,6 +626,14 @@ class IcebergCanonicalSink(CanonicalSink):
             always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
         )
 
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
+        """Write the manifest row alone — no document, no sections (ADR-0047)."""
+        self._write_rows(
+            self._config.processing_manifests_table,
+            [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
+        )
+
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
         self.status_events.extend(status_events)
 
@@ -737,6 +780,14 @@ class SparkDeltaCanonicalSink(CanonicalSink):
             always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
         )
 
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
+        """Write the manifest row alone — no document, no sections (ADR-0047)."""
+        self._write_rows(
+            self._config.processing_manifests_uri,
+            [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
+        )
+
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
         self.status_events.extend(status_events)
 
@@ -804,11 +855,24 @@ def _projection_keys_for_rows(
     rows: Sequence[dict[str, object]],
     always_present_keys: frozenset[str] | None,
 ) -> frozenset[str] | None:
-    if always_present_keys != _PUBLISHED_DOCUMENTS_DELTA_KEYS:
-        return always_present_keys
-    if any(isinstance(row.get("extensions"), dict) and row["extensions"] for row in rows):
-        return always_present_keys
-    return frozenset(key for key in always_present_keys if key != "extensions")
+    if always_present_keys == _PUBLISHED_DOCUMENTS_DELTA_KEYS:
+        if any(isinstance(row.get("extensions"), dict) and row["extensions"] for row in rows):
+            return always_present_keys
+        return frozenset(key for key in always_present_keys if key != "extensions")
+    if always_present_keys == _PROCESSING_MANIFESTS_DELTA_KEYS:
+        # Widen, rather than narrow: `failure` and `quarantine` join the projection only for
+        # a batch that actually carries one. Forcing them always-present would write a
+        # PyArrow `null` column on every canonical-ready row, which deltalake rejects
+        # outright ("Invalid data type for Delta Lake: Null") — taking down the publish path
+        # to preserve a reason. Leaving them out entirely is what silently discarded the
+        # quarantine slug in every non-in-memory sink. See the constant's comment.
+        present = frozenset(
+            key
+            for key in _PROCESSING_MANIFESTS_CONDITIONAL_KEYS
+            if any(isinstance(row.get(key), dict) and row[key] for row in rows)
+        )
+        return always_present_keys | present
+    return always_present_keys
 
 
 def _delta_ready_rows(
