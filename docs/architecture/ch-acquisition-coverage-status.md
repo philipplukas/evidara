@@ -95,7 +95,12 @@ acceptance harness exercises this path end-to-end (capture → DI lifecycle
 `lexfind_api` is the cantonal rung. LexFind (`www.lexfind.ch`, a project of
 the *Schweizerische Staatsschreiberkonferenz*) exposes an unauthenticated
 JSON API over the same texts of law the cantons publish themselves — 26
-cantons plus Bund, 28 entities, behind one contract. One provider covers
+cantons plus Bund, behind one contract. (The provider header says
+"26 cantons + Bund" and then counts **28** entities against
+`entities/extended` — `services/lexfind_api_provider.py:1,12`.
+That 27-vs-28 discrepancy is
+upstream's and is not reconciled here; the enumeration work in #818 measured
+28.) One provider covers
 the whole rung, which is why it was prioritised: #628 measures the cost of
 the Nth source, and 28 jurisdictions behind one homogeneous contract is the
 cheapest available test of whether that cost falls.
@@ -196,7 +201,9 @@ true on `main`:
 (`services/gemeinde_http_provider.py:304`), on acceptance evidence captured
 against live Zürich AS 554.510 on 2026-07-20
 ([`2026-07-20-ch-gemeinde-zuerich-acceptance.md`](../runbooks/evidence/2026-07-20-ch-gemeinde-zuerich-acceptance.md)) —
-also `environment: compose-local`. The single template
+also `environment: compose-local`, per
+[`…-acceptance.json:2`](../runbooks/evidence/2026-07-20-ch-gemeinde-zuerich-acceptance.json),
+which is the file that carries that field. The single template
 `gemeinde_http_zh_stadt_hundevorschriften` ships `enabled: false`, so no
 communal law is acquired in any environment.
 
@@ -233,8 +240,10 @@ an explicit lowercase `court` hint that is passed through to the resource
 metadata (`services/ch_court_decisions_provider.py:7-14`).
 
 Compliance is pre-declared: `cp_ch_court_decisions` is a
-public-official-tier policy (robots strict, ~20 rpm, 2 concurrent, 365-day
-retention) intended to bind at the **authority** level (`auth_bger` /
+public-official-tier policy (robots strict, a 10–20 rpm corridor — min 10,
+start 20, max 20 — 2 concurrent per host, 365-day retention;
+`seeds/reference/compliance_policies.yaml:74-79`) intended to bind at the
+**authority** level (`auth_bger` /
 `auth_bvger`) so court runs are stricter than Fedlex legislation while both
 sit under `jur_ch_federal` — see the authority-over-jurisdiction resolution
 in ADR-0030 §4. Live-enablement requires real discovery URLs and a `pass`
