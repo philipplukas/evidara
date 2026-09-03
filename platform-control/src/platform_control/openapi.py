@@ -87,7 +87,14 @@ API_TITLE = "Platform Control API"
 # resolves to a recorded outcome instead of hanging with no timeout, no
 # notification and no way to end (#560), so the gate decision is readable as a
 # claim rather than inferred from a run that never moves.
-API_VERSION = "0.23.0"
+# 0.24.0: additive -- the ADR-0030 config-key flip guard moved server-side (#854).
+# `PUT /v1/sources/blueprint-templates/{overlay}/{template}/enablement` now accepts
+# `evidence_run_id` and the two ADR-0030 acknowledgements, answers 409 with
+# machine-readable `refusals[].code` when it will not move the key, and reports
+# `applied` / `needs_human` / `evidence_binding` on success. Additive on the wire, but
+# a caller that sent `{enabled, note}` alone can no longer arm a key — which is the
+# point: the admin panel was the soft path around the guard the CLI enforced.
+API_VERSION = "0.24.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

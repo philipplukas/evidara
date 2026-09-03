@@ -396,6 +396,13 @@ async def test_blueprint_template_inventory_reports_config_key_provenance(client
     Without `source`, the admin inventory cannot tell a template running on the
     shipped default from one an operator deliberately turned on (or off) — which
     is the whole point of an evidence-gated coverage surface.
+
+    Driven in the *closing* direction because that is the harder provenance case and
+    the one the panel used to render wrong (#854): `enabled: false, source: default`
+    is a key nobody ever turned, which ADR-0030's acceptance waiver still dispatches
+    at; `enabled: false, source: override` is an operator's kill switch, which it does
+    not (#768). Both read `enabled: false`. Arming the key needs cited acceptance
+    evidence and is driven end to end in `tests/smoke/test_app.py`.
     """
     before = await client.get("/v1/sources/blueprint-templates")
     assert before.status_code == 200
@@ -405,12 +412,13 @@ async def test_blueprint_template_inventory_reports_config_key_provenance(client
         if (r["overlay_id"], r["provider_template_id"]) == ("de", "bundesland_http_bayern")
     )
     assert row["source"] == "default"
+    assert row["enabled"] is False
     assert row["note"] is None
     assert row["updated_by"] is None
 
     flip = await client.put(
         "/v1/sources/blueprint-templates/de/bundesland_http_bayern/enablement",
-        json={"enabled": True, "note": "acceptance run 2026-07-19"},
+        json={"enabled": False, "note": "shut pending 2026-07-19 terms review"},
     )
     assert flip.status_code == 200
 
@@ -421,9 +429,9 @@ async def test_blueprint_template_inventory_reports_config_key_provenance(client
         if (r["overlay_id"], r["provider_template_id"]) == ("de", "bundesland_http_bayern")
     )
     assert flipped["source"] == "override"
-    assert flipped["enabled"] is True
+    assert flipped["enabled"] is False
     assert flipped["default_enabled"] is False
-    assert flipped["note"] == "acceptance run 2026-07-19"
+    assert flipped["note"] == "shut pending 2026-07-19 terms review"
     assert flipped["updated_at"] is not None
 
 

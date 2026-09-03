@@ -17,6 +17,20 @@ const awaitingEvidence = (enabled: boolean) => ({
   acquisition_readiness: "awaiting_evidence" as const,
 });
 
+/**
+ * A key an operator deliberately shut, on a provider that is otherwise ready.
+ *
+ * `source: "override"` is the only thing separating this from `lock(false, true)` —
+ * both read `enabled: false` — and the difference is what #854 says the panel was
+ * throwing away.
+ */
+const killSwitch = (readiness: "live" | "awaiting_evidence" | "scaffold" = "live") => ({
+  enabled: false,
+  live_ready: readiness === "live",
+  acquisition_readiness: readiness,
+  source: "override" as const,
+});
+
 describe("classifyTemplate", () => {
   it("calls both keys open 'live'", () => {
     expect(classifyTemplate(lock(true, true)).id).toBe("live");
@@ -48,6 +62,33 @@ describe("classifyTemplate", () => {
     // an operator action for a provider that genuinely has no implementation.
     expect(classifyTemplate(lock(false, false)).id).toBe("engineer-blocked");
   });
+
+  it("does not collapse an operator's kill switch into 'ready to enable'", () => {
+    // #854: `classifyTemplate` derived the class from `enabled` alone, so a key
+    // somebody deliberately shut and a key nobody ever turned rendered identically —
+    // and the panel told the operator the second one's story about both. The dialog
+    // then offered to overwrite a state the list never showed.
+    expect(classifyTemplate(killSwitch()).id).toBe("operator-disabled");
+    expect(classifyTemplate(lock(false, true)).id).toBe("operator-actionable");
+  });
+
+  it("still sends a kill switch on a scaffold provider to an engineer first", () => {
+    // Mirrors `evidara_cli.coverage.classify_template`'s blocker ordering, so the
+    // panel and the CLI never disagree about the first step. The closed key is not
+    // lost — `describeConfigKey` reports it unconditionally.
+    expect(classifyTemplate(killSwitch("scaffold")).id).toBe("engineer-blocked");
+    expect(describeConfigKey(killSwitch("scaffold")).ownerHint).toContain("deliberately");
+  });
+
+  it("outranks 'awaiting acceptance' with a kill switch", () => {
+    expect(classifyTemplate(killSwitch("awaiting_evidence")).id).toBe("operator-disabled");
+  });
+
+  it("reads a payload with no `source` as a key nobody turned", () => {
+    // The safe direction: inventing a kill switch nobody installed would send an
+    // operator to ask a colleague who does not exist.
+    expect(classifyTemplate({ enabled: false, live_ready: true }).id).toBe("operator-actionable");
+  });
 });
 
 describe("summarizeInventory", () => {
@@ -63,10 +104,17 @@ describe("summarizeInventory", () => {
     expect(summary).toEqual({
       live: 1,
       "operator-actionable": 2,
+      "operator-disabled": 0,
       "awaiting-acceptance": 1,
       "engineer-blocked": 2,
       total: 6,
     });
+  });
+
+  it("counts an operator's kill switch as its own class", () => {
+    const summary = summarizeInventory([killSwitch(), lock(false, true)]);
+    expect(summary["operator-disabled"]).toBe(1);
+    expect(summary["operator-actionable"]).toBe(1);
   });
 });
 
@@ -75,6 +123,15 @@ describe("key descriptors", () => {
     const config = describeConfigKey(lock(false, true));
     expect(config.state).toBe("shut");
     expect(config.ownerHint).toContain("yours");
+  });
+
+  it("never calls somebody else's kill switch 'yours to turn'", () => {
+    // The state the dialog is about to overwrite has to be legible before it opens.
+    const config = describeConfigKey(killSwitch());
+    expect(config.state).toBe("shut");
+    expect(config.ownerHint).not.toContain("yours");
+    expect(config.ownerHint).toContain("ask before reopening");
+    expect(config.level).toBe("critical");
   });
 
   it("tells the operator a shut code key needs an engineer", () => {

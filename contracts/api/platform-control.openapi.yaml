@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.23.0
+  version: 0.24.0
 paths:
   /health:
     get:
@@ -518,12 +518,21 @@ paths:
       - source-versions
       summary: Set Blueprint Template Enablement
       description: |-
-        Flip the operator-reachable ADR-0030 config key for one template (#632).
+        Flip the operator-reachable ADR-0030 config key for one template (#632, #854).
 
         This is the key an operator turns after capturing acceptance-run evidence —
         reachable over the API, with an audit trail (who/when/why), no repo edit and
         no deploy. The code key (`live_ready`) is unaffected: a run at a scaffold
         provider still refuses even once this is enabled.
+
+        **The guard is here, not in the clients.** Enabling requires a cited
+        `evidence_run_id` whose run survives the ADR-0030 acceptance verdict and binds to
+        *this* template — not merely to its provider, which for `lexfind` would be 26
+        cantons plus Bund off one canton's run (#846). Reopening a key an operator
+        deliberately shut, and arming the config key ahead of the code key, each need their
+        own acknowledgement. Refusals come back as **409** with machine-readable codes and
+        nothing written; a 200 additionally asserts `applied`, which is a genuine read-back
+        rather than the status code (#631, #713).
       operationId: setBlueprintTemplateEnablement
       security:
       - APIKeyHeader: []
@@ -559,6 +568,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 'The ADR-0030 guard refused to move the config key. `refusals[].code` names why,
+            in the same vocabulary `evidara workflow coverage enable` reports. `write_attempted: false`
+            means nothing was written.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlueprintTemplateEnablementRefusedResponse'
         '422':
           description: Validation Error
           content:
@@ -3493,6 +3510,124 @@ components:
         tenant/corpus/scope binding, the trust tier, and the portal-identifying
         config stay whatever the blueprint says, and the merged seeds must still sit
         on an origin the template itself reaches. See ADR-0046.
+    BlueprintTemplateAcceptanceVerdict:
+      properties:
+        is_acceptance_evidence:
+          type: boolean
+          title: Is Acceptance Evidence
+        refusals:
+          items:
+            $ref: '#/components/schemas/BlueprintTemplateEnablementRefusal'
+          type: array
+          title: Refusals
+        run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Run Id
+        mode:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mode
+        execution_mode:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Execution Mode
+        captured_resources_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Captured Resources Count
+      type: object
+      required:
+      - is_acceptance_evidence
+      title: BlueprintTemplateAcceptanceVerdict
+      description: Whether the cited run may be cited as ADR-0030 acceptance evidence.
+    BlueprintTemplateEnablementRefusal:
+      properties:
+        code:
+          type: string
+          title: Code
+          description: Stable refusal code. The same vocabulary `evidara workflow coverage enable` reports,
+            so an agent branches on the code and never on prose.
+          examples:
+          - operator_kill_switch_not_acknowledged
+        detail:
+          type: string
+          title: Detail
+          description: Operator-facing explanation of the refusal.
+      type: object
+      required:
+      - code
+      - detail
+      title: BlueprintTemplateEnablementRefusal
+      description: One machine-readable reason the flip did not happen.
+    BlueprintTemplateEnablementRefusedResponse:
+      properties:
+        detail:
+          type: string
+          title: Detail
+          description: Human-readable summary — the first refusal's detail.
+        correlation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Correlation Id
+        overlay_id:
+          type: string
+          title: Overlay Id
+        provider_template_id:
+          type: string
+          title: Provider Template Id
+        refusals:
+          items:
+            $ref: '#/components/schemas/BlueprintTemplateEnablementRefusal'
+          type: array
+          title: Refusals
+        needs_human:
+          type: boolean
+          title: Needs Human
+          default: true
+        write_attempted:
+          type: boolean
+          title: Write Attempted
+          description: 'False for a pre-write refusal: nothing was written and the key is unchanged. True
+            only when the override row was written and the read-back then failed to confirm it — the key''s
+            state is then whatever the read-back reports, not what was requested.'
+        evidence_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Evidence Run Id
+        evidence_binding:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Evidence Binding
+          description: 'How tightly the cited run is bound to *this* template. ''template'' is exact —
+            the run''s source version records this overlay and provider template. ''acquisition_spec''
+            is near-exact — the version has no blueprint provenance but its resolved spec equals this
+            template''s, so `needs_human` is set. ''provider'' and ''none'' are too weak to enable on
+            and are refused: all 26 cantons and Bund sit behind the single `lexfind` provider (#846).'
+        acceptance_verdict:
+          anyOf:
+          - $ref: '#/components/schemas/BlueprintTemplateAcceptanceVerdict'
+          - type: 'null'
+      type: object
+      required:
+      - detail
+      - overlay_id
+      - provider_template_id
+      - refusals
+      - write_attempted
+      title: BlueprintTemplateEnablementRefusedResponse
+      description: |-
+        The 409 body when the ADR-0030 guard refuses to move the config key (#854).
+
+        Carries `detail` so a client that only knows the uniform error envelope still gets
+        a usable message, and `refusals` so one that does not can render the codes.
     BlueprintTemplateEnablementRequest:
       properties:
         enabled:
@@ -3503,12 +3638,40 @@ components:
           - type: string
           - type: 'null'
           title: Note
-          description: Why the key was flipped — e.g. a link to captured acceptance-run evidence.
+          description: 'Why the key was flipped. Required in both directions: it is the only durable record
+            of why this template was trusted, or why a portal was shut off.'
+        evidence_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Evidence Run Id
+          description: Run whose acceptance evidence earns the flip (ADR-0030 §5). Required to enable;
+            ignored when disabling. The server re-derives the acceptance verdict from this run and binds
+            it to this template — a run of a different template on the same provider is refused (#846).
+        reopen_operator_kill_switch:
+          type: boolean
+          title: Reopen Operator Kill Switch
+          description: 'Acknowledge reopening a key an operator deliberately shut. Acceptance evidence
+            does not waive a kill switch (ADR-0030 §2, #768).'
+          default: false
+        acknowledge_provider_below_live:
+          type: boolean
+          title: Acknowledge Provider Below Live
+          description: Acknowledge arming the config key before the provider's code key reaches `live`.
+            ADR-0030 §2 wants LIVE first.
+          default: false
       type: object
       required:
       - enabled
       title: BlueprintTemplateEnablementRequest
-      description: Operator flip of the ADR-0030 config key (#632).
+      description: |-
+        Operator flip of the ADR-0030 config key (#632), with its evidence (#854).
+
+        Until #854 this carried `enabled` and a free-text `note`, and the note being
+        non-empty was the entire precondition for arming a template. The CLI meanwhile
+        required a cited acceptance run and refused with eight named codes, so the two
+        paths to the same state differed sharply in rigour and **the easier one was the
+        weaker one**. The guard now lives on the server and these are the inputs it needs.
     BlueprintTemplateEnablementResponse:
       properties:
         overlay_id:
@@ -3545,6 +3708,45 @@ components:
             format: date-time
           - type: 'null'
           title: Updated At
+        applied:
+          type: boolean
+          title: Applied
+          description: 'The flip was confirmed by re-reading the template: the effective key is what was
+            asked for AND the read model attributes it to an operator override. A 200 alone cannot tell
+            a flip from a write that silently did nothing (#631, #713), so never report a flip on the
+            status code.'
+          default: true
+        needs_human:
+          type: boolean
+          title: Needs Human
+          description: The flip happened but at least one thing was not decided for you — read `needs_human_reasons`.
+            Set when the evidence bound to the template only by acquisition-spec equality, when the code
+            key is still below `live`, or when an operator's kill switch was reopened.
+          default: false
+        needs_human_reasons:
+          items:
+            type: string
+          type: array
+          title: Needs Human Reasons
+        evidence_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Evidence Run Id
+        evidence_binding:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Evidence Binding
+          description: 'How tightly the cited run is bound to *this* template. ''template'' is exact —
+            the run''s source version records this overlay and provider template. ''acquisition_spec''
+            is near-exact — the version has no blueprint provenance but its resolved spec equals this
+            template''s, so `needs_human` is set. ''provider'' and ''none'' are too weak to enable on
+            and are refused: all 26 cantons and Bund sit behind the single `lexfind` provider (#846).'
+        acceptance_verdict:
+          anyOf:
+          - $ref: '#/components/schemas/BlueprintTemplateAcceptanceVerdict'
+          - type: 'null'
       type: object
       required:
       - overlay_id

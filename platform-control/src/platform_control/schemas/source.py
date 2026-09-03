@@ -580,13 +580,81 @@ class SourceBlueprintTemplateListResponse(BaseModel):
 
 
 class BlueprintTemplateEnablementRequest(BaseModel):
-    """Operator flip of the ADR-0030 config key (#632)."""
+    """Operator flip of the ADR-0030 config key (#632), with its evidence (#854).
+
+    Until #854 this carried `enabled` and a free-text `note`, and the note being
+    non-empty was the entire precondition for arming a template. The CLI meanwhile
+    required a cited acceptance run and refused with eight named codes, so the two
+    paths to the same state differed sharply in rigour and **the easier one was the
+    weaker one**. The guard now lives on the server and these are the inputs it needs.
+    """
 
     enabled: bool
     note: str | None = Field(
         default=None,
-        description="Why the key was flipped — e.g. a link to captured acceptance-run evidence.",
+        description=(
+            "Why the key was flipped. Required in both directions: it is the only "
+            "durable record of why this template was trusted, or why a portal was shut "
+            "off."
+        ),
     )
+    evidence_run_id: str | None = Field(
+        default=None,
+        description=(
+            "Run whose acceptance evidence earns the flip (ADR-0030 §5). Required to "
+            "enable; ignored when disabling. The server re-derives the acceptance "
+            "verdict from this run and binds it to this template — a run of a different "
+            "template on the same provider is refused (#846)."
+        ),
+    )
+    reopen_operator_kill_switch: bool = Field(
+        default=False,
+        description=(
+            "Acknowledge reopening a key an operator deliberately shut. Acceptance "
+            "evidence does not waive a kill switch (ADR-0030 §2, #768)."
+        ),
+    )
+    acknowledge_provider_below_live: bool = Field(
+        default=False,
+        description=(
+            "Acknowledge arming the config key before the provider's code key reaches "
+            "`live`. ADR-0030 §2 wants LIVE first."
+        ),
+    )
+
+
+class BlueprintTemplateEnablementRefusal(BaseModel):
+    """One machine-readable reason the flip did not happen."""
+
+    code: str = Field(
+        description=(
+            "Stable refusal code. The same vocabulary `evidara workflow coverage "
+            "enable` reports, so an agent branches on the code and never on prose."
+        ),
+        examples=["operator_kill_switch_not_acknowledged"],
+    )
+    detail: str = Field(description="Operator-facing explanation of the refusal.")
+
+
+class BlueprintTemplateAcceptanceVerdict(BaseModel):
+    """Whether the cited run may be cited as ADR-0030 acceptance evidence."""
+
+    is_acceptance_evidence: bool
+    refusals: list[BlueprintTemplateEnablementRefusal] = Field(default_factory=list)
+    run_id: str | None = None
+    mode: str | None = None
+    execution_mode: str | None = None
+    captured_resources_count: int | None = None
+
+
+EVIDENCE_BINDING_DESCRIPTION = (
+    "How tightly the cited run is bound to *this* template. 'template' is exact — the "
+    "run's source version records this overlay and provider template. "
+    "'acquisition_spec' is near-exact — the version has no blueprint provenance but its "
+    "resolved spec equals this template's, so `needs_human` is set. 'provider' and "
+    "'none' are too weak to enable on and are refused: all 26 cantons and Bund sit "
+    "behind the single `lexfind` provider (#846)."
+)
 
 
 class BlueprintTemplateEnablementResponse(BaseModel):
@@ -598,3 +666,51 @@ class BlueprintTemplateEnablementResponse(BaseModel):
     note: str | None = None
     updated_by: str | None = None
     updated_at: datetime | None = None
+    applied: bool = Field(
+        default=True,
+        description=(
+            "The flip was confirmed by re-reading the template: the effective key is "
+            "what was asked for AND the read model attributes it to an operator "
+            "override. A 200 alone cannot tell a flip from a write that silently did "
+            "nothing (#631, #713), so never report a flip on the status code."
+        ),
+    )
+    needs_human: bool = Field(
+        default=False,
+        description=(
+            "The flip happened but at least one thing was not decided for you — read "
+            "`needs_human_reasons`. Set when the evidence bound to the template only by "
+            "acquisition-spec equality, when the code key is still below `live`, or "
+            "when an operator's kill switch was reopened."
+        ),
+    )
+    needs_human_reasons: list[str] = Field(default_factory=list)
+    evidence_run_id: str | None = None
+    evidence_binding: str | None = Field(default=None, description=EVIDENCE_BINDING_DESCRIPTION)
+    acceptance_verdict: BlueprintTemplateAcceptanceVerdict | None = None
+
+
+class BlueprintTemplateEnablementRefusedResponse(BaseModel):
+    """The 409 body when the ADR-0030 guard refuses to move the config key (#854).
+
+    Carries `detail` so a client that only knows the uniform error envelope still gets
+    a usable message, and `refusals` so one that does not can render the codes.
+    """
+
+    detail: str = Field(description="Human-readable summary — the first refusal's detail.")
+    correlation_id: str | None = None
+    overlay_id: str
+    provider_template_id: str
+    refusals: list[BlueprintTemplateEnablementRefusal]
+    needs_human: bool = True
+    write_attempted: bool = Field(
+        description=(
+            "False for a pre-write refusal: nothing was written and the key is "
+            "unchanged. True only when the override row was written and the read-back "
+            "then failed to confirm it — the key's state is then whatever the read-back "
+            "reports, not what was requested."
+        ),
+    )
+    evidence_run_id: str | None = None
+    evidence_binding: str | None = Field(default=None, description=EVIDENCE_BINDING_DESCRIPTION)
+    acceptance_verdict: BlueprintTemplateAcceptanceVerdict | None = None

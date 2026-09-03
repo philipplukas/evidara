@@ -442,155 +442,44 @@ def version_execution_mode(version: dict[str, Any] | None) -> str | None:
     return str(mode) if mode is not None else None
 
 
-def version_provider(version: dict[str, Any] | None) -> str | None:
-    """The acquisition provider the version actually ran.
-
-    ``SourceVersionResponse`` does not expose ``overlay_id`` / ``provider_template_id``
-    even though the ORM model carries both
-    (``platform_control/schemas/source.py:460-471`` vs ``run_service.py:210-229``), so
-    the provider on the acquisition spec is the *only* binding between a run and the
-    blueprint template it came from that the API makes visible. It is provider-level,
-    not template-level — see :func:`evidence_binding_strength`.
-    """
-    if not isinstance(version, dict):
-        return None
-    spec = version.get("acquisition_spec")
-    if not isinstance(spec, dict):
-        return None
-    provider = spec.get("provider")
-    return str(provider) if provider is not None else None
-
-
 # ---------------------------------------------------------------------------------
 # ADR-0030 config-key flip (`enabled: true`)
 # ---------------------------------------------------------------------------------
+#
+# **The flip guard is server-side and this module no longer mirrors it (#854).**
+#
+# It used to live here: `flip_refusals`, `evidence_binding_strength` and `verify_flip`
+# derived the eight refusals, the binding strength and the read-back locally, and
+# `coverage enable` PUT only after they passed. The admin panel, hitting the same
+# endpoint, required a non-empty free-text note and nothing else — so two clients
+# guarded the platform's most dangerous action by two different rules and **the easier
+# path was the weaker one**. A third copy of a rule that already warns it exists twice
+# was never going to hold.
+#
+# `PUT /v1/sources/blueprint-templates/{overlay}/{template}/enablement` now derives all
+# of it: it re-derives the acceptance verdict from the cited run, binds that run to the
+# template by the version's own `overlay_id`/`provider_template_id` (exact, where the
+# client could only see the provider — #846), requires the two ADR-0030
+# acknowledgements, and re-reads the write. Refusals come back as HTTP 409 carrying
+# `refusals[].code` in the vocabulary below, which is unchanged in spelling and
+# meaning; the codes are what agents branch on and the `coverage-acceptance-loop` skill
+# documents.
+#
+# The server additionally refuses `evidence_run_not_found`,
+# `evidence_run_template_mismatch`, `evidence_run_template_unbindable` and
+# `no_audit_note_recorded` — all strictly additional.
 
-FLIP_NO_EVIDENCE_RUN = "no_evidence_run_cited"
-FLIP_EVIDENCE_NOT_ACCEPTANCE = "evidence_run_is_not_acceptance_evidence"
-FLIP_EVIDENCE_PROVIDER_UNRESOLVED = "evidence_run_provider_unresolved"
-FLIP_PROVIDER_MISMATCH = "evidence_run_provider_mismatch"
-FLIP_EVIDENCE_CAPTURE_COUNT_UNKNOWN = "evidence_run_capture_count_unknown"
+#: The one refusal that stays client-side: it compares *this module's* lock derivation
+#: against the server's `launchable`, which is tautological on the server that produces
+#: `launchable`. `enable` is the only coverage command whose client-side derivation
+#: gates a write, so unlike `templates` and `preflight` a disagreement is disqualifying.
 FLIP_CLASSIFICATION_DISAGREES = "classification_disagrees_with_server"
-FLIP_PROVIDER_NOT_LIVE = "provider_not_live_not_acknowledged"
-FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED = "operator_kill_switch_not_acknowledged"
 
-_FLIP_DETAIL = {
-    FLIP_NO_EVIDENCE_RUN: (
-        "ADR-0030 §5: the config key is turned *after* acceptance-run evidence is "
-        "captured, not on confidence. Cite the run with --evidence-run-id."
-    ),
-    FLIP_EVIDENCE_NOT_ACCEPTANCE: (
-        "The cited run cannot serve as acceptance evidence. Read "
-        "`acceptance_verdict.refusals` for which rule it broke — "
-        "`execution_mode_shadow` is the one that looks greenest and proves least."
-    ),
-    FLIP_EVIDENCE_PROVIDER_UNRESOLVED: (
-        "The cited run's acquisition provider could not be resolved, so the evidence "
-        "cannot be tied to this template at all. Refused rather than skipped-and-passed "
-        "(#744)."
-    ),
-    FLIP_PROVIDER_MISMATCH: (
-        "The cited run ran a different acquisition provider than this template uses. "
-        "Evidence about one portal is not evidence about another (ADR-0030 §2)."
-    ),
-    FLIP_EVIDENCE_CAPTURE_COUNT_UNKNOWN: (
-        "The cited run reports no `captured_resources_count`, so the 'it captured "
-        "something' check did not run. A check that cannot run must refuse, not pass "
-        "(#744)."
-    ),
-    FLIP_CLASSIFICATION_DISAGREES: (
-        "The client-side lock derivation disagrees with the server's `launchable`. "
-        "This command gates a *write* on that derivation, so a disagreement is "
-        "disqualifying. Trust /v1/runs/readiness and file a bug."
-    ),
-    FLIP_PROVIDER_NOT_LIVE: (
-        "ADR-0030 §2: a template may only be `enabled: true` if its provider is LIVE — "
-        "not merely AWAITING_EVIDENCE, because an enabled template would dispatch "
-        "production runs on evidence nobody captured. That invariant is asserted over "
-        "`source_blueprints.yaml` by test_blueprint_provider_parity.py but NOT over the "
-        "override table this writes, so the ordering is on you: move the code key "
-        "first. Pass --acknowledge-provider-below-live to arm the key ahead of it "
-        "anyway."
-    ),
-    FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED: (
-        "This key was turned off by an operator — a deliberate kill switch, not a key "
-        "that was never earned. Acceptance evidence does not waive it. Pass "
-        "--reopen-operator-kill-switch only after asking them."
-    ),
-}
-
-
-def flip_refusals(
-    *,
-    template: dict[str, Any],
-    desired_enabled: bool,
-    evidence_verdict: dict[str, Any] | None = None,
-    evidence_provider: str | None = None,
-    reopen_acknowledged: bool = False,
-    below_live_acknowledged: bool = False,
-) -> list[dict[str, str]]:
-    """Reasons the ADR-0030 config key must not be flipped to ``desired_enabled``.
-
-    ``template`` is a :func:`classify_template` verdict. Turning the key **off** is a
-    kill switch and needs no evidence; turning it **on** needs a run that survives
-    :func:`acceptance_evidence_verdict`, a provider that matches, and both ADR-0030
-    ordering rules acknowledged where they are not met.
-
-    Every check here keys off ``config_key`` / ``code_key`` — the *states* — never off
-    ``blocker``, which is a single priority-ordered value. Keying the kill-switch check
-    off ``blocker`` is what let a scaffold provider mask a closed key and flip it
-    unacknowledged: ``classify_template`` reports ``provider_scaffold`` for that
-    template and the closed key never surfaces.
-    """
-    if not desired_enabled:
-        return []
-
-    codes: list[str] = []
-    if evidence_verdict is None:
-        codes.append(FLIP_NO_EVIDENCE_RUN)
-    else:
-        if not evidence_verdict.get("is_acceptance_evidence"):
-            codes.append(FLIP_EVIDENCE_NOT_ACCEPTANCE)
-        if evidence_verdict.get("captured_resources_count") is None:
-            codes.append(FLIP_EVIDENCE_CAPTURE_COUNT_UNKNOWN)
-        template_provider = template.get("provider")
-        if not evidence_provider:
-            codes.append(FLIP_EVIDENCE_PROVIDER_UNRESOLVED)
-        elif template_provider and str(evidence_provider) != str(template_provider):
-            codes.append(FLIP_PROVIDER_MISMATCH)
-
-    # `enable` is the only coverage command whose client-side derivation gates a write,
-    # so unlike `templates` and `preflight` a disagreement here is disqualifying.
-    if template.get("agrees_with_server") is False:
-        codes.append(FLIP_CLASSIFICATION_DISAGREES)
-
-    if template.get("code_key") != READINESS_LIVE and not below_live_acknowledged:
-        codes.append(FLIP_PROVIDER_NOT_LIVE)
-
-    if template.get("config_key") == CONFIG_KEY_CLOSED_BY_OPERATOR and not reopen_acknowledged:
-        codes.append(FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED)
-
-    return [{"code": code, "detail": _FLIP_DETAIL[code]} for code in codes]
-
-
-def evidence_binding_strength(*, evidence_provider: str | None, template: dict[str, Any]) -> str:
-    """How tightly the cited run is bound to *this* template.
-
-    ``provider`` is the strongest answer available today, and it is **weak**: all 26
-    cantons and Bund sit behind the single ``lexfind`` provider, so one passing run for
-    any canton satisfies this check for every LexFind template — the exact source this
-    was built to serve. Treat it as a prompt to confirm the run by hand, not as a floor.
-    Binding a run to its template needs ``overlay_id`` / ``provider_template_id`` on
-    ``SourceVersionResponse``; comparing the version's ``acquisition_spec`` against
-    ``POST /v1/sources/blueprint-preview`` would get near-template-exact with no
-    platform-control change (#846).
-    """
-    template_provider = template.get("provider")
-    if not evidence_provider or not template_provider:
-        return "none"
-    if str(evidence_provider) != str(template_provider):
-        return "none"
-    return "provider"
+FLIP_CLASSIFICATION_DISAGREES_DETAIL = (
+    "The client-side lock derivation disagrees with the server's `launchable`. "
+    "This command gates a *write* on that derivation, so a disagreement is "
+    "disqualifying. Trust /v1/runs/readiness and file a bug."
+)
 
 
 def is_already_in_desired_state(*, template: dict[str, Any], desired_enabled: bool) -> bool:
@@ -610,43 +499,24 @@ def is_already_in_desired_state(*, template: dict[str, Any], desired_enabled: bo
     return str(template.get("source") or "default").strip().lower() == "override"
 
 
-FLIP_READ_BACK_DISAGREES = "read_back_disagrees"
-FLIP_NO_OVERRIDE_RECORDED = "no_override_recorded"
+def server_refusals(payload: Any) -> list[dict[str, str]]:
+    """Read `refusals` off the server's 409 body, failing closed on an unknown shape.
 
-_FLIP_VERIFY_DETAIL = {
-    FLIP_READ_BACK_DISAGREES: (
-        "The PUT returned 200 but the blueprint-template read model still reports the "
-        "old effective key. The key was NOT flipped — do not report it as flipped."
-    ),
-    FLIP_NO_OVERRIDE_RECORDED: (
-        "The effective key is what was asked for, but the read model still attributes "
-        "it to the shipped default rather than an operator override. `set_enabled` "
-        "always writes an override row, so the write did not land and the value merely "
-        "happens to agree."
-    ),
-}
-
-
-def verify_flip(*, after_template: dict[str, Any], desired_enabled: bool) -> dict[str, Any]:
-    """Prove the flip landed by re-reading the template, not by trusting the 200.
-
-    Both conditions must hold: the effective key is what was asked for, **and** the read
-    model attributes it to an operator override. Either alone is also satisfied by a
-    write that silently did nothing — the failure mode behind #631 and #713.
+    A 409 whose body this cannot parse is still a refusal — it must never be reported
+    as an empty refusal list, which would read as "nothing was wrong".
     """
-    effective = bool(after_template.get("enabled"))
-    provenance = str(after_template.get("source") or "default").strip().lower()
-    codes: list[str] = []
-    if effective is not bool(desired_enabled):
-        codes.append(FLIP_READ_BACK_DISAGREES)
-    if provenance != "override":
-        codes.append(FLIP_NO_OVERRIDE_RECORDED)
-    return {
-        "applied": not codes,
-        "effective_enabled": effective,
-        "provenance": provenance,
-        "problems": [{"code": code, "detail": _FLIP_VERIFY_DETAIL[code]} for code in codes],
-        "updated_by": after_template.get("updated_by"),
-        "updated_at": after_template.get("updated_at"),
-        "note": after_template.get("note"),
-    }
+    items = payload.get("refusals") if isinstance(payload, dict) else None
+    parsed = [
+        {"code": str(item.get("code")), "detail": str(item.get("detail") or "")}
+        for item in (items or [])
+        if isinstance(item, dict) and item.get("code")
+    ]
+    if parsed:
+        return parsed
+    detail = payload.get("detail") if isinstance(payload, dict) else None
+    return [
+        {
+            "code": "refused_by_server",
+            "detail": str(detail or "platform-control refused the flip and gave no codes."),
+        }
+    ]
