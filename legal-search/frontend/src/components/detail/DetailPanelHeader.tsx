@@ -9,6 +9,7 @@ import { AnalyticsEvent, track } from "@/lib/analytics";
 import type { DetailViewModel } from "@/lib/types";
 import { AccentButton } from "../primitives";
 import { Breadcrumbs } from "./Breadcrumbs";
+import { Regeste } from "./Regeste";
 
 interface DetailPanelHeaderProps {
   detail: DetailViewModel;
@@ -45,6 +46,11 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
               {translationLabel}
             </div>
           )}
+
+          {/* The headnote sits above the metadata strip: it is what the
+              decision held, and the metadata is bookkeeping about it. It
+              renders nothing at all when there is no Regeste (#760). */}
+          <Regeste text={detail.regeste} />
 
           {detail.metadata.length > 0 ? (
             <div className="mt-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">

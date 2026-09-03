@@ -53,6 +53,9 @@ export function mapDetail(detail: DetailView): DetailViewModel {
     // carried across and `content` alone was left behind, so the API could
     // return a full document text and the view would never see it.
     contentText: detail.content,
+    // The headnote. The BFF already omits a blank one, but a whitespace-only
+    // value must not reach the view either — `Regeste` renders nothing for it.
+    regeste: detail.regeste,
     tabs: detail.tabs,
     relatedGroups: detail.relatedGroups.map((group) => ({
       groupLabel: group.label,

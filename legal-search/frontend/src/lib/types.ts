@@ -137,6 +137,15 @@ export interface DetailViewModel {
    * did, which is why the body's absence in production went unnoticed (#609).
    */
   contentText?: string;
+  /**
+   * The official headnote (Regeste) of a court decision, straight from
+   * `DetailView.regeste`. Prose, not a metadata row — for a Swiss decision it
+   * is the first thing a lawyer reads to judge relevance. Usually absent: the
+   * document-intelligence projection emits no `regeste` (it is not in
+   * `contracts/schemas/search-projection.schema.json`), so only the seed
+   * corpora carry one and the view must render nothing when it is missing.
+   */
+  regeste?: string;
   contentLanguage?: ContentLanguage;
   tabs: TabViewModel[];
   relatedGroups: RelatedGroup[];

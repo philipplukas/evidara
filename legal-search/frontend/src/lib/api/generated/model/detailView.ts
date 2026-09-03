@@ -17,7 +17,7 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
 particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.10.0
+ * OpenAPI spec version: 0.11.0
  */
 import type { DetailMetadataRow } from './detailMetadataRow';
 import type { ContentLanguage } from './contentLanguage';
@@ -54,6 +54,23 @@ actually built; until then `string` is what the BFF can honestly
 promise.
  */
   content?: string;
+  /** The official headnote (Regeste) of a court decision — the summary of
+what the decision held, and the field a lawyer reads first to judge
+whether the decision is relevant at all. Prose, not a metadata row:
+clients render it as a headnote alongside the title, not as another
+`metadata` entry.
+
+Absent when the document carries none, and a client must render
+nothing rather than an empty labelled box in that case. Absence is
+the common case outside the seed corpus: `regeste` is mapped as
+`text` in `legal-search/api/src/core/opensearch/documents-index.mapping.ts`
+and has been queried and highlighted by the search adapter for far
+longer than it has been readable here, but
+`contracts/schemas/search-projection.schema.json` still declares no
+`regeste` property, so the document-intelligence projection does not
+emit one — only `legal-search/api/scripts/seed-*.ts` do (#760).
+ */
+  regeste?: string;
   contentLanguage?: ContentLanguage;
   tabs: TabView[];
   relatedGroups: RelatedGroup[];

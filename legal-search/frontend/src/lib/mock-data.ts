@@ -447,6 +447,12 @@ export const decisionDetail: DetailViewModel = {
     { label: "Chamber", value: "I. Civil Law Division", visibility: "default" },
     { label: "Outcome", value: "Appeal dismissed", visibility: "always" },
   ],
+  // The headnote, as its own field — the shape the API returns since #760. It
+  // is also the opening of `contentText` below, because the seeded body text
+  // of a Swiss decision starts with the printed Regeste.
+  regeste: `Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung.
+
+Das Bundesgericht bestätigt, dass die Verantwortlichkeit nach Art. 754 OR eine Pflichtverletzung, einen Schaden, einen Kausalzusammenhang und ein Verschulden voraussetzt. Die Beweislast für sämtliche Haftungsvoraussetzungen liegt beim Kläger (E. 3.2).`,
   contentText: `Regeste
 
 Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung.
