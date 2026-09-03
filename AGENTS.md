@@ -58,6 +58,12 @@ Update as applicable:
 - JSON Schema in `contracts/schemas/` or `contracts/events/`
 - Generated clients (`npm run openapi:generate` in `legal-search/frontend/`)
 - Contract tests and schema validation
+- **`contracts/manifest.yaml`'s top-level `version`**, whenever anything under `contracts/api/` or
+  `contracts/events/` changes. `scripts/check_contract_version_bump.py` enforces it and reads
+  **only** that key — not `apis.<name>.version`, which `check_contract_manifest.py` separately
+  requires to equal the app's `API_VERSION`. Both move together. Neither
+  `check-platform-control.sh` nor any other surface script runs the bump gate, so a PR that misses
+  it is green locally and red in CI (three PRs, 2026-09-03).
 
 ### infra-change
 
@@ -218,6 +224,22 @@ Always add or update the **narrowest test** that proves the change:
 
 Do not add large brittle tests when a small test proves the change.
 
+### A guard ships with a test that fails when the guard is removed
+
+A check whose test passes with the check deleted is decoration, and this repo has shipped several:
+a deny-assertion that probed a key which did not exist, so "denied" was satisfied unconditionally; a
+refusal keyed on a priority-ordered field so it never fired for one class of input; a content gate
+that abstained by construction on the only format it was called with; a rendered feature that could
+be deleted with every one of 286 tests still passing.
+
+So: delete or invert the guard, confirm a named test goes red, and say so in the PR. The same
+applies to a *fixture* the guard is calibrated against — a floor tuned to one sample will withhold
+real data on the next one (a marker floor of 3 put two genuine in-force municipal ordinances exactly
+on the boundary).
+
+Prefer a guard that cannot silently abstain over one that can. An assertion that reports "not
+applicable" is only honest if something else asserts the case it declined.
+
 ## Documentation policy
 
 Update docs when any of these change:
@@ -267,6 +289,17 @@ with evidence instead of manufacturing work to match the ticket.
 The same applies to a green test suite: see the testing-trust rules on when a passing run is and
 is not evidence.
 
+### A gate is evidence only for the stages that actually ran
+
+`PASS`, `FAIL` and `DID-NOT-RUN` are three outcomes, not two. A gate whose prerequisites were absent
+did not pass — report it as `DID-NOT-RUN` and name what was missing. Common causes, all of which
+leave the earlier output looking like success: no running Docker daemon (the `legal-search/api`
+Testcontainers layer), missing extras, missing `pyyaml`, an unset `CI` (the CI-skip guard cannot
+fire without it), and a fresh worktree with no `node_modules`.
+
+When you report a gate as green, say which stages ran. `CLAUDE.md` carries the per-surface commands
+and the traps.
+
 ### Report what you found, not what was expected
 
 State honestly when a result contradicts the brief you were given, including a brief from another
@@ -285,3 +318,10 @@ Flag or warn if:
 - Design tokens are hardcoded instead of using CSS custom properties
 - OpenAPI clients are hand-written instead of generated
 - New patterns conflict with established conventions
+- A guard, refusal or assertion was added or changed with no test that fails when it is removed
+- A field, config key or capability is **declared with no producer** — a mapping field nothing
+  writes, a config knob nothing emits, an export nothing imports. Declared-and-empty reads as
+  *"none exists"*, which is worse than absent
+- The same rule is enforced in two clients rather than once behind them — the easier path becomes
+  the real policy, and it is usually the weaker one
+- A gate is reported green without saying which stages actually ran
