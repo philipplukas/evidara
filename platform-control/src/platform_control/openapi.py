@@ -72,7 +72,13 @@ API_TITLE = "Platform Control API"
 # jurisdiction, with a denominator tier. Deliberately carries no percentage or
 # completeness score (ADR-0042 rejected those outright), and names `indexed` as
 # unmeasured because it lives in legal-search's index (#816).
-API_VERSION = "0.20.0"
+# 0.21.0: additive — `published_artifacts_count` and `publication_withheld` on the
+# run detail and run list responses. A FAILED dispatch no longer publishes what it
+# captured (#853), so captured and published are now different numbers and the read
+# model must carry both: rendering `artifacts_count` alone would claim a delivery
+# that did not happen, and rendering `0` would hide the capture. Touches the locked
+# `/v1/runs` and `/v1/runs/{run_id}` paths, but only by adding response fields.
+API_VERSION = "0.21.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

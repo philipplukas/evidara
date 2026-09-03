@@ -3309,6 +3309,18 @@ export interface components {
              */
             refused: boolean;
             /**
+             * Published Artifacts Count
+             * @description How many of `artifacts_count` reached the broker. Lower than `artifacts_count` when the dispatch was withheld or the handoff failed partway (#853, #707).
+             * @default 0
+             */
+            published_artifacts_count: number;
+            /**
+             * Publication Withheld
+             * @description True when a FAILED run's captured documents were deliberately not published (#853).
+             * @default false
+             */
+            publication_withheld: boolean;
+            /**
              * Created At
              * Format: date-time
              */
@@ -3507,6 +3519,18 @@ export interface components {
              * @default false
              */
             refused: boolean;
+            /**
+             * Published Artifacts Count
+             * @description How many of `artifacts_count` actually reached the broker. Equal to `artifacts_count` for an ordinary run; lower when the dispatch was withheld (`publication_withheld`) or the handoff failed partway (#707). Render it beside `artifacts_count`, never instead of it — a discard is not an empty run (#853).
+             * @default 0
+             */
+            published_artifacts_count: number;
+            /**
+             * Publication Withheld
+             * @description True when this run captured documents that were deliberately never published, because the run is FAILED. The artifacts are kept as evidence of what the source served; nothing downstream received them (#853).
+             * @default false
+             */
+            publication_withheld: boolean;
             /**
              * Created At
              * Format: date-time
