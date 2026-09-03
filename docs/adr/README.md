@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists the same files under **ADRs**.
+Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists a subset of these under **ADRs** — see the note below the table.
 
 | ADR | Document |
 |-----|----------|
@@ -29,17 +29,40 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0025 | [Portal HTTP provider strategy](adr-0025-portal-http-provider-strategy.md) |
 | ADR-0026 | [`authority_id` / `jurisdiction_id` naming policy](adr-0026-id-naming-policy.md) |
 | ADR-0027 | [Workspace ↔ admin visual language](0027-workspace-admin-visual-language.md) |
+| ADR-0028 | [Shared shell module — `@evidara/shell` path alias](0028-shared-shell-module.md) |
 | ADR-0029 | [Self-hosted Hetzner runtime — retire GCP managed services](0029-self-hosted-hetzner-runtime.md) |
 | ADR-0030 | [Acquisition provider enablement lifecycle](0030-acquisition-provider-enablement-lifecycle.md) |
+| ADR-0031 | [Disposition of Temporal, Argilla, and Firecrawl](0031-temporal-argilla-firecrawl-disposition.md) (Accepted) |
 | ADR-0032 | [Pipeline observability — Prometheus, Grafana, and a funnel that cannot lie](0032-pipeline-observability.md) |
+| ADR-0033 | [Agentic legal reasoning — RAG to enter, graph to reason](0033-agentic-legal-reasoning.md) (Accepted) |
 | ADR-0034 | [Generate the platform-control contract from the app](0034-generated-platform-control-contract.md) |
 | ADR-0035 | [Operator-reachable blueprint enablement](0035-operator-reachable-blueprint-enablement.md) |
+| ADR-0036 | [Nessie + Trino + Iceberg lakehouse for the DI canonical surfaces](0036-nessie-trino-lakehouse-for-di-surfaces.md) |
+| ADR-0037 | [Binary artifacts end-to-end and a layout-aware PDF normaliser](0037-binary-artifacts-and-layout-aware-pdf.md) |
 | ADR-0038 | [User identity, roles, and genuine operator attribution](0038-user-identity-and-operator-attribution.md) (Accepted) |
 | ADR-0039 | [A third frontend surface — the public marketing page](0039-public-marketing-surface.md) |
 | ADR-0040 | [What makes a test result trustworthy](0040-test-result-trust.md) |
 | ADR-0041 | [Separate the Randtitel band geometrically, and do not adopt Docling for PDFs](0041-geometric-pdf-marginalia.md) |
 | ADR-0042 | [Corpus coverage is an API, and it is a claim about the corpus — never about the law](0042-corpus-coverage-as-an-api.md) |
 | ADR-0043 | [A source's scope is a measurement, not an assumption](0043-source-scope-must-be-measured.md) |
+| ADR-0044 | [A pipeline transformation is disclosed where the text is read](0044-pipeline-transformations-are-disclosed.md) |
+| ADR-0045 | [The admin derives its wire types from the generated contract](0045-admin-derives-wire-types-from-the-contract.md) (Accepted) |
+| ADR-0046 | [A blueprint template takes operator seeds, and nothing else](0046-blueprint-templates-take-operator-seeds.md) |
+| ADR-0047 | [Quarantine — the corpus holds only documents whose class we have implemented](0047-quarantine-unhandled-document-classes.md) |
+| ADR-0048 | [Completeness crosses the boundary by projection, and never becomes a score](0048-completeness-crosses-the-boundary-by-projection.md) |
+| ADR-0049 | [Workloads never hold the object-store root credential](0049-workloads-never-hold-the-object-store-root-credential.md) |
+| ADR-0050 | [One rule, one enforcement point](0050-one-rule-one-enforcement-point.md) (Proposed) |
+| ADR-0051 | [A gate that cannot fail is not a gate](0051-a-gate-that-cannot-fail-is-not-a-gate.md) (Proposed) |
+| ADR-0052 | [Declared means produced](0052-declared-means-produced.md) (Proposed) |
+| ADR-0053 | [Effects follow the verdict](0053-effects-follow-the-verdict.md) (Proposed) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.
+
+**This table is hand-maintained, and it was eleven entries behind the directory** until
+2026-09-03: ADR-0028, 0031, 0033, 0036, 0037 and 0044 through 0049 existed in `docs/adr/`
+and were listed nowhere. The MkDocs navigation this file claims mirrors it still stops at
+ADR-0042. Listing here is not what makes an ADR real — `scripts/check_adr_numbers.py` reads
+the directory, not this table — so when the two disagree, `ls docs/adr/` wins. The gap was
+an instance of [ADR-0052](0052-declared-means-produced.md) in prose: an index that omits an
+entry reads as *"no such decision"*.
