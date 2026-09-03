@@ -32,8 +32,16 @@ What is checked:
 4. Every policy document in `infra/hetzner/minio-policies/` must name concrete bucket
    ARNs — a `Resource: "*"` or `arn:aws:s3:::*` grant is root by another name — and
    every bucket a policy names must be one of `accounts.json`'s `all_buckets`.
-5. `accounts.json` must classify every bucket for every account (allow or deny), so a
+5. Each policy's **actions and object prefix** must match the `access` (`ro`/`wo`/`rw`)
+   and `prefix` its account declares. Bucket sets alone are not enough: adding
+   `s3:PutObject` on `arn:aws:s3:::evidara-lakehouse/canonical/*` to the read-only
+   `document-service` policy changes no bucket set, and would let a compromised read API
+   corrupt the canonical surfaces legal-search indexes.
+6. `accounts.json` must classify every bucket for every account (allow or deny), so a
    new bucket cannot be silently untested by `verify-minio-scoping.sh`.
+7. No file under `infra/hetzner/apps/`, `infra/hetzner/values/` or
+   `postgres-cluster.yaml` may reference the `minio-root` Secret, and any
+   `evidara-s3-*` Secret they reference must be one `accounts.json` provisions.
 
 Usage:
     python3 scripts/check_hetzner_minio_credentials.py
@@ -157,23 +165,122 @@ WILDCARD_RESOURCES = {"*", "arn:aws:s3:::*", "arn:aws:s3:::*/*"}
 _ARN_PREFIX = "arn:aws:s3:::"
 
 
+# Bucket-level operations, granted for any allowed bucket whatever the `access`.
+BUCKET_ACTIONS = frozenset(
+    {"s3:ListBucket", "s3:GetBucketLocation", "s3:ListBucketMultipartUploads"}
+)
+# Object-level operations, gated on `access`. `wo` gets WRITE and NOT read; `ro` the
+# reverse. This is the whole least-privilege claim, so it is checked, not asserted:
+# checking bucket sets alone let `document-service` silently acquire s3:PutObject on
+# the canonical surfaces it is supposed to be unable to touch.
+READ_ACTIONS = frozenset({"s3:GetObject"})
+WRITE_ACTIONS = frozenset(
+    {
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts",
+    }
+)
+ACCESS_OBJECT_ACTIONS = {
+    "ro": READ_ACTIONS,
+    "wo": WRITE_ACTIONS,
+    "rw": READ_ACTIONS | WRITE_ACTIONS,
+}
+
+
+def _as_list(value: object) -> list:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
 def _policy_buckets(document: dict) -> tuple[set[str], set[str]]:
     """Return (buckets named, wildcard resources found) for one policy document."""
     buckets: set[str] = set()
     wildcards: set[str] = set()
     for statement in document.get("Statement") or []:
-        resources = statement.get("Resource")
-        if isinstance(resources, str):
-            resources = [resources]
-        for resource in resources or []:
-            if resource in WILDCARD_RESOURCES:
-                wildcards.add(resource)
+        for resource in _as_list(statement.get("Resource")):
+            if not isinstance(resource, str) or resource in WILDCARD_RESOURCES:
+                wildcards.add(str(resource))
                 continue
             if not resource.startswith(_ARN_PREFIX):
                 wildcards.add(resource)
                 continue
             buckets.add(resource[len(_ARN_PREFIX) :].split("/", 1)[0])
     return buckets, wildcards
+
+
+def _check_policy_actions(
+    problems: list[str],
+    policy: dict,
+    policy_rel: object,
+    user: str,
+    allow_entries: dict[str, dict],
+) -> None:
+    """Assert each statement's actions and object prefix match the declared `access`.
+
+    Bucket-set equality is not enough. Adding `s3:PutObject` on
+    `arn:aws:s3:::evidara-lakehouse/canonical/*` to the read-only `document-service`
+    policy changes no bucket set at all — and would let a compromised read API corrupt
+    or delete the canonical surfaces legal-search indexes.
+    """
+    seen_buckets: set[str] = set()
+    for statement in policy.get("Statement") or []:
+        if statement.get("Effect") != "Allow":
+            # A Deny only narrows; nothing to enforce.
+            continue
+        sid = statement.get("Sid", "<unnamed statement>")
+        actions = {a for a in _as_list(statement.get("Action")) if isinstance(a, str)}
+        for resource in _as_list(statement.get("Resource")):
+            if not isinstance(resource, str) or not resource.startswith(_ARN_PREFIX):
+                continue  # already reported as a wildcard by _policy_buckets
+            remainder = resource[len(_ARN_PREFIX) :]
+            bucket, _, key_pattern = remainder.partition("/")
+            entry = allow_entries.get(bucket)
+            if entry is None:
+                continue  # already reported as an undeclared bucket
+            seen_buckets.add(bucket)
+            access = entry.get("access", "")
+            prefix = entry.get("prefix", "")
+
+            if "/" not in remainder:
+                permitted = BUCKET_ACTIONS
+                level = "bucket-level"
+            else:
+                permitted = ACCESS_OBJECT_ACTIONS.get(access, frozenset())
+                level = f"object-level (access `{access}`)"
+                expected_pattern = f"{prefix}*"
+                if key_pattern != expected_pattern:
+                    problems.append(
+                        f"{policy_rel}: statement `{sid}` scopes objects to "
+                        f"`{key_pattern}` but account `{user}` declares prefix "
+                        f"`{prefix}` for {bucket} — the Resource must be exactly "
+                        f"`{_ARN_PREFIX}{bucket}/{expected_pattern}` so the deny tests "
+                        "probe inside the granted prefix (#813)"
+                    )
+                if not access:
+                    problems.append(
+                        f"{policy_rel}: account `{user}` declares no `access` for {bucket}"
+                    )
+            over = sorted(actions - permitted)
+            if over:
+                problems.append(
+                    f"{policy_rel}: statement `{sid}` grants {over} at the {level} for "
+                    f"{bucket}, which account `{user}` does not declare in accounts.json "
+                    "— the policy is wider than the tested scope (#813)"
+                )
+
+    missing = sorted(set(allow_entries) - seen_buckets)
+    if missing:
+        problems.append(
+            f"{policy_rel}: account `{user}` declares {missing} in `allow`, but the "
+            "policy document grants nothing there"
+        )
 
 
 def check_policies(problems: list[str]) -> None:
@@ -191,7 +298,8 @@ def check_policies(problems: list[str]) -> None:
 
     for account in accounts_doc.get("accounts") or []:
         user = account.get("user", "<unnamed>")
-        allowed = {entry["bucket"] for entry in account.get("allow") or []}
+        allow_entries = {entry["bucket"]: entry for entry in account.get("allow") or []}
+        allowed = set(allow_entries)
         denied = set(account.get("deny") or [])
         unclassified = sorted(all_buckets - allowed - denied)
         if unclassified:
@@ -235,6 +343,61 @@ def check_policies(problems: list[str]) -> None:
                 "declare in `allow` — the policy is wider than the tested scope (#813)"
             )
 
+        _check_policy_actions(problems, policy, policy_rel, user, allow_entries)
+
+
+# Deployment files that may name a Secret. `values/trino.yaml` is checked in more detail
+# by check_trino, but it is walked here too so a NEW values file cannot slip root in.
+def _manifest_paths() -> list[Path]:
+    paths = sorted(HETZNER.glob("apps/*.yaml")) + sorted(HETZNER.glob("values/*.yaml"))
+    cluster = HETZNER / "postgres-cluster.yaml"
+    if cluster.is_file():
+        paths.append(cluster)
+    return paths
+
+
+def _walk_secret_refs(node: object):
+    """Yield every Secret name referenced by a `secretRef` / `secretKeyRef` anywhere."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key in {"secretRef", "secretKeyRef"} and isinstance(value, dict):
+                name = value.get("name")
+                if isinstance(name, str):
+                    yield name
+            yield from _walk_secret_refs(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _walk_secret_refs(item)
+
+
+def check_workload_manifests(problems: list[str], known_secrets: set[str]) -> None:
+    """No workload manifest may name the administrative root Secret.
+
+    Checking only `values/trino.yaml` and `deploy-stage4.sh` left the obvious hole:
+    adding `- secretRef: {name: minio-root}` to `apps/platform-control.yaml` passed the
+    guard clean while putting root back into a running pod.
+    """
+    for path in _manifest_paths():
+        rel = path.relative_to(REPO_ROOT)
+        try:
+            documents = list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
+        except yaml.YAMLError as error:
+            problems.append(f"{rel}: not valid YAML ({error})")
+            continue
+        for name in {n for doc in documents for n in _walk_secret_refs(doc)}:
+            if name == ROOT_SECRET:
+                problems.append(
+                    f"{rel}: references the administrative `{ROOT_SECRET}` Secret. Every "
+                    "workload gets its own scoped MinIO account — see "
+                    "infra/hetzner/minio-policies/accounts.json (#813)"
+                )
+            elif name.startswith("evidara-s3-") and name not in known_secrets:
+                problems.append(
+                    f"{rel}: references `{name}`, which no account in "
+                    "infra/hetzner/minio-policies/accounts.json provisions — nothing "
+                    "would ever create it (#813)"
+                )
+
 
 def main() -> int:
     problems: list[str] = []
@@ -243,10 +406,21 @@ def main() -> int:
             print(f"FAIL: {path.relative_to(REPO_ROOT)} does not exist.")
             return 1
 
+    try:
+        known_secrets = {
+            account.get("k8s_secret")
+            for account in json.loads(ACCOUNTS_JSON.read_text(encoding="utf-8")).get(
+                "accounts", []
+            )
+        }
+    except (OSError, json.JSONDecodeError):
+        known_secrets = set()
+
     check_minio(problems)
     check_trino(problems)
     check_stage4(problems)
     check_policies(problems)
+    check_workload_manifests(problems, known_secrets)
 
     if problems:
         print("FAIL: MinIO credentials are committed, or a workload still runs as root")
@@ -255,8 +429,8 @@ def main() -> int:
         return 1
 
     print(
-        "OK: Hetzner MinIO credentials are referenced not inlined, no workload uses root, "
-        "and every policy is scoped to declared buckets"
+        "OK: Hetzner MinIO credentials are referenced not inlined, no workload or manifest "
+        "uses root, and every policy's buckets, actions and prefixes match accounts.json"
     )
     return 0
 

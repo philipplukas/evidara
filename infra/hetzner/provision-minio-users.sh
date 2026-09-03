@@ -65,7 +65,14 @@ trap cleanup EXIT
 
 # Buckets first: `mb --ignore-existing` is a no-op for the two the chart creates, and
 # creates `evidara-pg-backups`, which no chart owns (ADR-0038 §2).
-BUCKETS="$(python3 -c 'import json,sys;print(" ".join(json.load(open(sys.argv[1]))["all_buckets"]))' "$ACCOUNTS_JSON")"
+#
+# Both reads go through minio-policies/scoping_matrix.py, which validates the whole file
+# before emitting anything. So provisioning refuses to create an account that
+# verify-minio-scoping.sh could not then test — an unclassified bucket or an unknown
+# `access` fails here rather than becoming a live credential nothing asserts.
+MATRIX_PY="${POLICY_DIR}/scoping_matrix.py"
+[ -f "$MATRIX_PY" ] || { echo "missing $MATRIX_PY"; exit 1; }
+BUCKETS="$(python3 "$MATRIX_PY" --buckets "$ACCOUNTS_JSON")"
 echo "==> Buckets"
 kubectl -n "$NS" exec -i "$POD" -- sh -s <<EOSH
 set -eu
@@ -75,25 +82,7 @@ for b in ${BUCKETS}; do
 done
 EOSH
 
-ACCOUNTS_TSV="$(python3 - "$ACCOUNTS_JSON" <<'PY'
-import json
-import sys
-
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-for account in data["accounts"]:
-    print(
-        "\t".join(
-            (
-                account["user"],
-                account["policy_file"],
-                account["k8s_secret"],
-                account["access_key_field"],
-                account["secret_key_field"],
-            )
-        )
-    )
-PY
-)"
+ACCOUNTS_TSV="$(python3 "$MATRIX_PY" --provision "$ACCOUNTS_JSON")"
 
 wanted() {
   [ ${#WANTED[@]} -eq 0 ] && return 0

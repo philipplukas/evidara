@@ -9,11 +9,32 @@
     "",
     "`allow` and `deny` together must name every bucket in `all_buckets` for each",
     "account: an unlisted bucket is an untested bucket, and the guard fails on it.",
+    "",
     "`access` is derived from what the workload's code actually does — see the table in",
-    "infra/hetzner/README.md and the file:line citations in the #813 PR body.",
+    "infra/hetzner/README.md and the file:line citations in the #813 PR body:",
+    "  ro = s3:GetObject only",
+    "  wo = s3:PutObject / DeleteObject / AbortMultipartUpload / ListMultipartUploadParts",
+    "  rw = both",
+    "Bucket-level s3:ListBucket / GetBucketLocation / ListBucketMultipartUploads are",
+    "granted for every allowed bucket regardless of `access`.",
+    "",
+    "`prefix` is the object-key prefix the account is scoped to inside that bucket. The",
+    "policy document's object-level Resource must be exactly",
+    "arn:aws:s3:::<bucket>/<prefix>* — the guard asserts that, and derives the probe keys",
+    "verify-minio-scoping.sh uses from it, so a probe can never land outside the granted",
+    "prefix and pass vacuously.",
+    "",
+    "KNOWN GAP — di-consumer + Iceberg (ADR-0036). di-consumer's lakehouse grant is",
+    "scoped to canonical/, which is where the Delta sink writes. The Iceberg sink",
+    "(persist/sinks.py IcebergCanonicalSink) reuses the SAME DI_S3_* credential against the",
+    "Nessie warehouse root s3://evidara-lakehouse, which is OUTSIDE canonical/. That path is",
+    "inert today (DI_ICEBERG_CATALOG_URI is unset in apps/configmap.yaml), but whoever",
+    "enables it must widen di-consumer's `prefix` to \"\" and di-consumer.json's object",
+    "Resource to arn:aws:s3:::evidara-lakehouse/*, or the first write returns AccessDenied.",
     "",
     "The MinIO root credential (Secret `minio-root`) is administrative only. No workload",
-    "may reference it."
+    "may reference it. The `console` MinIO user is NOT managed here — audit it separately;",
+    "see Step 6 of docs/runbooks/minio-least-privilege-cutover.md."
   ],
   "all_buckets": [
     "evidara-raw-artifacts",
@@ -32,11 +53,7 @@
         "cronjob/platform-control-retention-sweep"
       ],
       "allow": [
-        {
-          "bucket": "evidara-raw-artifacts",
-          "access": "wo",
-          "write_probe_key": ".evidara-scoping-probe"
-        }
+        { "bucket": "evidara-raw-artifacts", "access": "wo", "prefix": "" }
       ],
       "deny": ["evidara-lakehouse", "evidara-pg-backups"]
     },
@@ -48,12 +65,8 @@
       "secret_key_field": "DI_S3_SECRET_ACCESS_KEY",
       "workloads": ["deploy/di-consumer"],
       "allow": [
-        { "bucket": "evidara-raw-artifacts", "access": "ro" },
-        {
-          "bucket": "evidara-lakehouse",
-          "access": "rw",
-          "write_probe_key": "canonical/.evidara-scoping-probe"
-        }
+        { "bucket": "evidara-raw-artifacts", "access": "ro", "prefix": "" },
+        { "bucket": "evidara-lakehouse", "access": "rw", "prefix": "canonical/" }
       ],
       "deny": ["evidara-pg-backups"]
     },
@@ -64,7 +77,9 @@
       "access_key_field": "DI_S3_ACCESS_KEY_ID",
       "secret_key_field": "DI_S3_SECRET_ACCESS_KEY",
       "workloads": ["deploy/document-service"],
-      "allow": [{ "bucket": "evidara-lakehouse", "access": "ro" }],
+      "allow": [
+        { "bucket": "evidara-lakehouse", "access": "ro", "prefix": "canonical/" }
+      ],
       "deny": ["evidara-raw-artifacts", "evidara-pg-backups"]
     },
     {
@@ -74,13 +89,7 @@
       "access_key_field": "accessKey",
       "secret_key_field": "secretKey",
       "workloads": ["statefulset/trino-coordinator", "deploy/trino-worker"],
-      "allow": [
-        {
-          "bucket": "evidara-lakehouse",
-          "access": "rw",
-          "write_probe_key": ".evidara-scoping-probe"
-        }
-      ],
+      "allow": [{ "bucket": "evidara-lakehouse", "access": "rw", "prefix": "" }],
       "deny": ["evidara-raw-artifacts", "evidara-pg-backups"]
     },
     {
@@ -90,13 +99,7 @@
       "access_key_field": "ACCESS_KEY_ID",
       "secret_key_field": "ACCESS_SECRET_KEY",
       "workloads": ["cluster/evidara-pg (CloudNativePG barmanObjectStore)"],
-      "allow": [
-        {
-          "bucket": "evidara-pg-backups",
-          "access": "rw",
-          "write_probe_key": ".evidara-scoping-probe"
-        }
-      ],
+      "allow": [{ "bucket": "evidara-pg-backups", "access": "rw", "prefix": "" }],
       "deny": ["evidara-raw-artifacts", "evidara-lakehouse"]
     }
   ]

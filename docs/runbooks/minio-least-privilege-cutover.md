@@ -82,6 +82,17 @@ are generated with `openssl rand -hex 24`, never printed and never committed.
 the existing Secret and re-applies it, so a live Postgres backup credential is never
 rotated by a re-run. The same protection applies to every account on any later re-run.
 
+> ⚠️ **`cnpg-backup`'s *policy* does change.** ADR-0038 §2 gave it `s3:*` on the two
+> `evidara-pg-backups` ARNs; `minio-policies/cnpg-backup.json` replaces that with the
+> explicit list (`ListBucket`, `GetBucketLocation`, `ListBucketMultipartUploads`,
+> `GetObject`, `PutObject`, `DeleteObject`, `AbortMultipartUpload`,
+> `ListMultipartUploadParts`), so that no account anywhere holds a wildcard that includes
+> `s3:DeleteBucket`. That set covers every call barman-cloud makes, but this is the
+> backup path — if you would rather not touch it in the same window, run
+> `bash infra/hetzner/provision-minio-users.sh platform-control di-consumer document-service trino`
+> now and do `cnpg-backup` separately, verifying a backup in between. Step 5b item 5 is
+> the check either way, and the troubleshooting table has the rollback.
+
 ## Step 2 — prove the scoping before anything depends on it
 
 ```bash
@@ -137,7 +148,33 @@ kubectl -n $NS rollout status deploy/platform-control-api deploy/di-consumer \
 > in the shared Secret. That is deliberate: it makes a half-finished cutover safe rather
 > than ambiguous.
 
-## Step 5 — exercise each write path once
+## Step 5 — confirm each pod is actually on its new account
+
+Steps 4 and 6 prove the Secrets are right and the write paths work. Neither proves a
+given **pod** picked the new credential up: a Deployment that was never restarted, or
+that rolled back to an old ReplicaSet, keeps the environment it started with and looks
+perfectly healthy — indefinitely, because this cutover deliberately does not rotate root,
+so the old key stays valid.
+
+The access key **is** the MinIO username, so one command per workload settles it:
+
+```bash
+NS=evidara
+kubectl -n $NS exec deploy/platform-control-api -- printenv PLATFORM_CONTROL_S3_ACCESS_KEY_ID   # platform-control
+kubectl -n $NS exec deploy/di-consumer         -- printenv DI_S3_ACCESS_KEY_ID                  # di-consumer
+kubectl -n $NS exec deploy/document-service    -- printenv DI_S3_ACCESS_KEY_ID                  # document-service
+kubectl -n $NS exec deploy/trino-worker        -- printenv MINIO_ACCESS_KEY                     # trino
+# projection-bridge must print NOTHING and exit non-zero — it holds no storage credential:
+kubectl -n $NS exec deploy/projection-bridge   -- printenv DI_S3_ACCESS_KEY_ID || echo "correct: unset"
+```
+
+Anything still printing the root username (`evidara`) is a pod that never restarted.
+Restart it and re-check before continuing.
+
+The retention sweep is a CronJob, so check the Job it creates in Step 5b item 4 rather
+than a running pod.
+
+## Step 5b — exercise each write path once
 
 The deny tests prove what is *denied*. These prove what still *works*:
 
@@ -173,31 +210,90 @@ kubectl -n $NS get deploy,cronjob,statefulset -o yaml | grep -c 'minio-root' || 
 ```
 
 `scripts/check_hetzner_minio_credentials.py` enforces the same invariant on the committed
-files, in pre-commit and in CI, so it cannot come back by edit. It cannot see the live
-cluster — that is what this step is for.
+files — including `infra/hetzner/apps/*.yaml` — in pre-commit and in CI, so it cannot come
+back by edit. It cannot see the live cluster; that is what this step is for.
+
+### Audit the `console` MinIO user while you are here
+
+`accounts.json` does not manage a `console` user, but the rotation procedure in
+`infra/hetzner/README.md` expects one to exist, and Step 0 will have listed it. Nothing in
+this change constrains it, and if it carries `consoleAdmin` it is a second root-equivalent
+credential sitting beside the one this cutover just retired:
+
+```bash
+NS=evidara
+POD=$(kubectl -n $NS get pod -l app=minio -o jsonpath='{.items[0].metadata.name}')
+kubectl -n $NS exec "$POD" -- sh -c \
+  'mc --config-dir /tmp/c alias set r http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null \
+   && mc --config-dir /tmp/c admin user info r console'
+```
+
+Decision rule: if no human uses it, **remove it** (`mc admin user remove r console`). If a
+human does, scope it and add it to `accounts.json` like any other account. Either way,
+record what you found — an unaudited `consoleAdmin` makes the rest of this cutover much
+less valuable than it looks.
+
+### Root is deliberately NOT rotated here, and its old key stays valid
+
+This cutover does not touch the root credential — combining an IAM re-encryption with a
+per-workload cutover makes any failure impossible to attribute. The consequence must be
+stated plainly: **every workload's previous root credential remains valid MinIO auth until
+root is rotated.** A copy that leaked before today is not revoked by this change; it is
+only no longer *in use*.
+
+Rotate root as a scheduled follow-up once this cutover is verified — procedure in
+[`infra/hetzner/README.md`](../../infra/hetzner/README.md#rotating-the-minio-root-credential).
+That procedure is now cheap: the per-workload users are separate IAM records, so no app
+restart is needed, only `verify-minio-scoping.sh` afterwards.
 
 ## Rollback
 
 Rollback is per-workload and does not require reverting the merge.
 
-**A single app fails on the new credential.** Restore the shared key for that workload
-only, diagnose, then redo:
+**Do not roll back by editing manifests.** `document-service` and `di-consumer` no longer
+mount `evidara-app-secrets` at all (`infra/hetzner/apps/document-intelligence.yaml`), so
+removing their `evidara-s3-*` `envFrom` entry leaves them with *no* S3 credential rather
+than the old one — moving a broken workload from "wrong credential" to "no credential" —
+and repopulating the shared Secret would have no effect on them. A `kubectl patch` of a
+Deployment is also undone by the next `kubectl apply -k`, so the rollback would silently
+evaporate on the next deploy.
+
+**Roll back by repointing the workload's own Secret instead.** It works identically for
+every workload, needs no manifest surgery, and survives `deploy-stage4.sh`:
 
 ```bash
 NS=evidara
-kubectl -n $NS patch deploy/<name> --type=json \
-  -p='[{"op":"remove","path":"/spec/template/spec/containers/0/envFrom/<index-of-evidara-s3-*>"}]'
-# then re-add PLATFORM_CONTROL_S3_* / DI_S3_* to evidara-app-secrets from minio-root
+RU=$(kubectl -n $NS get secret minio-root -o jsonpath='{.data.rootUser}' | base64 -d)
+RP=$(kubectl -n $NS get secret minio-root -o jsonpath='{.data.rootPassword}' | base64 -d)
+
+# platform-control-api + retention sweep
+kubectl -n $NS create secret generic evidara-s3-platform-control \
+  --from-literal=PLATFORM_CONTROL_S3_ACCESS_KEY_ID="$RU" \
+  --from-literal=PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY="$RP" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n $NS rollout restart deploy/platform-control-api
+
+# di-consumer  (same shape; DI_S3_* keys, Secret evidara-s3-di-consumer)
+# document-service (same shape; DI_S3_* keys, Secret evidara-s3-document-service)
+# trino (keys accessKey / secretKey, Secret evidara-s3-trino, then restart the pods)
+unset RU RP
 ```
 
-**Trino fails.** Revert `values/trino.yaml`'s two `secretKeyRef` names to `minio-root` /
-`rootUser` / `rootPassword` locally and `helm upgrade` again. Do not commit that revert;
-it fails the CI guard, which is the point.
+**This re-widens the blast radius to what it was before #813 — time-box it.** Undo it the
+moment the cause is understood:
 
-**Everything fails.** `git revert` the #813 merge and re-run `deploy-stage4.sh` plus the
-Trino `helm upgrade`. The MinIO users and their Secrets are harmless if left in place —
-nothing references them after a revert — so leave them for the retry rather than deleting
-credentials under a live cluster.
+```bash
+bash infra/hetzner/provision-minio-users.sh <user>   # restores the scoped credential
+bash infra/hetzner/verify-minio-scoping.sh <user>
+kubectl -n evidara rollout restart deploy/<workload>
+```
+
+**Everything fails.** `git revert` the #813 merge, then re-run `deploy-stage4.sh` and the
+Trino `helm upgrade`. Note that the reverted `deploy-stage4.sh` re-seeds the root keys into
+`evidara-app-secrets`, and the reverted manifests mount it again — so this path is
+self-contained. Leave the MinIO users and their Secrets in place: nothing references them
+after a revert, and deleting credentials under a live cluster only adds a failure mode to
+the retry.
 
 ## Troubleshooting
 
@@ -207,6 +303,8 @@ credentials under a live cluster.
 | `GET /v1/documents/{id}/lean` returns the thin fallback | `document-service` cannot read `evidara-lakehouse/canonical/*` | `bash infra/hetzner/verify-minio-scoping.sh document-service` |
 | CNPG `lastFailedBackup` appears right after Step 1 | `cnpg-backup`'s Secret and MinIO disagree | `bash infra/hetzner/provision-minio-users.sh cnpg-backup`, then `verify-minio-scoping.sh cnpg-backup` |
 | `verify-minio-scoping.sh` says "credential is not accepted by MinIO" | the IAM user was orphaned by a root rotation | re-run `provision-minio-users.sh <user>` and restart that user's workloads |
+| DI writes fail with `AccessDenied` **after** someone sets `DI_ICEBERG_CATALOG_URI` | `di-consumer` is scoped to `evidara-lakehouse/canonical/*`, but the Iceberg sink (ADR-0036) writes at the Nessie warehouse root `s3://evidara-lakehouse`, outside that prefix | widen `di-consumer`'s `prefix` to `""` in `accounts.json` **and** `di-consumer.json`'s object Resource to `arn:aws:s3:::evidara-lakehouse/*` in the same PR, then re-provision. Known and disclosed — see the `KNOWN GAP` note in `accounts.json` |
+| CNPG backup fails right after Step 1, and `cnpg-backup` authenticates fine | this change narrows `cnpg-backup` from `s3:*` to an explicit action list | check the failing action in the barman log; if it is genuinely needed, add it to `cnpg-backup.json` and re-provision. Roll back with the pre-#813 policy (`s3:*` on the two bucket ARNs) via `provision-minio-users.sh cnpg-backup` |
 | `mc: command not found` inside the pod | non-MinIO image matched `-l app=minio` | check `kubectl -n evidara get pod -l app=minio` returns the MinIO pod only |
 
 ## What this does not cover

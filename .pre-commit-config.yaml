@@ -96,7 +96,11 @@ repos:
         entry: python3 scripts/check_hetzner_minio_credentials.py
         language: system
         pass_filenames: false
-        files: ^(infra/hetzner/(values/(minio|trino)\.yaml|deploy-stage4\.sh|minio-policies/.*\.json)|scripts/check_hetzner_minio_credentials\.py)$
+        # The app manifests are IN this pattern on purpose: adding
+        # `- secretRef: {name: minio-root}` to apps/platform-control.yaml is the easiest
+        # way to put root back into a running pod, and a pattern that excluded
+        # infra/hetzner/apps/ would not even fire the hook on that edit.
+        files: ^(infra/hetzner/(values/.*\.yaml|apps/.*\.yaml|postgres-cluster\.yaml|deploy-stage4\.sh|minio-policies/.*\.(json|py))|scripts/check_hetzner_minio_credentials\.py)$
 
       # Skips when Docker is unavailable locally; CI runs it with --strict
       # (.github/workflows/architecture.yml), same as the kustomize gate above.

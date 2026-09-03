@@ -84,7 +84,11 @@ bash infra/hetzner/verify-minio-scoping.sh     # the allow/deny assertions — m
 
 The source of truth is [`minio-policies/accounts.json`](minio-policies/accounts.json) plus
 the policy documents beside it. Both scripts and the CI guard
-(`scripts/check_hetzner_minio_credentials.py`) read that one file.
+(`scripts/check_hetzner_minio_credentials.py`) read that one file, via
+[`minio-policies/scoping_matrix.py`](minio-policies/scoping_matrix.py). It declares, per
+account per bucket, the **operations** (`ro` / `wo` / `rw`) and the **key prefix** — and
+the guard checks the policy documents' actions and prefixes against it, not just their
+bucket names.
 
 | MinIO user | Kubernetes Secret | Workloads | `evidara-raw-artifacts` | `evidara-lakehouse` | `evidara-pg-backups` |
 |---|---|---|---|---|---|
@@ -109,7 +113,14 @@ Why each scope is what it is, from the code rather than from guesswork:
 - **document-service** only reads those same surfaces back
   (`document_intelligence/service/store.py::DeltaPublishedDocumentStore`).
 - **trino** queries Iceberg with `default-warehouse-dir=s3://evidara-lakehouse`
-  (`values/trino.yaml`) and touches nothing else.
+  (`values/trino.yaml`) and touches nothing else. Its policy is an explicit action list,
+  not `s3:*` — a wildcard on a bucket ARN includes `s3:DeleteBucket`.
+- **`di-consumer` and the Iceberg sink (ADR-0036).** The `canonical/` prefix is where the
+  Delta sink writes. The Iceberg sink reuses the same `DI_S3_*` credential against the
+  Nessie warehouse root `s3://evidara-lakehouse`, which is **outside** it. That path is
+  inert today (`DI_ICEBERG_CATALOG_URI` is unset in `apps/configmap.yaml`); enabling it
+  requires widening `di-consumer`'s `prefix` to `""` and `di-consumer.json`'s object
+  Resource to `arn:aws:s3:::evidara-lakehouse/*` in the same change.
 - **projection-bridge** makes no object-storage call at all — it consumes NATS and POSTs
   HTTP. It held the shared root key until #813 only because it took `evidara-app-secrets`
   via `envFrom`.
@@ -126,6 +137,15 @@ mc ls v/evidara-pg-backups/     # allowed
 mc ls v/evidara-raw-artifacts/  # MUST be "Access Denied"
 mc ls v/evidara-lakehouse/      # MUST be "Access Denied"
 ```
+
+`verify-minio-scoping.sh` does the same thing for every account, and additionally asserts
+reads and writes rather than only listings. It has root **seed a probe object first**: a
+read denied because the object is not there is not a permission result, and a deny test
+that cannot distinguish the two passes whatever the policy says.
+
+`console` is **not** managed here. It predates this change; audit it separately (Step 6 of
+the cutover runbook) — a `console` user carrying `consoleAdmin` is a second
+root-equivalent credential.
 
 Cutover from the previous shared-root arrangement, including rollback:
 [docs/runbooks/minio-least-privilege-cutover.md](../../docs/runbooks/minio-least-privilege-cutover.md).

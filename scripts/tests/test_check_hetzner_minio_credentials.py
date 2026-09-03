@@ -178,6 +178,15 @@ class CheckMinioCredentialsTest(unittest.TestCase):
         checker.check_trino(problems)
         checker.check_stage4(problems)
         checker.check_policies(problems)
+        checker.check_workload_manifests(
+            problems,
+            {
+                account["k8s_secret"]
+                for account in json.loads(
+                    checker.ACCOUNTS_JSON.read_text(encoding="utf-8")
+                )["accounts"]
+            },
+        )
         self.assertEqual(problems, [])
 
 
@@ -230,6 +239,102 @@ class CheckPoliciesTest(unittest.TestCase):
                 return problems
             finally:
                 checker.POLICY_DIR, checker.ACCOUNTS_JSON, checker.REPO_ROOT = original
+
+    def _accounts_with_prefix(self, access: str, prefix: str = "") -> dict:
+        return {
+            "all_buckets": self.ALL_BUCKETS,
+            "accounts": [
+                {
+                    "user": "demo",
+                    "policy_file": "demo.json",
+                    "k8s_secret": "evidara-s3-demo",
+                    "access_key_field": "AK",
+                    "secret_key_field": "SK",
+                    "allow": [
+                        {"bucket": "evidara-lakehouse", "access": access, "prefix": prefix}
+                    ],
+                    "deny": ["evidara-raw-artifacts", "evidara-pg-backups"],
+                }
+            ],
+        }
+
+    @staticmethod
+    def _two_statement_policy(prefix: str, object_actions: list[str]) -> dict:
+        return {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "Bucket",
+                    "Effect": "Allow",
+                    "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
+                    "Resource": ["arn:aws:s3:::evidara-lakehouse"],
+                },
+                {
+                    "Sid": "Objects",
+                    "Effect": "Allow",
+                    "Action": object_actions,
+                    "Resource": [f"arn:aws:s3:::evidara-lakehouse/{prefix}*"],
+                },
+            ],
+        }
+
+    def test_read_only_account_granted_write_is_rejected(self) -> None:
+        """The exact escape the reviewer demonstrated: bucket sets are unchanged.
+
+        `document-service` acquiring s3:PutObject on `canonical/*` lets a compromised
+        read API corrupt the canonical surfaces legal-search indexes, and changes no
+        bucket set at all.
+        """
+        accounts = self._accounts_with_prefix("ro", "canonical/")
+        policy = self._two_statement_policy(
+            "canonical/", ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        )
+        problems = self._run(accounts, {"demo.json": policy})
+        self.assertTrue(any("s3:PutObject" in p for p in problems), problems)
+
+    def test_write_only_account_granted_read_is_rejected(self) -> None:
+        """`platform-control` must not be able to read raw artifacts back."""
+        accounts = self._accounts_with_prefix("wo")
+        policy = self._two_statement_policy("", ["s3:PutObject", "s3:GetObject"])
+        problems = self._run(accounts, {"demo.json": policy})
+        self.assertTrue(any("s3:GetObject" in p for p in problems), problems)
+
+    def test_object_resource_outside_the_declared_prefix_is_rejected(self) -> None:
+        """A bucket-root grant makes the account's in-prefix deny probe meaningless."""
+        accounts = self._accounts_with_prefix("ro", "canonical/")
+        policy = self._two_statement_policy("", ["s3:GetObject"])
+        problems = self._run(accounts, {"demo.json": policy})
+        self.assertTrue(any("prefix" in p for p in problems), problems)
+
+    def test_bucket_level_admin_action_is_rejected(self) -> None:
+        """`s3:*` on a bucket ARN includes s3:DeleteBucket."""
+        accounts = self._accounts_with_prefix("rw")
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "Everything",
+                    "Effect": "Allow",
+                    "Action": ["s3:*"],
+                    "Resource": ["arn:aws:s3:::evidara-lakehouse"],
+                }
+            ],
+        }
+        problems = self._run(accounts, {"demo.json": policy})
+        self.assertTrue(any("s3:*" in p for p in problems), problems)
+
+    def test_declared_bucket_with_no_grant_is_rejected(self) -> None:
+        accounts = self._accounts_with_prefix("ro", "canonical/")
+        empty = {"Version": "2012-10-17", "Statement": []}
+        problems = self._run(accounts, {"demo.json": empty})
+        self.assertTrue(any("grants nothing there" in p for p in problems), problems)
+
+    def test_matching_policy_passes(self) -> None:
+        accounts = self._accounts_with_prefix("rw", "canonical/")
+        policy = self._two_statement_policy(
+            "canonical/", ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        )
+        self.assertEqual(self._run(accounts, {"demo.json": policy}), [])
 
     def _accounts(self, allow: list[dict], deny: list[str]) -> dict:
         return {
@@ -294,6 +399,102 @@ class CheckPoliciesTest(unittest.TestCase):
         policies = {"demo.json": self._policy(["arn:aws:s3:::evidara-lakehouse/*"])}
         problems = self._run(accounts, policies)
         self.assertTrue(any("evidara-pg-backups" in p for p in problems), problems)
+
+
+class CheckWorkloadManifestsTest(unittest.TestCase):
+    """Checking only the values files and deploy-stage4.sh left the obvious hole.
+
+    Adding `- secretRef: {name: minio-root}` to `apps/platform-control.yaml` put root
+    straight back into a running pod, and the guard reported "no workload uses root".
+    """
+
+    def _run(self, manifests: dict[str, str], known: set[str] | None = None) -> list[str]:
+        with TemporaryDirectory() as tmp:
+            hetzner = Path(tmp) / "infra" / "hetzner"
+            (hetzner / "apps").mkdir(parents=True)
+            (hetzner / "values").mkdir(parents=True)
+            for name, body in manifests.items():
+                (hetzner / name).write_text(body, encoding="utf-8")
+
+            original = (checker.HETZNER, checker.REPO_ROOT)
+            checker.HETZNER, checker.REPO_ROOT = hetzner, Path(tmp)
+            try:
+                problems: list[str] = []
+                checker.check_workload_manifests(
+                    problems, known if known is not None else {"evidara-s3-platform-control"}
+                )
+                return problems
+            finally:
+                checker.HETZNER, checker.REPO_ROOT = original
+
+    CLEAN = dedent("""\
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: platform-control-api
+        spec:
+          template:
+            spec:
+              containers:
+                - name: api
+                  envFrom:
+                    - secretRef:
+                        name: evidara-s3-platform-control
+    """)
+
+    ROOT_SECRET_REF = dedent("""\
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: platform-control-api
+        spec:
+          template:
+            spec:
+              containers:
+                - name: api
+                  envFrom:
+                    - secretRef:
+                        name: minio-root
+    """)
+
+    ROOT_SECRET_KEY_REF = dedent("""\
+        server:
+          workers: 1
+        env:
+          - name: MINIO_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: minio-root
+                key: rootPassword
+    """)
+
+    def test_clean_manifest_passes(self) -> None:
+        self.assertEqual(self._run({"apps/platform-control.yaml": self.CLEAN}), [])
+
+    def test_secret_ref_to_root_is_rejected(self) -> None:
+        problems = self._run({"apps/platform-control.yaml": self.ROOT_SECRET_REF})
+        self.assertTrue(any("minio-root" in p for p in problems), problems)
+
+    def test_secret_key_ref_to_root_in_a_values_file_is_rejected(self) -> None:
+        """A NEW values file must not be able to smuggle root in either."""
+        problems = self._run({"values/some-new-chart.yaml": self.ROOT_SECRET_KEY_REF})
+        self.assertTrue(any("minio-root" in p for p in problems), problems)
+
+    def test_reference_to_an_unprovisioned_scoped_secret_is_rejected(self) -> None:
+        """A typo'd `evidara-s3-*` name yields a pod with no credential at all."""
+        problems = self._run({"apps/platform-control.yaml": self.CLEAN}, known={"other"})
+        self.assertTrue(any("no account" in p for p in problems), problems)
+
+    def test_real_repo_manifests_pass(self) -> None:
+        known = {
+            account["k8s_secret"]
+            for account in json.loads(checker.ACCOUNTS_JSON.read_text(encoding="utf-8"))[
+                "accounts"
+            ]
+        }
+        problems: list[str] = []
+        checker.check_workload_manifests(problems, known)
+        self.assertEqual(problems, [])
 
 
 if __name__ == "__main__":

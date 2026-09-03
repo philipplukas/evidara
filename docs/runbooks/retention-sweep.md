@@ -21,7 +21,11 @@ A Kubernetes CronJob — `platform-control-retention-sweep`, daily at **04:00 UT
 and applied by `kubectl apply -k infra/hetzner/apps` (i.e. `infra/hetzner/deploy-stage4.sh`).
 
 It runs the `platform-control-retention-sweep` console script from the platform-control image,
-with the same `evidara-config` + `evidara-app-secrets` env as the API.
+with the same env as the API: `evidara-config` + `evidara-app-secrets` (the Postgres URL) +
+`evidara-s3-platform-control` (the scoped MinIO credential — write and delete on
+`evidara-raw-artifacts`, nothing else; ADR-0049). A sweep that logs `AccessDenied` on blob
+deletion is a credential problem, not a data problem: run
+`bash infra/hetzner/verify-minio-scoping.sh platform-control`.
 
 `concurrencyPolicy: Forbid` — a sweep never races itself.
 

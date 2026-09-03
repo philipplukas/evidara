@@ -11,25 +11,43 @@
 # The matrix comes from minio-policies/accounts.json, so adding an account or widening
 # a policy without widening its expectations fails here rather than in production.
 #
-# Checks performed per account per bucket:
-#   list   `mc ls`   — expected allow/deny from the account's allow/deny lists
-#   read   `mc cat`  — asserted only where it must be DENIED (a permitted read of an
-#                      absent key returns NoSuchKey, which is not a permission signal)
-#   write  `mc pipe` — put a tiny probe object, then remove it again; on deny-buckets
-#                      nothing is ever written. `pipe` streams a PutObject rather than
-#                      stat-ing the destination first, which matters for the write-only
-#                      `platform-control` account: a client that HEADs before writing
-#                      would report a false deny.
+# ---------------------------------------------------------------------------------
+# WHY THE PROBE OBJECTS ARE SEEDED BY ROOT FIRST
+#
+# The first version of this script asserted "read is denied" by running `mc cat` against
+# a key that did not exist. A missing object returns NoSuchKey whether or not
+# `s3:GetObject` is granted, so `expect=deny` matched unconditionally: every read
+# assertion passed by construction and could never fail. Granting `s3:GetObject` on
+# `evidara-raw-artifacts/*` to `platform-control` — the internet-facing webhook ingester,
+# which is supposed to be write-only — would still have printed PASS.
+#
+# So before testing, root writes one `.evidara-read-probe` object per bucket-and-prefix
+# the matrix reads from, and removes them afterwards. A denied read is then a *permission*
+# result, not an absence. The write probe is a separate key (`.evidara-write-probe`) so a
+# write test can never clobber a read probe, and it is always placed INSIDE the account's
+# granted prefix — probing the bucket root for a `canonical/`-scoped account was the
+# second way this could pass vacuously.
+# ---------------------------------------------------------------------------------
+#
+# Checks performed per account per bucket, in this order:
+#   list   `mc ls`   — allow/deny per the account's allow/deny lists
+#   read   `mc cat`  — against the root-seeded probe; allow for `ro`/`rw`, DENY for `wo`
+#                      and for every denied bucket
+#   write  `mc pipe` — put a probe inside the granted prefix, then remove it; allow for
+#                      `wo`/`rw`, DENY for `ro` and for every denied bucket. `pipe`
+#                      streams a PutObject rather than stat-ing the destination first,
+#                      which matters for the write-only `platform-control` account: a
+#                      client that HEADs before writing would report a false deny.
 #
 # Read-only and write-only accounts are asserted as such: `document-service` must not be
-# able to write to the lakehouse, and `platform-control` must not be able to *read* raw
-# artifacts back (it only stores and purges them — see the table in README.md).
+# able to write the canonical surfaces, and `platform-control` must not be able to read
+# raw artifacts back (it only stores and purges them — see the table in README.md).
 #
 # Usage (laptop, KUBECONFIG pointed at the cluster):
 #   bash infra/hetzner/verify-minio-scoping.sh            # every account
 #   bash infra/hetzner/verify-minio-scoping.sh trino      # one or more accounts
 #
-# Exits non-zero on the first account with a violation, after reporting all of them.
+# Reports every violation, then exits non-zero if there was one.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,66 +64,45 @@ WANTED=("$@")
 POD="$(kubectl -n "$NS" get pod -l app=minio -o jsonpath='{.items[0].metadata.name}')"
 [ -n "$POD" ] || { echo "no MinIO pod in namespace $NS"; exit 1; }
 
+# Root is used ONLY to place and remove the read probes — never to test an account.
+ROOT_USER="$(kubectl -n "$NS" get secret minio-root -o jsonpath='{.data.rootUser}' | base64 -d)"
+ROOT_PW="$(kubectl -n "$NS" get secret minio-root -o jsonpath='{.data.rootPassword}' | base64 -d)"
+: "${ROOT_USER:?Secret minio-root not found (infra/hetzner/README.md, Stage 1)}"
+: "${ROOT_PW:?Secret minio-root has no rootPassword key}"
+
+# `bucket:key` pairs, deduplicated — the read probes root must place before testing.
+SEED_SPECS="$(python3 "${SCRIPT_DIR}/minio-policies/scoping_matrix.py" --seeds "$ACCOUNTS_JSON")"
+# user \t k8s_secret \t access_key_field \t secret_key_field \t "bucket:check:expect:key ..."
+# `:` and not `|` as the field separator: the check list is interpolated unquoted into
+# the `for spec in ...` line of the in-pod script, and a bare `|` there is a shell pipe.
+# Bucket names, check names and probe keys contain no `:`.
+MATRIX_TSV="$(python3 "${SCRIPT_DIR}/minio-policies/scoping_matrix.py" --matrix "$ACCOUNTS_JSON")"
+
+SEEDED=0
 cleanup() {
+  if [ "$SEEDED" -eq 1 ]; then
+    kubectl -n "$NS" exec -i "$POD" -- sh -s >/dev/null 2>&1 <<EOSH || true
+mc --config-dir ${MC_CONFIG_DIR} alias set root "http://localhost:9000" '${ROOT_USER}' '${ROOT_PW}' >/dev/null 2>&1
+for spec in ${SEED_SPECS}; do
+  OLDIFS="\$IFS"; IFS=':'; set -- \$spec; IFS="\$OLDIFS"
+  mc --config-dir ${MC_CONFIG_DIR} rm "root/\$1/\$2" >/dev/null 2>&1 || true
+done
+EOSH
+  fi
   kubectl -n "$NS" exec "$POD" -- rm -rf "$MC_CONFIG_DIR" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
-# user \t k8s_secret \t access_key_field \t secret_key_field \t "bucket:check:expect:key ..."
-# `:` and not `|` as the field separator: the check list is interpolated unquoted into the
-# `for spec in ...` line of the in-pod script, and a bare `|` there is a shell pipe.
-# Bucket names, check names and probe keys contain no `:`.
-MATRIX_TSV="$(python3 - "$ACCOUNTS_JSON" <<'PY'
-import json
-import sys
-
-ABSENT_KEY = ".evidara-scoping-probe-absent"
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-buckets = data["all_buckets"]
-
-for account in data["accounts"]:
-    allowed = {entry["bucket"]: entry for entry in account["allow"]}
-    denied = set(account["deny"])
-    covered = set(allowed) | denied
-    if covered != set(buckets):
-        missing = sorted(set(buckets) - covered)
-        raise SystemExit(
-            f"accounts.json: account {account['user']} does not classify {missing} "
-            "— every bucket must be in `allow` or `deny`, or it goes untested"
-        )
-
-    checks = []
-    for bucket in buckets:
-        entry = allowed.get(bucket)
-        if entry is None:
-            checks.append(f"{bucket}:list:deny:-")
-            checks.append(f"{bucket}:read:deny:{ABSENT_KEY}")
-            checks.append(f"{bucket}:write:deny:{ABSENT_KEY}")
-            continue
-        access = entry["access"]
-        probe = entry.get("write_probe_key", ".evidara-scoping-probe")
-        checks.append(f"{bucket}:list:allow:-")
-        if access == "wo":
-            # Write-only: storing and purging is granted, reading back is not.
-            checks.append(f"{bucket}:read:deny:{ABSENT_KEY}")
-        if access in ("wo", "rw"):
-            checks.append(f"{bucket}:write:allow:{probe}")
-        else:
-            checks.append(f"{bucket}:write:deny:{probe}")
-
-    print(
-        "\t".join(
-            (
-                account["user"],
-                account["k8s_secret"],
-                account["access_key_field"],
-                account["secret_key_field"],
-                " ".join(checks),
-            )
-        )
-    )
-PY
-)"
+echo "==> Seeding read probes as root (removed again on exit)"
+SEEDED=1
+kubectl -n "$NS" exec -i "$POD" -- sh -s <<EOSH
+set -eu
+mc --config-dir ${MC_CONFIG_DIR} alias set root "http://localhost:9000" '${ROOT_USER}' '${ROOT_PW}' >/dev/null
+for spec in ${SEED_SPECS}; do
+  OLDIFS="\$IFS"; IFS=':'; set -- \$spec; IFS="\$OLDIFS"
+  echo evidara-scoping-read-probe | mc --config-dir ${MC_CONFIG_DIR} pipe "root/\$1/\$2" >/dev/null
+done
+EOSH
 
 wanted() {
   [ ${#WANTED[@]} -eq 0 ] && return 0
@@ -147,10 +144,11 @@ for spec in ${CHECKS}; do
       if mc --config-dir "\$CFG" ls "u/\$bucket/" >/dev/null 2>&1; then got=allow; else got=deny; fi
       ;;
     read)
+      # The key exists — root seeded it — so a failure here is a permission result.
       if mc --config-dir "\$CFG" cat "u/\$bucket/\$key" >/dev/null 2>&1; then got=allow; else got=deny; fi
       ;;
     write)
-      if echo evidara-scoping-probe | mc --config-dir "\$CFG" pipe "u/\$bucket/\$key" >/dev/null 2>&1; then
+      if echo evidara-scoping-write-probe | mc --config-dir "\$CFG" pipe "u/\$bucket/\$key" >/dev/null 2>&1; then
         got=allow
         mc --config-dir "\$CFG" rm "u/\$bucket/\$key" >/dev/null 2>&1 || true
       else
@@ -160,9 +158,9 @@ for spec in ${CHECKS}; do
     *) echo "    FAIL unknown check \$check"; fail=1; continue ;;
   esac
   if [ "\$got" = "\$expect" ]; then
-    echo "    PASS \$bucket \$check -> \$expect"
+    echo "    PASS \$bucket \$check(\$key) -> \$expect"
   else
-    echo "    FAIL \$bucket \$check -> expected \$expect, got \$got"
+    echo "    FAIL \$bucket \$check(\$key) -> expected \$expect, got \$got"
     fail=1
   fi
 done
@@ -184,4 +182,4 @@ if [ "$CHECKED" -eq 0 ]; then
   echo "No accounts matched ${WANTED[*]:-<all>} — check minio-policies/accounts.json"
   exit 1
 fi
-echo "OK: ${CHECKED} account(s) reach exactly the buckets they are scoped to"
+echo "OK: ${CHECKED} account(s) reach exactly the buckets, prefixes and operations they are scoped to"
