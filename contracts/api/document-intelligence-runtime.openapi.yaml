@@ -16,6 +16,12 @@ info:
     # vocabulary with no SPDX registration — it made these specs non-conformant.
     # `name` alone is conformant and states only what is true today: no licence has
     # been granted. Adding an identifier is a licence decision, not a spec fix.
+    #
+    # Two linters emit a WARNING here and both are style rules, not conformance
+    # failures — redocly's `info-license-strict` ("should contain one of `url`,
+    # `identifier`") and orval's bundled 3.0-shaped schema ("must match exactly
+    # one schema in oneOf"). Both still report the document valid. Do not
+    # silence them by putting `UNLICENSED` back: it is not an SPDX expression.
     name: Proprietary
 
 servers:
