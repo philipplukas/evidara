@@ -342,8 +342,10 @@ ok.forEach((r) => {
   ;(r.draft.cantons || []).forEach((c) => {
     const v = r.verdicts.find((x) => x.canton === c.canton)
     const invented = (v && v.invented_fields) || []
-    // A draft with an untraceable field is demoted, never presented as ready.
-    const status = v && v.sound === false ? 'BLOCKED_NEEDS_HUMAN_DECISION' : c.status
+    // A draft with an untraceable field is demoted, never presented as ready — and so is a draft
+    // no sceptic examined. In the one workflow whose premise is refusing to present untraced
+    // facts, a dead sceptic must not be an implicit pass.
+    const status = !v || v.sound === false ? 'BLOCKED_NEEDS_HUMAN_DECISION' : c.status
     entries.push({
       ...c,
       status,

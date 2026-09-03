@@ -32,9 +32,10 @@ export const meta = {
 }
 
 const A = args || {}
-// Natural fan-out is 13 (one agent per provider) which, with a sceptic each, is 27 agents — over
-// the medium cap. Batching 3 providers per agent gives 5 audit + 5 refute + 2 = 12. Set
-// providersPerAgent: 1 for the full 13-way fan-out (27 agents) when you want maximum independence.
+// Natural fan-out is 13 (one agent per provider) which, with a sceptic each plus the roster and
+// matrix agents, is 28 — over the medium cap. Batching 3 providers per agent gives
+// 5 audit + 5 refute + 2 = 12. Set providersPerAgent: 1 for the full 13-way fan-out (28 agents)
+// when you want maximum independence.
 const PER_AGENT = Math.max(1, A.providersPerAgent || 3)
 // Restrict the sweep, e.g. args.only = ['lexfind_api', 'gemeinde_http'].
 const ONLY = Array.isArray(A.only) ? A.only : null
@@ -57,7 +58,8 @@ GROUND RULES (.claude/workflows/_house-rules.md):
    For a single test file, \`cd platform-control && uv run pytest tests/unit/<file> -x\` is fine, but
    say that is what you ran.
 
-4. BOUNDARY. Do NOT contact any provider's upstream host — no curl, no fetch, no browser, in
+4. BOUNDARY. Do NOT merge a PR, push, delete a branch, or comment on a PR — this report is returned
+   to the caller and a human acts on it. Do NOT contact any provider's upstream host — no curl, no fetch, no browser, in
    particular nothing at lexfind.ch, fedlex.admin.ch, entscheidsuche.ch, a cantonal or communal
    portal, or data.bka.gv.at. Do NOT dispatch a run in any mode. Do NOT change a provider's
    \`readiness\` or a template's \`enabled\` key: those are the two keys of the ADR-0030 lock and
@@ -224,6 +226,13 @@ if (ONLY) {
   const before = providers.length
   providers = providers.filter((p) => ONLY.indexOf(p.key) !== -1)
   log(`args.only restricted the sweep to ${providers.length} of ${before} providers`)
+}
+// Backstop against a bogus roster: the registry has 13 providers, so anything past 20 is a parse
+// artefact, and batching it would spawn dozens of agents.
+const ROSTER_CEILING = 20
+if (providers.length > ROSTER_CEILING) {
+  log(`⚠ roster returned ${providers.length} providers, which is not plausible for this registry; capped to ${ROSTER_CEILING}. The remainder was NOT AUDITED.`)
+  providers = providers.slice(0, ROSTER_CEILING)
 }
 
 const batches = []

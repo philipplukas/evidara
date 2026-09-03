@@ -34,8 +34,9 @@ export const meta = {
 const A = args || {}
 const ALL = A.all === true // sweep every gate regardless of what changed
 const BASE = A.base || 'origin/main'
-// Hard ceiling on parallel gate agents. Default keeps a full run at ≤15 agents.
-const MAX_GATES = A.maxGates || 12
+// Hard ceiling on parallel gate agents. 11 + 1 serialized mutating gate + Select + Aggregate = 14,
+// so even the fallback path (unparsable selection -> full sweep) stays under 15.
+const MAX_GATES = A.maxGates || 11
 
 // The gate table. Source of truth is CLAUDE.md "Per-surface quality gates"; this mirrors it, and
 // the Select agent is told to re-read CLAUDE.md and report any disagreement rather than trusting
@@ -91,12 +92,27 @@ const GATES = [
     paths: ['scripts/'],
     cmd: 'uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"',
     notes:
-      '`--with pyyaml` is NOT optional. Without it seven modules fail to import and the runner says "Ran 97 tests ... FAILED (errors=7)" — which reads as seven broken tests and is really THIRTY-SEVEN THAT NEVER RAN. If the total is 97, this is DID_NOT_RUN.',
+      '`--with pyyaml` is NOT optional. Without it eleven modules fail to import and the runner says "Ran 144 tests ... FAILED (errors=11)" — which reads as eleven broken tests and is really FIFTY-SEVEN THAT NEVER RAN. If the total is 144 rather than 201, this is DID_NOT_RUN.',
   },
   {
     id: 'country-overlays',
     paths: ['country-overlays/', 'platform-control/src/platform_control/seeds/'],
-    cmd: 'python scripts/check_country_overlay_files.py',
+    cmd: 'for c in AT CH DE FR IT EU; do python scripts/check_country_overlay_files.py --country $c; done',
+    notes:
+      '`--country` is REQUIRED (check_country_overlay_files.py:358-360, `required=True`). The bare command exits 2 on argparse before checking anything — that is DID_NOT_RUN, and it is not a pass however it is reported.',
+  },
+  {
+    id: 'legal-search-both',
+    paths: ['legal-search/'],
+    cmd: 'bash scripts/check-legal-search.sh',
+    notes: 'The both-surfaces gate. Prefer it over running the api and frontend gates separately when a change spans both.',
+  },
+  {
+    id: 'eval',
+    paths: ['eval/'],
+    cmd: 'see .github/workflows/eval-ris.yml — two -k-filtered pytest selections',
+    notes:
+      'CLAUDE.md gives no single local command for this surface: it points at the workflow file. READ eval-ris.yml, reproduce BOTH -k selections, and report each. If you run only one, that is DID_NOT_RUN for the other — do not report a half-run as PASS.',
   },
   {
     id: 'scraping-qa',

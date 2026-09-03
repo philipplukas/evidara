@@ -22,7 +22,7 @@ nothing:
 | Trap | Signature |
 |---|---|
 | Wrong Node | `ExperimentalWarning: localStorage is not available`. CI pins Node 22 (`.nvmrc`); the workstation default is newer. Source it with **semicolons**, not `&&` — `nvm.sh` returns 3 and short-circuits an `&&` chain: `export NVM_DIR="$HOME/.config/nvm"; . "$NVM_DIR/nvm.sh"; nvm use 22` |
-| Missing `pyyaml` | `scripts/` reports `Ran 97 tests ... FAILED (errors=7)`. That is **37 tests that never ran**, not 7 that broke. Use `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` |
+| Missing `pyyaml` | `scripts/` reports `Ran 144 tests ... FAILED (errors=11)` instead of the real 201. That is **57 tests that never ran**, not 11 that broke. Use `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` |
 | Missing DI extras | `document-intelligence` silently drops `test_dspy_modules.py` and skips the eval harness. Use `uv run --extra dev --extra service --extra test --extra llm pytest` |
 | No Docker daemon | `legal-search/api` integration layer (`*.integration.spec.ts`) is the only layer that meets a real index mapping. Without Docker it does not run |
 | Fresh git worktree | A worktree does **not** inherit `platform-control/admin/node_modules`. `scripts/check-platform-control.sh` then stops before its admin half and the partial run reads as a pass |

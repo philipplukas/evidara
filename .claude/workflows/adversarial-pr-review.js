@@ -54,8 +54,9 @@ GROUND RULES (.claude/workflows/_house-rules.md — these override your instinct
      Source it with SEMICOLONS, not && (nvm.sh returns 3 and short-circuits an && chain):
        export NVM_DIR="$HOME/.config/nvm"; . "$NVM_DIR/nvm.sh"; nvm use 22
      "ExperimentalWarning: localStorage is not available" means you are on the wrong Node.
-   - scripts/ without pyyaml reports "Ran 97 tests ... FAILED (errors=7)". That is 37 tests that
-     NEVER RAN. Use: uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"
+   - scripts/ without pyyaml reports "Ran 144 tests ... FAILED (errors=11)" instead of the real 201.
+     That is 57 tests that NEVER RAN, not 11 that broke. Use:
+       uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"
    - document-intelligence without extras silently drops test_dspy_modules.py. Use:
        cd document-intelligence && uv run --extra dev --extra service --extra test --extra llm pytest
    - legal-search/api's *.integration.spec.ts layer needs a running Docker daemon.
@@ -147,6 +148,9 @@ const VERDICT_SCHEMA = {
 // Worst-first. Declared here, not below the pipeline: the refute stage closes over it and runs
 // before any later statement would have initialised it.
 const SEVERITY = ['ship-blocker', 'high', 'medium', 'low', 'none']
+// Sort key for blast radius. `indexOf` returns -1 for a missing or unrecognised value, which
+// would sort an unlabelled finding ABOVE a ship-blocker; 99 puts it last instead.
+const rank = (s) => (SEVERITY.indexOf(s) + 1 || 99)
 
 // ── the five dimensions ──────────────────────────────────────────────────────
 // Each is grounded in a real failure this repo shipped or nearly shipped.
@@ -291,8 +295,15 @@ far better than padding. Use \`dropped\` to say what you examined and deliberate
 
   // Stage 2 — refute. Starts the moment THIS dimension reports; no barrier.
   async (found, dim) => {
-    if (!found || !found.findings || found.findings.length === 0) {
-      return { dim: dim.id, gates: (found && found.gates_run) || [], survivors: [], killed: 0 }
+    // A finder that died is NOT a clean dimension. Returning a tidy empty object here would make
+    // rounds[i] truthy and hide the gap — this workflow's own "DID-NOT-RUN is not PASS" rule,
+    // violated in its own code.
+    if (!found) {
+      log(`⚠ ${dim.id}: finder produced no result — this dimension was NOT covered`)
+      return { dim: dim.id, gates: [], survivors: [], killed: 0, finderDied: true }
+    }
+    if (!found.findings || found.findings.length === 0) {
+      return { dim: dim.id, gates: found.gates_run || [], survivors: [], killed: 0 }
     }
     const list = found.findings
       .map(
@@ -350,16 +361,23 @@ Return one verdict per finding, in order.`,
           return list.find((x) => x && x.title === f.title) || list[i]
         })
         .filter(Boolean)
+      // No verdict at all is UNEXAMINED, not refuted. Killing on absence would delete a real
+      // finding because a sceptic returned fewer verdicts than findings — the schema guarantees
+      // neither the count nor the order.
+      if (forThis.length === 0) {
+        survivors.push({ ...f, status: 'UNVERIFIED — no sceptic verdict' })
+        return
+      }
       const refutes = forThis.filter((v) => v.refuted).length
       // Majority refutes → dead. A tie kills it too: the burden is on the finding.
-      if (forThis.length === 0 || refutes * 2 >= forThis.length) {
+      if (refutes * 2 >= forThis.length) {
         killed++
         return
       }
       const worst = forThis
         .map((v) => v.severity_after_check)
         .filter(Boolean)
-        .sort((a, b) => SEVERITY.indexOf(a) - SEVERITY.indexOf(b))[0]
+        .sort((a, b) => rank(a) - rank(b))[0]
       survivors.push({
         ...f,
         status: 'SURVIVED',
@@ -374,11 +392,11 @@ Return one verdict per finding, in order.`,
 )
 
 const ok = rounds.filter(Boolean)
-const dead = DIMENSIONS.filter((d, i) => !rounds[i]).map((d) => d.id)
+const dead = DIMENSIONS.filter((d, i) => !rounds[i] || rounds[i].finderDied).map((d) => d.id)
 if (dead.length) log(`⚠ dimensions that produced no result at all: ${dead.join(', ')}`)
 
 const all = ok.flatMap((r) => r.survivors)
-all.sort((a, b) => SEVERITY.indexOf(a.blast_radius) - SEVERITY.indexOf(b.blast_radius))
+all.sort((a, b) => rank(a.blast_radius) - rank(b.blast_radius))
 const top = all.slice(0, TOP_N)
 if (all.length > top.length) {
   log(`capped at ${TOP_N}: dropped ${all.length - top.length} lower-blast-radius survivors`)

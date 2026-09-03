@@ -57,10 +57,12 @@ Several workflows run per-surface gates. They use the table in
 [`CLAUDE.md` § Per-surface quality gates](../../CLAUDE.md), which is the CI-equivalent set, and they
 report `PASS` / `FAIL` / `DID-NOT-RUN` as three distinct outcomes. That third outcome is the point:
 a gate that fell over during setup did not pass, and this repo has a documented collection of ways
-a gate reads green while running nothing — the wrong Node major, a missing `pyyaml` turning
-"37 tests never ran" into "7 tests failed", missing `document-intelligence` extras dropping a test
-module at collection, an absent Docker daemon skipping the only layer that meets a real index
-mapping, and a fresh worktree that inherits no `node_modules`.
+a gate reads green while running nothing — the wrong Node major, a missing `pyyaml` reporting
+`Ran 144 tests ... FAILED (errors=11)` when the suite is 201, so that 57 tests that never ran read
+as 11 that broke; missing `document-intelligence` extras dropping a test module at collection; an
+absent Docker daemon skipping the only layer that meets a real index mapping; a fresh worktree that
+inherits no `node_modules`; and `scripts/check_country_overlay_files.py` exiting 2 on argparse when
+its required `--country` is omitted.
 
 Note that [`.claude/commands/merge-readiness.md`](../../.claude/commands/merge-readiness.md) carries
 an **older, narrower** gate table — it prescribes `cd platform-control && uv run pytest`, which

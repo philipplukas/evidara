@@ -185,6 +185,9 @@ const CONFIRM_SCHEMA = {
 }
 
 const SEVERITY = ['ship-blocker', 'high', 'medium', 'low']
+// Sort key for blast radius. `indexOf` returns -1 for a missing or unrecognised value, which
+// would sort an unlabelled finding ABOVE a ship-blocker; 99 puts it last instead.
+const rank = (s) => (SEVERITY.indexOf(s) + 1 || 99)
 
 // ── run ──────────────────────────────────────────────────────────────────────
 phase('Inventory')
@@ -205,7 +208,7 @@ ${WHAT_IS_A_GUARD}
 2. Determine the CI-EQUIVALENT gate for this surface from CLAUDE.md's "Per-surface quality gates"
    table, and quote the row. ${GATE ? `The caller passed a gate to use: ${GATE} — sanity-check it against the table and say if it is narrower than CI.` : 'Choose the narrowest gate that still covers the target, and say why.'}
    Remember the traps: a bare \`uv run pytest\` is narrower than CI for platform-control;
-   \`scripts/\` needs \`--with pyyaml\` or 37 tests never run; document-intelligence needs its four
+   \`scripts/\` needs \`--with pyyaml\` or 57 tests never run; document-intelligence needs its four
    extras or test_dspy_modules.py is dropped at collection; legal-search/api's integration layer
    needs Docker.
 3. Say exactly what a fresh git worktree would have to install before that gate can run, as
@@ -238,7 +241,12 @@ if (inv.feasible === false) {
   log(`⚠ inventory reports the gate is not runnable here: ${inv.feasibility_note || 'no reason given'}`)
 }
 
-const batches = inv.batches.filter((b) => b && b.length)
+// BATCHES is only *asked for* in the prompt, and a model-controlled fan-out is not a fan-out
+// budget. An inventory returning 20 batches would spawn 42 agents, 40 of them worktree-isolated.
+const batches = inv.batches.filter((b) => b && b.length).slice(0, BATCHES)
+if (inv.batches.length > batches.length) {
+  log(`⚠ inventory returned ${inv.batches.length} batches; capped to ${BATCHES}. The remainder was NOT MUTATED and nothing is known about those guards.`)
+}
 log(`${batches.length} batch(es), gate: ${inv.gate}; ~${batches.length * 2 + 2} agents, ${batches.length * 2} worktrees`)
 
 const results = await pipeline(
@@ -289,10 +297,10 @@ and matching test counts. Two out of three is DID_NOT_RUN.`,
     if (!mut) return null
     if (!mut.baseline || mut.baseline.green !== true) {
       log(`batch ${idx + 1}: baseline NOT green — reported as DID_NOT_RUN, correctly not as findings`)
-      return { mut, verdicts: [], abandoned: true }
+      return { mut, verdicts: [], abandoned: true, batchNo: idx + 1 }
     }
     const unnoticed = (mut.results || []).filter((r) => r.outcome === 'UNNOTICED')
-    if (unnoticed.length === 0) return { mut, verdicts: [], abandoned: false }
+    if (unnoticed.length === 0) return { mut, verdicts: [], abandoned: false, batchNo: idx + 1 }
 
     const panel = await agent(
       `${HOUSE}
@@ -327,7 +335,7 @@ Set blast_radius by what the guard protects: data integrity, a refusal boundary 
 is ship-blocker or high; input-validation politeness is low.`,
       { phase: 'Confirm', label: `confirm batch ${idx + 1}`, schema: CONFIRM_SCHEMA, isolation: 'worktree' },
     )
-    return { mut, verdicts: (panel && panel.verdicts) || [], abandoned: false }
+    return { mut, verdicts: (panel && panel.verdicts) || [], abandoned: false, batchNo: idx + 1 }
   },
 )
 
@@ -339,9 +347,11 @@ const decoration = []
 const caught = []
 const didNotRun = []
 const abandoned = []
-ok.forEach((r, i) => {
+// r.batchNo is the ORIGINAL batch index. Using the position in `ok` (post-filter) would report
+// "batch 3" for what was actually batch 4 whenever an earlier batch died.
+ok.forEach((r) => {
   if (r.abandoned) {
-    abandoned.push(`batch ${i + 1}: ${(r.mut.baseline && r.mut.baseline.detail) || 'baseline not green'}`)
+    abandoned.push(`batch ${r.batchNo}: ${(r.mut.baseline && r.mut.baseline.detail) || 'baseline not green'}`)
     return
   }
   ;(r.mut.results || []).forEach((res) => {
@@ -353,11 +363,11 @@ ok.forEach((r, i) => {
     decoration.push({ ...res, blast_radius: v.blast_radius || 'medium', confirmer_note: v.reason })
   })
 })
-decoration.sort((a, b) => SEVERITY.indexOf(a.blast_radius) - SEVERITY.indexOf(b.blast_radius))
+decoration.sort((a, b) => rank(a.blast_radius) - rank(b.blast_radius))
 log(`${decoration.length} guard(s) confirmed unnoticed, ${caught.length} caught, ${didNotRun.length} did not run, ${abandoned.length} batch(es) abandoned`)
 
 const dirty = ok
-  .map((r, i) => ({ i: i + 1, s: r.mut.final_git_status }))
+  .map((r) => ({ batch: r.batchNo, s: r.mut.final_git_status }))
   .filter((x) => x.s && x.s.trim() && x.s.trim() !== 'clean')
 
 phase('Rank')

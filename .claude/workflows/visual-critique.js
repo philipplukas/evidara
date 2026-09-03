@@ -91,7 +91,8 @@ GROUND RULES (.claude/workflows/_house-rules.md), adapted for a visual review:
    image as a claim to be checked, not as the definition of correct.
 
 6. READ-ONLY. Never write, update or delete a baseline. Never run the app, the Playwright suite, or
-   any capture script. Never contact a public-sector host. Do not open a PR.
+   any capture script. Never contact a public-sector host. Never merge a PR, push, delete a branch,
+   comment on a PR, or open a PR — this report is returned to the caller and a human acts on it.
 `
 
 const RUBRIC = `
@@ -188,9 +189,11 @@ const VERIFY_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['title', 'refuted', 'reason'],
+        required: ['title', 'image', 'region', 'refuted', 'reason'],
         properties: {
           title: { type: 'string' },
+          image: { type: 'string', description: "Echo the finding's image path VERBATIM — verdicts are matched back on image+region." },
+          region: { type: 'string', description: "Echo the finding's region VERBATIM." },
           refuted: { type: 'boolean' },
           reason: { type: 'string' },
           corrected_source_anchor: { type: 'string' },
@@ -202,6 +205,9 @@ const VERIFY_SCHEMA = {
 }
 
 const SEVERITY = ['ship-blocker', 'high', 'medium', 'low', 'none']
+// Sort key for blast radius. `indexOf` returns -1 for a missing or unrecognised value, which
+// would sort an unlabelled finding ABOVE a ship-blocker; 99 puts it last instead.
+const rank = (s) => (SEVERITY.indexOf(s) + 1 || 99)
 
 // ── run ──────────────────────────────────────────────────────────────────────
 phase('Census')
@@ -249,7 +255,11 @@ if (!cen || !Array.isArray(cen.groups) || cen.groups.length === 0) {
   log('⚠ could not parse the census — aborting rather than critiquing images blind')
   return `Baseline census could not be parsed, so no critique was performed. Raw census follows.\n\n${census}`
 }
-const groups = cen.groups.filter((g) => g && g.length)
+// Cap: GROUPS is asked for in the prompt, not enforced by it.
+const groups = cen.groups.filter((g) => g && g.length).slice(0, GROUPS)
+if (cen.groups.length > groups.length) {
+  log(`⚠ census returned ${cen.groups.length} groups; capped to ${GROUPS}. Those images were NOT critiqued.`)
+}
 log(`${groups.length} image group(s); ~${groups.length * 2 + 2} agents`)
 
 const results = await pipeline(
@@ -312,14 +322,21 @@ For each:
   - Kill anything that is taste: if the finding reduces to a preference once you look, refute it.
 
 refuted = true unless you personally saw it in the image AND confirmed it in source. DEFAULT TO
-refuted = true WHEN UNCERTAIN.`,
+refuted = true WHEN UNCERTAIN.
+
+Return ONE verdict per finding, and echo each finding's \`image\` and \`region\` VERBATIM — the
+verdicts are matched back on those two fields, and a paraphrase leaves the finding unverified.`,
       { phase: 'Verify', label: `verify group ${idx + 1}`, schema: VERIFY_SCHEMA },
     )
     const verdicts = (panel && panel.verdicts) || []
     const survivors = []
     let killed = 0
     crit.findings.forEach((f) => {
-      const v = verdicts.find((x) => x.title === f.title)
+      // Match on image+region first: a verifier that paraphrases the title would otherwise leave
+      // every finding UNVERIFIED. Title is the fallback.
+      const v =
+        verdicts.find((x) => x.image === f.image && x.region === f.region) ||
+        verdicts.find((x) => x.title === f.title)
       if (!v) {
         survivors.push({ ...f, status: 'UNVERIFIED — no verifier verdict' })
         return
@@ -346,7 +363,7 @@ const lost = groups.length - ok.length
 if (lost > 0) log(`⚠ ${lost} image group(s) produced nothing — those images were NOT critiqued`)
 
 const all = ok.flatMap((r) => r.survivors)
-all.sort((a, b) => SEVERITY.indexOf(a.blast_radius) - SEVERITY.indexOf(b.blast_radius))
+all.sort((a, b) => rank(a.blast_radius) - rank(b.blast_radius))
 const top = all.slice(0, TOP_N)
 if (all.length > top.length) log(`capped at ${TOP_N}: dropped ${all.length - top.length} lower-blast-radius survivors`)
 

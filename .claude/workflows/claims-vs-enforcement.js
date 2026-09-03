@@ -153,6 +153,9 @@ const REFUTE_SCHEMA = {
 }
 
 const SEVERITY = ['ship-blocker', 'high', 'medium', 'low', 'none']
+// Sort key for blast radius. `indexOf` returns -1 for a missing or unrecognised value, which
+// would sort an unlabelled finding ABOVE a ship-blocker; 99 puts it last instead.
+const rank = (s) => (SEVERITY.indexOf(s) + 1 || 99)
 
 // ── run ──────────────────────────────────────────────────────────────────────
 phase('Harvest')
@@ -184,7 +187,14 @@ let batches = []
 try {
   const m = String(harvest).match(/\{[\s\S]*\}/)
   const parsed = m ? JSON.parse(m[0]) : null
-  if (parsed && Array.isArray(parsed.batches)) batches = parsed.batches.filter((b) => b && b.length)
+  if (parsed && Array.isArray(parsed.batches)) {
+    // Cap: BATCHES is asked for in the prompt, not enforced by it. A model-controlled fan-out is
+    // not a fan-out budget.
+    batches = parsed.batches.filter((b) => b && b.length).slice(0, BATCHES)
+    if (parsed.batches.length > batches.length) {
+      log(`⚠ harvest returned ${parsed.batches.length} batches; capped to ${BATCHES}. The remainder was NOT SWEPT.`)
+    }
+  }
 } catch (e) {
   batches = []
 }
@@ -297,7 +307,7 @@ if (lost > 0) log(`⚠ ${lost} batch(es) produced nothing — those documents ar
 const all = ok.flatMap((r) => r.survivors)
 const ORDER = { UNENFORCED: 0, FALSE_CLAIM: 1, UNDER_ENFORCED: 2, ENFORCED_BUT_UNTESTED: 3 }
 all.sort((a, b) => {
-  const s = SEVERITY.indexOf(a.blast_radius) - SEVERITY.indexOf(b.blast_radius)
+  const s = rank(a.blast_radius) - rank(b.blast_radius)
   return s !== 0 ? s : (ORDER[a.verdict] || 9) - (ORDER[b.verdict] || 9)
 })
 const top = all.slice(0, TOP_N)

@@ -257,6 +257,9 @@ const REFUTE_SCHEMA = {
 }
 
 const SEVERITY = ['ship-blocker', 'high', 'medium', 'low', 'none']
+// Sort key for blast radius. `indexOf` returns -1 for a missing or unrecognised value, which
+// would sort an unlabelled finding ABOVE a ship-blocker; 99 puts it last instead.
+const rank = (s) => (SEVERITY.indexOf(s) + 1 || 99)
 
 // ── run ──────────────────────────────────────────────────────────────────────
 phase('Aim')
@@ -392,7 +395,7 @@ const lost = items.length - ok.length
 if (lost > 0) log(`⚠ ${lost} lens/surface pair(s) produced nothing — NOT SWEPT, not clean`)
 
 const all = ok.flatMap((r) => r.survivors)
-all.sort((a, b) => SEVERITY.indexOf(a.blast_radius) - SEVERITY.indexOf(b.blast_radius))
+all.sort((a, b) => rank(a.blast_radius) - rank(b.blast_radius))
 const top = all.slice(0, TOP_N)
 if (all.length > top.length) log(`capped at ${TOP_N}: dropped ${all.length - top.length} lower-blast-radius survivors`)
 

@@ -106,7 +106,7 @@ The gap it fills is precise: `test_blueprint_provider_parity.py` ties templates 
 **nothing asserts that the comment above a `register()` call still describes the class below it.**
 
 **Do not use it** to check whether a provider *works*; it never contacts a host. `args`:
-`providersPerAgent` (3 → 12 agents; set 1 for the full 13-way fan-out at 27), `only`.
+`providersPerAgent` (3 → 12 agents; set 1 for the full 13-way fan-out at 28), `only`.
 
 ### `cross-surface-gate-sweep.js`
 
@@ -127,7 +127,8 @@ workflow uses the `CLAUDE.md` table and reports the disagreement rather than sil
 one. The command should be updated; that is not this directory's change to make.
 
 **Do not use it** as a CI substitute — it runs on your machine, with your Docker daemon and your
-Node. `args`: `all`, `base`, `maxGates` (12).
+Node. `args`: `all`, `base`, `maxGates` (11 — plus the serialized mutating gate, Select and
+Aggregate, that is 14 even on the fallback full-sweep path).
 
 ### `cantonal-onboarding-dry-run.js`
 
