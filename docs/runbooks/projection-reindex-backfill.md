@@ -157,6 +157,14 @@ The summary tells you how much truth exists and whether any rows are unusable:
 }
 ```
 
+**The exit code is part of the result.** A clean dry run exits `0`. Until #825 it could print
+exactly the summary above and then exit `134`/`139` with `terminate called without an active
+exception` as its last line — an abort during interpreter teardown, *after* the work was done,
+caused by the Delta reader's Python-callback filesystem racing Arrow's IO threads at shutdown.
+If you are on an image older than that fix and see this, the summary is the truth and the exit
+code is not; re-run on a current image rather than concluding the tool is broken. On a current
+image, treat a non-zero exit as real and stop.
+
 ### Step 2: Backfill into the write alias
 
 ```bash

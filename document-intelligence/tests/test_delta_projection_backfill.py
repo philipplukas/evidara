@@ -8,11 +8,15 @@ Proves the two halves of the recovery path that did not exist before:
    on one bad or rejected document.
 """
 
+import contextlib
+import http.server
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -357,6 +361,163 @@ class CanonicalDeltaEnumerationTests(unittest.TestCase):
             )
             # The bridge ships raw JSON bytes; the rebuilt event must survive that.
             json.dumps(poster.posted[0])
+
+
+class _AcceptEverythingProjections(http.server.BaseHTTPRequestHandler):
+    """Stand-in for the legal-search projections endpoint: accepts every event."""
+
+    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler's naming
+        self.rfile.read(int(self.headers.get("content-length") or 0))
+        self.send_response(202)
+        self.send_header("content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"status":"applied"}')
+
+    def log_message(self, *args: Any) -> None:
+        return
+
+
+@contextlib.contextmanager
+def _projections_endpoint() -> Any:
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _AcceptEverythingProjections)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@unittest.skipUnless(DELTA_AVAILABLE, "deltalake is not installed")
+class BackfillProcessExitCodeTests(unittest.TestCase):
+    """The job's *exit code* must agree with its summary (#825).
+
+    The backfill used to print ``"failed": false`` and then abort with ``terminate called
+    without an active exception`` while the interpreter was shutting down — exit 134/139, so a
+    Kubernetes Job reported ``Failed`` and a ``set -e`` runbook step stopped, on a run that had
+    already done its work. The crash lived in the Delta/Arrow teardown *after* ``main()``
+    returned, which is why no in-process test could see it: calling ``main()`` and asserting on
+    its return value passed throughout. Only a real subprocess exposes it.
+
+    The pre-fix abort is a race, not a certainty: measured at 15/30 runs for ``--dry-run`` on a
+    local table and 6/20 against MinIO. Repeating the invocation is therefore part of the
+    assertion — one clean run proves nothing.
+    """
+
+    RUNS = 8
+
+    def _corpus(self, temp_dir: str) -> dict[str, str]:
+        from document_intelligence.persist.sinks import DeltaCanonicalSink, DeltaSinkConfig
+        from test_adapters import build_processing_result
+
+        uris = {
+            "DI_PUBLISHED_DOCUMENTS_URI": os.path.join(temp_dir, "published_documents"),
+            "DI_PUBLISHED_SECTIONS_URI": os.path.join(temp_dir, "published_sections"),
+            "DI_PROCESSING_MANIFESTS_URI": os.path.join(temp_dir, "processing_manifests"),
+        }
+        sink = DeltaCanonicalSink(
+            DeltaSinkConfig(
+                published_documents_uri=uris["DI_PUBLISHED_DOCUMENTS_URI"],
+                published_sections_uri=uris["DI_PUBLISHED_SECTIONS_URI"],
+                processing_manifests_uri=uris["DI_PROCESSING_MANIFESTS_URI"],
+            )
+        )
+        result = build_processing_result()
+        sink.persist(result.document, result.sections, result.manifest)
+        return uris
+
+    def _run(self, uris: dict[str, str], argv: list[str]) -> subprocess.CompletedProcess[str]:
+        env = dict(os.environ, **uris)
+        env["PYTHONPATH"] = os.pathsep.join(
+            [os.path.join(os.path.dirname(__file__), "..", "src"), env.get("PYTHONPATH", "")]
+        ).rstrip(os.pathsep)
+        return subprocess.run(
+            [sys.executable, "-m", "document_intelligence.jobs.delta_projection_backfill", *argv],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+
+    def _assert_clean_exit(self, completed: subprocess.CompletedProcess[str], attempt: int) -> None:
+        self.assertEqual(
+            completed.returncode,
+            0,
+            f"run {attempt} exited {completed.returncode}; stderr tail: {completed.stderr[-2000:]}",
+        )
+        self.assertNotIn("terminate called", completed.stderr)
+        self.assertEqual(json.loads(completed.stdout)["failed"], False)
+
+    def test_dry_run_exits_zero_every_time(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            uris = self._corpus(temp_dir)
+            for attempt in range(1, self.RUNS + 1):
+                completed = self._run(uris, ["--dry-run"])
+                self._assert_clean_exit(completed, attempt)
+                self.assertEqual(json.loads(completed.stdout)["applied"], 1)
+
+    def test_real_run_exits_zero_every_time(self) -> None:
+        """The POST path, which the issue explicitly refused to call proven.
+
+        Be honest about what this one is worth: reverting the fix leaves it green (0/30 aborts
+        measured), because the HTTP round-trips give teardown enough slack to win the race. It
+        is a guard against the *next* change tipping that balance, not a reproducer.
+        """
+        with tempfile.TemporaryDirectory() as temp_dir, _projections_endpoint() as url:
+            uris = self._corpus(temp_dir)
+            checkpoint = os.path.join(temp_dir, "checkpoint")
+            for attempt in range(1, self.RUNS + 1):
+                completed = self._run(
+                    uris,
+                    ["--legal-search-api-url", url, "--checkpoint-path", checkpoint],
+                )
+                self._assert_clean_exit(completed, attempt)
+                self.assertEqual(json.loads(completed.stdout)["applied"], 1)
+
+
+class NativeDeltaFilesystemTests(unittest.TestCase):
+    """``delta_dataset_filesystem`` must produce a native filesystem, or nothing at all."""
+
+    def test_local_uri_resolves_to_a_native_filesystem_rooted_at_the_table(self) -> None:
+        import pyarrow.fs as pa_fs
+
+        from document_intelligence.persist.sinks import delta_dataset_filesystem
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filesystem = delta_dataset_filesystem(temp_dir)
+
+        self.assertIsInstance(filesystem, pa_fs.SubTreeFileSystem)
+        # A PyFileSystem here would mean Arrow's IO threads call back into Python — the
+        # teardown abort in #825. LocalFileSystem is entirely C++.
+        self.assertIsInstance(filesystem.base_fs, pa_fs.LocalFileSystem)
+
+    def test_s3_endpoint_options_are_mirrored_onto_a_native_s3_filesystem(self) -> None:
+        import pyarrow.fs as pa_fs
+
+        from document_intelligence.persist.sinks import delta_dataset_filesystem, delta_storage_options
+
+        options = delta_storage_options(
+            {
+                "DI_S3_ENDPOINT_URL": "http://minio.evidara.svc:9000",
+                "DI_S3_REGION": "us-east-1",
+                "DI_S3_ACCESS_KEY_ID": "key",
+                "DI_S3_SECRET_ACCESS_KEY": "secret",
+            }
+        )
+        filesystem = delta_dataset_filesystem("s3://canonical/published_documents", options)
+
+        self.assertIsInstance(filesystem, pa_fs.SubTreeFileSystem)
+        self.assertIsInstance(filesystem.base_fs, pa_fs.S3FileSystem)
+        # Rooted at the table, because to_pyarrow_dataset() resolves fragments relatively.
+        self.assertEqual(filesystem.base_path, "canonical/published_documents/")
+
+    def test_an_unresolvable_uri_falls_back_to_deltalake_s_own_handler(self) -> None:
+        from document_intelligence.persist.sinks import delta_dataset_filesystem
+
+        self.assertIsNone(delta_dataset_filesystem("nosuchscheme://bucket/table"))
 
 
 if __name__ == "__main__":
