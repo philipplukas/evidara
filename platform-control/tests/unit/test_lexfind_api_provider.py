@@ -196,6 +196,35 @@ def test_repealed_law_is_not_reported_in_force_despite_an_open_window():
     assert is_in_force(version, as_of="2026-07-22") is False
 
 
+def test_repealed_law_with_an_end_date_is_not_in_force_after_it():
+    """The dated half of the trap: `version_inactive_since` must close the window.
+
+    Deliberately leaves `is_active` at the fixture's `True`, so the
+    `is_active is False` short-circuit cannot answer and the *date* branch is
+    the only thing under test. Without this the branch had no coverage at all
+    and a law repealed after capture read as in force forever.
+    """
+    version = dict(_current_version(_tol("554.5")))
+    version.update(version_inactive_since="30.06.2026")
+    assert version["is_active"] is True
+    assert is_in_force(version, as_of="2026-07-01") is False
+
+
+def test_the_inactive_since_date_is_the_first_day_out_of_force():
+    """The boundary, asserted deliberately: `version_inactive_since` is EXCLUSIVE.
+
+    LexFind's field says the version has been *out of force since* that date —
+    the day its successor took over, mirroring `version_active_since`, which is
+    the inclusive first day in force. So the last day in force is the day
+    before. Guessing the other way would report a repealed norm as good law for
+    one more day, which is the #661 failure at one-day resolution.
+    """
+    version = dict(_current_version(_tol("554.5")))
+    version.update(version_inactive_since="30.06.2026")
+    assert is_in_force(version, as_of="2026-06-29") is True
+    assert is_in_force(version, as_of="2026-06-30") is False
+
+
 def test_active_law_inside_its_window_is_in_force():
     assert is_in_force(_current_version(_tol("554.5")), as_of="2026-07-22") is True
 
