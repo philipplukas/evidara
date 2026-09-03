@@ -58,6 +58,44 @@ Filters: `--overlay`, `--provider`, `--template`, `--readiness`, `--blocker`, `-
 > mirror has drifted and its verdicts are untrustworthy. `/v1/runs/readiness` is
 > authoritative.
 
+## 1b. When there is no template yet — the source-lifecycle half
+
+`coverage templates` inventories what `source_blueprints.yaml` already ships. For a
+source with **no** blueprint template, the entry point is `workflow source`, whose five
+steps map onto the same loop: `inspect` → `propose` → `apply` → `verify` →
+`compensate`.
+
+```bash
+uv run evidara workflow source inspect --human                 # reachability + discovery
+uv run evidara workflow source propose --seed-url <url> --human
+uv run evidara workflow source apply --display-name '<name>' --seed-url <url> \
+  --jurisdiction-id <id> --human
+uv run evidara workflow source verify --source-id <id> --human   # or --run-id
+uv run evidara workflow source compensate --source-id <id> --reason '<why>' --human
+```
+
+Every one of these returns the ADR-0022 envelope
+(`contracts/schemas/workflow-command-envelope.schema.json`), and two fields decide what
+you may do next:
+
+- **`side_effect_level`** — `none` for `inspect`/`propose`/`verify`, `reversible` for
+  `apply` and `compensate`. Only `apply` mutates, and it creates a **draft** source.
+- **`status`** — `passed`, `needs_human`, `failed_retriable`, `failed_terminal`, or
+  `compensated`. `propose` returns `needs_human` when its duplicate check reports a
+  risk above `none`; that is a stop, not a warning. Do not create a second source for a
+  corpus the platform already holds.
+
+`compensate` is a **real corrective action**, not an in-memory undo: it cancels the run
+(`POST /v1/runs/{id}/cancel`) and rejects the latest `pending_approval`/`draft` version
+(`POST /v1/versions/{id}/reject`). With nothing pending it records intent only and
+still reports `compensated` — read `artifacts` to see what it actually did.
+
+Adding a *provider* rather than a source is a code change, and two things about it are
+easy to get wrong in ways nothing catches:
+
+- whether the captured bytes are law → `validate-acquisition-provider` skill
+- what `in_force_until` means at your upstream → `provider-temporal-semantics` skill
+
 ## 2. Pre-flight — before creating anything
 
 ```bash
@@ -193,6 +231,9 @@ driver §3 recommends — has no `--copy-evidence` flag** (its own comment says 
 `scripts/ch-fedlex-fast-loop.sh` (`:185`) and its siblings, which run against a deployed
 environment rather than local compose.
 
+Whether the captured bytes were law at all is a separate question this harness does not
+answer — see the `validate-acquisition-provider` skill before citing a run as coverage.
+
 ## 6. Flip the key
 
 Two keys, two owners, and only one is yours.
@@ -240,6 +281,13 @@ evidence item marked `passed: false` before calling it done:
   every LexFind template. Confirm by hand that the cited run is this template's (#846).
 - **Arming the config key ahead of the code key** is reported, not waved through.
 
+A `200` is not a flip. Read `verification.problems`:
+
+| code | what it means |
+|---|---|
+| `read_back_disagrees` | The `PUT` returned 200 and the read model still reports the old effective key. **The key was not flipped.** |
+| `no_override_recorded` | The effective key is what you asked for, but the read model still attributes it to the shipped default. `set_enabled` always writes an override row, so the write did not land and the value merely happens to agree. |
+
 Turning the key **off** takes no evidence, but it does take `--note`, and it is a real
 write even when the key merely reads `false` today: a `never_turned` key is waived by
 acceptance mode, an operator's `false` is not (#768). Do not read "it's already off" as
@@ -271,7 +319,11 @@ still admits when the provider is short of `live`.
 
 - [ADR-0030](../../../docs/adr/0030-acquisition-provider-enablement-lifecycle.md) — the lifecycle, the two-key lock (§2), the evidence workflow (§5), `RunMode.ACCEPTANCE` (§6)
 - [ADR-0033](../../../docs/adr/0033-agentic-legal-reasoning.md) §4 — the build order, and why not to build the MCP server
+- [ADR-0022](../../../docs/adr/adr-0022-agentic-cli-workflow-control-surface.md) — the envelope every `workflow` command returns
 - `tools/evidara-cli/src/evidara_cli/coverage.py` — the classification rules, with their platform-control counterparts cited
 - `tools/evidara-cli/src/evidara_cli/gate_coverage.py` — the excluded / not-evaluated split and the one implementation of the rule that escalates it
 - `scripts/ch-fedlex-compose-e2e.sh` — the driver
+- `.claude/skills/validate-acquisition-provider/SKILL.md` — whether the captures were law
+- `.claude/skills/provider-temporal-semantics/SKILL.md` — `in_force_from` / `in_force_until` for a new provider
+- `.claude/skills/opensearch-mapping-drift/SKILL.md` — why a document reaches the index and the query still returns nothing
 - `.claude/skills/run-admin-panel/SKILL.md` — driving the admin UI to flip the config key

@@ -64,6 +64,7 @@ react-admin gates on a role. Without these the lists render empty / redirect:
 ```bash
 bash scripts/platform-control-demo.sh admin   # = npm run dev, http://localhost:3000
 ```
+
 (Set the two `NEXT_PUBLIC_*` vars in `platform-control/admin/.env.local` first.)
 
 ## 3b. For automated driving / screenshots → PRODUCTION build, then Playwright
