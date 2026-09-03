@@ -35,6 +35,13 @@ from platform_control.temporal.activities import ScopeShardActivities
 
 SHARD_COUNT = 12
 
+#: Large enough to reproduce the contention collapse review found: with a plain
+#: retry loop and no backoff, 70 simultaneous writers meant 16 raised
+#: `ProgressWriteConflictError` and only 54 shards were ever recorded. Exactly one
+#: writer wins per round, so lockstep retries are quadratic. An explicit
+#: `scope["shards"]` list is uncapped (#561 §5), so 70 is not a hypothetical.
+HIGH_CONTENTION_SHARD_COUNT = 70
+
 
 def _to_asyncpg_url(url: str) -> str:
     if url.startswith("postgresql+psycopg://"):
@@ -48,7 +55,18 @@ def _to_asyncpg_url(url: str) -> str:
 async def postgres_session_maker() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     try:
         with PostgresContainer("postgres:16-alpine", driver="psycopg") as postgres:
-            engine = create_async_engine(_to_asyncpg_url(postgres.get_connection_url()))
+            # A pool wide enough for every writer to be in flight at once. The
+            # default (5 + 10 overflow) queues writers behind connections, which
+            # *hides* CAS contention: at most 15 writers ever contend, so the
+            # lockstep-retry collapse this module tests for cannot happen. That is
+            # a property of the test fixture, not of production — a real worker
+            # sizes its pool for its fan-out — so the fixture must not accidentally
+            # serialise what it claims to run concurrently.
+            engine = create_async_engine(
+                _to_asyncpg_url(postgres.get_connection_url()),
+                pool_size=HIGH_CONTENTION_SHARD_COUNT,
+                max_overflow=0,
+            )
             async with engine.begin() as connection:
                 await connection.run_sync(Base.metadata.create_all)
 
@@ -99,6 +117,36 @@ async def test_concurrent_shard_reports_all_land_on_postgres(postgres_session_ma
         # One committed version bump per writer: nobody's write was skipped, and
         # nobody's write was applied twice.
         assert run.progress_version == SHARD_COUNT
+
+
+@pytest.mark.asyncio
+async def test_a_large_fan_out_does_not_lose_shards_to_cas_contention(
+    postgres_session_maker,
+) -> None:
+    """Every one of 70 simultaneous writers lands — none raises, none is dropped.
+
+    Loud failure beats silent loss, but a writer that gives up is still a shard
+    missing from the operator's view. Jittered backoff is what makes the retry
+    budget meaningful at this width; without it this test raises
+    `ProgressWriteConflictError` for roughly a fifth of the writers.
+    """
+    wizard_run_id = await _seed_wizard_run(postgres_session_maker)
+    shard_acts = ScopeShardActivities(session_factory=postgres_session_maker)
+    stats = {"nodes_discovered": 1, "records_accepted": 1, "records_sent_to_review": 0}
+
+    await asyncio.gather(
+        *[
+            shard_acts.report_shard_progress(wizard_run_id, f"shard-{index}", stats)
+            for index in range(HIGH_CONTENTION_SHARD_COUNT)
+        ]
+    )
+
+    async with postgres_session_maker() as session:
+        run = await session.get(WizardRun, wizard_run_id)
+        assert run is not None
+        assert len(run.progress["shards"]) == HIGH_CONTENTION_SHARD_COUNT
+        assert run.progress["accepted_records"] == HIGH_CONTENTION_SHARD_COUNT
+        assert run.progress_version == HIGH_CONTENTION_SHARD_COUNT
 
 
 @pytest.mark.asyncio

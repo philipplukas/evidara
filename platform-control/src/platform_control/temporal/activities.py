@@ -125,6 +125,22 @@ class WizardStateActivities:
 # ---------------------------------------------------------------------------
 
 
+#: Run states that mean "an earlier attempt is still working on this shard".
+#: A claim in one of these is durable before any result exists, so it must not be
+#: read as an outcome.
+_NON_TERMINAL_RUN_STATUSES = frozenset({RunStatus.PENDING, RunStatus.RUNNING})
+
+
+class ShardDispatchInFlightError(RuntimeError):
+    """Raised when an earlier attempt at this shard has not finished yet.
+
+    Retryable on purpose: Temporal's backoff is the wait. The alternative —
+    returning the in-flight run's zeroed counters — reports success with no data,
+    and `ScopeShardWorkflow` does not inspect `status`, so the shard would be
+    recorded complete having captured nothing.
+    """
+
+
 def _run_summary(run: Run, *, status: str | None = None, **extra: Any) -> dict[str, Any]:
     """Summary stats the shard activity returns to the workflow, read off the run."""
     return {
@@ -261,15 +277,46 @@ async def _dispatch_provider_run(
         run_metadata=run_metadata,
     )
     if not created:
-        # An earlier attempt of this same activity already dispatched this shard.
-        # Report what that run actually did; do not crawl the portal again.
+        # An earlier attempt claimed this shard. What happens next depends entirely
+        # on how that attempt ended — idempotency must mean "do not redo work that
+        # succeeded", never "cache the first failure forever".
+        if run.status is RunStatus.COMPLETED:
+            logger.info(
+                "Shard %s of wizard run %s already completed as run %s; not re-crawling.",
+                scope_shard_key,
+                wizard_run_id,
+                run.run_id,
+            )
+            return _run_summary(run, deduplicated=True)
+
+        if run.status in _NON_TERMINAL_RUN_STATUSES:
+            # An async/webhook provider commits its run while it is still RUNNING
+            # (`RunService`), so the claim outlives the results. Returning the row's
+            # zeros here would be a *successful* return with no data, and the
+            # workflow does not inspect `status` — the shard would be recorded
+            # complete having captured nothing. Raise instead, so Temporal's
+            # backoff gives the in-flight attempt time to land.
+            raise ShardDispatchInFlightError(
+                f"Shard {scope_shard_key} of wizard run {wizard_run_id} is already "
+                f"dispatched as run {run.run_id} and is still {run.status.value}."
+            )
+
+        # Terminal but unsuccessful (FAILED / CANCELLED). Re-arm the *same* row and
+        # dispatch again: that is what the retry policy is for. Reusing the row is
+        # what #561 asked for — one run per shard — and is not the same thing as
+        # refusing to ever retry a transient provider error.
         logger.info(
-            "Shard %s of wizard run %s already dispatched as run %s; not re-dispatching.",
+            "Re-dispatching shard %s of wizard run %s on run %s after %s.",
             scope_shard_key,
             wizard_run_id,
             run.run_id,
+            run.status.value,
         )
-        return _run_summary(run, deduplicated=True)
+        run.status = RunStatus.PENDING
+        run.failure_reason = None
+        run.completed_at = None
+        run.started_at = datetime.now(UTC)
+        await session.flush()
 
     run_service = RunService(session, provider_registry=registry)
     try:

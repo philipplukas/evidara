@@ -37,10 +37,30 @@ ROLLOUT
 Both columns are additive and backfill-free: `idempotency_key` is nullable and
 `progress_version` has `server_default '0'`, so existing rows are valid the
 moment the DDL lands and old application code keeps working against the new
-schema. No staged rollout in the sense of #253 is required — but note the
-ordering that always applies: migrate first, deploy second. Old code inserting
-into `runs` without `idempotency_key` writes NULL, which the UNIQUE index
-permits.
+schema. No staged rollout in the sense of #253 is required for *compatibility* —
+but note the ordering that always applies: migrate first, deploy second. Old code
+inserting into `runs` without `idempotency_key` writes NULL, which the UNIQUE
+index permits.
+
+**It is not, however, a zero-impact migration.** Both `ADD COLUMN`s are
+metadata-only on PostgreSQL 11+ and effectively instant, but
+`CREATE UNIQUE INDEX` (non-concurrent) takes a `SHARE` lock on `runs` and
+**blocks every write to it for the duration of the build**. `runs` is one of the
+highest-volume tables here. On today's row counts that is a blip; run it in a
+maintenance window anyway, or — if `runs` has grown — build it concurrently
+instead, which cannot be done from inside Alembic's transaction:
+
+    op.execute("COMMIT")  # or with_autocommit / autocommit_block
+    op.execute(
+        "CREATE UNIQUE INDEX CONCURRENTLY uq_runs_idempotency_key "
+        "ON runs (idempotency_key)"
+    )
+
+That variant is deliberately *not* the default here: `CONCURRENTLY` cannot run in
+a transaction, so it forfeits this migration's atomicity, and it can leave an
+INVALID index behind on failure that a human then has to drop. The blocking build
+is the right trade at this size; this note exists so the next person can make
+that call with the numbers in front of them rather than discovering the lock.
 
 There is nothing to backfill for the wizard: `PLATFORM_CONTROL_WIZARD_ORCHESTRATOR_BACKEND`
 is `in_memory` in every environment and no Temporal server is deployed

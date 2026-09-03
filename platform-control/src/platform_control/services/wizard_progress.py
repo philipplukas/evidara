@@ -44,7 +44,9 @@ progress dict it is handed, never of a snapshot read earlier.
 
 from __future__ import annotations
 
+import asyncio
 import copy
+import random
 from collections.abc import Callable
 
 from sqlalchemy import select, update
@@ -54,13 +56,24 @@ from platform_control.models.wizard_run import WizardRun
 
 #: How many times a losing writer re-reads and re-applies before giving up.
 #:
-#: With N writers contending, the unluckiest one can lose at most N-1 rounds, so
-#: this has to exceed the realistic shard fan-out — `fetch_scope_shards` caps a
-#: *derived* shard list at 20, and an explicit `scope["shards"]` list is not
-#: capped at all today (the remaining half of #561). 50 leaves headroom, and each
-#: lost round costs one indexed read plus one no-op update, so a generous bound
-#: is cheap. Exhausting it raises rather than dropping the write.
-MAX_CAS_ATTEMPTS = 50
+#: Exactly one writer wins each round, so with N writers arriving together the
+#: unluckiest loses up to N-1 rounds, and the fan-out is not bounded:
+#: `fetch_scope_shards` caps a *derived* shard list at 20, but an explicit
+#: `scope["shards"]` list is uncapped (the remaining half of #561). Without
+#: backoff this is quadratic and a 70-shard run really does exhaust the budget —
+#: measured: 16 of 70 writers raised, and only 54 shards were recorded.
+#:
+#: The bound alone cannot fix that; :data:`_MAX_BACKOFF_SECONDS` is what does.
+#: Jittered backoff de-synchronises the losers so each round has far fewer
+#: contenders, which turns "everyone retries in lockstep forever" into a handful
+#: of rounds. The count then only has to cover the tail.
+MAX_CAS_ATTEMPTS = 200
+
+#: Jittered backoff after a lost round: `uniform(0, min(2^attempt * base, cap))`.
+#: Sleeping a *random* interval is the load-bearing part — a fixed delay would
+#: keep the losers synchronised and change nothing.
+_BASE_BACKOFF_SECONDS = 0.002
+_MAX_BACKOFF_SECONDS = 0.25
 
 
 class ProgressWriteConflictError(RuntimeError):
@@ -70,6 +83,75 @@ class ProgressWriteConflictError(RuntimeError):
     that a dropped progress write used to be invisible. An activity that cannot
     record its progress must fail loudly so Temporal retries it.
     """
+
+
+async def _backoff(attempt: int) -> None:
+    ceiling = min(_BASE_BACKOFF_SECONDS * (2**attempt), _MAX_BACKOFF_SECONDS)
+    await asyncio.sleep(random.uniform(0, ceiling))  # noqa: S311 — jitter, not crypto
+
+
+def _apply(current_progress: dict | None, mutate: Callable[[dict], dict]) -> dict:
+    # A deep copy so `mutate` cannot smuggle state between rounds via the dict it
+    # was handed, and so a mutation that raises leaves nothing half-applied.
+    return mutate(copy.deepcopy(dict(current_progress or {})))
+
+
+async def _cas_round(
+    session: AsyncSession,
+    wizard_run_id: str,
+    mutate: Callable[[dict], dict],
+) -> tuple[dict | None, bool]:
+    """One read-mutate-compare-and-set round. Commits. Returns ``(progress, won)``.
+
+    ``(None, True)`` means the wizard run does not exist — nothing to write and
+    nothing to retry.
+    """
+    row = (
+        await session.execute(
+            select(WizardRun.progress, WizardRun.progress_version).where(
+                WizardRun.wizard_run_id == wizard_run_id
+            )
+        )
+    ).one_or_none()
+    if row is None:
+        return None, True
+    current_progress, version = row
+
+    new_progress = _apply(current_progress, mutate)
+
+    result = await session.execute(
+        update(WizardRun)
+        .where(
+            WizardRun.wizard_run_id == wizard_run_id,
+            WizardRun.progress_version == version,
+        )
+        .values(progress=new_progress, progress_version=version + 1)
+    )
+    await session.commit()
+    # rowcount == 0: another writer committed between our read and our write.
+    return (new_progress, True) if result.rowcount == 1 else (None, False)
+
+
+async def update_wizard_progress_in_session(
+    session: AsyncSession,
+    wizard_run_id: str,
+    mutate: Callable[[dict], dict],
+) -> dict | None:
+    """:func:`update_wizard_progress` for a caller that already owns a session.
+
+    **Commits**, once per round — so call it outside, not inside, a transaction
+    the caller still intends to extend.
+    """
+    for attempt in range(MAX_CAS_ATTEMPTS):
+        progress, won = await _cas_round(session, wizard_run_id, mutate)
+        if won:
+            return progress
+        await _backoff(attempt)
+
+    raise ProgressWriteConflictError(
+        f"Could not write progress for wizard run {wizard_run_id} after "
+        f"{MAX_CAS_ATTEMPTS} attempts: another writer won every round."
+    )
 
 
 async def update_wizard_progress(
@@ -86,39 +168,8 @@ async def update_wizard_progress(
     Returns the stored progress dict, or ``None`` when the wizard run does not
     exist. Raises :class:`ProgressWriteConflictError` if every attempt loses.
     """
-    for _ in range(MAX_CAS_ATTEMPTS):
-        async with session_factory() as session:
-            row = (
-                await session.execute(
-                    select(WizardRun.progress, WizardRun.progress_version).where(
-                        WizardRun.wizard_run_id == wizard_run_id
-                    )
-                )
-            ).one_or_none()
-            if row is None:
-                return None
-            current_progress, version = row
-
-            new_progress = mutate(copy.deepcopy(dict(current_progress or {})))
-
-            result = await session.execute(
-                update(WizardRun)
-                .where(
-                    WizardRun.wizard_run_id == wizard_run_id,
-                    WizardRun.progress_version == version,
-                )
-                .values(progress=new_progress, progress_version=version + 1)
-            )
-            await session.commit()
-            if result.rowcount == 1:
-                return new_progress
-            # rowcount == 0: another writer committed between our read and our
-            # write. Loop and re-apply `mutate` on top of their result.
-
-    raise ProgressWriteConflictError(
-        f"Could not write progress for wizard run {wizard_run_id} after "
-        f"{MAX_CAS_ATTEMPTS} attempts: another writer won every round."
-    )
+    async with session_factory() as session:
+        return await update_wizard_progress_in_session(session, wizard_run_id, mutate)
 
 
 def roll_up_shard_totals(progress: dict) -> dict:

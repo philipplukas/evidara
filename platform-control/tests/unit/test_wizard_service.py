@@ -28,6 +28,7 @@ from platform_control.services.wizard_service import WizardService
 from platform_control.temporal.activities import (
     ReviewDrainActivities,
     ScopeShardActivities,
+    ShardDispatchInFlightError,
     WizardStateActivities,
 )
 from platform_control.temporal.workflows import (
@@ -495,6 +496,136 @@ async def test_retrying_the_shard_crawl_does_not_re_scrape_the_portal(session_ma
         runs = (await session.scalars(select(Run))).all()
         assert len(runs) == 1
         assert runs[0].idempotency_key == f"wizard:{wizard_run_id}:shard:ch/zurich"
+
+
+class _FlakyProvider(_CountingProvider):
+    """Fails its first dispatch, succeeds afterwards — a transient provider error."""
+
+    async def start_run(self, source, source_version, run):
+        self.dispatches += 1
+        if self.dispatches == 1:
+            raise RuntimeError("portal returned 503")
+        return await _FakeInlineProvider.start_run(self, source, source_version, run)
+
+
+@pytest.mark.asyncio
+async def test_a_transiently_failed_shard_is_re_dispatched_on_the_same_run(
+    session_maker,
+) -> None:
+    """Idempotency must not mean "cache the first failure forever".
+
+    The dedupe key stops a *successful* crawl being redone. A run that ended
+    FAILED is exactly what the retry policy exists for, so the next attempt
+    re-arms the same row and dispatches again — one run per shard, still, but the
+    shard is recoverable. Returning the stored failure instead would make a
+    transient 503 permanent, which is worse than the duplicate rows #561 removed.
+    """
+    wizard_run_id = await _wizard_run_with_source(session_maker, "flaky")
+    provider = _FlakyProvider()
+    registry = ProviderRegistry()
+    registry.register(provider)
+    shard_acts = ScopeShardActivities(
+        session_factory=session_maker,
+        provider_registry_factory=lambda: registry,
+    )
+
+    first = await shard_acts.run_shard_crawl(wizard_run_id, "ch/zurich", None)
+    assert first["status"] == "failed"
+
+    second = await shard_acts.run_shard_crawl(wizard_run_id, "ch/zurich", None)
+
+    assert provider.dispatches == 2, "the retry never reached the provider"
+    assert second["status"] == "completed"
+    assert second["run_id"] == first["run_id"], "the retry created a second Run row"
+
+    async with session_maker() as session:
+        runs = (await session.scalars(select(Run))).all()
+        assert len(runs) == 1
+        assert runs[0].status is RunStatus.COMPLETED
+        assert runs[0].failure_reason is None
+
+
+@pytest.mark.asyncio
+async def test_a_shard_still_in_flight_raises_instead_of_reporting_zeros(
+    session_maker,
+) -> None:
+    """An async provider's run is durable while still RUNNING — that is not an outcome.
+
+    Returning that row's zeroed counters would be a *successful* activity return
+    with no data, and `ScopeShardWorkflow` does not inspect `status`, so the shard
+    would be recorded complete having captured nothing. Raising lets Temporal's
+    backoff give the in-flight attempt time to land.
+    """
+    wizard_run_id = await _wizard_run_with_source(session_maker, "in flight")
+    provider = _CountingProvider()
+    registry = ProviderRegistry()
+    registry.register(provider)
+    shard_acts = ScopeShardActivities(
+        session_factory=session_maker,
+        provider_registry_factory=lambda: registry,
+    )
+
+    first = await shard_acts.run_shard_crawl(wizard_run_id, "ch/zurich", None)
+    async with session_maker() as session:
+        run = await session.get(Run, first["run_id"])
+        assert run is not None
+        run.status = RunStatus.RUNNING  # what an async/webhook provider leaves behind
+        await session.commit()
+
+    with pytest.raises(ShardDispatchInFlightError):
+        await shard_acts.run_shard_crawl(wizard_run_id, "ch/zurich", None)
+
+    assert provider.dispatches == 1, "an in-flight shard was dispatched a second time"
+
+
+@pytest.mark.asyncio
+async def test_starting_a_pilot_run_does_not_clobber_shard_progress(session_maker) -> None:
+    """`start_pilot_run` is the third writer to `progress` and must also compare-and-set.
+
+    It used to assign the column outright from a snapshot, which drops whatever a
+    shard committed *and* leaves `progress_version` unchanged — so no CAS writer
+    could detect the loss either.
+    """
+    async with session_maker() as session:
+        source_id, sv_id = await _seed_source_fixtures(session)
+        await session.commit()
+
+    async with session_maker() as session:
+        service = WizardService(session, InMemoryOrchestrator())
+        project = await service.create_project(CreateWizardProjectRequest(name="third writer"))
+        await service.update_scope(project.wizard_project_id, {"domains": ["example.com"]})
+        await service.update_discovery_plan(
+            project.wizard_project_id,
+            {"source_id": source_id, "source_version_id": sv_id},
+        )
+        wizard_run = await service._get_latest_run_for_project(project.wizard_project_id)
+        wizard_run_id = wizard_run.wizard_run_id
+        await session.commit()
+
+    shard_acts = ScopeShardActivities(session_factory=session_maker)
+
+    async with session_maker() as session:
+        service = WizardService(session, InMemoryOrchestrator())
+        # Warm this session's identity map *before* the shard writes, so the
+        # in-memory `progress` is stale by the time `start_pilot_run` gets to it.
+        # That is the interleaving: a snapshot read, then somebody else's commit,
+        # then a write built on the snapshot.
+        await service.get_run(wizard_run_id)
+
+        await shard_acts.report_shard_progress(
+            wizard_run_id, "ch/zurich", {"nodes_discovered": 3, "records_accepted": 2}
+        )
+
+        await service.start_pilot_run(project.wizard_project_id, sample_limit=25)
+
+    async with session_maker() as session:
+        run = await session.get(WizardRun, wizard_run_id)
+        assert run is not None
+        assert run.progress["sample_limit"] == 25
+        assert "ch/zurich" in run.progress["shards"], "the shard's entry was clobbered"
+        assert run.progress["accepted_records"] == 2
+        # Both writers bumped the version, so a third could detect either of them.
+        assert run.progress_version == 2
 
 
 @pytest.mark.asyncio
