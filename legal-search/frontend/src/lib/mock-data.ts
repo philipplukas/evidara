@@ -447,13 +447,24 @@ export const decisionDetail: DetailViewModel = {
     { label: "Chamber", value: "I. Civil Law Division", visibility: "default" },
     { label: "Outcome", value: "Appeal dismissed", visibility: "always" },
   ],
-  contentText: `Regeste
+  // The headnote, as its own field — the shape the API returns since #760.
+  //
+  // `contentText` below is the Erwägungen, NOT the headnote again. This fixture
+  // used to open the body with a literal "Regeste" heading followed by this
+  // same text, because before the field existed that was the only way to show
+  // a headnote at all. Leaving it that way would have rendered the Regeste
+  // twice on one screen — once in the header, once at the top of the Inhalt
+  // tab — which is what a fixture is supposed to catch before a reader does.
+  regeste: `Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung.
 
-Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung.
+Das Bundesgericht bestätigt, dass die Verantwortlichkeit nach Art. 754 OR eine Pflichtverletzung, einen Schaden, einen Kausalzusammenhang und ein Verschulden voraussetzt. Die Beweislast für sämtliche Haftungsvoraussetzungen liegt beim Kläger (E. 3.2).`,
+  contentText: `Erwägungen
 
-Das Bundesgericht bestätigt, dass die Verantwortlichkeit nach Art. 754 OR eine Pflichtverletzung, einen Schaden, einen Kausalzusammenhang und ein Verschulden voraussetzt. Die Beweislast für sämtliche Haftungsvoraussetzungen liegt beim Kläger (E. 3.2).
+3.2 Der Beschwerdeführer rügt eine Verletzung von Art. 754 OR. Er macht geltend, die Vorinstanz habe die Beweislast für die Pflichtverletzung zu Unrecht ihm auferlegt. Die Rüge geht fehl: Wer aus Art. 754 OR einen Anspruch ableitet, hat sämtliche Haftungsvoraussetzungen zu beweisen.
 
-Die Sorgfaltspflicht der Verwaltungsratsmitglieder bemisst sich nach einem objektiven Massstab unter Berücksichtigung der konkreten Umstände des Einzelfalls (E. 4.1).`,
+4.1 Die Sorgfaltspflicht der Verwaltungsratsmitglieder bemisst sich nach einem objektiven Massstab unter Berücksichtigung der konkreten Umstände des Einzelfalls. Massgebend ist, wie ein gewissenhaftes Verwaltungsratsmitglied in der gleichen Lage gehandelt hätte.
+
+5. Die Beschwerde erweist sich als unbegründet und ist abzuweisen.`,
   tabs: [
     { key: "content", label: "Inhalt" },
     { key: "details", label: "Details" },

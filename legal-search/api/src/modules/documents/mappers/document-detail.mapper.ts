@@ -27,6 +27,11 @@ import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/
 /**
  * A body is only a body if it carries text. Whitespace-only `content` would
  * otherwise advertise an "Inhalt" tab over an empty document.
+ *
+ * The same rule governs `regeste`: the index stores whatever the seed wrote,
+ * including `''`, and an empty headnote must be omitted rather than shipped —
+ * the client cannot distinguish "no Regeste" from "a Regeste that is blank"
+ * once the key is present.
  */
 function hasBodyText(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
@@ -43,6 +48,12 @@ export interface DetailView {
   metadata: DetailMetadataRowView[];
   /** The document body text — plain text, paragraphs split by blank lines. */
   content?: string;
+  /**
+   * The official headnote (Regeste) of a court decision, as prose. Omitted
+   * when the document carries none or carries only whitespace — an empty
+   * string here would have the client draw a labelled box around nothing.
+   */
+  regeste?: string;
   contentLanguage?: {
     display: string;
     original: string;
@@ -330,6 +341,7 @@ export function mapDocumentToDetailView(
       breadcrumbs: doc.structural_path.split(' › '),
     }),
     ...(hasBodyText(doc.content) && { content: doc.content }),
+    ...(hasBodyText(doc.regeste) && { regeste: doc.regeste.trim() }),
     ...(composeContentLanguage(doc, locale) && {
       contentLanguage: composeContentLanguage(doc, locale),
     }),

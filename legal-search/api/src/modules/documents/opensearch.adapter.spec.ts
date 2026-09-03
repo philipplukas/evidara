@@ -94,4 +94,52 @@ describe('DocumentsOpenSearchAdapter', () => {
       }),
     );
   });
+
+  // `regeste` is mapped in `documents-index.mapping.ts` and boosted by the
+  // search adapter, but `getById` did not read it out of `_source` — so the
+  // headnote was indexed, searched and highlighted while the detail response
+  // could not carry it (#760).
+  it('maps regeste from OpenSearch documents', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: {
+          hits: [
+            {
+              _source: {
+                document_id: 'doc_002',
+                title: 'BGer 4A_123/2022',
+                document_type: 'decision',
+                regeste: 'Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder.',
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    const adapter = new DocumentsOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) => {
+          switch (key) {
+            case 'opensearch.documentsReadAlias':
+              return 'documents-read-test';
+            case 'opensearch.sectionsIndex':
+              return 'sections-test';
+            case 'opensearch.citationsIndex':
+              return 'citations-test';
+            default:
+              return null;
+          }
+        },
+      } as ConfigService,
+    );
+
+    await expect(adapter.getById('doc_002')).resolves.toEqual(
+      expect.objectContaining({
+        document_id: 'doc_002',
+        regeste: 'Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder.',
+      }),
+    );
+  });
 });

@@ -16,6 +16,17 @@ export interface DocumentEntity {
    * `/lean` payload is a canonical row, not a DoclingDocument.
    */
   content?: string;
+  /**
+   * The official headnote (Regeste) of a court decision — prose, not a label.
+   * Mapped as `text` in `core/opensearch/documents-index.mapping.ts` and
+   * boosted by the search adapter, so a search snippet could quote it long
+   * before the detail response could return it (#760).
+   *
+   * Usually absent: `contracts/schemas/search-projection.schema.json` declares
+   * no `regeste`, so the document-intelligence projection never writes one —
+   * only the `scripts/seed-*.ts` corpora do.
+   */
+  regeste?: string;
   jurisdiction?: string;
   document_type?: string;
   authority_name?: string;

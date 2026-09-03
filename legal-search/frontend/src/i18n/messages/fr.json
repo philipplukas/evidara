@@ -68,6 +68,10 @@
     "metadataHeading": "M\u00e9tadonn\u00e9es",
     "showMore": "{count, plural, one {Afficher # champ suppl\u00e9mentaire} other {Afficher # champs suppl\u00e9mentaires}}",
     "showLess": "Afficher moins",
+    "regeste": {
+      "heading": "Regeste",
+      "showMore": "Afficher le regeste complet"
+    },
     "notAvailable": "Non disponible",
     "sheetDescription": "Vue d\u00e9taill\u00e9e du r\u00e9sultat de recherche s\u00e9lectionn\u00e9.",
     "tabs": {

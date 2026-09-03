@@ -68,6 +68,10 @@
     "metadataHeading": "Metadaten",
     "showMore": "{count, plural, one {# weiteres Feld anzeigen} other {# weitere Felder anzeigen}}",
     "showLess": "Weniger anzeigen",
+    "regeste": {
+      "heading": "Regeste",
+      "showMore": "Ganze Regeste anzeigen"
+    },
     "notAvailable": "Nicht verf\u00fcgbar",
     "sheetDescription": "Detailansicht des ausgew\u00e4hlten Suchergebnisses.",
     "tabs": {

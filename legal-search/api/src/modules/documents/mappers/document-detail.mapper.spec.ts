@@ -244,6 +244,46 @@ describe('mapDocumentToDetailView', () => {
     expect(view.tabs.map((t) => t.key)).not.toContain('content');
   });
 
+  // The Regeste is the headnote a lawyer reads first. It was indexed, boosted
+  // and highlighted by the search adapter long before it could reach the detail
+  // response, so the result list carried more legal signal than the page it
+  // linked to (#760).
+  it('should emit the indexed regeste as prose, not as a metadata row', () => {
+    const view = mapDocumentToDetailView(
+      {
+        document_id: 'doc_004',
+        title: 'BGer 4A_123/2022',
+        document_type: 'decision',
+        regeste: 'Art. 754 OR; Verantwortlichkeit.\n\nDie Beweislast liegt beim Kläger.',
+      },
+      [],
+      [],
+    );
+    expect(view.regeste).toBe(
+      'Art. 754 OR; Verantwortlichkeit.\n\nDie Beweislast liegt beim Kläger.',
+    );
+    expect(view.metadata.map((row) => row.value)).not.toContain(view.regeste);
+  });
+
+  it('should trim surrounding whitespace off the regeste', () => {
+    const view = mapDocumentToDetailView(
+      { document_id: 'doc_005', title: 'Entscheid', regeste: '\n  Kurze Regeste.  \n' },
+      [],
+      [],
+    );
+    expect(view.regeste).toBe('Kurze Regeste.');
+  });
+
+  it('should omit a blank regeste rather than ship an empty headnote', () => {
+    const view = mapDocumentToDetailView(
+      { document_id: 'doc_006', title: 'Entscheid', regeste: '   \n  ' },
+      [],
+      [],
+    );
+    expect(view.regeste).toBeUndefined();
+    expect('regeste' in view).toBe(false);
+  });
+
   it('should not advertise a citations tab when no references back it', () => {
     // The index says the document has 3 citations, but the citations query
     // returned none — a lagging or empty citations index. Advertising the tab
@@ -277,6 +317,7 @@ describe('mapDocumentToDetailView', () => {
     const view = mapDocumentToDetailView(minimalDoc, [], []);
     expect(view.breadcrumbs).toBeUndefined();
     expect(view.content).toBeUndefined();
+    expect(view.regeste).toBeUndefined();
     expect(view.contentLanguage).toBeUndefined();
     expect(view.localStructure).toBeUndefined();
   });
