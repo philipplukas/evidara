@@ -49,7 +49,13 @@ from platform_control.models.document_lifecycle_event import DocumentLifecycleEv
 from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
-from platform_control.models.run import Run
+from platform_control.models.run import (
+    DISPATCH_PUBLISH_WITHHELD_KEY,
+    PUBLISHED_ARTIFACTS_COUNT_KEY,
+    Run,
+    publication_withheld_from,
+    published_artifacts_count_from,
+)
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.observability import metrics
@@ -331,12 +337,34 @@ class RunService:
             RunListItemResponse.model_validate(
                 {
                     **{k: v for k, v in row._mapping.items() if k != "run_metadata"},
+                    **self._publication_read_model(
+                        row._mapping["run_metadata"],
+                        row._mapping["artifacts_count"],
+                    ),
                     "refused": (row._mapping["run_metadata"] or {}).get("refused") is True,
                 }
             )
             for row in rows
         ]
         return data, total
+
+    @staticmethod
+    def _publication_read_model(
+        run_metadata: dict[str, Any] | None, artifacts_count: int
+    ) -> dict[str, Any]:
+        """Captured vs published, for a row read as columns rather than as a `Run`.
+
+        `list_runs` selects columns, not entities, so it cannot reach
+        `Run.published_artifacts_count` / `Run.publication_withheld`. It calls the same
+        module-level helpers those properties call, so the list and the detail view
+        cannot disagree about whether a run's documents were published.
+        """
+        return {
+            "published_artifacts_count": published_artifacts_count_from(
+                run_metadata, artifacts_count
+            ),
+            "publication_withheld": publication_withheld_from(run_metadata),
+        }
 
     async def create_run(self, request: CreateRunRequest) -> Run:
         source = await self.session.get(Source, request.source_id)
@@ -1736,7 +1764,11 @@ class RunService:
     async def _publish_pending_dispatch_events(
         self, pending_publications: list[PendingDispatchPublications]
     ) -> list[str]:
-        """Hand the dispatched run's events to the broker, honestly (#707).
+        """Hand the dispatched run's events to the broker, honestly (#707, #853).
+
+        The first thing this does is read `run.status`: a FAILED run publishes
+        nothing (#853). See `_withhold_dispatch_publication`, which also records the
+        rollback decision — the artifacts stay, only the events are dropped.
 
         Publication happens after the run row is already committed, so a failure
         here used to be invisible: the exception escaped to FastAPI as a bare 500
@@ -1764,7 +1796,15 @@ class RunService:
         """
         failures: list[str] = []
         for pending in pending_publications:
+            run = await self.session.get(Run, pending.run_id) if pending.run_id else None
+            if run is None or run.status is RunStatus.FAILED:
+                # A FAILED run does not get to hand its documents downstream (#853).
+                # See `_withhold_dispatch_publication` for why this lives here and not
+                # in the providers.
+                await self._withhold_dispatch_publication(run, pending)
+                continue
             run_failures: list[str] = []
+            published_artifacts = 0
             for artifact_id in pending.raw_artifact_ids:
                 artifact = await self.session.get(RawArtifact, artifact_id)
                 if artifact is None:  # pragma: no cover - defensive guard
@@ -1773,6 +1813,8 @@ class RunService:
                     await self.publisher.publish_raw_artifact_available(artifact)
                 except Exception as exc:
                     run_failures.append(f"raw_artifact.available for {artifact_id}: {exc}")
+                    continue
+                published_artifacts += 1
             for event in pending.bundle_events:
                 try:
                     await self.publisher.publish_artifact_bundle_available(event)
@@ -1783,12 +1825,64 @@ class RunService:
                     continue
                 metrics.record_bundle_event_published()
             if run_failures:
-                await self._record_dispatch_publish_failure(pending.run_id, run_failures)
+                await self._record_dispatch_publish_failure(
+                    pending.run_id, run_failures, published_artifacts
+                )
                 failures.extend(run_failures)
         return failures
 
+    async def _withhold_dispatch_publication(
+        self, run: Run | None, pending: PendingDispatchPublications
+    ) -> None:
+        """Drop a failed dispatch's events instead of publishing them (#853).
+
+        `_dispatch_run` persists `inline_resources` and builds the bundle events
+        BEFORE it reads `inline_failure_reason` (:1348-1374 / :1376-1381). A provider
+        that returns documents *and* a reason not to trust them therefore left the run
+        red while its artifacts went downstream anyway — the corpus would be worse for
+        having run the check than for skipping it.
+
+        This never bit because every provider gated its failure reason on
+        `if not resources` (`deterministic_http:143`, `fedlex_sparql:328`,
+        `eur_lex:284`, `ris_ogd:239`, `legifrance:155`, `ch_court_decisions:336`,
+        `portal_http_provider_base:162`, `gemeinde:426`) — an unstated invariant
+        `_dispatch_run` was written on. #845 was the first provider to want the other
+        combination and had to discard the batch itself. That fix is correct and stays,
+        but it only covers one provider; the invariant belongs at the boundary that
+        actually publishes, where no future provider can miss it.
+
+        **The persisted rows are deliberately NOT rolled back.** `RawArtifact` and
+        `CapturedResource` are the evidence of what the source served — for #845 the
+        diverged bytes are the whole finding — and nothing downstream reads them
+        without an event, because document-intelligence is a NATS consumer. Deleting
+        them would also erase `artifacts_count`, collapsing "captured 12, published 0"
+        into an empty run and hiding exactly the discard an operator needs to see.
+        Withholding is a publication decision, not a storage one.
+
+        `failure_reason` is left alone on purpose: the provider's reason is why the run
+        failed, and overwriting it with "events withheld" would replace the cause with
+        its consequence. The marker in `run_metadata` carries the consequence.
+        """
+        withheld = len(pending.raw_artifact_ids)
+        logging.getLogger(__name__).warning(
+            "withheld %d raw_artifact.available and %d artifact_bundle.available event(s) "
+            "for run %s: the run is %s, so its captured documents are not published",
+            withheld,
+            len(pending.bundle_events),
+            pending.run_id,
+            "unresolvable" if run is None else run.status.value,
+        )
+        if run is None:  # pragma: no cover - defensive guard
+            return
+        run.run_metadata = {
+            **(run.run_metadata or {}),
+            DISPATCH_PUBLISH_WITHHELD_KEY: True,
+            PUBLISHED_ARTIFACTS_COUNT_KEY: 0,
+        }
+        await self.session.commit()
+
     async def _record_dispatch_publish_failure(
-        self, run_id: str | None, run_failures: list[str]
+        self, run_id: str | None, run_failures: list[str], published_artifacts: int = 0
     ) -> None:
         """Rewrite a run that acquired successfully but could not hand off (#707)."""
         reason = (
@@ -1810,7 +1904,13 @@ class RunService:
         run.status = RunStatus.FAILED
         run.failure_reason = reason
         run.completed_at = datetime.now(UTC)
-        run.run_metadata = {**(run.run_metadata or {}), "dispatch_publish_failed": True}
+        run.run_metadata = {
+            **(run.run_metadata or {}),
+            "dispatch_publish_failed": True,
+            # What really left the service, not what was captured (#853). A partial
+            # handoff is neither 0 nor `artifacts_count`.
+            PUBLISHED_ARTIFACTS_COUNT_KEY: published_artifacts,
+        }
         await self.session.commit()
 
     @staticmethod

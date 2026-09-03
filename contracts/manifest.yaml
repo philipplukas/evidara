@@ -1,4 +1,4 @@
-version: "2.27.0"
+version: "2.28.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -22,7 +22,11 @@ apis:
     # platform_control.openapi.API_VERSION, which is what the app serves as
     # info.version; check_contract_manifest.py compares the two.
     file: "contracts/api/platform-control.openapi.yaml"
-    version: "0.20.0"
+    # 0.21.0: adds `published_artifacts_count` and `publication_withheld` to the run
+    # responses on the locked `/v1/runs` and `/v1/runs/{run_id}` paths (#853).
+    # Additive: both fields have defaults and a reader that ignores them sees exactly
+    # what it saw before.
+    version: "0.21.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

@@ -15,7 +15,7 @@ from platform_control.models.document_lifecycle_event import DocumentLifecycleEv
 from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
-from platform_control.models.run import Run
+from platform_control.models.run import PUBLISHED_ARTIFACTS_COUNT_KEY, Run
 from platform_control.schemas.run import CreateRunRequest
 from platform_control.schemas.source import (
     CreateSourceRequest,
@@ -1396,7 +1396,7 @@ class OneBadArtifactPublisher:
         self.published_bundles.append(event)
 
 
-async def _seed_inline_run_fixtures(session):
+async def _seed_inline_run_fixtures(session, inline_provider=None):
     source, version, source_service = await _seed_source_version(session)
     await source_service.approve_source_version(version.source_version_id)
     version.acquisition_spec = {
@@ -1407,7 +1407,7 @@ async def _seed_inline_run_fixtures(session):
     await session.commit()
     registry = ProviderRegistry()
     registry.register(StubProvider())
-    registry.register(InlineJsonDeterministicProvider())
+    registry.register(inline_provider or InlineJsonDeterministicProvider())
     return source, version, registry
 
 
@@ -1478,3 +1478,148 @@ async def test_one_unpublishable_artifact_does_not_strand_the_rest_of_its_batch(
     assert run is not None
     assert run.status is RunStatus.FAILED
     assert "maximum payload exceeded" in (run.failure_reason or "")
+    # A partial handoff is neither "all of it" nor "none of it" (#853): one artifact
+    # was rejected, the other left the service, and the run says so.
+    assert run.artifacts_count == 1
+    assert run.published_artifacts_count == 0
+    # ...and it is a publish FAILURE, not a deliberate withholding. Collapsing the two
+    # would tell an operator the platform chose this.
+    assert run.publication_withheld is False
+
+
+# --- #853: a FAILED dispatch must not publish what it captured ----------------
+#
+# `_dispatch_run` persists resources and builds bundle events (run_service.py
+# :1348-1374) BEFORE it reads `inline_failure_reason` (:1376-1381), so a provider
+# returning documents *and* a reason not to trust them shipped the documents and
+# marked the run red afterwards. Every provider in the repo happened to gate its
+# failure reason on `if not resources`, so nothing exercised the combination until
+# #845 — which fixed it inside one provider. These tests pin the class fix at the
+# publish boundary, where no future provider can miss it.
+
+
+@dataclass
+class DistrustedCaptureProvider:
+    """Captures a document AND reports a reason not to trust it.
+
+    The shape #845's mirror-fidelity check wanted and no provider could safely
+    return: `inline_resources` non-empty alongside `inline_failure_reason`.
+    """
+
+    provider_name: str = "deterministic_http"
+    live_ready: bool = True
+
+    async def start_run(self, source, source_version, run) -> ProviderStartResult:
+        del source, source_version, run
+        return ProviderStartResult(
+            provider=self.provider_name,
+            external_job_id="det_job_distrusted",
+            request_payload={"seed_urls": ["https://registry.npmjs.org/left-pad/latest"]},
+            response_payload={"captured": 1, "published": 0},
+            inline_resources=[
+                ProviderResource(
+                    source_url="https://registry.npmjs.org/left-pad/latest",
+                    final_url="https://registry.npmjs.org/left-pad/latest",
+                    content_type="application/json",
+                    body='{"name":"left-pad","version":"1.3.0"}',
+                    title=None,
+                    http_status=200,
+                    discovery_depth=0,
+                )
+            ],
+            inline_failure_reason=(
+                "mirror fidelity check FAILED: the mirror no longer serves bytes "
+                "identical to the issuing source."
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_a_failed_dispatch_publishes_nothing_even_though_it_captured_a_document(
+    session,
+) -> None:
+    source, version, registry = await _seed_inline_run_fixtures(
+        session, inline_provider=DistrustedCaptureProvider()
+    )
+    publisher = RecordingPublisher()
+    run_service = RunService(
+        session,
+        provider_registry=registry,
+        artifact_store=InMemoryArtifactStore(),
+        publisher=publisher,
+    )
+
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+
+    assert run.status is RunStatus.FAILED
+    # Nothing reached document-intelligence. Publishing here would have put a corpus
+    # the platform itself distrusts into the index, cited to the issuing source.
+    assert publisher.raw_artifact_ids == []
+    assert publisher.bundle_events == []
+
+    # The rollback decision, asserted: the captured rows STAY. They are the evidence
+    # of what the source served — for a fidelity failure they are the finding itself —
+    # and nothing downstream reads them without an event.
+    artifacts = list(
+        await session.scalars(select(RawArtifact).where(RawArtifact.run_id == run.run_id))
+    )
+    captured = list(
+        await session.scalars(select(CapturedResource).where(CapturedResource.run_id == run.run_id))
+    )
+    assert len(artifacts) == 1
+    assert len(captured) == 1
+    assert run.artifacts_count == 1
+
+    # ...and the withholding is legible rather than looking like an empty run (M15).
+    assert run.publication_withheld is True
+    assert run.published_artifacts_count == 0
+    # The provider's reason survives: it is why the run failed. "Events withheld" is
+    # the consequence, and it belongs in the metadata, not in `failure_reason`.
+    assert "mirror fidelity check FAILED" in (run.failure_reason or "")
+
+    # The list read model must tell the same story as the detail one.
+    items, _total = await run_service.list_runs()
+    item = next(row for row in items if row.run_id == run.run_id)
+    assert item.artifacts_count == 1
+    assert item.published_artifacts_count == 0
+    assert item.publication_withheld is True
+
+
+@pytest.mark.asyncio
+async def test_the_ordinary_success_path_still_publishes_everything_it_captured(session) -> None:
+    source, version, registry = await _seed_inline_run_fixtures(session)
+    publisher = RecordingPublisher()
+    run_service = RunService(
+        session,
+        provider_registry=registry,
+        artifact_store=InMemoryArtifactStore(),
+        publisher=publisher,
+    )
+
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+
+    # The guard must refuse a FAILED run and nothing else: a status check that
+    # withheld the success path too would satisfy the test above and break the
+    # platform.
+    assert run.status is RunStatus.COMPLETED
+    assert publisher.raw_artifact_ids is not None
+    assert len(publisher.raw_artifact_ids) == 1
+    assert publisher.bundle_events is not None
+    assert len(publisher.bundle_events) == 1
+    assert run.publication_withheld is False
+    # No marker is written on the happy path, so published falls back to captured
+    # rather than to a fabricated 0 — the reading every run predating #853 needs.
+    assert run.published_artifacts_count == run.artifacts_count == 1
+    assert PUBLISHED_ARTIFACTS_COUNT_KEY not in (run.run_metadata or {})

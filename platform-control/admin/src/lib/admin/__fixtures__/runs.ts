@@ -34,6 +34,11 @@ export const buildRunRecord = (overrides: Partial<RunRecord> = {}): RunRecord =>
   captured_resources_count: 12,
   failure_reason: null,
   refused: false,
+  // Captured and published are separate numbers as of #853: a FAILED dispatch
+  // keeps its artifacts but publishes none of them. The boring case published
+  // everything it captured.
+  published_artifacts_count: 4,
+  publication_withheld: false,
   created_at: "2026-04-15T08:55:00Z",
   updated_at: "2026-04-15T09:30:00Z",
   ...overrides,
@@ -56,6 +61,11 @@ export const buildRunListRecord = (overrides: Partial<RunListRecord> = {}): RunL
   captured_resources_count: 12,
   failure_reason: null,
   refused: false,
+  // Captured and published are separate numbers as of #853: a FAILED dispatch
+  // keeps its artifacts but publishes none of them. The boring case published
+  // everything it captured.
+  published_artifacts_count: 4,
+  publication_withheld: false,
   created_at: "2026-04-15T08:55:00Z",
   updated_at: "2026-04-15T09:30:00Z",
   source_name: "Zurich decisions",

@@ -106,6 +106,24 @@ class RunResponse(BaseModel):
             "ask what was attempted and why it was refused (#634)."
         ),
     )
+    published_artifacts_count: int = Field(
+        default=0,
+        description=(
+            "How many of `artifacts_count` actually reached the broker. Equal to "
+            "`artifacts_count` for an ordinary run; lower when the dispatch was "
+            "withheld (`publication_withheld`) or the handoff failed partway (#707). "
+            "Render it beside `artifacts_count`, never instead of it — a discard is "
+            "not an empty run (#853)."
+        ),
+    )
+    publication_withheld: bool = Field(
+        default=False,
+        description=(
+            "True when this run captured documents that were deliberately never "
+            "published, because the run is FAILED. The artifacts are kept as evidence "
+            "of what the source served; nothing downstream received them (#853)."
+        ),
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -128,6 +146,20 @@ class RunListItemResponse(BaseModel):
         description=(
             "True when the ADR-0030 two-key lock blocked this dispatch (#634). "
             "Filter the collection with `?refused=true` to audit refusals."
+        ),
+    )
+    published_artifacts_count: int = Field(
+        default=0,
+        description=(
+            "How many of `artifacts_count` reached the broker. Lower than "
+            "`artifacts_count` when the dispatch was withheld or the handoff "
+            "failed partway (#853, #707)."
+        ),
+    )
+    publication_withheld: bool = Field(
+        default=False,
+        description=(
+            "True when a FAILED run's captured documents were deliberately not published (#853)."
         ),
     )
     created_at: datetime

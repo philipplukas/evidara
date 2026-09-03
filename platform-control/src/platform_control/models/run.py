@@ -10,6 +10,34 @@ from platform_control.domain import RunMode, RunStatus
 from platform_control.ids import generate_prefixed_id
 from platform_control.models.base import Base, TimestampMixin, utcnow
 
+#: `run_metadata` key recording that a run's captured documents were deliberately
+#: never published (#853), and the companion key holding how many artifacts really
+#: reached the broker. Both are read back through the helpers below rather than
+#: inline, because `RunService.list_runs` selects columns instead of entities and
+#: would otherwise re-implement the reading.
+DISPATCH_PUBLISH_WITHHELD_KEY = "dispatch_publish_withheld"
+PUBLISHED_ARTIFACTS_COUNT_KEY = "published_artifacts_count"
+
+
+def publication_withheld_from(run_metadata: dict[str, Any] | None) -> bool:
+    return (run_metadata or {}).get(DISPATCH_PUBLISH_WITHHELD_KEY) is True
+
+
+def published_artifacts_count_from(
+    run_metadata: dict[str, Any] | None, artifacts_count: int
+) -> int:
+    """How many artifacts left the service, defaulting to "all of them".
+
+    Only the two paths that publish less than they captured — the #853 withhold and
+    the #707 partial handoff — write the key. Every other run published what it
+    captured, so an absent key must fall back to `artifacts_count`; defaulting to `0`
+    would report every historical run as having delivered nothing.
+    """
+    recorded = (run_metadata or {}).get(PUBLISHED_ARTIFACTS_COUNT_KEY)
+    if isinstance(recorded, bool) or not isinstance(recorded, int):
+        return artifacts_count
+    return recorded
+
 
 class Run(TimestampMixin, Base):
     __tablename__ = "runs"
@@ -87,3 +115,28 @@ class Run(TimestampMixin, Base):
         that actually fired and failed.
         """
         return (self.run_metadata or {}).get("refused") is True
+
+    @property
+    def publication_withheld(self) -> bool:
+        """True when this run captured artifacts that were deliberately not published.
+
+        `RunService._publish_pending_dispatch_events` refuses to hand a FAILED run's
+        events to the broker (#853). The artifacts stay on disk and in these counts —
+        they are evidence of what the source served — but nothing downstream ever
+        sees them. Without this marker a withheld batch is indistinguishable from a
+        broker outage, and `artifacts_count` alone would claim a delivery that did
+        not happen.
+        """
+        return publication_withheld_from(self.run_metadata)
+
+    @property
+    def published_artifacts_count(self) -> int:
+        """How many of `artifacts_count` actually reached the broker (#853).
+
+        Captured and published are different numbers whenever a dispatch is withheld
+        (FAILED run, #853) or the handoff itself fails partway (#707). Both paths
+        record the real figure in `run_metadata`; every other run published what it
+        captured, so the absent key falls back to `artifacts_count` rather than to a
+        fabricated `0`.
+        """
+        return published_artifacts_count_from(self.run_metadata, self.artifacts_count)
