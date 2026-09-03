@@ -1815,11 +1815,30 @@ class RunService:
 
     @staticmethod
     def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:
-        return str(
-            artifact_metadata.get("source_url")
-            or artifact_metadata.get("final_url")
-            or "https://unknown.local/resource"
-        )
+        """The locator `document_id` is derived from (#652, #806).
+
+        `document_intelligence`'s `_document_identity_key` keys `document_id` on this
+        string, and the projection upserts on `document_id`
+        (`opensearch.adapter.ts` `upsertProjection`). Two properties therefore matter.
+
+        **`source_url` must stay ahead of `final_url`.** They are different URIs by
+        construction for the SPARQL providers, not merely on redirect: `fedlex_sparql`
+        sets `source_url` to the act-level ELI (`.../eli/cc/1999/404`) and `final_url`
+        to the filestore manifestation, whose path **embeds the consolidation date**
+        (`fedlex_sparql_provider.py` `_filestore_html_url`). Keying on `final_url`
+        would mint a fresh `document_id` at every consolidation — the #652 duplicate,
+        permanently, across the whole federal corpus. `eur_lex_sparql` is the same
+        shape. Do not flip this order globally; see #806 for why the correct identity
+        is a per-provider decision (`lexfind_api` needs the opposite preference and is
+        wrong today).
+
+        Returns `""` when the artifact carries no URL at all. This must not be a shared
+        placeholder: every locator-less artifact of a source would derive one
+        `document_id` and silently overwrite itself in the index. Empty defers to
+        `_document_identity_key`'s per-artifact fallback — `upstream_locator` is
+        neither required nor constrained in `artifact-bundle-manifest.schema.json`.
+        """
+        return str(artifact_metadata.get("source_url") or artifact_metadata.get("final_url") or "")
 
     @staticmethod
     def _build_storage_ref_for_artifact(artifact: RawArtifact) -> dict[str, Any]:
