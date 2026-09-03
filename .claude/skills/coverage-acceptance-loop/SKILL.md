@@ -90,9 +90,10 @@ bash scripts/ch-fedlex-compose-e2e.sh \
 
 Despite the name it is corpus-parameterised. Pass the corpus-shape flags: without
 `--expect-content-type` a PDF corpus reports `provider_failed` while working correctly,
-and without `--expect-language` / `--expect-title` those gates do not run at all — they
-are recorded as **`excluded`**, which is honest but means the run proves nothing about
-the title or the language facet (#735, #744).
+and without `--expect-language` / `--expect-title` the harness falls back to the template
+id — the `_de`/`_fr`/`_it` suffix, and a hardcoded list of three Fedlex titles. For any
+other template those gates do not run at all and are recorded as **`excluded`**: honest,
+but the run then proves nothing about the title or the language facet (#735, #744).
 
 ### Bringing the stack up
 
@@ -186,8 +187,11 @@ With the bundle, two more refusal codes can appear in `acceptance_verdict.refusa
 bundle reported no coverage at all). Both refuse the flip in §6. Without the bundle only
 the run-level rules above run, and a hole in the gates stays invisible.
 
-Persist the bundle under `docs/runbooks/evidence/` (the harness `--copy-evidence` flag
-does this).
+Persist the bundle under `docs/runbooks/evidence/`. **`ch-fedlex-compose-e2e.sh` — the
+driver §3 recommends — has no `--copy-evidence` flag** (its own comment says so at
+`:65`); pass `--out-dir` and copy the directory yourself. `--copy-evidence` exists on
+`scripts/ch-fedlex-fast-loop.sh` (`:185`) and its siblings, which run against a deployed
+environment rather than local compose.
 
 ## 6. Flip the key
 
