@@ -1,25 +1,42 @@
 name: Interaction Flow Staging Evidence
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/interaction-flow-staging-evidence.yml"
-      - "legal-search/frontend/e2e/**"
-      - "legal-search/frontend/playwright.config.ts"
-      - "legal-search/frontend/src/app/page.tsx"
-      - "legal-search/frontend/src/app/HomeClient.tsx"
-      - "legal-search/frontend/src/app/WorkspaceClient.tsx"
-      - "legal-search/frontend/src/lib/control-plane-entry.ts"
-      - "legal-search/frontend/src/lib/control-plane-entry-server.ts"
-      - "legal-search/frontend/src/components/layout/AppHeader.tsx"
-      - "legal-search/frontend/src/components/layout/MobileWorkspace.tsx"
-      - "platform-control/admin/src/app/AdminShell.tsx"
-      - "scripts/run-interaction-flow-local.sh"
-  # Nightly schedule disabled 2026-06-28: resolves live GCP staging UI URLs and uploads
-  # evidence to GCS, being retired for the self-hosted Hetzner runtime (see
-  # docs/adr/0029-self-hosted-hetzner-runtime.md). The push trigger above still runs the
-  # suite on relevant changes; re-enable the nightly once Hetzner is live.
+  # BOTH automatic triggers are disabled. This workflow resolves live GCP staging UI URLs
+  # and uploads evidence to GCS, and that environment is being wound down for the
+  # self-hosted Hetzner runtime (see docs/adr/0029-self-hosted-hetzner-runtime.md).
+  #
+  # The nightly went first (2026-06-28), but the `push` trigger was left behind. That made
+  # this the only one of ADR-0029's five GCP-dependent nightlies still firing automatically
+  # at a decommissioned environment: red on every matching push to main since 2026-07-20,
+  # always the same failure, never a code regression. The Playwright global setup gets
+  # HTTP 500 from `/api/e2e-identity` — Google's error page, not the app — and aborts
+  # before a single test runs. Staging answers 503 on `/` because nothing deploys there
+  # any more: `Runtime Cloud Run CD` is a no-op explainer job while
+  # `vars.ENABLE_GCP_CLOUD_RUN_CD != 'true'` (see platform-control-cd.yml).
+  #
+  # A red canary nobody can act on trains people to ignore canaries, so it is off rather
+  # than tolerated. `workflow_dispatch` still works against any environment that is up.
+  #
+  # RE-ENABLE both blocks once a Hetzner UI surface exists — `k8s/gitops/` still carries
+  # placeholder hosts (`search.REPLACE_ME.example`, `admin.staging.evidara.example`).
+  # ADR-0029 tracks this under "re-point/re-enable the disabled nightlies at the new
+  # environment"; see #826 for the coverage gap this leaves open in the meantime.
+  #
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - ".github/workflows/interaction-flow-staging-evidence.yml"
+  #     - "legal-search/frontend/e2e/**"
+  #     - "legal-search/frontend/playwright.config.ts"
+  #     - "legal-search/frontend/src/app/page.tsx"
+  #     - "legal-search/frontend/src/app/HomeClient.tsx"
+  #     - "legal-search/frontend/src/app/WorkspaceClient.tsx"
+  #     - "legal-search/frontend/src/lib/control-plane-entry.ts"
+  #     - "legal-search/frontend/src/lib/control-plane-entry-server.ts"
+  #     - "legal-search/frontend/src/components/layout/AppHeader.tsx"
+  #     - "legal-search/frontend/src/components/layout/MobileWorkspace.tsx"
+  #     - "platform-control/admin/src/app/AdminShell.tsx"
+  #     - "scripts/run-interaction-flow-local.sh"
   # schedule:
   #   - cron: "45 4 * * *"
   workflow_dispatch:

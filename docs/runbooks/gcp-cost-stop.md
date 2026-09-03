@@ -30,6 +30,14 @@ The five scheduled workflows that hammer live GCP are disabled in
 `interaction-flow-staging-evidence`, `release-readiness`. No action needed beyond
 merging this branch — listed here for completeness.
 
+> **Correction (2026-07-31).** For four of the five, commenting out `schedule:` was
+> enough. `interaction-flow-staging-evidence` also had a `push: branches: [main]`
+> trigger, which this section did not account for — so it kept firing at the wound-down
+> staging environment and was red on every matching push to main from 2026-07-20
+> onwards (Playwright's identity check gets HTTP 500 from Cloud Run and aborts before
+> any test runs). The `push` block is now commented out too. When auditing a
+> "disabled" workflow, check every trigger, not just the one you meant to remove.
+
 ## 2. Scale Cloud Run services to zero
 
 Cloud Run services bill while serving; the always-on worker (`min=max=1`) bills
