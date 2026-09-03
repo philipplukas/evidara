@@ -1,17 +1,25 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 import typer
+from typer.testing import CliRunner
 
 from evidara_cli.coverage import (
     STALL_NO_DISPATCH_WORKER,
     STALL_PUBLISH_PATH_DISABLED,
     STALL_RUN_REFUSED,
 )
-from evidara_cli.coverage_cmd import coverage_preflight, coverage_templates, coverage_watch
+from evidara_cli.coverage_cmd import (
+    coverage_enable,
+    coverage_preflight,
+    coverage_templates,
+    coverage_watch,
+)
+from evidara_cli.main import app
 
 TEMPLATES = {
     "data": [
@@ -373,3 +381,443 @@ def test_watch_rejects_an_unknown_until_target() -> None:
             correlation_id=None,
         )
     assert exc.value.exit_code == 2
+
+
+# --- enable -------------------------------------------------------------------------
+
+_ACCEPTANCE_RUN = {
+    "run_id": "run_ok",
+    "source_id": "src_1",
+    "source_version_id": "sv_1",
+    "mode": "acceptance",
+    "status": "completed",
+    "refused": False,
+    "captured_resources_count": 3,
+}
+_VERSIONS_LIVE = {
+    "data": [
+        {
+            "source_version_id": "sv_1",
+            "execution_mode": "live",
+            "acquisition_spec": {"provider": "lexfind"},
+        }
+    ]
+}
+
+
+def _templates_with(**overrides: Any) -> dict[str, Any]:
+    """TEMPLATES with the lexfind row patched — the template under test."""
+    rows = [dict(row) for row in TEMPLATES["data"]]
+    rows[1] = {**rows[1], **overrides}
+    return {"data": rows}
+
+
+# The ordinary target: provider already LIVE, config key never turned. Anything below
+# `live` is refused unless acknowledged, so the happy path must not use it (ADR-0030 §2).
+_LIVE_NEVER_TURNED = _templates_with(acquisition_readiness="live")
+_LIVE_FLIPPED = _templates_with(
+    acquisition_readiness="live", enabled=True, source="override", launchable=True
+)
+
+
+def _enable(**kwargs: Any) -> None:
+    """coverage_enable with the defaults every call needs, so tests state only the delta."""
+    args: dict[str, Any] = {
+        "overlay": "ch",
+        "template": "lexfind_zh_hundegesetz",
+        "evidence_run_id": None,
+        "note": None,
+        "enabled": True,
+        "reopen_operator_kill_switch": False,
+        "acknowledge_provider_below_live": False,
+        "human": False,
+        "correlation_id": None,
+    }
+    args.update(kwargs)
+    coverage_enable(**args)
+
+
+def _codes(payload: dict[str, Any]) -> list[str]:
+    return [r["code"] for r in payload["artifacts"]["refusals"]]
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_flips_the_key_and_proves_it_by_reading_it_back(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    req_mock.side_effect = [
+        _LIVE_NEVER_TURNED,
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+        {"enabled": True, "source": "override"},
+        _LIVE_FLIPPED,
+    ]
+    _enable(evidence_run_id="run_ok", note="Evidence bundle under docs/runbooks/evidence/")
+    payload = _payload(emit_mock)
+    assert payload["ok"] is True
+    assert payload["side_effect_level"] == "reversible"
+    verification = payload["artifacts"]["verification"]
+    assert verification["applied"] is True
+    assert verification["provenance"] == "override"
+    # The audit note must carry the citation, not just the operator's prose.
+    put_call = req_mock.call_args_list[3]
+    assert put_call.args[0] == "PUT"
+    assert "run_ok" in put_call.kwargs["json_body"]["note"]
+    # A provider-level binding is not a pass: one lexfind run covers 26 cantons + Bund.
+    binding = [e for e in payload["evidence"] if e["target"] == "adr-0030:acceptance-evidence"]
+    assert binding and binding[0]["passed"] is False
+    assert payload["status"] == "needs_human"
+    assert payload["decision"]["recommended_action"] == "needs-human"
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_a_shadow_run_and_writes_nothing(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """The refusal ADR-0030 §2 names. A green SHADOW run must not reach the PUT."""
+    req_mock.side_effect = [
+        _LIVE_NEVER_TURNED,
+        _ACCEPTANCE_RUN,
+        {
+            "data": [
+                {
+                    "source_version_id": "sv_1",
+                    "execution_mode": "shadow",
+                    "acquisition_spec": {"provider": "lexfind"},
+                }
+            ]
+        },
+    ]
+    with pytest.raises(typer.Exit) as exc:
+        _enable(evidence_run_id="run_ok")
+    assert exc.value.exit_code == 1
+    payload = _payload(emit_mock)
+    assert payload["ok"] is False
+    assert payload["side_effect_level"] == "none"
+    assert _codes(payload) == ["evidence_run_is_not_acceptance_evidence"]
+    verdict = payload["artifacts"]["acceptance_verdict"]
+    assert [r["code"] for r in verdict["refusals"]] == ["execution_mode_shadow"]
+    # Three reads, no write.
+    assert req_mock.call_count == 3
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json", return_value=_LIVE_NEVER_TURNED)
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_without_a_cited_run(_pc: object, req_mock: Any, emit_mock: Any) -> None:
+    with pytest.raises(typer.Exit):
+        _enable(note="trust me")
+    assert _codes(_payload(emit_mock)) == ["no_evidence_run_cited"]
+    assert req_mock.call_count == 1
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_evidence_from_a_different_provider(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    req_mock.side_effect = [
+        _LIVE_NEVER_TURNED,
+        _ACCEPTANCE_RUN,
+        {
+            "data": [
+                {
+                    "source_version_id": "sv_1",
+                    "execution_mode": "live",
+                    "acquisition_spec": {"provider": "fedlex_sparql"},
+                }
+            ]
+        },
+    ]
+    with pytest.raises(typer.Exit):
+        _enable(evidence_run_id="run_ok")
+    payload = _payload(emit_mock)
+    assert _codes(payload) == ["evidence_run_provider_mismatch"]
+    assert payload["artifacts"]["evidence_binding"] == "none"
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_a_provider_below_live_until_acknowledged(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """ADR-0030 §2: LIVE first. The override table this writes is outside the invariant
+    test that enforces it over source_blueprints.yaml, so the ordering is enforced here."""
+    req_mock.side_effect = [TEMPLATES, _ACCEPTANCE_RUN, _VERSIONS_LIVE]
+    with pytest.raises(typer.Exit):
+        _enable(evidence_run_id="run_ok")
+    assert _codes(_payload(emit_mock)) == ["provider_not_live_not_acknowledged"]
+    assert req_mock.call_count == 3
+
+    emit_mock.reset_mock()
+    req_mock.reset_mock()
+    req_mock.side_effect = [
+        TEMPLATES,
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+        {"enabled": True, "source": "override"},
+        _templates_with(enabled=True, source="override"),
+    ]
+    _enable(evidence_run_id="run_ok", acknowledge_provider_below_live=True)
+    payload = _payload(emit_mock)
+    assert payload["ok"] is True
+    # Armed ahead of the code key: reported as a check that did not pass, not as fine.
+    code_key = [e for e in payload["evidence"] if e["target"] == "adr-0030:code-key"]
+    assert code_key and code_key[0]["passed"] is False
+    assert payload["status"] == "needs_human"
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_to_reopen_an_operator_kill_switch(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """Acceptance evidence does not waive somebody's deliberate kill switch."""
+    req_mock.side_effect = [
+        _templates_with(acquisition_readiness="live", enabled=False, source="override"),
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+    ]
+    with pytest.raises(typer.Exit):
+        _enable(evidence_run_id="run_ok")
+    assert _codes(_payload(emit_mock)) == ["operator_kill_switch_not_acknowledged"]
+    assert req_mock.call_count == 3
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_a_kill_switch_masked_by_a_scaffold_provider(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """`blocker` is single and priority-ordered: `provider_scaffold` outranks
+    `template_disabled_by_operator`, so keying the kill-switch check off it let a
+    scaffold provider hide a closed key and flip it unacknowledged, exit 0. And
+    `scaffold` is the server's fail-closed default for any provider it cannot resolve,
+    so the fail-closed signal became a client-side fail-open. Key off `config_key`."""
+    req_mock.side_effect = [
+        _templates_with(acquisition_readiness="scaffold", enabled=False, source="override"),
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+    ]
+    with pytest.raises(typer.Exit) as exc:
+        _enable(evidence_run_id="run_ok", acknowledge_provider_below_live=True)
+    assert exc.value.exit_code == 1
+    assert _codes(_payload(emit_mock)) == ["operator_kill_switch_not_acknowledged"]
+    assert req_mock.call_count == 3  # no PUT
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_when_the_client_disagrees_with_the_server(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """`enable` is the one coverage command whose client-side lock mirror gates a write."""
+    req_mock.side_effect = [
+        _templates_with(acquisition_readiness="live", launchable=True),
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+    ]
+    with pytest.raises(typer.Exit):
+        _enable(evidence_run_id="run_ok")
+    assert _codes(_payload(emit_mock)) == ["classification_disagrees_with_server"]
+    assert req_mock.call_count == 3
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_a_run_whose_capture_count_is_unknown(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """A check that cannot run refuses; it does not self-skip and report a pass (#744)."""
+    req_mock.side_effect = [
+        _LIVE_NEVER_TURNED,
+        {k: v for k, v in _ACCEPTANCE_RUN.items() if k != "captured_resources_count"},
+        _VERSIONS_LIVE,
+    ]
+    with pytest.raises(typer.Exit):
+        _enable(evidence_run_id="run_ok")
+    assert _codes(_payload(emit_mock)) == ["evidence_run_capture_count_unknown"]
+    assert req_mock.call_count == 3
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_fails_when_the_read_back_does_not_confirm_the_flip(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """A 200 is not proof. This is the #631 / #713 failure mode, caught."""
+    req_mock.side_effect = [
+        _LIVE_NEVER_TURNED,
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+        {"enabled": True, "source": "override"},
+        _LIVE_NEVER_TURNED,  # read-back: still disabled, still the shipped default
+    ]
+    with pytest.raises(typer.Exit) as exc:
+        _enable(evidence_run_id="run_ok")
+    assert exc.value.exit_code == 1
+    payload = _payload(emit_mock)
+    assert payload["ok"] is False
+    assert payload["status"] == "failed_terminal"
+    assert [p["code"] for p in payload["artifacts"]["verification"]["problems"]] == [
+        "read_back_disagrees",
+        "no_override_recorded",
+    ]
+    assert "not report this key as flipped" in payload["decision"]["reason"]
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_is_a_no_op_only_when_the_override_is_already_recorded(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    req_mock.return_value = _templates_with(
+        acquisition_readiness="live", enabled=True, source="override", launchable=True
+    )
+    _enable()
+    payload = _payload(emit_mock)
+    assert payload["ok"] is True
+    assert payload["artifacts"]["already_in_desired_state"] is True
+    assert payload["side_effect_level"] == "none"
+    assert req_mock.call_count == 1
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_writes_the_audit_row_when_the_key_is_open_only_by_default(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """Effective-true-by-default is not the desired state: ADR-0030 §5 wants the
+    evidence citation recorded, which only the override row carries."""
+    req_mock.side_effect = [
+        _templates_with(
+            acquisition_readiness="live", enabled=True, source="default", launchable=True
+        ),
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+        {"enabled": True, "source": "override"},
+        _LIVE_FLIPPED,
+    ]
+    _enable(evidence_run_id="run_ok")
+    payload = _payload(emit_mock)
+    assert payload["ok"] is True
+    assert "already_in_desired_state" not in payload["artifacts"]
+    assert req_mock.call_args_list[3].args[0] == "PUT"
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_disable_installs_a_kill_switch_on_a_key_that_was_only_never_turned(
+    _pc: object, req_mock: Any, emit_mock: Any
+) -> None:
+    """#768: `never_turned` is waived by acceptance mode, an operator's `false` is not.
+    Short-circuiting on the boolean alone left live traffic flowing at a portal the
+    operator believed they had shut off, and exited 0."""
+    req_mock.side_effect = [
+        TEMPLATES,  # lexfind row: enabled False, source "default" => never_turned
+        {"enabled": False, "source": "override"},
+        _templates_with(enabled=False, source="override"),
+    ]
+    _enable(enabled=False, note="Portal owner asked us to stop.")
+    payload = _payload(emit_mock)
+    assert payload["ok"] is True
+    assert "already_in_desired_state" not in payload["artifacts"]
+    put_call = req_mock.call_args_list[1]
+    assert put_call.args[0] == "PUT"
+    assert put_call.kwargs["json_body"] == {
+        "enabled": False,
+        "note": "Portal owner asked us to stop.",
+    }
+    assert payload["artifacts"]["verification"]["applied"] is True
+    assert payload["artifacts"]["template_after"]["config_key"] == "closed_by_operator"
+    assert payload["artifacts"]["template_after"]["dispatchable_modes"] == []
+    # Disabling needs no evidence, so nothing here is left for a human to confirm.
+    assert payload["status"] == "passed"
+
+
+def test_disable_requires_a_reason() -> None:
+    with pytest.raises(typer.Exit) as exc:
+        _enable(enabled=False)
+    assert exc.value.exit_code == 2
+
+
+# --- CLI surface (flag spellings and real exit codes) --------------------------------
+
+
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_every_enable_flag_parses_through_the_real_cli(_pc: object, req_mock: Any) -> None:
+    """The tests above call the function directly, so nothing else pins the flag
+    spellings or the real process exit codes. A misspelled option would exit 2 here."""
+    req_mock.side_effect = [
+        _LIVE_NEVER_TURNED,
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+        {"enabled": True, "source": "override"},
+        _LIVE_FLIPPED,
+    ]
+    result = CliRunner().invoke(
+        app,
+        [
+            "workflow",
+            "coverage",
+            "enable",
+            "--overlay",
+            "ch",
+            "--template",
+            "lexfind_zh_hundegesetz",
+            "--evidence-run-id",
+            "run_ok",
+            "--note",
+            "why",
+            "--enable",
+            "--reopen-operator-kill-switch",
+            "--acknowledge-provider-below-live",
+            "--correlation-id",
+            "cid-1",
+        ],
+    )
+    # Exit 0 = every flag parsed and the flip completed. Exit 2 = a flag did not parse.
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["inputs"]["acknowledge_provider_below_live"] is True
+    assert payload["inputs"]["reopen_operator_kill_switch"] is True
+    assert payload["artifacts"]["verification"]["applied"] is True
+
+
+@patch("evidara_cli.coverage_cmd.request_json", return_value=_LIVE_NEVER_TURNED)
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_exit_codes_through_the_real_cli(_pc: object, _req: object) -> None:
+    runner = CliRunner()
+    base = [
+        "workflow",
+        "coverage",
+        "enable",
+        "--overlay",
+        "ch",
+        "--template",
+        "lexfind_zh_hundegesetz",
+    ]
+
+    refused = runner.invoke(app, base)
+    assert refused.exit_code == 1
+    assert json.loads(refused.output)["artifacts"]["refusals"][0]["code"] == (
+        "no_evidence_run_cited"
+    )
+
+    missing_note = runner.invoke(app, [*base, "--disable"])
+    assert missing_note.exit_code == 2

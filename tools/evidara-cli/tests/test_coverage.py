@@ -46,8 +46,15 @@ from evidara_cli.coverage import (
     config_key_state,
     diagnose_stall,
     dispatchable_modes,
+    evidence_binding_strength,
+    find_source_version,
+    flip_refusals,
+    is_already_in_desired_state,
     normalise_readiness,
     summarise_templates,
+    verify_flip,
+    version_execution_mode,
+    version_provider,
 )
 
 
@@ -331,3 +338,245 @@ def test_refused_and_incomplete_runs_are_refused() -> None:
     assert EVIDENCE_RUN_REFUSED in codes
     assert EVIDENCE_RUN_NOT_COMPLETED in codes
     assert EVIDENCE_NO_CAPTURED_RESOURCES in codes
+
+
+# --- source-version lookup -----------------------------------------------------------
+
+
+def test_version_lookup_reads_execution_mode_and_provider() -> None:
+    payload = {
+        "data": [
+            {"source_version_id": "sv_other", "execution_mode": "shadow"},
+            {
+                "source_version_id": "sv_1",
+                "execution_mode": "live",
+                "acquisition_spec": {"provider": "lexfind"},
+            },
+        ]
+    }
+    version = find_source_version(payload, "sv_1")
+    assert version_execution_mode(version) == "live"
+    assert version_provider(version) == "lexfind"
+
+
+def test_version_lookup_returns_none_rather_than_guessing() -> None:
+    assert find_source_version({"data": []}, "sv_1") is None
+    assert find_source_version({"data": [{"source_version_id": "sv_1"}]}, None) is None
+    assert version_execution_mode(None) is None
+    assert version_provider({"source_version_id": "sv_1"}) is None
+
+
+# --- config-key flip -----------------------------------------------------------------
+
+_GOOD_EVIDENCE = {
+    "is_acceptance_evidence": True,
+    "refusals": [],
+    "captured_resources_count": 3,
+}
+
+
+def test_flip_to_off_needs_no_evidence() -> None:
+    """Turning the key off is a kill switch; demanding evidence for it helps nobody."""
+    assert (
+        flip_refusals(
+            template=classify_template(template()),
+            desired_enabled=False,
+        )
+        == []
+    )
+
+
+def test_flip_to_on_refuses_without_a_cited_run() -> None:
+    codes = [
+        r["code"]
+        for r in flip_refusals(
+            template=classify_template(template()),
+            desired_enabled=True,
+        )
+    ]
+    assert codes == ["no_evidence_run_cited"]
+
+
+def test_flip_to_on_refuses_a_run_the_verdict_rejected() -> None:
+    codes = [
+        r["code"]
+        for r in flip_refusals(
+            template=classify_template(template(provider="lexfind")),
+            desired_enabled=True,
+            evidence_verdict={**_GOOD_EVIDENCE, "is_acceptance_evidence": False},
+            evidence_provider="lexfind",
+        )
+    ]
+    assert codes == ["evidence_run_is_not_acceptance_evidence"]
+
+
+def test_flip_to_on_refuses_a_run_whose_capture_count_is_unknown() -> None:
+    """`acceptance_evidence_verdict` skips the capture check when the field is absent;
+    for a *write* that self-skip is exactly the #744 shape, so refuse instead."""
+    codes = [
+        r["code"]
+        for r in flip_refusals(
+            template=classify_template(template(provider="lexfind")),
+            desired_enabled=True,
+            evidence_verdict={**_GOOD_EVIDENCE, "captured_resources_count": None},
+            evidence_provider="lexfind",
+        )
+    ]
+    assert codes == ["evidence_run_capture_count_unknown"]
+
+
+def test_flip_to_on_refuses_when_the_provider_cannot_be_resolved() -> None:
+    """A check that cannot run must refuse, not self-skip and report a pass (#744)."""
+    codes = [
+        r["code"]
+        for r in flip_refusals(
+            template=classify_template(template(provider="lexfind")),
+            desired_enabled=True,
+            evidence_verdict=_GOOD_EVIDENCE,
+            evidence_provider=None,
+        )
+    ]
+    assert codes == ["evidence_run_provider_unresolved"]
+
+
+def test_flip_to_on_refuses_evidence_from_another_provider() -> None:
+    codes = [
+        r["code"]
+        for r in flip_refusals(
+            template=classify_template(template(provider="lexfind")),
+            desired_enabled=True,
+            evidence_verdict=_GOOD_EVIDENCE,
+            evidence_provider="fedlex_sparql",
+        )
+    ]
+    assert codes == ["evidence_run_provider_mismatch"]
+
+
+def test_flip_to_on_refuses_to_reopen_an_operator_kill_switch_without_acknowledgement() -> None:
+    shut = classify_template(template(provider="lexfind", enabled=False, source="override"))
+    assert shut["blocker"] == BLOCKER_TEMPLATE_DISABLED_BY_OPERATOR
+    args: dict[str, Any] = {
+        "template": shut,
+        "desired_enabled": True,
+        "evidence_verdict": _GOOD_EVIDENCE,
+        "evidence_provider": "lexfind",
+    }
+    assert [r["code"] for r in flip_refusals(**args)] == ["operator_kill_switch_not_acknowledged"]
+    assert flip_refusals(**args, reopen_acknowledged=True) == []
+
+
+def test_flip_kill_switch_check_survives_a_scaffold_provider_masking_the_blocker() -> None:
+    """`blocker` is single and priority-ordered, so `provider_scaffold` hides
+    `template_disabled_by_operator` — and `scaffold` is the server's fail-closed default
+    for any provider it cannot resolve. Keying off `blocker` turned that fail-closed
+    signal into a client-side fail-open that erased kill switches at exit 0."""
+    masked = classify_template(
+        template(
+            provider="lexfind",
+            readiness=READINESS_SCAFFOLD,
+            enabled=False,
+            source="override",
+        )
+    )
+    assert masked["blocker"] == BLOCKER_PROVIDER_SCAFFOLD  # not the kill switch
+    assert masked["config_key"] == CONFIG_KEY_CLOSED_BY_OPERATOR  # but the state is there
+    codes = [
+        r["code"]
+        for r in flip_refusals(
+            template=masked,
+            desired_enabled=True,
+            evidence_verdict=_GOOD_EVIDENCE,
+            evidence_provider="lexfind",
+            below_live_acknowledged=True,
+        )
+    ]
+    assert codes == ["operator_kill_switch_not_acknowledged"]
+
+
+def test_flip_to_on_refuses_a_provider_below_live_until_acknowledged() -> None:
+    """ADR-0030 §2: a template may only be enabled if its provider is LIVE. The
+    invariant test enforcing that covers source_blueprints.yaml, never the DB override
+    table this command writes."""
+    args: dict[str, Any] = {
+        "template": classify_template(
+            template(provider="lexfind", readiness=READINESS_AWAITING_EVIDENCE, enabled=False)
+        ),
+        "desired_enabled": True,
+        "evidence_verdict": _GOOD_EVIDENCE,
+        "evidence_provider": "lexfind",
+    }
+    assert [r["code"] for r in flip_refusals(**args)] == ["provider_not_live_not_acknowledged"]
+    assert flip_refusals(**args, below_live_acknowledged=True) == []
+
+
+def test_flip_to_on_refuses_when_the_client_mirror_disagrees_with_the_server() -> None:
+    """`templates` and `preflight` already fail loudly on this; `enable` is the one that
+    gates a write on the mirror, so it must too."""
+    drifted = classify_template(
+        template(provider="lexfind", readiness=READINESS_SCAFFOLD, launchable=True)
+    )
+    assert drifted["agrees_with_server"] is False
+    codes = [
+        r["code"]
+        for r in flip_refusals(
+            template=drifted,
+            desired_enabled=True,
+            evidence_verdict=_GOOD_EVIDENCE,
+            evidence_provider="lexfind",
+            below_live_acknowledged=True,
+        )
+    ]
+    assert codes == ["classification_disagrees_with_server"]
+
+
+def test_already_in_desired_state_needs_the_provenance_not_just_the_boolean() -> None:
+    """#768: a `--disable` on a `never_turned` key must still write, or the operator
+    believes they installed a kill switch that the acceptance waiver ignores."""
+    never_turned = template(enabled=False, source="default")
+    assert is_already_in_desired_state(template=never_turned, desired_enabled=False) is False
+    kill_switch = template(enabled=False, source="override")
+    assert is_already_in_desired_state(template=kill_switch, desired_enabled=False) is True
+    # Same for the mirror case: effective-true-by-default has no evidence citation.
+    assert (
+        is_already_in_desired_state(
+            template=template(enabled=True, source="default"), desired_enabled=True
+        )
+        is False
+    )
+
+
+def test_evidence_binding_is_never_stronger_than_provider_level() -> None:
+    tpl = classify_template(template(provider="lexfind"))
+    assert evidence_binding_strength(evidence_provider="lexfind", template=tpl) == "provider"
+    assert evidence_binding_strength(evidence_provider="fedlex_sparql", template=tpl) == "none"
+    assert evidence_binding_strength(evidence_provider=None, template=tpl) == "none"
+
+
+def test_verify_flip_accepts_only_a_recorded_override() -> None:
+    assert verify_flip(
+        after_template={"enabled": True, "source": "override"},
+        desired_enabled=True,
+    )["applied"]
+
+
+def test_verify_flip_catches_a_write_that_silently_did_nothing() -> None:
+    """The 200-but-nothing-changed failure mode (#631, #713)."""
+    result = verify_flip(
+        after_template={"enabled": False, "source": "default"},
+        desired_enabled=True,
+    )
+    assert result["applied"] is False
+    assert [p["code"] for p in result["problems"]] == [
+        "read_back_disagrees",
+        "no_override_recorded",
+    ]
+
+
+def test_verify_flip_rejects_a_matching_value_with_no_override_recorded() -> None:
+    """`set_enabled` always writes an override; a 'default' provenance means it didn't."""
+    result = verify_flip(
+        after_template={"enabled": True, "source": "default"},
+        desired_enabled=True,
+    )
+    assert result["applied"] is False
+    assert [p["code"] for p in result["problems"]] == ["no_override_recorded"]

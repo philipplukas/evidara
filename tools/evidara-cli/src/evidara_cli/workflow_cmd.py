@@ -23,7 +23,11 @@ from evidara_cli.client import (
     request_json,
     request_status,
 )
-from evidara_cli.coverage import acceptance_evidence_verdict
+from evidara_cli.coverage import (
+    acceptance_evidence_verdict,
+    find_source_version,
+    version_execution_mode,
+)
 from evidara_cli.envelope import (
     build_envelope,
     evidence_assertion,
@@ -996,15 +1000,9 @@ def run_evidence(
                     join_url(pc_base, f"/v1/sources/{source_id}/versions"),
                     headers=pc_headers,
                 )
-                versions = (
-                    versions_payload.get("data", [])
-                    if isinstance(versions_payload, dict)
-                    else versions_payload or []
+                execution_mode = version_execution_mode(
+                    find_source_version(versions_payload, version_id)
                 )
-                for version in versions:
-                    if isinstance(version, dict) and version.get("source_version_id") == version_id:
-                        execution_mode = version.get("execution_mode")
-                        break
             except HttpJsonError:
                 execution_mode = None
 

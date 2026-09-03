@@ -52,6 +52,7 @@ evidara workflow coverage templates --blocker provider_awaiting_evidence
 evidara workflow coverage preflight --overlay ch --template <template_id>
 evidara workflow coverage watch --run-id <run_id> --until processed
 evidara workflow run evidence --run-id <run_id>
+evidara workflow coverage enable --overlay ch --template <template_id> --evidence-run-id <run_id>
 
 # Legal-search (needs OpenSearch + API running for ping/search)
 evidara legal-search ping
@@ -172,6 +173,62 @@ never touches the live portal, so a green SHADOW run proves nothing about it (AD
 §2) — as well as a refused run, a non-acceptance mode, and a run that captured nothing.
 A pass still carries the reminder that it justifies only the gates that actually ran
 (#744).
+
+### `coverage enable` — flip the config key, then prove it flipped
+
+```bash
+uv run evidara workflow coverage enable \
+  --overlay ch --template <template_id> --evidence-run-id <run_id> \
+  --note "Evidence bundle: docs/runbooks/evidence/<dir>" --human
+```
+
+The loop's last step, and the one worth getting wrong quietly. Enabling **requires** an
+`--evidence-run-id`; the command re-derives the ADR-0030 acceptance verdict for that run
+and refuses when it does not earn the flip. Refusal codes:
+
+| code | meaning |
+|---|---|
+| `no_evidence_run_cited` | ADR-0030 §5: the key is turned after evidence, not on confidence. |
+| `evidence_run_is_not_acceptance_evidence` | The run failed the verdict — read `acceptance_verdict.refusals`. |
+| `evidence_run_provider_unresolved` | The run's provider could not be resolved, so nothing ties it to this template. Refused rather than skipped-and-passed (#744). |
+| `evidence_run_provider_mismatch` | The run used a different acquisition provider. |
+| `evidence_run_capture_count_unknown` | The run reports no `captured_resources_count`, so that check did not run. |
+| `classification_disagrees_with_server` | The client-side lock mirror disagrees with the server's `launchable`. This is the one command where that derivation gates a write, so a disagreement is disqualifying. |
+| `provider_not_live_not_acknowledged` | ADR-0030 §2 admits `enabled: true` only for a LIVE provider. `test_blueprint_provider_parity.py` asserts that over `source_blueprints.yaml` but **not** over the override table this writes, so the ordering is enforced here. `--acknowledge-provider-below-live` arms it anyway. |
+| `operator_kill_switch_not_acknowledged` | The key was shut by an operator. Pass `--reopen-operator-kill-switch` only after asking them. Keyed off `config_key`, never off `blocker` — `blocker` is single and priority-ordered, so a `provider_scaffold` (the server's fail-closed default for an unresolvable provider) hides the kill switch. |
+
+A refusal writes nothing (`side_effect_level: none`).
+
+**"Already in the desired state" is a pair, not a boolean** — the requested value *and*
+an `override` provenance. `--disable` on a key that merely reads `false` today still
+writes: `never_turned` is waived by ADR-0030's acceptance mode and an operator's `false`
+is not (#768), so short-circuiting on the boolean would report a kill switch that was
+never installed while live traffic kept flowing. The mirror case writes too — a key open
+only by shipped default has no evidence citation recorded against it.
+
+A flip that lands still comes back `needs_human` rather than `passed` when a check did
+not pass: the provider-level evidence binding always, and arming the key ahead of the
+code key. `ok` tracks the write; `status` tracks whether a human still has something to
+confirm.
+
+**The `200` is not the proof.** After the `PUT` the command re-reads
+`/v1/sources/blueprint-templates` and requires *both* that the effective key is what was
+asked for **and** that the read model attributes it to an operator `override`. Either
+alone is also satisfied by a write that silently did nothing — the failure mode behind
+#631 and #713 — so a mismatch exits nonzero with `verification.problems`
+(`read_back_disagrees`, `no_override_recorded`).
+
+Flipping the config key does not open the code key: when the provider is short of `live`
+the envelope says which modes the lock still admits. Turning the key **off** is a kill
+switch — it needs no evidence but does need `--note`.
+
+The binding between the cited run and the template is **provider-level**, reported as
+`artifacts.evidence_binding`. `SourceVersionResponse` exposes no `overlay_id` /
+`provider_template_id`, so a same-provider run of a different template also satisfies the
+check — and for `lexfind` that is all 26 cantons plus Bund behind one name, so one run
+covers every LexFind template. The envelope marks that check `passed: false` so it is
+confirmed by a human rather than read as proven; #846 tracks binding it near-exactly by
+comparing the version's acquisition spec against `POST /v1/sources/blueprint-preview`.
 
 **Agent skill:** `.claude/skills/coverage-acceptance-loop/SKILL.md` routes the whole loop,
 including the compose env vars whose defaults silently break it.
