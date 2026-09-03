@@ -26,6 +26,7 @@ EXAMPLE_TO_SCHEMA = {
     "section.json": "contracts/schemas/section.schema.json",
     "citation.json": "contracts/schemas/citation.schema.json",
     "evidence-ref.json": "contracts/schemas/evidence-ref.schema.json",
+    "workflow-command-envelope.json": "contracts/schemas/workflow-command-envelope.schema.json",
     "commentary-insight.json": "contracts/schemas/commentary-insight.schema.json",
     "correction-commentary-insight.json": "contracts/schemas/corrections.json",
     "correction-rescore-request.json": "contracts/schemas/corrections.json",

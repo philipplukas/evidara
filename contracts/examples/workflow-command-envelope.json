@@ -1,0 +1,63 @@
+{
+  "ok": false,
+  "workflow": "example-workflow",
+  "run_id": "wf_01J8EXAMPLE",
+  "step": "example.apply",
+  "status": "needs_human",
+  "side_effect_level": "irreversible",
+  "inputs": {
+    "target_id": "obj_1",
+    "dry_run": false
+  },
+  "artifacts": {
+    "created_id": "obj_1",
+    "affected_count": 3
+  },
+  "evidence": [
+    {
+      "kind": "http",
+      "target": "service:/v1/objects/obj_1",
+      "status_code": 200,
+      "passed": true,
+      "note": "Target exists and is in the expected state."
+    },
+    {
+      "kind": "contract",
+      "target": "openapi:/v1/objects/{id}",
+      "passed": true,
+      "note": "Response matched the declared schema."
+    },
+    {
+      "kind": "count",
+      "target": "preconditions-satisfied",
+      "value": 3,
+      "passed": true
+    },
+    {
+      "kind": "assertion",
+      "target": "rollback-path-exists",
+      "value": false,
+      "passed": false,
+      "note": "No supported compensating action for this step."
+    },
+    {
+      "kind": "object-ref",
+      "target": "s3://evidence/wf_01J8EXAMPLE/preflight.json",
+      "passed": true
+    }
+  ],
+  "decision": {
+    "recommended_action": "needs-human",
+    "reason": "Preconditions are satisfied, but the act has no guaranteed rollback. A human authorises it.",
+    "confidence": 0.82
+  },
+  "next_actions": ["approve", "abort"],
+  "compensation": {
+    "available": false,
+    "note": "Irreversible: recovery would be a new forward action, not an undo."
+  },
+  "error": "Awaiting operator approval before an irreversible step.",
+  "error_detail": {
+    "blocked_on": "operator_approval"
+  }
+}

@@ -15,6 +15,12 @@ evidara = "evidara_cli.main:main"
 
 [dependency-groups]
 dev = [
+  # test-only: tests/test_envelope.py validates builder output against
+  # contracts/schemas/workflow-command-envelope.schema.json. Same validator the
+  # repo already uses elsewhere (scripts/validate_json_schemas.py,
+  # platform-control/tests/unit/). Deliberately NOT a runtime dependency: the
+  # envelope builder must stay import-free (see tests/test_envelope.py).
+  "jsonschema>=4.25.0,<5",
   "pytest>=8.4.0,<9",
   "ruff>=0.12.0,<1",
 ]

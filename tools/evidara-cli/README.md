@@ -197,7 +197,7 @@ and refuses when it does not earn the flip. Refusal codes:
 | `provider_not_live_not_acknowledged` | ADR-0030 §2 admits `enabled: true` only for a LIVE provider. `test_blueprint_provider_parity.py` asserts that over `source_blueprints.yaml` but **not** over the override table this writes, so the ordering is enforced here. `--acknowledge-provider-below-live` arms it anyway. |
 | `operator_kill_switch_not_acknowledged` | The key was shut by an operator. Pass `--reopen-operator-kill-switch` only after asking them. Keyed off `config_key`, never off `blocker` — `blocker` is single and priority-ordered, so a `provider_scaffold` (the server's fail-closed default for an unresolvable provider) hides the kill switch. |
 
-A refusal writes nothing (`side_effect_level: none`).
+A refusal writes nothing (`side_effect_level: none`). What the three `side_effect_level` values mean, and what a consumer is expected to do differently for each, is written up in [docs/components/workflow-command-envelope.md](../../docs/components/workflow-command-envelope.md).
 
 **"Already in the desired state" is a pair, not a boolean** — the requested value *and*
 an `override` provenance. `--disable` on a key that merely reads `false` today still

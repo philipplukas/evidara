@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from evidara_cli.envelope import build_envelope, evidence_assertion, evidence_count, evidence_http
 from evidara_cli.main import _detail_checks, workflow_mvp_acceptance
 from evidara_cli.proposal import SourceSpecProposal
 from evidara_cli.workflow_cmd import (
@@ -128,70 +127,6 @@ def test_detail_checks_accepts_legacy_metadata_shape():
     checks = _detail_checks(payload, document_id="doc_123")
 
     assert checks["metadata_is_array"] is True
-
-
-# ---------------------------------------------------------------------------
-# envelope builder
-# ---------------------------------------------------------------------------
-
-
-def test_build_envelope_minimal():
-    env = build_envelope(
-        ok=True,
-        workflow="source-lifecycle",
-        step="source.inspect",
-        status="passed",
-        side_effect_level="none",
-        inputs={"source_id": "src_123"},
-    )
-    assert env["ok"] is True
-    assert env["workflow"] == "source-lifecycle"
-    assert env["step"] == "source.inspect"
-    assert env["status"] == "passed"
-    assert env["side_effect_level"] == "none"
-    assert env["inputs"] == {"source_id": "src_123"}
-    assert env["run_id"] is None
-    assert env.get("error") is None
-    assert env.get("error_detail") is None
-
-
-def test_build_envelope_with_error():
-    env = build_envelope(
-        ok=False,
-        workflow="source-lifecycle",
-        step="source.apply",
-        status="failed_terminal",
-        side_effect_level="reversible",
-        inputs={},
-        error="Service unavailable",
-        error_detail={"status_code": 503, "body": ""},
-    )
-    assert env["ok"] is False
-    assert env["error"] == "Service unavailable"
-    assert env["error_detail"]["status_code"] == 503
-
-
-def test_evidence_http_defaults_passed():
-    ev = evidence_http("platform-control:/health", status_code=200)
-    assert ev["kind"] == "http"
-    assert ev["passed"] is True
-
-
-def test_evidence_http_failed_on_4xx():
-    ev = evidence_http("platform-control:/health", status_code=404)
-    assert ev["passed"] is False
-
-
-def test_evidence_assertion():
-    ev = evidence_assertion("dup-check", value="none", passed=True)
-    assert ev["kind"] == "assertion"
-    assert ev["passed"] is True
-
-
-def test_evidence_count():
-    ev = evidence_count("sources", value=5, passed=True)
-    assert ev["kind"] == "count"
-    assert ev["value"] == 5
 
 
 # ---------------------------------------------------------------------------
