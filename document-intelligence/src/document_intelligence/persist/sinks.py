@@ -486,6 +486,7 @@ class DeltaCanonicalSink(CanonicalSink):
                 if not incoming_keys.issubset(set(schema.names)):
                     schema = None
             if schema is not None:
+                schema = _widen_for_new_nested_fields(schema, ready)
                 table = pa.Table.from_pylist(ready, schema=schema)
             else:
                 table = pa.Table.from_pylist(ready)
@@ -873,6 +874,42 @@ def _projection_keys_for_rows(
         )
         return always_present_keys | present
     return always_present_keys
+
+
+def _widen_for_new_nested_fields(schema: pa.Schema, rows: list[dict[str, object]]) -> pa.Schema:
+    """Add struct fields the batch carries but the existing Delta schema does not (#836).
+
+    Append reads the table's own Arrow schema and casts the batch to it, which is what keeps
+    a narrowed batch compatible with a legacy surface. But that cast is applied to *nested*
+    types too, and PyArrow drops a struct field the target type does not declare — silently,
+    with no error. ``metadata`` is one struct column, so every canonical metadata key added
+    after a table was created (``official_citation``, ``in_force_from``, now ``regeste``) is
+    written on a fresh table and dropped on every append to an existing one. The value is
+    then absent from Delta, absent from the lean document, and absent from the projection,
+    while every test — which starts from an empty directory — passes.
+
+    ``schema_mode="merge"`` cannot rescue it: by the time ``write_deltalake`` sees the batch,
+    the field is already gone. So unify the existing schema with the one inferred from the
+    batch *before* the cast. Unification is permissive in one direction only in practice:
+    a column that is null across the whole batch infers ``null`` and unifies to the existing
+    type, which is the narrowing this function must not undo.
+
+    Falls back to the existing schema whenever unification is not possible — a genuine type
+    conflict between the batch and the table is not something to paper over here; the cast
+    then behaves exactly as it did before.
+    """
+    try:
+        inferred = pa.Table.from_pylist(rows).schema
+        unified = pa.unify_schemas([schema, inferred], promote_options="permissive")
+    except Exception:
+        logger.debug("delta_schema_unify_skipped", exc_info=True)
+        return schema
+    if set(unified.names) != set(schema.names):
+        # Unification introduced a *top-level* column. The caller already established that
+        # the batch's keys are a subset of the table's, so this cannot come from the data;
+        # rather than evolve the surface by accident, keep the table's schema.
+        return schema
+    return unified
 
 
 def _delta_ready_rows(

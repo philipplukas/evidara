@@ -225,6 +225,7 @@ export class ProjectionsService {
       content_preview: preview,
     };
     if (extracted.fullText) projection.content = extracted.fullText;
+    if (extracted.regeste) projection.regeste = extracted.regeste;
     if (extracted.documentType) projection.document_type = extracted.documentType;
     if (extracted.effectiveDate) projection.effective_date = extracted.effectiveDate;
     if (extracted.structuralPath) projection.structural_path = extracted.structuralPath;
@@ -312,6 +313,7 @@ export class ProjectionsService {
     title?: string;
     language?: string;
     officialCitation?: string;
+    regeste?: string;
     originalLanguage?: string;
     translationStatus?: 'original' | 'machine_translated' | 'translation_unavailable';
     previewText?: string;
@@ -338,6 +340,16 @@ export class ProjectionsService {
     const officialCitation = this.firstNestedString(doc, [
       ['metadata', 'official_citation'],
       ['official_citation'],
+    ]);
+    // The official headnote of a decision (#836). `metadata.regeste` is the field
+    // document-intelligence promotes; `extracted_metadata.headnote` is where the XML
+    // normalizer parks the RIS `leitsatz`/`rechtssatz`/`strs` and is read as a fallback
+    // so a document published before the promotion existed picks the headnote up on its
+    // next reindex, without being reprocessed.
+    const regeste = this.firstNestedString(doc, [
+      ['metadata', 'regeste'],
+      ['regeste'],
+      ['metadata', 'extracted_metadata', 'headnote'],
     ]);
     const originalLanguage =
       this.firstNestedString(doc, [['metadata', 'original_language'], ['original_language']]) ??
@@ -474,6 +486,7 @@ export class ProjectionsService {
       title: fallbackTitle,
       language,
       officialCitation,
+      regeste,
       originalLanguage,
       translationStatus,
       previewText,

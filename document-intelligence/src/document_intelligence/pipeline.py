@@ -707,6 +707,13 @@ def _build_document(
     official_citation = _resolve_official_citation(normalized_document.metadata, extracted_metadata, eh)
     if official_citation:
         metadata["official_citation"] = official_citation
+    # #836: promote the source's own headnote onto the document's metadata, the same hop
+    # `official_citation` takes. The search projection reads `metadata.regeste`, so
+    # without this the field is unreachable for anything acquired through the platform
+    # and only the seed scripts can ever fill it.
+    regeste = _resolve_regeste(normalized_document.metadata, extracted_metadata)
+    if regeste:
+        metadata["regeste"] = regeste
     original_language = _resolve_original_language(normalized_document.metadata, manifest.source_defaults)
     if original_language:
         metadata["original_language"] = original_language
@@ -854,6 +861,50 @@ def _resolve_official_citation(
         hinted = hints.get("official_citation_hint")
         if isinstance(hinted, str) and hinted.strip():
             return hinted.strip()
+
+    return None
+
+
+def _resolve_regeste(
+    normalized_metadata: dict[str, Any],
+    extracted_metadata: dict[str, Any],
+) -> str | None:
+    """Resolve the official headnote the source published for this document (#836).
+
+    The Regeste is the orienting field of a decision — the headnote a lawyer reads
+    first to decide whether the decision is relevant at all. The search index maps it
+    (``documents-index.mapping.ts``) and boosts it (``regeste^2``), but until now the
+    only writers were the seed scripts, so an acquired decision had no headnote at any
+    layer.
+
+    Two sources, in precedence order:
+
+    1. An explicit ``regeste`` on the normalized document — the documented slot for a
+       normalizer that can identify the headnote structurally (a Swiss decision's
+       ``Regeste`` block). No normalizer sets it today; it exists so adding one is a
+       normalizer change and not another contract change.
+    2. ``extracted_metadata["headnote"]`` — populated today by the XML normalizer from
+       RIS ``absatz[@ct]`` ``leitsatz`` / ``rechtssatz`` / ``strs`` (``normalize/xml.py``).
+       That is the Austrian headnote and is exactly this field.
+
+    Deliberately **not** a source: the LLM extractor's ``summary``. A Regeste is an
+    official text written by the court, and the whole value of the field is that a
+    reader can trust it as such. A generated summary in the same slot is
+    indistinguishable from one once indexed, and would be the confident fabrication the
+    quarantine invariant (ADR-0047) exists to prevent. Nor is ``headnote_reference``
+    (RIS ``hinweisstrs``): that is a *pointer* to another decision's headnote
+    ("GRS wie Ra 2023/18/0108"), not a headnote.
+
+    Returns ``None`` when the source published none, which is the normal case: statutes
+    and ordinances have no headnote and every consumer treats absence as normal.
+    """
+    explicit = normalized_metadata.get("regeste")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+
+    headnote = extracted_metadata.get("headnote")
+    if isinstance(headnote, str) and headnote.strip():
+        return headnote.strip()
 
     return None
 

@@ -151,6 +151,10 @@
       "type": "string",
       "description": "Full text content for search indexing, snippet generation, and the detail view's document body. Plain text: paragraphs separated by blank lines, no markup — this is document-intelligence's `body_text`/`full_text` indexed verbatim."
     },
+    "regeste": {
+      "type": "string",
+      "description": "The official headnote of a court decision, verbatim — the Swiss `Regeste`, the Austrian `Rechtssatz`/`Leitsatz`. Prose, not a label: for a decision it is the orienting field a lawyer reads first, which is why the index boosts it (`regeste^2`) and highlights it. Copied from the canonical document's `metadata.regeste`, which document-intelligence promotes only from an official headnote the source itself published — never from a generated summary. Absent is the normal case: statutes and ordinances have no headnote, and a decision whose source published none must carry no `regeste` rather than an invented one."
+    },
 
     "sections_count": {
       "type": "integer",

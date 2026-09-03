@@ -20,6 +20,7 @@ Companion to `search-projection.schema.json`. Documents ownership, source, and f
 | `effective_date` | document-intelligence | metadata extraction | no | Date metadata row omitted |
 | `lifecycle_status` | document-intelligence | `document.processed` event payload | no | Non-active documents lose explicit trust signal |
 | `content` | document-intelligence | text extraction (`body_text`/`full_text`) | no | No search snippets, no preview, and no document body in the detail view |
+| `regeste` | document-intelligence | canonical metadata `regeste` — the source's own headnote, promoted by the pipeline from an explicit normalizer field or `extracted_metadata.headnote` (RIS `leitsatz`/`rechtssatz`/`strs`) | no | Decision detail renders no headnote and the `regeste^2` boost has nothing to weight; statutes and ordinances legitimately have none |
 | `source_id` | document-intelligence | lineage (from platform-control) | no | Lineage broken |
 | `processed_at` | document-intelligence | processing timestamp | no | — |
 

@@ -22,9 +22,12 @@ export interface DocumentEntity {
    * boosted by the search adapter, so a search snippet could quote it long
    * before the detail response could return it (#760).
    *
-   * Usually absent: `contracts/schemas/search-projection.schema.json` declares
-   * no `regeste`, so the document-intelligence projection never writes one —
-   * only the `scripts/seed-*.ts` corpora do.
+   * Often absent, and legitimately so: only a decision has a headnote, and the
+   * projection writes one only when the source itself published it — the Swiss
+   * `Regeste`, the Austrian `Rechtssatz`/`Leitsatz`, promoted by
+   * document-intelligence onto `metadata.regeste` (#836). Statutes and
+   * ordinances carry none, and a decision whose source published none carries
+   * none rather than an invented summary.
    */
   regeste?: string;
   jurisdiction?: string;

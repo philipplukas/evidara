@@ -212,6 +212,57 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             # A published row carries no quarantine, and writing it did not fail.
             self.assertIsNone(by_status["canonical_ready"]["quarantine"])
 
+    def test_a_new_metadata_key_survives_append_to_an_existing_table(self) -> None:
+        """A canonical metadata key added after the table exists must reach Delta (#836).
+
+        Append casts the batch to the table's own Arrow schema, and that cast reaches into
+        `metadata` — a struct column. PyArrow drops a struct field the target type does not
+        declare, without error, so `regeste` (and before it `official_citation`,
+        `in_force_from`) was written on a fresh table and silently discarded on every append
+        to a table created before the key existed. Which is every deployed table.
+
+        The first document is persisted **without** the key, so the table is created from
+        the old shape — that is the whole point: starting from an empty directory is what
+        made every other test green over this.
+        """
+        import deltalake
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            documents_uri = os.path.join(temp_dir, "published_documents")
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=documents_uri,
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                )
+            )
+
+            first = build_processing_result()
+            without = dataclasses.replace(
+                first.document,
+                metadata={k: v for k, v in first.document.metadata.items() if k != "regeste"},
+            )
+            sink.persist(without, first.sections, first.manifest)
+            self.assertNotIn(
+                "regeste",
+                deltalake.DeltaTable(documents_uri).to_pyarrow_table().to_pylist()[0]["metadata"],
+            )
+
+            headnote = "Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder."
+            with_regeste = dataclasses.replace(
+                first.document,
+                document_id="doc_01hx000000000000000000002x",
+                metadata={**without.metadata, "regeste": headnote},
+            )
+            sink.persist(with_regeste, [], first.manifest)
+
+            rows = {
+                row["document_id"]: row for row in deltalake.DeltaTable(documents_uri).to_pyarrow_table().to_pylist()
+            }
+            self.assertEqual(rows[with_regeste.document_id]["metadata"]["regeste"], headnote)
+            # The pre-existing row keeps its shape; widening the schema did not rewrite it.
+            self.assertIsNone(rows[without.document_id]["metadata"].get("regeste"))
+
     def test_latest_document_revision_reads_back_published_history(self) -> None:
         # The read side of #652: the pipeline asks the sink what it already published so a
         # re-acquisition can be revision N+1 instead of another row pinned at 1.
