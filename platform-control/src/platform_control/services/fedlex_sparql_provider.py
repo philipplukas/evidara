@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, date, datetime
-from typing import NamedTuple
+from typing import Any, NamedTuple
 from urllib.parse import urlparse
 
 import httpx
 
+from acquisition_core.content_gate import assess_legal_text_density
 from platform_control.domain import AcquisitionProvider
 from platform_control.errors import ProviderConfigurationError
 from platform_control.models.run import Run
@@ -192,6 +193,10 @@ LIMIT 1
 
         resources: list[ProviderResource] = []
         failures: list[dict[str, str]] = []
+        # Manifestations fetched and refused by the legal-text density gate: a 200
+        # carrying chrome rather than the act. Recorded, never counted as captured
+        # (#631). Same shape as `portal_http_provider_base`'s.
+        skipped: list[dict[str, Any]] = []
 
         async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
             work_uris = self._seed_work_uris(acquisition_spec)
@@ -259,6 +264,28 @@ LIMIT 1
                             f"fedlex_sparql manifestation response was empty for {html_url}"
                         )
                     body_text = body.decode(charset, errors="replace")
+
+                    # The legal-text density gate (#631). `scripts/ch-fedlex-fast-loop.sh`
+                    # has gated on `art_density >= 3` against THIS provider's output since
+                    # the canary was written, and #635 lifted that heuristic into
+                    # `content_gate` so every provider could share it — but the sharing
+                    # never reached the provider the heuristic came from. Until this call
+                    # existed the check ran only in a canary script an operator has to
+                    # remember to run, so a Fedlex filestore error page or holding page
+                    # was capturable by the acquisition path itself.
+                    assessment = assess_legal_text_density(body_text, content_type=content_type)
+                    if not assessment.is_legal_text:
+                        skipped.append(
+                            {
+                                "url": resolved_url,
+                                "work_uri": work_uri,
+                                "reason": "no_legal_text_markers",
+                                "detail": assessment.reason,
+                                **assessment.as_evidence(),
+                            }
+                        )
+                        continue
+
                     html_title = self._title_from_html(body_text)
                     resources.append(
                         ProviderResource(
@@ -284,6 +311,11 @@ LIMIT 1
                                 "title_short": title_short,
                                 "describe_turtle": describe_turtle,
                                 "fetched_at": datetime.now(UTC).isoformat(),
+                                # The gate's verdict travels with the document, so
+                                # acceptance evidence shows the check ran rather
+                                # than leaving it inferred from a passing count.
+                                "legal_text_assessment": "passed",
+                                "legal_text_evidence": assessment.as_evidence(),
                                 # ELI round-trip: Fedlex work URIs ARE ELI URIs.
                                 # Emitting eli_uri here lets canonical document
                                 # metadata carry the identifier forward per
@@ -323,11 +355,21 @@ LIMIT 1
             "requested": len(work_uris),
             "captured": len(resources),
             "failed": len(failures),
+            "skipped": len(skipped),
             "failures": failures,
+            "skipped_documents": skipped,
         }
         inline_failure_reason = None
         if not resources:
-            inline_failure_reason = "Fedlex SPARQL provider did not capture any resources."
+            if skipped:
+                inline_failure_reason = (
+                    f"fedlex_sparql fetched {len(skipped)} manifestation(s) but all failed "
+                    "the legal-text density gate: the filestore returned a page with no "
+                    "Art./§/Abs. markers, which is chrome or an error page rather than the "
+                    "act. Refusing rather than capturing it as acceptance evidence (#631)."
+                )
+            else:
+                inline_failure_reason = "Fedlex SPARQL provider did not capture any resources."
 
         return ProviderStartResult(
             provider=self.provider_name,

@@ -45,6 +45,25 @@ emits the metadata landing page as a stand-in for the ordinance: indexing a
 metadata stub as if it were the law is precisely the "demo that lies
 convincingly" failure ADR-0033 exists to prevent.
 
+Both capture gates run on the manifestation, because both failures are reachable
+here and neither subsumes the other:
+
+- `acquisition_core.artifact_guard.check_capture` — the content type is derived
+  from the manifestation URL's *suffix* (the landing page promised a `.pdf`), so
+  nothing but this guard makes the server keep that promise. An `OpenAttachment`
+  endpoint returning a 142-byte JavaScript redirect stub with a `200` is #716,
+  and until it was wired here this provider would have counted that stub in
+  `captured`.
+- `acquisition_core.content_gate.assess_legal_text_density` — for the communes
+  that publish law as HTML. A municipal CMS can serve its navigation shell in
+  place of the Reglement exactly as ZH-Lex did (#631). The gate abstains on
+  `application/pdf` by design; DI's extracted-text floors own that case
+  (ADR-0047), and this module must not grow a second opinion about it.
+
+A refusal is recorded in `response_payload.skipped_manifestations` with the
+guard's own slug, never swallowed — an unexplained skip and a silent capture are
+equally useless to an operator.
+
 Verified against live Zürich AS 554.510 ("Vollzugsvorschriften zum
 Hundegesetz", in force 2017-09-01): the landing page parses and the linked
 217 KB PDF is fetched intact.
@@ -106,6 +125,8 @@ from urllib.parse import urljoin, urlparse
 import httpx
 import yaml
 
+from acquisition_core.artifact_guard import check_capture
+from acquisition_core.content_gate import assess_legal_text_density
 from platform_control.domain import AcquisitionProvider
 from platform_control.errors import ProviderConfigurationError
 from platform_control.models.run import Run
@@ -156,6 +177,15 @@ _CARRIABLE_CONTENT_TYPES = _TEXT_CONTENT_TYPES | _BINARY_CONTENT_TYPES
 # run-level message keys off this exact string to tell "unparseable page shape" apart
 # from "seeds wrong / portal down" (#784).
 _NO_MANIFESTATION_ERROR = "no operative-text manifestation found on landing page"
+
+# Byte floor for a binary manifestation, before the capture guard refuses it as a
+# stub (#716). Deliberately BELOW `lexfind_api`'s 2 000: `artifact_guard` states the
+# floor is per-source because "the honest minimum for a one-article communal
+# ordinance is not the honest minimum for a cantonal act", and this provider is the
+# communal rung. A single-page PDF clears 1 000 bytes comfortably; the 142-byte
+# JavaScript redirect stub that #716 captured as a statute does not. Overridable per
+# source via `acquisition_spec.min_manifestation_bytes`.
+_DEFAULT_MIN_BINARY_BYTES = 1_000
 
 _SWISS_DATE_RE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
 
@@ -328,6 +358,9 @@ class GemeindeHttpProvider:
         seed_urls = self._seed_urls(acquisition_spec, portal_host=portal.host)
         timeout_seconds = float(acquisition_spec.get("request_timeout_seconds") or 30.0)
         max_content_bytes = int(acquisition_spec.get("max_content_bytes") or 5_000_000)
+        min_binary_bytes = int(
+            acquisition_spec.get("min_manifestation_bytes") or _DEFAULT_MIN_BINARY_BYTES
+        )
 
         resources: list[ProviderResource] = []
         failures: list[dict[str, str]] = []
@@ -388,6 +421,77 @@ class GemeindeHttpProvider:
                     text_response.raise_for_status()
                     manifestation = (text_response.content or b"")[:max_content_bytes]
                     is_binary = content_type in _BINARY_CONTENT_TYPES
+
+                    # `content_type` above is derived from the manifestation URL's
+                    # SUFFIX, not from the server — the landing page promised a
+                    # `.pdf`. `check_capture` is what makes the server keep that
+                    # promise. Without it this provider recorded a 142-byte
+                    # JavaScript redirect stub as a captured ordinance and counted
+                    # it in `captured`: #716 exactly, one rung further down and on
+                    # the provider that carries ADR-0033's acceptance question.
+                    # The byte floor applies to binaries only — an HTML
+                    # manifestation is judged by marker density below, and a byte
+                    # count is the wrong question to ask of it.
+                    verdict = check_capture(
+                        body=manifestation,
+                        expected_content_type=content_type,
+                        declared_content_type=text_response.headers.get("content-type"),
+                        min_bytes=min_binary_bytes if is_binary else 0,
+                    )
+                    if not verdict:
+                        skipped.append(
+                            {
+                                "url": document_url,
+                                "content_type": content_type,
+                                "reason": verdict.reason,
+                                "detail": verdict.detail,
+                                "as_number": record.get("as_number"),
+                                "title": record.get("title"),
+                            }
+                        )
+                        continue
+
+                    body_text = (
+                        None
+                        if is_binary
+                        else manifestation.decode(
+                            text_response.charset_encoding or "utf-8", errors="replace"
+                        )
+                    )
+
+                    # Marker density, for the communes that publish law as HTML. A
+                    # municipal CMS can serve its own navigation shell in place of
+                    # the Reglement just as ZH-Lex did (#631). The gate abstains on
+                    # `application/pdf`, so the PDF path is unaffected and DI's
+                    # extracted-text floors keep owning that case (ADR-0047) — it is
+                    # called on both branches so the abstention is recorded as
+                    # evidence rather than implied by its absence.
+                    assessment = assess_legal_text_density(
+                        body_text or "", content_type=content_type
+                    )
+                    if not assessment.is_legal_text:
+                        skipped.append(
+                            {
+                                "url": document_url,
+                                "content_type": content_type,
+                                "reason": "no_legal_text_markers",
+                                "detail": assessment.reason,
+                                "as_number": record.get("as_number"),
+                                "title": record.get("title"),
+                                **assessment.as_evidence(),
+                            }
+                        )
+                        continue
+
+                    resource_metadata = self._resource_metadata(
+                        record, bfs_number=bfs_number, portal=portal
+                    )
+                    resource_metadata["capture_guard"] = "passed"
+                    resource_metadata["legal_text_assessment"] = (
+                        "abstained_binary_manifestation" if is_binary else "passed"
+                    )
+                    resource_metadata["legal_text_evidence"] = assessment.as_evidence()
+
                     resources.append(
                         ProviderResource(
                             source_url=document_url,
@@ -395,18 +499,12 @@ class GemeindeHttpProvider:
                             content_type=content_type,
                             # A PDF must travel as bytes: decoding it would corrupt the
                             # ordinance before it ever reached the normaliser (#590).
-                            body=None
-                            if is_binary
-                            else manifestation.decode(
-                                text_response.charset_encoding or "utf-8", errors="replace"
-                            ),
+                            body=body_text,
                             body_bytes=manifestation if is_binary else None,
                             title=record.get("title"),
                             http_status=text_response.status_code,
                             discovery_depth=1,
-                            metadata=self._resource_metadata(
-                                record, bfs_number=bfs_number, portal=portal
-                            ),
+                            metadata=resource_metadata,
                         )
                     )
                 except Exception as exc:  # pragma: no cover - defensive capture
@@ -425,7 +523,27 @@ class GemeindeHttpProvider:
 
         inline_failure_reason = None
         if not resources:
-            if skipped:
+            # `skipped` now carries two distinct verdicts, and collapsing them
+            # sends an operator to the wrong remedy: "unrecognised content type"
+            # is a capability gap, while a guard refusal means the portal served
+            # something that is not the document it promised. Name whichever
+            # actually happened.
+            refused = [
+                entry
+                for entry in skipped
+                if entry.get("reason") != "unsupported_manifestation_content_type"
+            ]
+            if refused:
+                reasons = sorted({str(entry.get("reason")) for entry in refused})
+                inline_failure_reason = (
+                    f"{self.provider_name} fetched {len(refused)} manifestation(s) for BFS "
+                    f"{bfs_number} and the capture guard refused every one "
+                    f"({', '.join(reasons)}). The bytes are not the document the landing "
+                    "page promised — a redirect stub, a login interstitial or a navigation "
+                    "shell. Refusing rather than recording chrome as a captured ordinance; "
+                    "see the per-URL detail in `skipped_manifestations` (#631, #716)."
+                )
+            elif skipped:
                 inline_failure_reason = (
                     f"{self.provider_name} found {len(skipped)} manifestation(s) for BFS "
                     f"{bfs_number}, none of which it can carry: the operative text was "

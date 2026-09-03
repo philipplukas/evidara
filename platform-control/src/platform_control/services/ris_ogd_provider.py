@@ -13,6 +13,8 @@ from typing import Any
 
 import httpx
 
+from acquisition_core.artifact_guard import check_capture
+from acquisition_core.content_gate import assess_legal_text_density
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
@@ -419,10 +421,33 @@ async def _fetch_single_document(
     if len(body_bytes) > max_content_bytes:
         return {"url": url, "error": f"content exceeds {max_content_bytes} bytes"}
 
+    # `content_type` is the RIS *listing's* promise (`Data.…DataType` -> Xml/Html/
+    # Pdf), made before the download URL was fetched, so `check_capture` is what
+    # holds the OGD endpoint to it. Note what this catches that nothing else does:
+    # this function decodes every body as text, so an `Rtf`/`Pdf` download that
+    # arrived where `Xml` was promised would be UTF-8-mangled and captured as a
+    # document. `_FORMAT_PREFERENCE` defaults to Xml/Html, but `preferred_formats`
+    # is operator-settable, so that path is reachable by configuration alone.
+    verdict = check_capture(
+        body=body_bytes,
+        expected_content_type=content_type,
+        declared_content_type=response.headers.get("content-type"),
+    )
+    if not verdict:
+        return {"url": url, "error": f"{verdict.reason}: {verdict.detail}"}
+
     charset = response.charset_encoding or "utf-8"
     body = body_bytes.decode(charset, errors="replace")
     actual_ct = response.headers.get("content-type", content_type)
     normalized_ct = actual_ct.split(";")[0].strip().lower()
+
+    # Legal-text density (#631). RIS Bundesrecht is German and cites `§` and `Abs.`
+    # throughout, so the shared DE/IT vocabulary fits this source directly. The gate
+    # abstains on any content type it cannot read, so a format outside HTML/XML
+    # passes through untouched rather than being guessed at.
+    assessment = assess_legal_text_density(body, content_type=normalized_ct)
+    if not assessment.is_legal_text:
+        return {"url": url, "error": f"no_legal_text_markers: {assessment.reason}"}
 
     resource_metadata: dict[str, Any] = {
         "provider": "ris_ogd",
@@ -449,6 +474,8 @@ async def _fetch_single_document(
             resource_metadata[key] = value
     if meta.get("gesetzesnummer"):
         resource_metadata["gesetzesnummer"] = meta["gesetzesnummer"]
+    resource_metadata["capture_guard"] = "passed"
+    resource_metadata["legal_text_evidence"] = assessment.as_evidence()
 
     return ProviderResource(
         source_url=meta.get("document_url") or url,

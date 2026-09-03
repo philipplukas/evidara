@@ -90,13 +90,29 @@ control is the environment variable, which moves the floor for every source at o
 malformed override leaves the configured floor in place; an explicit `0` disables that
 floor, which is a supported escape hatch, not a bug.
 
-**Scope, stated plainly: the text-level invariant holds for PDF, not for HTML.** The
-legal-text floors skip HTML/XML on the theory that `content_gate` judged them at capture,
-but `assess_legal_text_density` is only reached by the three providers inheriting
-`PortalHttpProviderBase` (Canton/Bundesland/Regione). Fedlex, Gemeinde, RIS, Legifrance,
-EUR-Lex and the rest are plain classes, so their HTML is marker-checked by neither gate.
-Closing this means wiring `content_gate` into the remaining providers, or dropping the DI
-exemption — the latter is a deliberate, measurable coverage drop.
+**Scope, stated plainly: the text-level invariant now holds for PDF and for most HTML.**
+The legal-text floors skip HTML/XML on the theory that `content_gate` judged them at
+capture. That theory used to cover three of thirteen providers — only the ones inheriting
+`PortalHttpProviderBase` (Canton/Bundesland/Regione). It now covers **nine**: those three,
+plus `lexfind_api` (whose call is the deliberate `application/pdf` abstention),
+`gemeinde_http`, `fedlex_sparql`, `ris_ogd`, `ch_court_decisions` and `deterministic_http`.
+
+Four remain outside it, and three of those are decisions rather than omissions:
+
+- `eur_lex_sparql` — `_preferred_languages` defaults to `["en"]`, and `content_gate`'s
+  marker vocabulary is DE/IT. EU English writes "Article 5", which carries no `art.`,
+  `§` or `Abs.`, so the gate would refuse honest captures. Closing it needs an EN/FR
+  vocabulary, which `tests/test_quarantine.py` pins across both components.
+- `legifrance` — same vocabulary problem in French, and `readiness=SCAFFOLD`.
+- `cassette` — offline replay of already-captured bytes.
+- `firecrawl` — the real remaining hole. Its pages arrive at
+  `firecrawl_webhook_service.py`, a capture path outside the provider modules that calls
+  neither gate and guesses the content type.
+
+The matrix is asserted, not described:
+`platform-control/tests/unit/test_capture_guard_coverage.py` fails when a registered
+provider's capture path stops matching its recorded decision, and when a provider is
+registered with no decision at all.
 
 **Visibility.** `di_quarantined_documents_total{reason}` (Prometheus, on the consumers'
 existing `/metrics`), a `document_quarantined` structured log line, the consumer outcome
