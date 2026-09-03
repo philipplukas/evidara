@@ -53,6 +53,37 @@ describe("Regeste", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  // The normal Swiss headnote shape: an article/keyword line, a blank line,
+  // then the holding. Keying truncatability off paragraph count offered an
+  // expand control on 19 characters of text — the very noise the control is
+  // supposed to avoid.
+  it("offers no expand control for a short headnote split across paragraphs", () => {
+    const { container } = renderWithProviders(<Regeste text={"Art. 754 OR.\n\nKurz."} />);
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(container.querySelector("section > div > div")?.className).not.toContain("line-clamp-4");
+    expect(screen.getByText("Art. 754 OR.")).toBeInTheDocument();
+    expect(screen.getByText("Kurz.")).toBeInTheDocument();
+  });
+
+  // 40vh is ~150px on a landscape phone, so even a short headnote can overflow
+  // its bounded box. A scrollable region a keyboard user cannot reach is a
+  // trap, and jest-axe cannot see it because jsdom lays nothing out.
+  it("keeps every scrollable box keyboard-reachable, short or expanded", () => {
+    const { container: shortBox } = renderWithProviders(<Regeste text={SHORT} />);
+    const short = shortBox.querySelector("section > div > div");
+    expect(short?.className).toContain("overflow-y-auto");
+    expect(short).toHaveAttribute("tabindex", "0");
+
+    const { container: longBox } = renderWithProviders(<Regeste text={LONG} />);
+    const long = longBox.querySelector("section > div > div");
+    // Clamped, so it scrolls nothing and must NOT steal a tab stop.
+    expect(long).not.toHaveAttribute("tabindex");
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Ganze Regeste anzeigen/ })[0]);
+    expect(longBox.querySelector("section > div > div")).toHaveAttribute("tabindex", "0");
+  });
+
   it("collapses hard-wrapped lines into reflowing paragraphs", () => {
     // Court text in the corpus arrives wrapped mid-sentence; a single newline
     // is a hard wrap, not a paragraph break (see `toParagraphs`).

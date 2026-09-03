@@ -24,8 +24,10 @@ interface RegesteProps {
  *   - **absent / blank** — render nothing. A labelled box around no text is
  *     worse than no box, and most documents have no Regeste at all (the
  *     projection does not emit the field; see `lib/types.ts`).
- *   - **short** — one or two sentences, shown whole, with no expand control:
- *     a toggle that reveals nothing is noise.
+ *   - **short** — shown whole, with no expand control, however many
+ *     paragraphs it is split across: a toggle that reveals nothing is noise,
+ *     and the ordinary Swiss headnote is two paragraphs (keyword line, then
+ *     the holding) that together still fit.
  *   - **long** — several paragraphs. Clamped to four lines, expanded in place,
  *     and the expanded block scrolls inside its own bounded box. The header
  *     shares its height with the tab body, so an unbounded headnote would push
@@ -42,11 +44,18 @@ export function Regeste({ text }: RegesteProps) {
   if (paragraphs.length === 0) return null;
 
   // Whether the clamp actually bites depends on the rendered column width,
-  // which this component cannot measure without a layout effect. A length
-  // heuristic is enough to keep a two-sentence headnote from carrying a
-  // control that does nothing; guessing slightly wrong only costs a toggle
-  // that reveals a line or two.
-  const isTruncatable = paragraphs.length > 1 || paragraphs[0].length > 280;
+  // which this component cannot measure without a layout effect, so this is a
+  // heuristic on how much text there is. It measures **total length**, not
+  // paragraph count: the normal Swiss headnote shape is an article/keyword
+  // line, a blank line, then the holding, so counting paragraphs offered an
+  // expand control on a two-word Regeste — a toggle that reveals nothing,
+  // which is exactly the noise the control is supposed to avoid.
+  //
+  // Guessing low is safe by construction: text judged not truncatable is never
+  // clamped (`isOpen` is true for it), so it renders whole and, if the viewport
+  // is too short for it, scrolls inside the bounded box below.
+  const totalLength = paragraphs.reduce((sum, paragraph) => sum + paragraph.length, 0);
+  const isTruncatable = totalLength > 280;
   const isOpen = expanded || !isTruncatable;
 
   return (
@@ -54,10 +63,14 @@ export function Regeste({ text }: RegesteProps) {
       <div className="rounded-lg border-l-2 border-accent-core-muted bg-interactive-accent-subtle px-3 py-2.5">
         <SectionLabel>{t("regeste.heading")}</SectionLabel>
         <div
-          // A scrollable region has to be reachable by keyboard, so the
-          // expanded box takes a tab stop. The collapsed box scrolls nothing
-          // and takes none.
-          tabIndex={isOpen && isTruncatable ? 0 : undefined}
+          // A scrollable region has to be reachable by keyboard, so every box
+          // that carries `overflow-y-auto` takes a tab stop — which is every
+          // open one, including a short Regeste that is open because it was
+          // never truncatable. Gating this on `isTruncatable` as well left a
+          // short headnote scrollable-but-unreachable on a short viewport
+          // (landscape phone: 40vh is ~150px). The clamped box scrolls nothing
+          // and takes no tab stop.
+          tabIndex={isOpen ? 0 : undefined}
           className={`mt-1.5 font-document text-xs leading-6 text-foreground/85 [&>p+p]:mt-2 ${
             isOpen ? "max-h-[40vh] overflow-y-auto" : "line-clamp-4"
           }`}

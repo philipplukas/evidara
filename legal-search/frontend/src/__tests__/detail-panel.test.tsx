@@ -15,7 +15,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
 import { describe, expect, it, vi } from "vitest";
 import { DetailPanel } from "@/components/detail/DetailPanel";
-import { articleDetail } from "@/lib/mock-data";
+import { articleDetail, decisionDetail } from "@/lib/mock-data";
 import { renderWithProviders } from "./helpers/render-with-providers";
 
 expect.extend(toHaveNoViolations);
@@ -291,6 +291,46 @@ describe("DetailPanel", () => {
 
     expect(screen.getByText("Art. 756 OR")).toBeInTheDocument();
     expect(screen.queryByText("Kein Inhalt verfügbar")).not.toBeInTheDocument();
+  });
+
+  // The composition seam. `Regeste`, `mapDetail` and the BFF mapper each have
+  // their own tests, and all of them stayed green with the panel passing
+  // `text={undefined}` — the feature can be wholly dead at the one line that
+  // delivers it and nothing notices. That seam is #609 (the body mapped
+  // everywhere but the view) and #728 (a DTO that worked in every test layer
+  // and was inert in the built app). This is the test that fails if the header
+  // stops handing the headnote to `Regeste` (#760).
+  it("renders the regeste on the detail panel for a decision that carries one", () => {
+    renderWithProviders(
+      <DetailPanel
+        detail={decisionDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "Regeste" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders no Regeste region for a document that carries none", () => {
+    // `articleDetail` is a statute — no headnote — and must not get an empty
+    // labelled box.
+    renderWithProviders(
+      <DetailPanel
+        detail={articleDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+    );
+
+    expect(screen.queryByRole("region", { name: "Regeste" })).not.toBeInTheDocument();
   });
 
   it("has no accessibility violations (empty state)", async () => {
