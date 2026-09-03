@@ -108,9 +108,15 @@ For operator and user overlay copy:
   `{country_code}` placeholder with the overlay's ISO 3166-1 alpha-2
   code. No other templating is supported.
 
-The two-key live-ready lock (blueprint `enabled: true` AND
-`provider.live_ready: true`) enforces the same principle on the runtime
-side: a scaffold provider cannot fire by accident.
+The two-key enablement lock (blueprint `enabled: true` AND the provider's
+own code key) enforces the same principle on the runtime side: a scaffold
+provider cannot fire by accident. The code key is three-state since #743 —
+`scaffold` / `awaiting_evidence` / `live`, defined in
+[`acquisition_core/providers.py:92-118`](../../platform-control/src/acquisition_core/providers.py) —
+not the `live_ready: bool` this paragraph described until 2026-09-03. See
+[ADR-0030](../adr/0030-acquisition-provider-enablement-lifecycle.md) and
+[CH acquisition coverage status](ch-acquisition-coverage-status.md) for the
+per-provider values.
 
 ## Tests that enforce this
 

@@ -221,7 +221,8 @@ correspondingly order-dependent.)
 **The resolution rate is part of the contract.** `GET /v1/citations/stats` reports what
 share of extracted citations actually resolve, and attributes the remainder:
 
-- `not_normalizable` — DI could not key the citation at all (a fuzzy form like `Art. 36 BV`).
+- `not_normalizable` — DI could not key the citation at all (a fuzzy form like a BGE
+  reference, or `§ 4 Hundegesetz` — a spelled-out cantonal title is not yet an identifier).
   An **extractor** gap.
 - `unresolved_target` — the key is valid but names a norm not in the corpus. A **coverage** gap.
 
@@ -231,9 +232,44 @@ The same numbers are exported as Prometheus metrics (`legal_search_citation_reso
 `legal_search_citations_projected_total{keyed}`) and alerted on in
 `infra/hetzner/observability/alerts.yaml` (`evidara.citation-graph`).
 
-**Known gap:** bare article references (`Art. 36 BV`) are the dominant citation form and are
-*not* resolved — they need search-based resolution against article-level sections, which
-depends on article-level sectioning. They are counted as `not_normalizable`, never guessed.
+**Article references resolve deterministically, without search** (#594, shipped by #701).
+The previous revision of this section recorded `Art. 36 BV` as an unresolved gap awaiting
+search-based resolution. Measuring first showed that was the wrong tool: the short title
+*is* an identifier, and Fedlex publishes it as `title_short`, so the short-form-to-norm
+mapping is a fact the corpus supplies rather than an inference. Two things landed:
+
+- **A precision gate.** An `Art. N <token>` match whose trailing token is not
+  abbreviation-shaped (>= 2 capitals: `BV`, `OR`, `ZGB`, `StGB`) is not recorded as a
+  citation at all — the BV's own headings ("Art. 36 Einschränkungen von Grundrechten")
+  were scoring as citations to a statute called "Einschränkungen", and 98.5% of `article`
+  matches across the golden corpus were such phantoms, padding the denominator of
+  `resolution_rate`. This is a **shape** test, never a dictionary
+  (`legal-search/api/src/modules/citations/citation-key.ts:64-76`).
+- **Deterministic resolution.** `Art. 36 BV` keys to `abbrev_art:BV/36` on both sides —
+  DI at extraction (`nlp/citation_extractor.py:699-703`) and the BFF for a string typed by
+  a human or an agent (`citation-key.ts:119-124`). `ProjectionsService` mints the matching
+  nodes: `abbrev:BV` for the statute and one `abbrev_art:BV/36` per article-level section,
+  carrying `section_id` / `section_anchor` so a citation resolves to an openable provision
+  rather than a 525 KB statute (`projections.service.ts:1070-1113`). There is no
+  confidence score and no threshold anywhere.
+
+**What this does not cover.** Node minting has real preconditions, and a document that
+misses them mints nothing rather than guessing: only `document_type: law`
+(`projections.service.ts:1075`), only when the source publishes an abbreviation-shaped
+`title_short` (`:1078`), and only for sections that carry a `section_id` and a title
+beginning `Art. N` (`:1092-1098`). Still reported unresolved, never guessed:
+
+- **Ambiguity.** Short titles are not globally unique, so a key naming several *different*
+  documents comes back `unresolved_reason: 'ambiguous'` with every candidate returned
+  **unranked** — narrowing is not resolving (`citations.service.ts:108-126`).
+- **BGE references**, **German statute paragraphs** (`de_statute:BGB` names a statute but
+  not a provision), and **cross-lingual short titles** (`Cst.` / `Cost.` are the BV's
+  French and Italian names; nothing links them to `BV`).
+- **Swiss `§` citations against a spelled-out cantonal title** (`§ 4 Hundegesetz`). Since
+  #769 these are *extracted* and carry `resolved=false`, so a Zürich ordinance presents as
+  a document with an unsatisfied dependency rather than one with no references — but they
+  are not keyed, because `citation-targets` mints short-title nodes from `title_short` and
+  a cantonal statute publishes none (`nlp/citation_extractor.py:705-718`).
 
 ## Operator references
 
