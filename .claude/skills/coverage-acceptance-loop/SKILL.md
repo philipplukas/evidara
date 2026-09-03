@@ -90,8 +90,9 @@ bash scripts/ch-fedlex-compose-e2e.sh \
 
 Despite the name it is corpus-parameterised. Pass the corpus-shape flags: without
 `--expect-content-type` a PDF corpus reports `provider_failed` while working correctly,
-and without `--expect-language` / `--expect-title` those gates **self-skip while still
-reporting a pass** (#735, #744).
+and without `--expect-language` / `--expect-title` those gates do not run at all — they
+are recorded as **`excluded`**, which is honest but means the run proves nothing about
+the title or the language facet (#735, #744).
 
 ### Bringing the stack up
 
@@ -158,11 +159,35 @@ not** be cited to justify flipping `enabled: true`. The refusal codes:
 - `run_refused_by_lock`, `run_not_completed`, `no_captured_resources` — nothing happened
   to evidence.
 
-**A pass justifies only the gates that actually ran.** Before recommending
-`enabled: true`, read the harness's Gate coverage section / `checks.skipped_gates` in
-`summary.json` and treat every skipped gate as unverified, not as verified-and-green
-(#744). Persist the bundle under `docs/runbooks/evidence/` (the harness `--copy-evidence`
-flag does this).
+**A pass justifies only the gates that actually ran**, and *why* a gate did not run
+decides whether the run is still evidence. The harness's **Gate coverage** section, and
+`checks.gate_coverage` in `summary.json`, name both:
+
+| outcome | means | verdict |
+|---|---|---|
+| `excluded` | Nobody asked for it — this template declares no title pattern, no language to assert. | Unverified, but not a hole. The run is still acceptance evidence for what did run. |
+| `not_evaluated` | It was asked for and could not run — legal-search unreachable, projection never queryable, nothing processed to assert over. | A hole. The run is **not** acceptance evidence until the gate runs. |
+
+`checks.skipped_gates` is still emitted as the union of the two, so it no longer answers
+the question on its own. A bundle that predates the split (no `gate_coverage` key) has
+every entry read as `not_evaluated` — the safe direction, and free in practice because
+every persisted bundle reports `skipped_gates: []`.
+
+The CLI does not see any of this unless you hand it the file — platform-control stores
+no gate ledger:
+
+```bash
+uv run evidara workflow run evidence --run-id <run_id> \
+  --evidence-bundle <run_dir>/summary.json --human
+```
+
+With the bundle, two more refusal codes can appear in `acceptance_verdict.refusals`:
+`gate_not_evaluated` (names each gate and its reason) and `gate_coverage_unknown` (the
+bundle reported no coverage at all). Both refuse the flip in §6. Without the bundle only
+the run-level rules above run, and a hole in the gates stays invisible.
+
+Persist the bundle under `docs/runbooks/evidence/` (the harness `--copy-evidence` flag
+does this).
 
 ## 6. Flip the key
 
@@ -173,8 +198,13 @@ Two keys, two owners, and only one is yours.
 ```bash
 uv run evidara workflow coverage enable \
   --overlay ch --template <template_id> --evidence-run-id <run_id> \
+  --evidence-bundle docs/runbooks/evidence/<dir>/summary.json \
   --note "Evidence bundle: docs/runbooks/evidence/<dir>" --human
 ```
+
+Pass `--evidence-bundle`. Without it the command cannot tell a gate the operator
+excluded from a gate that could not run, and the flip is decided on the run-level rules
+alone (#744).
 
 Use this rather than a hand-rolled `PUT`: the command re-derives the acceptance verdict
 for the cited run and refuses when it does not earn the flip, and — the part that matters
@@ -188,7 +218,7 @@ Its refusals write nothing:
 | refusal | what to do |
 |---|---|
 | `no_evidence_run_cited` | Go capture evidence (§3–§5). The key is turned after evidence, not on confidence. |
-| `evidence_run_is_not_acceptance_evidence` | Read `acceptance_verdict.refusals` — usually `execution_mode_shadow`. Re-run live. |
+| `evidence_run_is_not_acceptance_evidence` | Read `acceptance_verdict.refusals` — usually `execution_mode_shadow`, or `gate_not_evaluated` when a cited bundle reports a gate that could not run. Re-run live, or run the missing gate. |
 | `evidence_run_provider_unresolved` | Nothing ties the run to this template. Do not "assume it's fine"; find the right run. |
 | `evidence_run_provider_mismatch` | You cited a run from another corpus. |
 | `evidence_run_capture_count_unknown` | The run reports no capture count, so that check did not run. A check that cannot run is not a pass. |
@@ -238,5 +268,6 @@ still admits when the provider is short of `live`.
 - [ADR-0030](../../../docs/adr/0030-acquisition-provider-enablement-lifecycle.md) — the lifecycle, the two-key lock (§2), the evidence workflow (§5), `RunMode.ACCEPTANCE` (§6)
 - [ADR-0033](../../../docs/adr/0033-agentic-legal-reasoning.md) §4 — the build order, and why not to build the MCP server
 - `tools/evidara-cli/src/evidara_cli/coverage.py` — the classification rules, with their platform-control counterparts cited
+- `tools/evidara-cli/src/evidara_cli/gate_coverage.py` — the excluded / not-evaluated split and the one implementation of the rule that escalates it
 - `scripts/ch-fedlex-compose-e2e.sh` — the driver
 - `.claude/skills/run-admin-panel/SKILL.md` — driving the admin UI to flip the config key

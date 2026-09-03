@@ -56,6 +56,7 @@ from evidara_cli.coverage import (
     version_provider,
 )
 from evidara_cli.envelope import build_envelope, evidence_assertion, evidence_count, evidence_http
+from evidara_cli.gate_coverage import load_evidence_bundle
 
 coverage_app = typer.Typer(
     no_args_is_help=True,
@@ -679,13 +680,17 @@ def _find_template(
 
 
 def _acceptance_context(
-    run_id: str, *, correlation_id: str | None
+    run_id: str, *, correlation_id: str | None, evidence_bundle: dict[str, Any] | None = None
 ) -> tuple[dict[str, Any], dict[str, Any], str | None]:
     """Fetch the cited run and derive its acceptance verdict and provider.
 
     Returns ``(run, verdict, provider)``. The provider comes from the source version's
     acquisition spec because the version read model exposes no template binding — see
     ``coverage.version_provider``.
+
+    ``evidence_bundle`` is the harness `summary.json`, when the operator cited one. It
+    is what makes a gate that could not run refuse the flip rather than pass unnoticed
+    (:mod:`evidara_cli.gate_coverage`).
     """
     pc_base = platform_control_base_url()
     pc_headers = platform_control_headers(correlation_id=correlation_id)
@@ -708,6 +713,7 @@ def _acceptance_context(
     verdict = acceptance_evidence_verdict(
         run=run,
         execution_mode=version_execution_mode(version),
+        evidence_bundle=evidence_bundle,
     )
     return run, verdict, version_provider(version)
 
@@ -724,6 +730,17 @@ def coverage_enable(
         typer.Option(
             "--evidence-run-id",
             help="Run id that earns the flip. Required to enable; ignored when disabling.",
+        ),
+    ] = None,
+    evidence_bundle: Annotated[
+        str | None,
+        typer.Option(
+            "--evidence-bundle",
+            help=(
+                "Path to the acceptance harness `summary.json` for the cited run. Its "
+                "gate ledger decides whether an absent gate was excluded (still "
+                "evidence) or not evaluated (refuses the flip)."
+            ),
         ),
     ] = None,
     note: Annotated[
@@ -773,12 +790,24 @@ def coverage_enable(
         typer.echo("--note is required when disabling: record why the key was shut.", err=True)
         raise typer.Exit(code=2)
 
+    # An unreadable bundle must stop the command, never degrade to "no gates skipped":
+    # a silent fallback here would restore exactly the green-over-nothing read this
+    # flag exists to close.
+    bundle: dict[str, Any] | None = None
+    if evidence_bundle:
+        try:
+            bundle = load_evidence_bundle(evidence_bundle)
+        except (OSError, ValueError) as exc:
+            typer.echo(f"--evidence-bundle could not be read: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
     step = "coverage.enable"
     inputs: dict[str, Any] = {
         "overlay": overlay,
         "template": template,
         "enabled": enabled,
         "evidence_run_id": evidence_run_id,
+        "evidence_bundle": evidence_bundle,
         "reopen_operator_kill_switch": reopen_operator_kill_switch,
         "acknowledge_provider_below_live": acknowledge_provider_below_live,
     }
@@ -862,7 +891,7 @@ def coverage_enable(
         evidence_provider: str | None = None
         if enabled and evidence_run_id:
             run, verdict, evidence_provider = _acceptance_context(
-                evidence_run_id, correlation_id=correlation_id
+                evidence_run_id, correlation_id=correlation_id, evidence_bundle=bundle
             )
             artifacts["evidence_run"] = run
             artifacts["acceptance_verdict"] = verdict

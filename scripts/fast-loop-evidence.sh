@@ -63,6 +63,64 @@ resolve_fast_loop_source() {
   log "    source_id=${SOURCE_ID} source_version_id=${SOURCE_VERSION_ID}"
 }
 
+# --- Gate-coverage ledger (#744, split 2026-09-03) --------------------------------
+#
+# `skipped_gates` answered WHICH gates did not run and never WHY, and the two reasons
+# mean opposite things:
+#
+#   excluded      — the operator did not ask for the gate (no title regex declared, no
+#                   language to assert). Not applicable; the run is still evidence.
+#   not_evaluated — the gate was asked for and could not run (legal-search unreachable,
+#                   projection never queryable, no processed documents). A hole in the
+#                   evidence; the run is NOT ADR-0030 acceptance evidence.
+#
+# The names are Soda Core v4's `CheckOutcome.EXCLUDED` / `NOT_EVALUATED`, which draws
+# this distinction and escalates only the second. The escalation itself is implemented
+# once, in `tools/evidara-cli/src/evidara_cli/gate_coverage.py`; these helpers only
+# record what happened, and the renderer below only states it.
+GATE_LEDGER=()
+
+gate_ledger_reset() { GATE_LEDGER=(); }
+
+# gate_excluded <gate> <reason-slug>
+gate_excluded() { GATE_LEDGER+=("${1:?missing gate}|excluded|${2:?missing reason}"); }
+
+# gate_not_evaluated <gate> <reason-slug>
+gate_not_evaluated() { GATE_LEDGER+=("${1:?missing gate}|not_evaluated|${2:?missing reason}"); }
+
+gate_ledger_json() {
+  jq -nc '[$ARGS.positional[] | split("|") | {gate: .[0], outcome: .[1], reason: .[2]}]' \
+    --args "${GATE_LEDGER[@]+"${GATE_LEDGER[@]}"}"
+}
+
+# gate_ledger_names_json [outcome] — every gate, or only those with that outcome.
+gate_ledger_names_json() {
+  local outcome="${1:-}"
+  jq -nc --arg outcome "${outcome}" \
+    '[$ARGS.positional[] | split("|")
+      | select($outcome == "" or .[1] == $outcome) | .[0]]' \
+    --args "${GATE_LEDGER[@]+"${GATE_LEDGER[@]}"}"
+}
+
+# Log the ledger for the operator watching the run, naming the two outcomes apart.
+gate_ledger_log() {
+  local entry gate outcome reason
+  local not_evaluated=0
+  for entry in "${GATE_LEDGER[@]+"${GATE_LEDGER[@]}"}"; do
+    IFS='|' read -r gate outcome reason <<< "${entry}"
+    if [[ "${outcome}" == "excluded" ]]; then
+      log "    - ${gate}: EXCLUDED (${reason}) — not applicable, not asserted"
+    else
+      log "    - ${gate}: NOT EVALUATED (${reason}) — asked for, could not run"
+      not_evaluated=1
+    fi
+  done
+  if [[ "${not_evaluated}" -eq 1 ]]; then
+    log "==> Gates were NOT EVALUATED. This bundle is not ADR-0030 acceptance evidence"
+    log "    until they run: an unverified gate is not a passed gate (#744)."
+  fi
+}
+
 fast_loop_next_action() {
   local verdict="${1:-}"
   case "${verdict}" in
@@ -128,7 +186,6 @@ render_fast_loop_evidence_markdown() {
   local next_action
   local checks_markdown
   local skipped_gates_markdown
-  local skipped_gate_count
   local paste_block
 
   environment="$(jq -r '.environment // "unknown"' "${summary_path}")"
@@ -154,35 +211,75 @@ render_fast_loop_evidence_markdown() {
     jq -r '.checks | to_entries[] | "- `\(.key)=\(.value)`"' "${summary_path}"
   )"
 
-  # A gate that self-skipped must read as skipped here, not as a pass (#744). The
+  # A gate that did not run must read as not-run here, not as a pass (#744). The
   # `checks` list above renders `<gate>_ok=1` for a gate that never ran, which is the
   # green-because-it-never-ran failure this repo keeps paying for (#605, #675, #713) —
   # and this markdown is the artifact an operator reads before flipping `enabled: true`
-  # under ADR-0030. Scripts that do not emit `skipped_gates` yet get the empty list,
-  # so the section stays truthful rather than claiming a coverage they never reported.
-  skipped_gate_count="$(jq -r '(.checks.skipped_gates // []) | length' "${summary_path}")"
-  if [[ "${skipped_gate_count}" -gt 0 ]]; then
-    skipped_gates_markdown="$(
-      jq -r '(.checks.skipped_gates // [])[] | "- `\(.)` — **skipped (not applicable to this template)**, not verified"' "${summary_path}"
-    )"
-  elif jq -e 'has("checks") and (.checks | has("skipped_gates"))' "${summary_path}" >/dev/null; then
-    skipped_gates_markdown="- None — every gate below was evaluated."
+  # under ADR-0030.
+  #
+  # Since 2026-09-03 the two reasons are told apart: a gate the operator EXCLUDED (not
+  # applicable to this corpus) is a defensible pass, while a gate that was NOT EVALUATED
+  # (asked for and could not run) is a hole in the evidence. Normalised here exactly as
+  # `tools/evidara-cli/src/evidara_cli/gate_coverage.py` does it, including the
+  # conservative legacy read: a bundle carrying `skipped_gates` but no `gate_coverage`
+  # predates the split and its reasons are unrecoverable from the file, so every entry
+  # is read as NOT EVALUATED — the direction that can only refuse evidence that might
+  # have been fine, never accept evidence that is not.
+  local gate_ledger_json_normalised
+  gate_ledger_json_normalised="$(
+    jq -c '(.checks // {}) as $c
+      | if ($c.gate_coverage | type) == "array" then
+          [ $c.gate_coverage[]
+            | {gate: ((.gate // "") | tostring),
+               outcome: (if .outcome == "excluded" then "excluded" else "not_evaluated" end),
+               reason: ((.reason // "reason_not_recorded") | tostring)}
+            | select(.gate != "") ]
+        elif ($c.skipped_gates | type) == "array" then
+          [ $c.skipped_gates[]
+            | {gate: (. | tostring), outcome: "not_evaluated", reason: "reason_not_recorded"}
+            | select(.gate != "") ]
+        else null
+        end' "${summary_path}"
+  )"
+
+  if [[ "${gate_ledger_json_normalised}" == "null" ]]; then
+    skipped_gates_markdown="- Unknown — this run reported no gate coverage at all. Read every gate below as unverified; this bundle cannot be cited as ADR-0030 acceptance evidence."
   else
-    skipped_gates_markdown="- Unknown — this run did not report gate coverage."
+    skipped_gates_markdown="$(
+      jq -r --argjson ledger "${gate_ledger_json_normalised}" -n '
+        [ ($ledger[] | select(.outcome == "excluded")
+           | "- `\(.gate)` — **excluded** (`\(.reason)`): deliberately not asserted for this corpus, so it is unverified but not a hole."),
+          ($ledger[] | select(.outcome == "not_evaluated")
+           | "- `\(.gate)` — **NOT EVALUATED** (`\(.reason)`): asked for and could not run. This is a hole in the evidence, not a pass."),
+          (if ($ledger | length) == 0 then "- None — every gate below was evaluated." else empty end),
+          (if ([$ledger[] | select(.outcome == "not_evaluated")] | length) > 0
+           then "\nAt least one gate was NOT EVALUATED, so this bundle is not ADR-0030 acceptance evidence until it runs (#744)."
+           else empty end)
+        ] | join("\n")'
+    )"
   fi
 
   paste_block="$(
-    jq -r --arg corpus_label "${corpus_label}" --arg next_action "${next_action}" '
+    jq -r --arg corpus_label "${corpus_label}" --arg next_action "${next_action}" \
+      --argjson ledger "${gate_ledger_json_normalised}" '
       # `content_type_html_count` predates --expect-content-type and is still emitted by
       # the sibling fast-loop scripts; prefer the corpus-agnostic key when present.
       (.checks.content_type_match_count // .checks.content_type_html_count // 0) as $ct_count
       | (.checks.expect_content_type // "text/html") as $ct_label
-      | (.checks.skipped_gates // []) as $skipped
+      | [($ledger // [])[] | select(.outcome == "excluded") | .gate] as $excluded
+      | [($ledger // [])[] | select(.outcome == "not_evaluated") | .gate] as $not_evaluated
       | [
         "> " + $corpus_label + " fast loop `" + (.template_id // "unknown") + "` on `" + (.environment // "unknown") + "` returned `" + (.verdict // "unknown") + "` (`" + (.run_id // "unknown") + "`).",
         "> Checks: captured=`" + ((.checks.captured_count // 0) | tostring) + "`, raw_artifacts=`" + ((.checks.raw_artifact_count // 0) | tostring) + "`, " + $ct_label + "=`" + ($ct_count | tostring) + "`, DI accepted/processing/canonical_ready=`" + ((.checks.accepted_count // 0) | tostring) + "/" + ((.checks.processing_count // 0) | tostring) + "/" + ((.checks.canonical_ready_count // 0) | tostring) + "`, lifecycle processed=`" + ((.checks.processed_count // 0) | tostring) + "`.",
         "> Run mode: `" + (.run_mode // "unspecified") + "`" + (if (.run_mode // "") == "acceptance" then " — an acceptance rehearsal, not production ingest; it does not imply either ADR-0030 key is turned." else "." end),
-        "> Skipped gates (not verified): " + (if ($skipped | length) > 0 then ($skipped | map("`" + . + "`") | join(", ")) else "none" end) + ".",
+        (if $ledger == null
+         then "> Gate coverage: NOT REPORTED by this run — every gate below is unverified, so this run is NOT ADR-0030 acceptance evidence."
+         else "> Gates excluded (not applicable, not asserted): " + (if ($excluded | length) > 0 then ($excluded | map("`" + . + "`") | join(", ")) else "none" end) + "."
+         end),
+        (if $ledger == null
+         then empty
+         else "> Gates NOT EVALUATED (asked for, could not run): " + (if ($not_evaluated | length) > 0 then ($not_evaluated | map("`" + . + "`") | join(", ")) + " — this run is NOT ADR-0030 acceptance evidence." else "none." end)
+         end),
         "> Source/version: `" + (.source_id // "unknown") + "` / `" + (.source_version_id // "unknown") + "`.",
         "> Next action: " + $next_action
       ] | join("\n")

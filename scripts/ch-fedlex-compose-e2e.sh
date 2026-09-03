@@ -533,12 +533,21 @@ indexed_title_ok=0
 indexed_title_checked=0
 indexed_title_observed=""
 indexed_title_expected_count=0
+# Why the gate did not run, when it did not. `excluded` (nobody asked for it) and
+# `not_evaluated` (asked for, could not run) are opposite claims about the evidence;
+# a single "skipped" list rendered an unreachable projection as "not applicable".
+indexed_title_skip_outcome=""
+indexed_title_skip_reason=""
 if [[ "${title_checked}" -eq 0 ]]; then
-  log "==> Indexed-title gate: SKIPPED — no title regex to assert for template ${TEMPLATE_ID}"
+  log "==> Indexed-title gate: EXCLUDED — no title regex to assert for template ${TEMPLATE_ID}"
+  indexed_title_skip_outcome="excluded"
+  indexed_title_skip_reason="no_expected_title_declared"
 else
   processed_document_ids="$(jq -r '[.data[]? | select(.event_type=="document.processed") | .document_id] | unique | join(" ")' < "${RUN_DIR}/document-lifecycle.json")"
   if [[ -z "${processed_document_ids}" ]]; then
-    log "==> Indexed-title gate: no processed documents to assert"
+    log "==> Indexed-title gate: NOT EVALUATED — a title regex was declared but no document.processed event exists to assert it over"
+    indexed_title_skip_outcome="not_evaluated"
+    indexed_title_skip_reason="no_processed_documents"
   else
     indexed_title_checked=1
     read -ra title_doc_ids <<< "${processed_document_ids}"
@@ -571,25 +580,38 @@ title_ok="$(jq -r --arg title_regex "${TITLE_REGEX}" '[.data[]? | select((.title
 accepted_count="$(jq -r '[.data[]? | select(.status=="accepted")] | length' < "${RUN_DIR}/processing-status.json")"
 processing_count="$(jq -r '[.data[]? | select(.status=="processing")] | length' < "${RUN_DIR}/processing-status.json")"
 
-# ── 9b. Skipped-gate ledger (#744) ─────────────────────────────────────────
-# A gate that self-skipped is reported as skipped, never folded into the pass count.
-# `skipped_gates` being empty is what an operator needs before flipping
-# `enabled: true` under ADR-0030: proof every gate actually ran.
-skipped_gates=()
-[[ "${title_checked}" -eq 1 ]] || skipped_gates+=("title_ok")
-[[ "${indexed_title_checked}" -eq 1 ]] || skipped_gates+=("indexed_title_ok")
-# checked=0 with ok=1 is a genuine skip; checked=0 with ok=0 is a real failure the
-# verdict already catches.
-if [[ "${indexed_language_checked}" -eq 0 && "${indexed_language_ok}" -eq 1 ]]; then
-  skipped_gates+=("indexed_language_ok")
+# ── 9b. Gate-coverage ledger (#744; split into excluded/not-evaluated) ─────
+# A gate that did not run is reported as not-run, never folded into the pass count —
+# and WHY it did not run decides whether this bundle is still acceptance evidence:
+#
+#   excluded      — nobody asked for it (no title regex, no language for this template).
+#                   Unverified, but not a hole: the run can still be cited under ADR-0030.
+#   not_evaluated — it was asked for and could not run. A hole in the evidence, and the
+#                   CLI refuses the `enabled: true` flip on it
+#                   (`tools/evidara-cli/src/evidara_cli/gate_coverage.py`).
+#
+# Names follow Soda Core v4's `CheckOutcome.EXCLUDED` / `NOT_EVALUATED`, which draws the
+# same line and escalates only the second.
+gate_ledger_reset
+[[ "${title_checked}" -eq 1 ]] || gate_excluded "title_ok" "no_expected_title_declared"
+if [[ "${indexed_title_skip_outcome}" == "excluded" ]]; then
+  gate_excluded "indexed_title_ok" "${indexed_title_skip_reason}"
+elif [[ "${indexed_title_skip_outcome}" == "not_evaluated" ]]; then
+  gate_not_evaluated "indexed_title_ok" "${indexed_title_skip_reason}"
 fi
-skipped_gates_json="$(jq -nc '$ARGS.positional' --args "${skipped_gates[@]+"${skipped_gates[@]}"}")"
+# checked=0 with ok=1 is a gate nobody asked for; checked=0 with ok=0 is a real failure
+# the verdict already catches, so it is not a coverage entry at all.
+if [[ "${indexed_language_checked}" -eq 0 && "${indexed_language_ok}" -eq 1 ]]; then
+  gate_excluded "indexed_language_ok" "no_expected_language_declared"
+fi
+gate_coverage_json="$(gate_ledger_json)"
+skipped_gates_json="$(gate_ledger_names_json)"
+excluded_gates_json="$(gate_ledger_names_json excluded)"
+not_evaluated_gates_json="$(gate_ledger_names_json not_evaluated)"
 
-if [[ "${#skipped_gates[@]}" -gt 0 ]]; then
-  log "==> Gates NOT evaluated for template ${TEMPLATE_ID} — reported as skipped, not as passes (#744):"
-  for skipped_gate in "${skipped_gates[@]}"; do
-    log "    - ${skipped_gate}: skipped (not applicable)"
-  done
+if [[ "${#GATE_LEDGER[@]}" -gt 0 ]]; then
+  log "==> Gate coverage for template ${TEMPLATE_ID} — not folded into the pass count (#744):"
+  gate_ledger_log
 fi
 
 # ── 10. Verdict ────────────────────────────────────────────────────────────
@@ -649,6 +671,9 @@ SUMMARY_JSON="$(jq -n \
   --argjson indexed_title_expected_count "${indexed_title_expected_count}" \
   --arg indexed_title_observed "${indexed_title_observed}" \
   --argjson skipped_gates "${skipped_gates_json}" \
+  --argjson gate_coverage "${gate_coverage_json}" \
+  --argjson excluded_gates "${excluded_gates_json}" \
+  --argjson not_evaluated_gates "${not_evaluated_gates_json}" \
   --argjson search_hits "${search_hits}" \
   --argjson indexed_language_ok "${indexed_language_ok}" \
   --argjson indexed_language_checked "${indexed_language_checked}" \
@@ -685,7 +710,12 @@ SUMMARY_JSON="$(jq -n \
       indexed_title_checked: $indexed_title_checked,
       indexed_title_expected_count: $indexed_title_expected_count,
       indexed_title_observed: $indexed_title_observed,
+      # Retained as the union of the two lists below so every existing reader keeps
+      # working; `gate_coverage` is what says which kind each one is.
       skipped_gates: $skipped_gates,
+      gate_coverage: $gate_coverage,
+      excluded_gates: $excluded_gates,
+      not_evaluated_gates: $not_evaluated_gates,
       search_hits: $search_hits,
       indexed_language_expected: $indexed_language_expected,
       indexed_language_observed: $indexed_language_observed,

@@ -556,21 +556,30 @@ indexed_language_observed=""
 indexed_title_checked=0
 indexed_title_ok=1
 indexed_title_observed=""
+# Why the read-back block did not run, when it did not. The indexed-title gate rides on
+# this block, so it inherits the reason: a template that declares no language never
+# reaches the read-back at all, and its title gate is then NOT EVALUATED — asked for and
+# missed — rather than excluded. Conflating the two is what let a run with an
+# unreachable legal-search render as "not applicable to this template" (#744).
+readback_skip_reason=""
 
 if [[ -z "${expected_lang}" ]]; then
   # Skipped, not passed. `indexed_language_checked` used to be set to 1 here, which
   # reported a facet assertion that never happened — the same green-because-it-never-ran
   # defect as #605/#675/#713. Keep `_ok=1` so the skip does not newly block the verdict
   # (#744 changes visibility only); `_checked=0` is what tells the reader it did not run.
-  log "==> Indexed-language gate: SKIPPED (not applicable) — template ${TEMPLATE_ID} has no language suffix"
+  log "==> Indexed-language gate: EXCLUDED (not applicable) — template ${TEMPLATE_ID} has no language suffix"
   indexed_language_checked=0
   indexed_language_ok=1
+  readback_skip_reason="no_expected_language_declared"
 elif [[ -z "${LS_URL}" ]]; then
-  log "==> Indexed-language gate: SKIPPED — no legal-search URL."
+  log "==> Indexed-language gate: NOT EVALUATED — no legal-search URL."
   log "    Pass --ls-url (self-hosted: kubectl -n evidara port-forward svc/legal-search-api 3102:3000)"
   log "    so the run can prove the search facet, not just the raw body."
+  readback_skip_reason="no_legal_search_url"
 elif [[ -z "${processed_document_ids}" ]]; then
-  log "==> Indexed-language gate: no document.processed events to check"
+  log "==> Indexed-language gate: NOT EVALUATED — no document.processed events to check"
+  readback_skip_reason="no_processed_documents"
 else
   log "==> Asserting indexed language=${expected_lang} for: ${processed_document_ids}"
   read -ra doc_ids <<< "${processed_document_ids}"
@@ -617,6 +626,7 @@ else
 
   if [[ "${indexed_language_checked}" -ne 1 ]]; then
     log "  indexed-language gate could not read the projection from legal-search"
+    readback_skip_reason="projection_not_queryable"
   fi
 fi
 
@@ -653,28 +663,47 @@ elif [[ "${in_force_from_present}" -lt 1 ]]; then
   log "    validity is unknown for this run (in-force state cannot be asserted)."
 fi
 
-# --- Skipped-gate ledger (#744) ---
+# --- Gate-coverage ledger (#744; split into excluded/not-evaluated) ---
 #
-# A gate that self-skipped must be reported as skipped, never folded into the pass
-# count. Collect the names here so both the machine summary and the human evidence
-# name them explicitly. `skipped_gates` being empty is itself the signal an operator
-# wants before flipping `enabled: true` under ADR-0030: every gate actually ran.
-skipped_gates=()
-[[ "${title_checked}" -eq 1 ]] || skipped_gates+=("title_ok")
-[[ "${body_lang_hint_checked}" -eq 1 ]] || skipped_gates+=("body_lang_hint_ok")
-# indexed_language_checked=0 with _ok=1 is a genuine skip; with _ok=0 it is a
-# fail-closed "could not evaluate", which the verdict already catches.
+# A gate that did not run must be reported as not-run, never folded into the pass count.
+# WHY it did not run is what decides whether this bundle is still acceptance evidence:
+#
+#   excluded      — nobody asked for it (this template declares no title pattern, no
+#                   language). Unverified, but not a hole: still citable under ADR-0030.
+#   not_evaluated — it was asked for and could not run (legal-search unreachable, the
+#                   projection never queryable, nothing processed to assert over). A hole
+#                   in the evidence; the CLI refuses the `enabled: true` flip on it
+#                   (`tools/evidara-cli/src/evidara_cli/gate_coverage.py`).
+#
+# Names follow Soda Core v4's `CheckOutcome.EXCLUDED` / `NOT_EVALUATED`, which draws the
+# same line and escalates only the second.
+gate_ledger_reset
+[[ "${title_checked}" -eq 1 ]] || gate_excluded "title_ok" "no_expected_title_declared"
+[[ "${body_lang_hint_checked}" -eq 1 ]] || gate_excluded "body_lang_hint_ok" "not_a_german_template"
+# indexed_language_checked=0 with _ok=1 is a gate nobody asked for; with _ok=0 it is a
+# fail-closed "could not evaluate", which the verdict already catches — so it is a
+# failure, not a coverage entry.
 if [[ "${indexed_language_checked}" -eq 0 && "${indexed_language_ok}" -eq 1 ]]; then
-  skipped_gates+=("indexed_language_ok")
+  gate_excluded "indexed_language_ok" "no_expected_language_declared"
 fi
-[[ "${indexed_title_checked}" -eq 1 ]] || skipped_gates+=("indexed_title_ok")
-skipped_gates_json="$(jq -nc '$ARGS.positional' --args "${skipped_gates[@]+"${skipped_gates[@]}"}")"
+if [[ "${indexed_title_checked}" -ne 1 ]]; then
+  if [[ "${title_checked}" -ne 1 ]]; then
+    gate_excluded "indexed_title_ok" "no_expected_title_declared"
+  else
+    # A title regex WAS declared and the gate still did not run. That is a hole, and
+    # `readback_skip_reason` names which one. It is never empty here: the read-back
+    # block sets it on every path that leaves `indexed_title_checked` at 0.
+    gate_not_evaluated "indexed_title_ok" "${readback_skip_reason:-reason_not_recorded}"
+  fi
+fi
+gate_coverage_json="$(gate_ledger_json)"
+skipped_gates_json="$(gate_ledger_names_json)"
+excluded_gates_json="$(gate_ledger_names_json excluded)"
+not_evaluated_gates_json="$(gate_ledger_names_json not_evaluated)"
 
-if [[ "${#skipped_gates[@]}" -gt 0 ]]; then
-  log "==> Gates NOT evaluated for template ${TEMPLATE_ID} — reported as skipped, not as passes (#744):"
-  for skipped_gate in "${skipped_gates[@]}"; do
-    log "    - ${skipped_gate}: skipped (not applicable)"
-  done
+if [[ "${#GATE_LEDGER[@]}" -gt 0 ]]; then
+  log "==> Gate coverage for template ${TEMPLATE_ID} — not folded into the pass count (#744):"
+  gate_ledger_log
 fi
 
 verdict="pass"
@@ -740,6 +769,9 @@ SUMMARY_JSON="$(jq -n \
   --argjson body_lang_hint_ok "${body_lang_hint_ok}" \
   --argjson body_lang_hint_checked "${body_lang_hint_checked}" \
   --argjson skipped_gates "${skipped_gates_json}" \
+  --argjson gate_coverage "${gate_coverage_json}" \
+  --argjson excluded_gates "${excluded_gates_json}" \
+  --argjson not_evaluated_gates "${not_evaluated_gates_json}" \
   --argjson indexed_language_checked "${indexed_language_checked}" \
   --argjson indexed_language_ok "${indexed_language_ok}" \
   --arg indexed_language_expected "${expected_lang}" \
@@ -788,7 +820,12 @@ SUMMARY_JSON="$(jq -n \
       lang_agreement_ok: $lang_agreement_ok,
       body_lang_hint_ok: $body_lang_hint_ok,
       body_lang_hint_checked: $body_lang_hint_checked,
+      # Retained as the union of the two lists below so every existing reader keeps
+      # working; `gate_coverage` is what says which kind each one is.
       skipped_gates: $skipped_gates,
+      gate_coverage: $gate_coverage,
+      excluded_gates: $excluded_gates,
+      not_evaluated_gates: $not_evaluated_gates,
       indexed_language_expected: $indexed_language_expected,
       indexed_language_observed: $indexed_language_observed,
       indexed_language_checked: $indexed_language_checked,
