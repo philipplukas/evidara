@@ -33,11 +33,19 @@ by name.
   markers every Swiss legal text carries (``Art.``, ``§``, ``Abs.``, ``comma``, ``cpv.``,
   ``alinéa``). A title page, an error page or a consent interstitial scores zero.
 
-Both floors are configurable (``DI_QUARANTINE_MIN_EXTRACTED_CHARS`` /
-``DI_QUARANTINE_MIN_LEGAL_MARKERS``, overridable per bundle through ``di_overrides``),
-because ADR-0047 is explicit that over-quarantine stalls ingestion and that "the honest
-minimum for a cantonal act is not the honest minimum for a one-article communal
-ordinance".
+Both floors are configurable through ``DI_QUARANTINE_MIN_EXTRACTED_CHARS`` /
+``DI_QUARANTINE_MIN_LEGAL_MARKERS``, because ADR-0047 is explicit that over-quarantine
+stalls ingestion and that "the honest minimum for a cantonal act is not the honest minimum
+for a one-article communal ordinance".
+
+**The per-source lever ADR-0047 asks for is only half-built, and the half that is missing
+is the other end.** This module reads ``di_overrides.quarantine_min_extracted_chars`` /
+``quarantine_min_legal_markers`` off the bundle manifest, and the contract schema declares
+them — but **nothing in platform-control emits ``di_overrides`` at all** (the key appears
+nowhere under ``platform-control/src``; ``events/artifact_bundle.py`` never sets it). So
+the only lever that works today is the environment variable, which moves the floor for
+every source at once. Do not read the ``di_overrides`` support here as a live per-source
+control: it is the receiving half of a wire whose sending half does not exist yet.
 
 **Marker vocabulary drift.** ADR-0047 §Context: the vocabulary and threshold "should be
 reused from ``content_gate``, not reimplemented — the two must not drift into separate
@@ -49,22 +57,38 @@ marker this module does not have. Superset, not equal, because the acquisition g
 ever meets HTML from portals whose vocabulary is DE/IT, while this gate meets the whole
 of LexFind — 26 cantons plus Bund, so DE/FR/IT.
 
+The *threshold* deliberately differs from upstream's, on measured evidence; see
+:data:`DEFAULT_MIN_LEGAL_MARKERS`. The relation the drift test pins is that this gate is
+never **stricter** than acquisition — a DI floor above `content_gate`'s would withhold a
+document acquisition had already accepted as law.
+
 **Which modalities the legal-text floors apply to.** Exactly the complement of
 ``content_gate._ASSESSABLE_CONTENT_TYPES`` — every content type acquisition's gate
-abstained on. Today that is ``application/pdf`` (the case ADR-0047 names) and the other
-non-HTML/XML modalities the pipeline can normalise. HTML and XML were already judged by
-``content_gate`` at capture, so re-judging them here would be a second opinion on a
-settled question rather than a gate on an unguarded one; ``tests/test_quarantine.py``
-fails if the upstream set changes, because either direction of drift opens a hole — a
-modality judged twice, or one judged by nobody.
+*could* assess. Today that is ``application/pdf`` (the case ADR-0047 names) and the other
+non-HTML/XML modalities the pipeline can normalise. HTML and XML are skipped here on the
+theory that ``content_gate`` judged them at capture.
+
+**That theory is only true for three providers, and this is the biggest hole left.**
+``assess_legal_text_density`` has exactly two call sites: ``portal_http_provider_base.py``
+(so every provider that *inherits* it) and ``lexfind_api_provider.py``, which is the
+deliberate abstain. Only ``CantonHttpProvider``, ``BundeslandHttpProvider`` and
+``RegioneHttpProvider`` extend that base. ``GemeindeHttpProvider`` (the municipal rung),
+``FedlexSparqlProvider`` (the federal rung), ``RisOgdProvider``, ``LegifranceProvider``,
+``EurLexSparqlProvider``, ``ChCourtDecisionsProvider``, ``DeterministicHttpProvider``,
+``FirecrawlProvider`` and ``CassetteProvider`` are all plain classes. So HTML/XML from ~10
+of 13 providers is marker-checked by **neither** gate, and ``normalize/html.py``'s
+tag-stripping fallback guarantees ``no_sections_extracted`` will not fire on it either.
+
+State it plainly: **the text-level invariant currently holds for PDF and not for HTML.**
+The exemption below is keyed on *content type* while the real coverage depends on
+*provider class*, so the drift test cannot see this widen — which is why it is written
+down here instead. Closing it means either wiring ``content_gate`` into the remaining
+providers (platform-control) or dropping the HTML exemption here, and the second is a
+deliberate, measurable coverage drop that ADR-0047 says must be communicated before it is
+measured, not slipped in.
 
 Two structural checks — ``no_text_layer`` and ``no_sections_extracted`` — run on **every**
 modality, because nothing upstream performs them at all.
-
-Known residual gap, stated rather than papered over: ``content_gate`` is wired into
-``portal_http_provider_base`` only, so an HTML capture from a provider that is not a
-portal HTTP provider is marker-checked by neither gate. Closing that belongs in
-platform-control, not here.
 """
 
 from __future__ import annotations
@@ -132,17 +156,41 @@ _LEGAL_MARKER_RE = re.compile(LEGAL_MARKER_PATTERN, re.IGNORECASE)
 # them instead of overlapping or leaving a hole.
 UPSTREAM_ASSESSED_CONTENT_TYPES = frozenset({"text/html", "application/xhtml+xml", "application/xml", "text/xml"})
 
-# `content_gate.DEFAULT_MIN_LEGAL_MARKERS`, and before that the Fedlex canary's
-# `art_density >= 3`. A statute clears it on its first page; a navigation shell, a cover
-# sheet or a consent interstitial scores zero.
-DEFAULT_MIN_LEGAL_MARKERS = 3
+# **Not** `content_gate`'s 3, and the divergence is measured rather than chosen.
+#
+# The upstream gate judges a whole *HTML portal page*, where the failure mode is a
+# script-heavy navigation shell and marker density is high. This floor judges the extracted
+# text of a *single PDF manifestation*, and the shortest real law in this repo is a
+# municipal dog-tax decision of ~700 characters. Measured on the BS LexFind acceptance
+# evidence (`tests/fixtures/bs_municipal_hundesteuer.json`, both in force):
+#
+#   Bettingen, Festsetzung der Hundesteuer     960 chars   3 markers   (2 without furniture)
+#   Riehen, Festsetzung der Hundesteuer       1001 chars   3 markers   (2 without furniture)
+#   Regierungsratsbeschluss, gefährliche Hunde 871 chars   5 markers   (4 without furniture)
+#
+# A floor of 3 puts the first two *exactly on* it — zero headroom — and their third marker
+# is the word `Artikel` inside LexFind's own change-table boilerplate ("Änderungstabelle -
+# Nach Artikel"), which is furniture, not legal structure. Strip the change table (a
+# first-enactment record without one, another canton's template, a marginalia filter that
+# drops it) and both fall to **2** and are withheld. That is the municipal rung of
+# ADR-0033's own dog question being silently deleted from the corpus by its guard.
+#
+# So the honest question this floor answers is "does this text carry *any* legal structure
+# at all", and the populations separate cleanly there: real law measures 2 at its worst,
+# while a cover page, an error page and a consent interstitial all measure 0. One gives the
+# shortest real law 2x headroom and still refuses every zero-marker interstitial.
+#
+# The relation to `content_gate` that matters is therefore **not stricter than upstream**,
+# not equal to it — a DI floor above acquisition's would withhold a document acquisition
+# already accepted as law. `tests/test_quarantine.py` pins that direction.
+DEFAULT_MIN_LEGAL_MARKERS = 1
 
-# Measured, not guessed. The ZH Hundeverordnung (AS 554.510, `tests/fixtures/`) — the
-# cantonal rung of ADR-0033's dog question and among the shorter real acts — normalises
-# to 3 080 characters of body text. A one-article communal ordinance is an order of
-# magnitude shorter than that, so the floor sits an order of magnitude below it again:
-# low enough that genuine short law is never refused, high enough that an image-only PDF
-# (0 characters) and a cover sheet cannot pass.
+# Measured, not guessed, and calibrated on the *shortest* real law rather than the
+# cantonal act: the smallest genuine document above is 871 characters, so a floor of 200
+# leaves roughly 4x headroom. (The ZH Hundeverordnung, `tests/fixtures/zh_as_554_510.pdf`,
+# normalises to 3 080 characters — but calibrating on it would have been calibrating on the
+# comfortable case.) Low enough that a one-article communal ordinance is never refused,
+# high enough that an image-only PDF (0 characters) and a cover sheet cannot pass.
 DEFAULT_MIN_EXTRACTED_CHARS = 200
 
 # Keys read from the bundle manifest's `di_overrides`. ADR-0047: "Floors are therefore
@@ -161,8 +209,12 @@ class QuarantineThresholds:
     def with_overrides(self, di_overrides: Mapping[str, Any] | None) -> QuarantineThresholds:
         """Apply a bundle's per-source floors, ignoring anything not a non-negative int.
 
-        A malformed override must not silently *lower* a floor, so anything that does not
-        parse as a non-negative integer leaves the configured default in place.
+        A *malformed* override must not silently lower a floor, so anything that does not
+        parse as a non-negative integer leaves the configured default in place. A
+        well-formed ``0`` is a different thing and is honoured: it turns that floor off for
+        the source. That is a supported escape hatch — ADR-0047 is explicit that
+        over-quarantine stalls ingestion — but it is a real off switch, so read a `0` here
+        as "this source's floor is disabled", not as "no override was given".
         """
         if not di_overrides:
             return self

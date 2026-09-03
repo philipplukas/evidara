@@ -6,6 +6,10 @@ import unittest.mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from document_intelligence.config.runtime import RuntimeSettings, SurfaceUris
+from document_intelligence.normalize.quarantine import (
+    DEFAULT_MIN_EXTRACTED_CHARS,
+    DEFAULT_MIN_LEGAL_MARKERS,
+)
 from document_intelligence.persist.surfaces import (
     PROCESSING_MANIFESTS,
     PUBLISHED_COMMENTARY_INSIGHTS,
@@ -94,9 +98,12 @@ class RuntimeSettingsTests(unittest.TestCase):
         # invariant, and an operator narrows the floors deliberately rather than by
         # forgetting to set them.
         defaults = RuntimeSettings.from_mapping({})
-        self.assertEqual(defaults.quarantine_min_extracted_chars, 200)
-        self.assertEqual(defaults.quarantine_min_legal_markers, 3)
-        self.assertEqual(defaults.quarantine_thresholds.min_extracted_chars, 200)
+        self.assertEqual(defaults.quarantine_min_extracted_chars, DEFAULT_MIN_EXTRACTED_CHARS)
+        self.assertEqual(defaults.quarantine_min_legal_markers, DEFAULT_MIN_LEGAL_MARKERS)
+        self.assertEqual(
+            defaults.quarantine_thresholds.min_extracted_chars,
+            DEFAULT_MIN_EXTRACTED_CHARS,
+        )
 
         configured = RuntimeSettings.from_mapping(
             {

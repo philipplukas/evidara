@@ -1,0 +1,13 @@
+{
+  "_provenance": "Extracted body text of two real, in-force municipal dog-tax decisions, copied verbatim from the BS LexFind acceptance evidence at docs/runbooks/evidence/2026-07-28-ch-canton-bs-lexfind-acceptance/. Both were captured as application/pdf via the lexfind_api provider, so both take the quarantine gate's below_content_floor path. They are the shortest real law the repo holds and therefore the calibration case for ADR-0047's floors.",
+  "documents": {
+    "bettingen": {
+      "title": "Beschluss der Einwohnergemeindeversammlung betreffend Festsetzung der Hundesteuer",
+      "text": "Beschluss der Einwohnergemeindeversammlung betreffend Festsetzung der Hundesteuer\n\nVom 7. Dezember 1993 (Stand 1. Januar 1994)\n\nDie Einwohnergemeindeversammlung Bettingen, gestützt auf § 2 Abs. 3 des Gesetzes betreffend das Halten von Hunden vom 21. Januar 1982 1) , auf Antrag des Gemeinderates, beschliesst:\n\nDie Hundesteuer wird auf Fr. 120.– für den ersten Hund und damit auf Fr. 240.– für jeden weiteren Hund je Person oder Haushalt oder Betrieb festgelegt.\n\nDieser Beschluss ist zu publizieren; er wird am 1. Januar 1994 wirksam. Gleichzeitig wird der Beschluss der Einwohner-Gemeindeversammlung betreffend die Festsetzung der Hundesteuer vom 30. März 1982 aufgehoben.\n\nÄnderungstabelle - Nach Beschluss\n\nBeschluss Inkrafttreten Element Änderung Fundstelle\n\n07.12.1993 01.01.1994 Erlass Erstfassung KB 15.12.1993\n\nÄnderungstabelle - Nach Artikel\n\nElement Beschluss Inkrafttreten Änderung Fundstelle\n\nErlass 07.12.1993 01.01.1994 Erstfassung KB 15.12.1993"
+    },
+    "riehen": {
+      "title": "Beschluss des Einwohnerrates betreffend Festsetzung der Hundesteuer 1)",
+      "text": "Beschluss des Einwohnerrates betreffend Festsetzung der Hundesteuer 1)\n\nVom 17. Dezember 1997 (Stand 1. April 1998)\n\nDer Einwohnerrat Riehen beschliesst, gestützt auf § 2 Abs. 2 des Gesetzes betreffend das Halten von Hunden vom 21. Januar 1982 2) , auf Antrag des Gemeinderates:\n\nDie Hundesteuer wird auf Fr. 150.– für den ersten und auf Fr. 300.– für jeden weiteren Hund je Person, Haushalt oder Betrieb festgelegt.\n\nDieser Beschluss ist zu publizieren; er unterliegt dem Referendum und der Genehmigung durch den Regierungsrat und wird nach Eintritt der Rechtskraft am 1. April 1998 wirksam. Gleichzeitig wird der Beschluss des Einwohnerrates betreffend Festsetzung der Hundesteuer von 24. Oktober 1990 aufgehoben.\n\nÄnderungstabelle - Nach Beschluss\n\nBeschluss Inkrafttreten Element Änderung Fundstelle\n\n17.12.1997 01.04.1998 Erlass Erstfassung KB 11.02.1998\n\nÄnderungstabelle - Nach Artikel\n\nElement Beschluss Inkrafttreten Änderung Fundstelle\n\nErlass 17.12.1997 01.04.1998 Erstfassung KB 11.02.1998"
+    }
+  }
+}

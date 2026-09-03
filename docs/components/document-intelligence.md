@@ -76,11 +76,27 @@ The reason vocabulary is closed (ADR-0047 §3) and mirrored in
 `contracts/schemas/processing-manifest.schema.json`.
 
 **Configuration.** Both floors default on — `DI_QUARANTINE_MIN_EXTRACTED_CHARS` (200) and
-`DI_QUARANTINE_MIN_LEGAL_MARKERS` (3, the same threshold and marker vocabulary as
-`content_gate`). A bundle narrows them per source via
-`di_overrides.quarantine_min_extracted_chars` / `di_overrides.quarantine_min_legal_markers`,
-because the honest minimum for a cantonal act is not the honest minimum for a one-article
-communal ordinance. A malformed override never lowers a floor.
+`DI_QUARANTINE_MIN_LEGAL_MARKERS` (1). The marker floor deliberately differs from
+`content_gate`'s 3, on measured evidence: the shortest real law this repo holds (the BS
+municipal dog-tax decisions, `tests/fixtures/bs_municipal_hundesteuer.json`) carries **two**
+genuine markers, and scored three only because of `Artikel` inside LexFind's change-table
+boilerplate. A floor of 3 had zero headroom against real municipal law. The relation that
+is enforced is that DI is never *stricter* than acquisition.
+
+DI also reads per-source floors from `di_overrides.quarantine_min_extracted_chars` /
+`di_overrides.quarantine_min_legal_markers`, but **no producer emits them** —
+`di_overrides` is set nowhere in `platform-control/src`. Until one exists, the only live
+control is the environment variable, which moves the floor for every source at once. A
+malformed override leaves the configured floor in place; an explicit `0` disables that
+floor, which is a supported escape hatch, not a bug.
+
+**Scope, stated plainly: the text-level invariant holds for PDF, not for HTML.** The
+legal-text floors skip HTML/XML on the theory that `content_gate` judged them at capture,
+but `assess_legal_text_density` is only reached by the three providers inheriting
+`PortalHttpProviderBase` (Canton/Bundesland/Regione). Fedlex, Gemeinde, RIS, Legifrance,
+EUR-Lex and the rest are plain classes, so their HTML is marker-checked by neither gate.
+Closing this means wiring `content_gate` into the remaining providers, or dropping the DI
+exemption — the latter is a deliberate, measurable coverage drop.
 
 **Visibility.** `di_quarantined_documents_total{reason}` (Prometheus, on the consumers'
 existing `/metrics`), a `document_quarantined` structured log line, the consumer outcome

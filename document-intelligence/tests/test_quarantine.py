@@ -46,6 +46,7 @@ from support import build_bundle_event, build_manifest_payload
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CONTENT_GATE = _REPO_ROOT / "platform-control" / "src" / "acquisition_core" / "content_gate.py"
 _REAL_STATUTE_PDF = Path(__file__).resolve().parent / "fixtures" / "zh_as_554_510.pdf"
+_MUNICIPAL_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "bs_municipal_hundesteuer.json"
 
 _PDF_PARSER_HINTS = {
     "expected_modalities": ["pdf"],
@@ -163,6 +164,23 @@ class AssessQuarantineTests(unittest.TestCase):
         self.assertEqual(thresholds.min_extracted_chars, DEFAULT_MIN_EXTRACTED_CHARS)
         self.assertEqual(thresholds.min_legal_markers, DEFAULT_MIN_LEGAL_MARKERS)
 
+    def test_an_explicit_zero_is_an_off_switch_and_not_a_rejected_override(self) -> None:
+        """Distinct from the malformed case above, and worth pinning so nobody reads
+        "malformed overrides fail closed" as "the floor cannot be switched off". It can."""
+        thresholds = QuarantineThresholds().with_overrides(
+            {"quarantine_min_extracted_chars": 0, "quarantine_min_legal_markers": 0}
+        )
+        self.assertEqual(thresholds.min_extracted_chars, 0)
+        self.assertEqual(thresholds.min_legal_markers, 0)
+
+        long_prose_without_law = "Cookie notice and nothing else at all. " * 20
+        verdict = assess_quarantine(
+            normalized_document=_ir(long_prose_without_law),
+            content_type="application/pdf",
+            thresholds=thresholds,
+        )
+        self.assertFalse(verdict.quarantined)
+
 
 class MarkerVocabularyDriftTests(unittest.TestCase):
     """ADR-0047: the two gates "must not drift into separate opinions about what law
@@ -188,21 +206,103 @@ class MarkerVocabularyDriftTests(unittest.TestCase):
             f"accepted as law would be quarantined here for lacking them — {missing}",
         )
 
-    def test_upstream_default_threshold_is_the_di_default(self) -> None:
+    def test_this_gate_is_never_stricter_than_acquisition(self) -> None:
+        """The thresholds legitimately differ — the relation is what must hold.
+
+        `content_gate` judges a whole HTML portal page; this gate judges the extracted text
+        of one PDF manifestation, and the shortest real law in the repo carries two markers
+        (see `MunicipalLawHeadroomTests`). What must never happen is a DI floor *above*
+        acquisition's: acquisition would accept a document as law and DI would then withhold
+        it, which is a contradiction the corpus cannot express.
+        """
         source = self._content_gate_source()
         match = re.search(r"DEFAULT_MIN_LEGAL_MARKERS = (\d+)", source)
         self.assertIsNotNone(match)
-        self.assertEqual(int(match.group(1)), DEFAULT_MIN_LEGAL_MARKERS)
+        self.assertLessEqual(
+            DEFAULT_MIN_LEGAL_MARKERS,
+            int(match.group(1)),
+            "DI's marker floor is stricter than acquisition's, so a capture accepted as law "
+            "upstream would be quarantined here",
+        )
 
-    def test_the_two_gates_partition_the_modality_space(self) -> None:
-        """DI's floors cover exactly what `content_gate` abstains on. If the upstream set
-        grows, this gate would start re-judging a modality acquisition now handles; if it
-        shrinks, a modality would fall between the two and be judged by nobody."""
+    def test_di_exempts_exactly_the_content_types_content_gate_can_assess(self) -> None:
+        """Pins the *content-type* set this module skips against the upstream one.
+
+        Deliberately named for what it actually checks. It does **not** prove the two gates
+        partition anything: `assess_legal_text_density` is only reached by the three
+        providers that inherit `PortalHttpProviderBase`, so HTML/XML from ~10 of 13
+        providers — Fedlex and Gemeinde among them — is marker-checked by neither gate. That
+        hole is keyed on provider class, is invisible to this assertion, and is written down
+        in the module docstring instead. An earlier version of this test was named for a
+        partition that does not exist, which would have let the gap widen under a green run.
+        """
         source = self._content_gate_source()
         match = re.search(r"_ASSESSABLE_CONTENT_TYPES = frozenset\(\s*\{(.*?)\}", source, re.DOTALL)
         self.assertIsNotNone(match)
         upstream = set(re.findall(r"\"([^\"]+)\"", match.group(1)))
         self.assertEqual(upstream, set(UPSTREAM_ASSESSED_CONTENT_TYPES))
+
+
+class MunicipalLawHeadroomTests(unittest.TestCase):
+    """The floors must admit the *shortest real law the repo holds*, not just a cantonal act.
+
+    These two documents are in-force municipal dog-tax decisions — the municipal rung of
+    ADR-0033's own dog question — captured as `application/pdf` via `lexfind_api`, so they
+    take exactly the `below_content_floor` path this gate added. At the original floor of 3
+    markers they sat *exactly on* it, and their third marker was the word `Artikel` inside
+    LexFind's change-table boilerplate. Any rendering without that table withheld genuine
+    law. This is the regression test for that.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        payload = json.loads(_MUNICIPAL_FIXTURE.read_text(encoding="utf-8"))
+        cls.documents = payload["documents"]
+
+    def _assert_admitted(self, text: str, label: str) -> None:
+        verdict = assess_quarantine(normalized_document=_ir(text), content_type="application/pdf")
+        self.assertFalse(
+            verdict.quarantined,
+            f"{label} is real law in force and was withheld: {verdict.reason} — {verdict.detail}",
+        )
+
+    def test_real_municipal_ordinances_are_admitted(self) -> None:
+        for key, document in self.documents.items():
+            with self.subTest(document=key):
+                self._assert_admitted(document["text"], document["title"])
+
+    def test_they_are_still_admitted_without_the_lexfind_change_table(self) -> None:
+        """The headroom has to survive the boilerplate going away.
+
+        `Änderungstabelle - Nach Artikel` is furniture, and the `Artikel` in it is why these
+        documents scored 3 rather than their genuine 2. A first-enactment record, another
+        canton's template, or a marginalia filter that drops the table must not turn a
+        published ordinance into a quarantined one.
+        """
+        for key, document in self.documents.items():
+            with self.subTest(document=key):
+                body = document["text"].split("Änderungstabelle")[0]
+                self.assertIn("Änderungstabelle", document["text"], "fixture no longer has the table")
+                self.assertEqual(
+                    count_legal_markers(body),
+                    2,
+                    "the genuine structural-marker count of these ordinances changed; "
+                    "re-derive the floor before touching it",
+                )
+                self._assert_admitted(body, f"{document['title']} (change table stripped)")
+
+    def test_the_floor_still_refuses_a_zero_marker_interstitial(self) -> None:
+        """Lowering the floor must not make it decorative: the population it separates is
+        real law (>= 2 markers measured) from chrome (0 measured)."""
+        interstitial = (
+            "Diese Website verwendet Cookies, um Ihnen die bestmoegliche Nutzung zu "
+            "ermoeglichen. Bitte bestaetigen Sie Ihre Auswahl, bevor Sie fortfahren. "
+            "Weitere Informationen finden Sie in unserer Datenschutzerklaerung sowie "
+            "in den Nutzungsbedingungen dieses Portals."
+        )
+        verdict = assess_quarantine(normalized_document=_ir(interstitial), content_type="application/pdf")
+        self.assertTrue(verdict.quarantined)
+        self.assertEqual(verdict.reason, "below_content_floor")
 
 
 class QuarantinePipelineTests(unittest.TestCase):
@@ -289,9 +389,14 @@ class QuarantinePipelineTests(unittest.TestCase):
         )
 
     def test_a_per_source_floor_from_di_overrides_reaches_the_gate(self) -> None:
-        """ADR-0047: floors are per-source config. A floor above the real ordinance
-        withholds it, which proves the override is wired end to end — nothing else about
-        this document changed."""
+        """Proves the **DI half** of ADR-0047's per-source lever, and only that half.
+
+        Nothing in platform-control emits `di_overrides` — the key appears nowhere under
+        `platform-control/src` — so no real bundle carries these floors today. This asserts
+        that when a producer exists the value arrives at the gate; it is not evidence that
+        an operator can narrow a floor per source. The only live control is the
+        environment-wide `DI_QUARANTINE_MIN_*`.
+        """
         result, sink = self._process_pdf(
             _REAL_STATUTE_PDF.read_bytes(),
             di_overrides={"quarantine_min_extracted_chars": 1_000_000},

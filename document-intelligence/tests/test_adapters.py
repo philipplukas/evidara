@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from document_intelligence.canonical.models import CommentaryInsight
 from document_intelligence.contracts.envelope import ManifestRef
 from document_intelligence.ingest.loaders import GcsBundleLoader
+from document_intelligence.normalize.quarantine import DEFAULT_MIN_LEGAL_MARKERS
 from document_intelligence.persist.sinks import DeltaCanonicalSink, DeltaSinkConfig
 from document_intelligence.pipeline import ProcessingPipeline
 from support import (
@@ -165,6 +166,51 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             )
             self.assertEqual(len(sink.status_events), 3)
             self.assertEqual(len(sink.document_processed_events), 1)
+
+    def test_quarantine_reason_survives_a_real_delta_write(self) -> None:
+        """The reason must survive the *production* sink, not just the in-memory one.
+
+        `_delta_ready_rows` projects every row to exactly `always_present_keys`, so a column
+        outside that set is dropped on the way to Delta — which is what happened to the
+        quarantine block, invisibly, because `InMemoryCanonicalSink` keeps the whole model
+        object and every other test uses it. A quarantine whose slug does not reach storage
+        is silent failure with extra steps (ADR-0047 §6), so this test writes a real table
+        and reads it back.
+
+        The canonical-ready row is written **first**, deliberately: it pins the other half
+        of the bug. Forcing `quarantine`/`failure` always-present makes that row carry a
+        PyArrow `null` column, which deltalake refuses outright ("Invalid data type for
+        Delta Lake: Null") — so a naive fix trades a lost reason for a dead publish path.
+        """
+        import deltalake
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifests_uri = os.path.join(temp_dir, "processing_manifests")
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=manifests_uri,
+                )
+            )
+
+            published = build_processing_result()
+            sink.persist(published.document, published.sections, published.manifest)
+
+            quarantined = build_quarantined_processing_result(sink=sink)
+            self.assertTrue(quarantined.is_quarantined)
+
+            rows = deltalake.DeltaTable(manifests_uri).to_pyarrow_table().to_pylist()
+            by_status = {row["status"]: row for row in rows}
+            self.assertEqual(set(by_status), {"canonical_ready", "quarantined"})
+
+            quarantine = by_status["quarantined"]["quarantine"]
+            self.assertEqual(quarantine["reason"], "no_text_layer")
+            self.assertIn("OCR", quarantine["detail"])
+            self.assertEqual(quarantine["extracted_chars"], 0)
+            self.assertEqual(quarantine["min_legal_markers"], DEFAULT_MIN_LEGAL_MARKERS)
+            # A published row carries no quarantine, and writing it did not fail.
+            self.assertIsNone(by_status["canonical_ready"]["quarantine"])
 
     def test_latest_document_revision_reads_back_published_history(self) -> None:
         # The read side of #652: the pipeline asks the sink what it already published so a
@@ -326,6 +372,49 @@ def build_processing_result(
 
     try:
         return ProcessingPipeline(processing_version="di_2026_03_29").process_event(build_bundle_event(manifest_path))
+    finally:
+        os.unlink(artifact_path)
+        os.unlink(manifest_path)
+
+
+def build_quarantined_processing_result(*, sink=None):
+    """Run a valid, text-layer-free PDF through the pipeline (ADR-0047 `no_text_layer`)."""
+    import io
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas as reportlab_canvas
+
+    buffer = io.BytesIO()
+    canvas = reportlab_canvas.Canvas(buffer, pagesize=A4)
+    canvas.rect(100, 400, 300, 200, stroke=1, fill=1)
+    canvas.showPage()
+    canvas.save()
+
+    with tempfile.NamedTemporaryFile("wb", suffix=".pdf", delete=False) as pdf_handle:
+        pdf_handle.write(buffer.getvalue())
+        artifact_path = pdf_handle.name
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+        json.dump(
+            build_manifest_payload(
+                artifact_path,
+                artifact_role="primary_document",
+                content_type="application/pdf",
+                parser_hints={
+                    "expected_modalities": ["pdf"],
+                    "expected_content_types": ["application/pdf"],
+                    "preferred_primary_artifact_roles": ["primary_document"],
+                    "ocr_expected": False,
+                    "attachment_policy": "ignore",
+                },
+            ),
+            manifest_handle,
+        )
+        manifest_path = manifest_handle.name
+
+    try:
+        pipeline = ProcessingPipeline(sink=sink, processing_version="di_2026_09_03")
+        return pipeline.process_event(build_bundle_event(manifest_path))
     finally:
         os.unlink(artifact_path)
         os.unlink(manifest_path)

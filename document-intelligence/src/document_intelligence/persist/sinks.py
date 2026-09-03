@@ -72,6 +72,21 @@ _PROCESSING_MANIFESTS_DELTA_KEYS = frozenset(
         "canonical_ready_at",
     }
 )
+# Columns that exist only on a row nobody publishes: `failure` on a failed result,
+# `quarantine` on a withheld one (ADR-0047). They are deliberately NOT in the set above.
+#
+# `_delta_ready_rows` projects every row to *exactly* `always_present_keys`, so a column
+# outside that set is dropped on the way to Delta/Iceberg/Spark whatever the model carries
+# — which is how a quarantine reason survived in `InMemoryCanonicalSink` (every test) and
+# vanished in every deployed configuration. But putting them in the always-present set is
+# not the fix either: on a canonical-ready row both are `None`, PyArrow infers a `null`
+# column, and deltalake refuses the whole write with *"Invalid data type for Delta Lake:
+# Null"* — that would take the publish path down, not just the reason.
+#
+# So they are added to the projection **per batch, only when a row carries one**, exactly
+# as `extensions` is dropped from it when no row carries one. A present value is a real
+# struct, so Arrow types it, and `schema_mode="merge"` evolves the table on first sight.
+_PROCESSING_MANIFESTS_CONDITIONAL_KEYS = frozenset({"failure", "quarantine"})
 _PUBLISHED_COMMENTARY_INSIGHTS_DELTA_KEYS = frozenset(
     {
         "insight_id",
@@ -840,11 +855,24 @@ def _projection_keys_for_rows(
     rows: Sequence[dict[str, object]],
     always_present_keys: frozenset[str] | None,
 ) -> frozenset[str] | None:
-    if always_present_keys != _PUBLISHED_DOCUMENTS_DELTA_KEYS:
-        return always_present_keys
-    if any(isinstance(row.get("extensions"), dict) and row["extensions"] for row in rows):
-        return always_present_keys
-    return frozenset(key for key in always_present_keys if key != "extensions")
+    if always_present_keys == _PUBLISHED_DOCUMENTS_DELTA_KEYS:
+        if any(isinstance(row.get("extensions"), dict) and row["extensions"] for row in rows):
+            return always_present_keys
+        return frozenset(key for key in always_present_keys if key != "extensions")
+    if always_present_keys == _PROCESSING_MANIFESTS_DELTA_KEYS:
+        # Widen, rather than narrow: `failure` and `quarantine` join the projection only for
+        # a batch that actually carries one. Forcing them always-present would write a
+        # PyArrow `null` column on every canonical-ready row, which deltalake rejects
+        # outright ("Invalid data type for Delta Lake: Null") — taking down the publish path
+        # to preserve a reason. Leaving them out entirely is what silently discarded the
+        # quarantine slug in every non-in-memory sink. See the constant's comment.
+        present = frozenset(
+            key
+            for key in _PROCESSING_MANIFESTS_CONDITIONAL_KEYS
+            if any(isinstance(row.get(key), dict) and row[key] for row in rows)
+        )
+        return always_present_keys | present
+    return always_present_keys
 
 
 def _delta_ready_rows(

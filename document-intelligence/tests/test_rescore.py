@@ -101,6 +101,51 @@ class RescoreTargetedTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome, "failed")
         self.assertIsNone(run_id)
 
+    async def test_quarantined_reextraction_does_not_crash_and_does_not_persist(self) -> None:
+        """A rescore whose re-extraction now quarantines must not dereference a null document.
+
+        `_target_changed` -> `_candidate_document_semantic` reads `candidate.document`, which
+        is `None` exactly when quarantined (ADR-0047). Without the guard this raised
+        `AttributeError` into `rescore_targeted`'s blanket `except Exception`, so the
+        correction workflow recorded a bare "failed" with the real reason nowhere — for the
+        one condition ADR-0047 says must never be conflated with failure.
+
+        `text/plain` because the legal-text floors apply to the modalities `content_gate`
+        abstains on; the tightened floor models an operator narrowing it after publication.
+        """
+        legal_text = (
+            "Art. 1 Abs. 1 Dieses Gesetz regelt die Erhebung und Bearbeitung von "
+            "personenbezogenen Daten durch die zustaendigen Behoerden des Bundes.\n"
+            "Art. 2 Abs. 1 Es gilt fuer alle Bundesstellen sowie fuer beauftragte "
+            "Dritte, soweit keine besonderen Bestimmungen entgegenstehen.\n"
+        )
+        with _bundle(legal_text, content_type="text/plain") as event:
+            published = build_processing_pipeline(runtime_settings=RuntimeSettings.from_mapping({})).process_event(
+                event
+            )
+            self.assertFalse(published.is_quarantined)
+            store = _store_from_result(published)
+
+            tightened = RuntimeSettings.from_mapping({"DI_QUARANTINE_MIN_EXTRACTED_CHARS": "1000000"})
+            with self.assertLogs("document_intelligence.rescore", level="WARNING") as logs:
+                outcome, run_id = await rescore_targeted(
+                    target_entity_type="document",
+                    target_entity_id=published.document.document_id,
+                    correction_id="cor_01jq7000000000000000000009",
+                    runtime_settings=tightened,
+                    surface_store=store,
+                    persist_changes=True,
+                )
+
+        self.assertEqual(outcome, "failed")
+        self.assertIsNone(run_id)
+        # The reason is named, not swallowed — and it is a quarantine, not a crash.
+        self.assertTrue(any("targeted_rescore_quarantined" in line for line in logs.output))
+        self.assertFalse(
+            any("AttributeError" in line for line in logs.output),
+            "the quarantined candidate was dereferenced instead of being handled",
+        )
+
     async def test_invalid_manifest_returns_failed(self) -> None:
         with _bundle("<html><body><h1>A</h1><p>B</p></body></html>") as event:
             result = build_processing_pipeline(runtime_settings=RuntimeSettings.from_mapping({})).process_event(event)
@@ -166,9 +211,16 @@ def _store_from_result(
 
 
 class _bundle:
-    def __init__(self, html: str, *, document_type_hint: str = "statute") -> None:
+    def __init__(
+        self,
+        html: str,
+        *,
+        document_type_hint: str = "statute",
+        content_type: str = "text/html",
+    ) -> None:
         self._html = html
         self._document_type_hint = document_type_hint
+        self._content_type = content_type
         self._temp_dir: tempfile.TemporaryDirectory[str] | None = None
 
     def __enter__(self) -> dict[str, Any]:
@@ -177,7 +229,11 @@ class _bundle:
         manifest_path = os.path.join(self._temp_dir.name, "bundle-manifest.json")
         with open(artifact_path, "w", encoding="utf-8") as handle:
             handle.write(self._html)
-        manifest = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        manifest = build_manifest_payload(
+            artifact_path,
+            artifact_role="primary_document",
+            content_type=self._content_type,
+        )
         manifest["source_defaults"]["document_type_hint"] = self._document_type_hint
         if self._document_type_hint == "commentary":
             manifest["source_defaults"]["authority_id"] = "auth_commentary_publisher"
