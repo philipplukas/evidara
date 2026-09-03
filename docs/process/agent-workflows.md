@@ -57,12 +57,23 @@ Several workflows run per-surface gates. They use the table in
 [`CLAUDE.md` § Per-surface quality gates](../../CLAUDE.md), which is the CI-equivalent set, and they
 report `PASS` / `FAIL` / `DID-NOT-RUN` as three distinct outcomes. That third outcome is the point:
 a gate that fell over during setup did not pass, and this repo has a documented collection of ways
-a gate reads green while running nothing — the wrong Node major, a missing `pyyaml` reporting
-`Ran 144 tests ... FAILED (errors=11)` when the suite is 201, so that 57 tests that never ran read
-as 11 that broke; missing `document-intelligence` extras dropping a test module at collection; an
-absent Docker daemon skipping the only layer that meets a real index mapping; a fresh worktree that
-inherits no `node_modules`; and `scripts/check_country_overlay_files.py` exiting 2 on argparse when
-its required `--country` is omitted.
+a gate's result misreports what it actually did:
+
+- the wrong Node major, which makes every Vitest result dishonest while still exiting 0;
+- a missing `pyyaml` reporting `Ran 144 tests ... FAILED (errors=11)` when the suite is 201, so
+  57 tests that never ran read as 11 that broke;
+- missing `document-intelligence` extras dropping a whole test module at collection;
+- an absent Docker daemon skipping the only layer that meets a real index mapping;
+- `scripts/check-platform-control.sh` wrapping its entire admin half in
+  `if [[ -f admin/package.json ]]` (`:18`), which skips it **silently** and still exits 0;
+- `scripts/check_country_overlay_files.py` exiting 2 on argparse when its required `--country` is
+  omitted, having checked nothing.
+
+The counter-example is worth stating too, because it is the shape to aim for: missing
+`platform-control/admin/node_modules` in a fresh worktree used to be one of these, and is not any
+more — `check-platform-control.sh:36-42` detects it, prints the checkout path and the exact
+`npm ci` remedy, and exits non-zero. A gate that cannot run should say so loudly; the workflows
+exist for the ones that do not.
 
 Note that [`.claude/commands/merge-readiness.md`](../../.claude/commands/merge-readiness.md) carries
 an **older, narrower** gate table — it prescribes `cd platform-control && uv run pytest`, which

@@ -275,13 +275,32 @@ LexFind entities instead — the same scaling question against a provider that w
 ## Known gap
 
 **Design review of routes that have no committed baseline.** `visual-critique.js` can only see what
-is in the snapshot directory. Capturing a route at two widths in both themes needs a running app,
-and the infrastructure exists — `scripts/playwright-visual-update-docker.sh`, the `run-admin-panel`
-skill's prod-build-plus-Playwright recipe, `legal-search/frontend/e2e/helpers/visual-stability.ts`.
-Wiring a capture phase in front of the critique is a real, buildable extension. It is deliberately
-not in this PR: it would be the first workflow here to start services, and that deserves its own
-review rather than riding along. Until it exists, this catalogue says nothing about focus
-visibility, keyboard reachability, hover states or dark mode.
+is in the snapshot directory (`args.snapshotDir` repoints it, but something else must fill the
+directory). Capturing a route at two widths in both themes needs a running app.
+
+This gap is narrower than it looks: a parallel lane has now demonstrated the capture end to end,
+bringing the admin up and taking 47 screenshots across three viewports, and the infrastructure is
+all present — `scripts/playwright-visual-update-docker.sh`, the `run-admin-panel` skill's
+prod-build-plus-Playwright recipe, `legal-search/frontend/e2e/helpers/visual-stability.ts`. Wiring a
+capture phase in front of the critique is a real, buildable extension. It is deliberately not in
+this PR: it would be the first workflow here to start services, and that deserves its own review
+rather than riding along.
+
+**Two preconditions that lane established the hard way**, recorded here so the next person does not
+rediscover them — and already encoded as rubric **R4a** in `visual-critique.js`, because both
+produce screenshots that lie:
+
+- `PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1` is required. Without it every protected
+  endpoint 503s (`platform-control/src/platform_control/auth.py:118`) and only `/health` looks up,
+  so every admin list renders empty — which reads exactly like a missing empty-state design.
+- Reference-data lists are **server**-paginated (`routers/reference_data.py:26,34-43` —
+  `limit`/`offset`/`total`, default limit 100). The `run-admin-panel` skill's claim that they return
+  the full array and paginate client-side is stale for these resources. `applyClientListWindow` does
+  still back some others (`admin/src/lib/admin/dataProvider.ts:918,1164,1179`), so it is
+  per-resource. A first page is a page, not the collection.
+
+Until the capture phase exists, this catalogue says nothing about focus visibility, keyboard
+reachability, hover states or dark mode.
 
 ## Serialization these workflows must respect
 

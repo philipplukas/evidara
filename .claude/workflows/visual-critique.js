@@ -118,6 +118,22 @@ R3 HIERARCHY. Is the most important thing on the screen the most prominent thing
    check whether a control and an informational label have their weights swapped. State it as an
    observation about the image, not as a preference.
 
+R4a CAPTURE ARTEFACTS — check this BEFORE reporting anything under R2 or R4 on an ADMIN image.
+   Two ways an admin screenshot lies about the product, both verified in this repo:
+     - An EMPTY LIST may be a misconfigured capture, not a product empty-state. Without
+       PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1 every protected endpoint 503s
+       (platform-control/src/platform_control/auth.py:118) and only /health looks up, so every list
+       renders empty. Reporting that as "the Jurisdictions list has no empty-state design" would be
+       a finding about the capture, not the UI.
+     - A SHORT LIST is not the whole collection. The reference-data endpoints are SERVER-paginated
+       (routers/reference_data.py:26,34-43 — limit/offset/total, default limit 100), so a first page
+       is a page. Do not infer a total, a "missing data" defect, or a pagination-control bug from
+       the number of rows visible. Note that the admin still uses applyClientListWindow for SOME
+       resources (admin/src/lib/admin/dataProvider.ts:918,1164,1179), so which one applies is
+       per-resource — read dataProvider.ts before claiming either.
+   If you cannot rule out a capture artefact, put the observation in \`not_assessable\`, not in
+   \`findings\`.
+
 R4 STATE COVERAGE. Which states does this surface have baselines for — populated, empty, error,
    loading, very long content, many results, one result? Compare the file list against the states
    the components can actually reach (check the source for the branches that render). A reachable
@@ -157,7 +173,7 @@ const CRITIQUE_SCHEMA = {
         additionalProperties: false,
         required: ['rubric', 'title', 'image', 'region', 'source_anchor', 'blast_radius'],
         properties: {
-          rubric: { type: 'string', enum: ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'] },
+          rubric: { type: 'string', enum: ['R1', 'R2', 'R3', 'R4', 'R4a', 'R5', 'R6', 'R7'] },
           title: { type: 'string' },
           image: { type: 'string', description: 'The PNG path.' },
           region: { type: 'string', description: 'Where in the image. Required.' },
@@ -317,6 +333,11 @@ For each:
     calling it a failure.
   - R4: is the "missing" state really unreachable in a baseline, or is it covered by a differently
     named file, or by a unit test rather than a screenshot?
+  - R4a, on any ADMIN image: is an "empty list" or "missing rows" finding actually a capture
+    artefact? An admin captured without PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1 shows
+    every list empty (auth.py:118), and the reference-data endpoints are server-paginated
+    (routers/reference_data.py:26,34-43), so a first page is a page and not the collection. Refute
+    any finding that reads either as a UI defect.
   - R6: is the divergence documented? ADR-0027 deliberately makes the workspace and the admin
     control plane two visual languages under one brand. A divergence that ADR covers is not drift.
   - Kill anything that is taste: if the finding reduces to a preference once you look, refute it.

@@ -53,8 +53,12 @@ GROUND RULES (.claude/workflows/_house-rules.md):
 
 3. DID-NOT-RUN IS NOT PASS. If you run a test, use the CI-equivalent gate:
      bash scripts/check-platform-control.sh
-   (a bare \`uv run pytest\` is narrower than CI, and in a fresh worktree the script's admin half
-   stops on missing platform-control/admin/node_modules and the partial run READS AS A PASS).
+   A bare \`uv run pytest\` is narrower than CI. And the script wraps its ENTIRE admin half in
+   \`if [[ -f admin/package.json ]]\` (check-platform-control.sh:18) — if that file is absent the
+   admin half is skipped SILENTLY and the script still exits 0, so read the output for the admin
+   section rather than trusting the exit code. Missing platform-control/admin/node_modules is a
+   DIFFERENT case and is NOT silent: :36-42 detects it, prints the exact \`npm ci\` remedy and exits
+   non-zero.
    For a single test file, \`cd platform-control && uv run pytest tests/unit/<file> -x\` is fine, but
    say that is what you ran.
 

@@ -25,7 +25,7 @@ nothing:
 | Missing `pyyaml` | `scripts/` reports `Ran 144 tests ... FAILED (errors=11)` instead of the real 201. That is **57 tests that never ran**, not 11 that broke. Use `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` |
 | Missing DI extras | `document-intelligence` silently drops `test_dspy_modules.py` and skips the eval harness. Use `uv run --extra dev --extra service --extra test --extra llm pytest` |
 | No Docker daemon | `legal-search/api` integration layer (`*.integration.spec.ts`) is the only layer that meets a real index mapping. Without Docker it does not run |
-| Fresh git worktree | A worktree does **not** inherit `platform-control/admin/node_modules`. `scripts/check-platform-control.sh` then stops before its admin half and the partial run reads as a pass |
+| A skipped sub-step | `scripts/check-platform-control.sh` wraps its whole admin half in `if [[ -f admin/package.json ]]` (`:18`). If that file is absent the admin half is skipped **silently** and the script still exits 0. Read the output for the admin section rather than trusting the exit code. **Not** a trap: missing `platform-control/admin/node_modules` in a fresh worktree — `:36-42` (added by #687) detects that, prints the checkout path and the exact `npm ci` remedy, and exits non-zero |
 
 Report the outcome as one of `PASS` / `FAIL` / `DID_NOT_RUN`, never collapse the third into the
 first, and always carry the reason.

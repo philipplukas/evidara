@@ -60,8 +60,13 @@ GROUND RULES (.claude/workflows/_house-rules.md — these override your instinct
    - document-intelligence without extras silently drops test_dspy_modules.py. Use:
        cd document-intelligence && uv run --extra dev --extra service --extra test --extra llm pytest
    - legal-search/api's *.integration.spec.ts layer needs a running Docker daemon.
-   - A fresh git worktree does NOT inherit platform-control/admin/node_modules, so
-     scripts/check-platform-control.sh stops before its admin half and the partial run READS AS A PASS.
+   - scripts/check-platform-control.sh wraps its ENTIRE admin half in
+     \`if [[ -f admin/package.json ]]\` (check-platform-control.sh:18). If that file is absent the
+     admin half is skipped SILENTLY and the script still exits 0 — read the output for the admin
+     section instead of trusting the exit code.
+     Do NOT assume the related worktree case: missing platform-control/admin/node_modules is
+     DETECTED at :36-42, which prints the checkout path and the exact \`npm ci\` remedy and exits
+     non-zero. That one fails loudly; do not report it as a silent pass.
    If a gate could not run, say DID_NOT_RUN and why. Never collapse it into PASS.
 
 3. EVIDENCE OR SILENCE. Every finding is anchored to a quoted file:line, a number with the command
