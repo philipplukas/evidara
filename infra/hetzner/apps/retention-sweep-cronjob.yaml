@@ -55,6 +55,12 @@ spec:
                     name: evidara-config
                 - secretRef:
                     name: evidara-app-secrets
+                # Same scoped credential as platform-control-api: the sweep's only
+                # object-storage call is delete_blob against evidara-raw-artifacts
+                # (services/retention_service.py). It must not reach the lakehouse or
+                # the PITR backups (#813).
+                - secretRef:
+                    name: evidara-s3-platform-control
               resources:
                 requests:
                   cpu: 50m

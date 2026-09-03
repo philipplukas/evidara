@@ -86,14 +86,17 @@ repos:
 
       # The same rule for the storage credential, which is where #792 actually
       # happened: `rootPassword` on main, live, plus Trino's own copy of it. Covers
-      # both files, because fixing only the obvious one leaves the leak in place.
+      # every file the credential has a home in, because fixing only the obvious one
+      # leaves the leak in place — and since #813 it also fails a workload that
+      # authenticates to MinIO as root at all, or a policy document wider than the
+      # scope its account declares.
       # Mirrored in CI (.github/workflows/docs-and-contracts.yml).
       - id: check-hetzner-minio-credentials
-        name: MinIO credentials referenced, not committed (minio + trino values)
+        name: MinIO credentials referenced not committed, and no workload runs as root
         entry: python3 scripts/check_hetzner_minio_credentials.py
         language: system
         pass_filenames: false
-        files: ^(infra/hetzner/values/(minio|trino)\.yaml|scripts/check_hetzner_minio_credentials\.py)$
+        files: ^(infra/hetzner/(values/(minio|trino)\.yaml|deploy-stage4\.sh|minio-policies/.*\.json)|scripts/check_hetzner_minio_credentials\.py)$
 
       # Skips when Docker is unavailable locally; CI runs it with --strict
       # (.github/workflows/architecture.yml), same as the kustomize gate above.

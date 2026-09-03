@@ -1,0 +1,103 @@
+{
+  "_comment": [
+    "Source of truth for MinIO service accounts on the self-hosted cluster (#813).",
+    "Read by infra/hetzner/provision-minio-users.sh (creates users/policies/Secrets),",
+    "infra/hetzner/verify-minio-scoping.sh (the allow/deny assertions), and",
+    "scripts/check_hetzner_minio_credentials.py (the committed-file guard).",
+    "JSON, not YAML, so every consumer parses it with the Python stdlib and no",
+    "workstation needs pyyaml installed.",
+    "",
+    "`allow` and `deny` together must name every bucket in `all_buckets` for each",
+    "account: an unlisted bucket is an untested bucket, and the guard fails on it.",
+    "`access` is derived from what the workload's code actually does — see the table in",
+    "infra/hetzner/README.md and the file:line citations in the #813 PR body.",
+    "",
+    "The MinIO root credential (Secret `minio-root`) is administrative only. No workload",
+    "may reference it."
+  ],
+  "all_buckets": [
+    "evidara-raw-artifacts",
+    "evidara-lakehouse",
+    "evidara-pg-backups"
+  ],
+  "accounts": [
+    {
+      "user": "platform-control",
+      "policy_file": "platform-control.json",
+      "k8s_secret": "evidara-s3-platform-control",
+      "access_key_field": "PLATFORM_CONTROL_S3_ACCESS_KEY_ID",
+      "secret_key_field": "PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY",
+      "workloads": [
+        "deploy/platform-control-api",
+        "cronjob/platform-control-retention-sweep"
+      ],
+      "allow": [
+        {
+          "bucket": "evidara-raw-artifacts",
+          "access": "wo",
+          "write_probe_key": ".evidara-scoping-probe"
+        }
+      ],
+      "deny": ["evidara-lakehouse", "evidara-pg-backups"]
+    },
+    {
+      "user": "di-consumer",
+      "policy_file": "di-consumer.json",
+      "k8s_secret": "evidara-s3-di-consumer",
+      "access_key_field": "DI_S3_ACCESS_KEY_ID",
+      "secret_key_field": "DI_S3_SECRET_ACCESS_KEY",
+      "workloads": ["deploy/di-consumer"],
+      "allow": [
+        { "bucket": "evidara-raw-artifacts", "access": "ro" },
+        {
+          "bucket": "evidara-lakehouse",
+          "access": "rw",
+          "write_probe_key": "canonical/.evidara-scoping-probe"
+        }
+      ],
+      "deny": ["evidara-pg-backups"]
+    },
+    {
+      "user": "document-service",
+      "policy_file": "document-service.json",
+      "k8s_secret": "evidara-s3-document-service",
+      "access_key_field": "DI_S3_ACCESS_KEY_ID",
+      "secret_key_field": "DI_S3_SECRET_ACCESS_KEY",
+      "workloads": ["deploy/document-service"],
+      "allow": [{ "bucket": "evidara-lakehouse", "access": "ro" }],
+      "deny": ["evidara-raw-artifacts", "evidara-pg-backups"]
+    },
+    {
+      "user": "trino",
+      "policy_file": "trino.json",
+      "k8s_secret": "evidara-s3-trino",
+      "access_key_field": "accessKey",
+      "secret_key_field": "secretKey",
+      "workloads": ["statefulset/trino-coordinator", "deploy/trino-worker"],
+      "allow": [
+        {
+          "bucket": "evidara-lakehouse",
+          "access": "rw",
+          "write_probe_key": ".evidara-scoping-probe"
+        }
+      ],
+      "deny": ["evidara-raw-artifacts", "evidara-pg-backups"]
+    },
+    {
+      "user": "cnpg-backup",
+      "policy_file": "cnpg-backup.json",
+      "k8s_secret": "cnpg-minio-backup",
+      "access_key_field": "ACCESS_KEY_ID",
+      "secret_key_field": "ACCESS_SECRET_KEY",
+      "workloads": ["cluster/evidara-pg (CloudNativePG barmanObjectStore)"],
+      "allow": [
+        {
+          "bucket": "evidara-pg-backups",
+          "access": "rw",
+          "write_probe_key": ".evidara-scoping-probe"
+        }
+      ],
+      "deny": ["evidara-raw-artifacts", "evidara-lakehouse"]
+    }
+  ]
+}

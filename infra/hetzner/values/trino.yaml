@@ -1,9 +1,15 @@
 # Trino — distributed SQL over Iceberg-on-MinIO via the Nessie catalog.
 # Chart: trino/trino. ADR-0029. Coordinator + 1 worker.
 #
-# MinIO credentials are injected from the `minio-root` Secret and referenced in the
-# catalog below via Trino's ${ENV:...} substitution — they are never written here. The
-# previous inline `s3.aws-secret-key=change-me-minio-root` was the live credential (#792).
+# MinIO credentials are injected from a Secret and referenced in the catalog below via
+# Trino's ${ENV:...} substitution — they are never written here. The previous inline
+# `s3.aws-secret-key=change-me-minio-root` was the live credential (#792).
+#
+# The Secret is `evidara-s3-trino`, NOT `minio-root` (#813). Trino queries Iceberg in
+# `evidara-lakehouse` and nothing else; running it as root also handed both pods
+# `evidara-raw-artifacts` and the `evidara-pg-backups` PITR backups. Provision with
+# infra/hetzner/provision-minio-users.sh trino; assert with
+# infra/hetzner/verify-minio-scoping.sh trino.
 server:
   workers: 1
 
@@ -12,13 +18,13 @@ env:
   - name: MINIO_ACCESS_KEY
     valueFrom:
       secretKeyRef:
-        name: minio-root
-        key: rootUser
+        name: evidara-s3-trino
+        key: accessKey
   - name: MINIO_SECRET_KEY
     valueFrom:
       secretKeyRef:
-        name: minio-root
-        key: rootPassword
+        name: evidara-s3-trino
+        key: secretKey
 
 # Heap must exceed query.max-memory-per-node (chart default 1GB) + heap headroom
 # (~0.3x heap), so keep this comfortably above ~1.5GB. 4G is ample on a 64GB box.

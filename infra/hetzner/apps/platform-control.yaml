@@ -31,6 +31,13 @@ spec:
                 name: evidara-config
             - secretRef:
                 name: evidara-app-secrets
+            # Scoped MinIO credential — `evidara-raw-artifacts` only, and write/purge
+            # only (this service stores and deletes artifacts; it never reads them
+            # back — see services/artifact_store.py::S3ArtifactStore). Listed AFTER
+            # evidara-app-secrets so it wins on a cluster where that Secret still
+            # carries the old shared root keys mid-cutover (#813).
+            - secretRef:
+                name: evidara-s3-platform-control
             - secretRef:
                 name: evidara-auth
           readinessProbe:
