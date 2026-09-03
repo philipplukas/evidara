@@ -28,25 +28,40 @@ _VALID_EVENT = json.dumps(
 ).encode("utf-8")
 
 
+class _Manifest:
+    processing_manifest_id = "pm_01jq7ab8x4nm7m3qz3b8e9q2fk"
+
+
 class _Result:
-    def __init__(self) -> None:
+    def __init__(self, *, quarantine: dict | None = None) -> None:
         self.status_events = [{"event_type": "document.processing_status.updated", "event_id": "evt_status_1"}]
-        self.document_processed_event = {
-            "event_type": "document.processed",
-            "event_id": "evt_processed_1",
-        }
+        self.quarantine = quarantine
+        self.manifest = _Manifest()
+        self.document_processed_event = (
+            None
+            if quarantine
+            else {
+                "event_type": "document.processed",
+                "event_id": "evt_processed_1",
+            }
+        )
+
+    @property
+    def is_quarantined(self) -> bool:
+        return self.quarantine is not None
 
 
 class FakePipeline:
-    def __init__(self, *, error: Exception | None = None) -> None:
+    def __init__(self, *, error: Exception | None = None, quarantine: dict | None = None) -> None:
         self._error = error
+        self._quarantine = quarantine
         self.calls = 0
 
     def process_event(self, payload: dict) -> _Result:
         self.calls += 1
         if self._error is not None:
             raise self._error
-        return _Result()
+        return _Result(quarantine=self._quarantine)
 
 
 class FakeMessage:
@@ -132,6 +147,35 @@ class DispatchMessageTests(unittest.TestCase):
 
         self.assertEqual(outcome, "processed")
         self.assertTrue(message.acked)
+
+    def test_quarantined_result_acks_and_publishes_no_processed_event(self) -> None:
+        """ADR-0047: quarantine is a terminal outcome, not a failure and not a success.
+
+        The three assertions that matter: the message is **acked** (redelivery would
+        produce the same verdict, so it must not nak or dead-letter), **no
+        ``document.processed`` event is published** (that event is what reaches
+        legal-search — publishing one for a manifestation we hold no legal text for is
+        exactly the fabrication the invariant exists to prevent), and the outcome label is
+        distinct from ``processed`` so the metric cannot report it as a corpus member.
+        """
+        message = FakeMessage(_VALID_EVENT)
+        publisher = FakePublisher()
+        dlq = _DlqRecorder()
+
+        outcome = _dispatch(
+            message,
+            pipeline=FakePipeline(quarantine={"reason": "no_text_layer", "detail": "no text layer"}),
+            publisher=publisher,
+            dlq=dlq,
+        )
+
+        self.assertEqual(outcome, "quarantined")
+        self.assertTrue(message.acked)
+        self.assertFalse(message.terminated)
+        self.assertEqual(message.naks, [])
+        self.assertEqual(len(publisher.status), 1)
+        self.assertEqual(publisher.processed, [])
+        self.assertEqual(dlq.published, [])
 
     def test_permanent_error_terminates_without_dlq(self) -> None:
         # KeyError is a PERMANENT_ERROR (content-driven, deterministic).

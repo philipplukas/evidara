@@ -120,7 +120,9 @@ class LocalOutboxReplayer:
         records: list[dict[str, Any]] = []
         for marker_path in marker_paths:
             marker = _read_json(marker_path)
-            if marker.get("cleanup_status") == "withdrawn":
+            # "quarantined" markers never produced a projection, so there is nothing to
+            # withdraw and no `document_processed_event` to build a withdrawal from.
+            if marker.get("cleanup_status") in {"withdrawn", "quarantined"}:
                 continue
             withdrawal = self._withdraw_projection(marker)
             marker.update(withdrawal)
@@ -152,7 +154,25 @@ class LocalOutboxReplayer:
             runtime_settings=RuntimeSettings.from_environment(),
             require_surface_uris=True,
         )
+        if result.is_quarantined:
+            # Nothing was published to canonical, so there is no projection to post and
+            # none to withdraw afterwards. The marker records *why*, so a replay sweep
+            # over a quarantined cohort reads as a cohort, not as a silent gap (ADR-0047).
+            marker = {
+                "event_id": event["event_id"],
+                "source_event_path": str(event_path),
+                "bundle_manifest_id": event["payload"]["bundle_manifest_id"],
+                "processing_manifest_id": result.manifest.processing_manifest_id,
+                "source_url": _source_url_for_event(event),
+                "quarantine": dict(result.quarantine or {}),
+                "cleanup_status": "quarantined",
+                "processed_at": _utc_now(),
+            }
+            _write_json_atomic(_marker_path(self.processed_dir, str(event["event_id"])), marker)
+            return marker
+
         processed_event = result.document_processed_event
+        assert result.document is not None  # guaranteed: not quarantined ⇒ a document was published
         projection_response = self._post_projection("document-processed", processed_event)
         marker = {
             "event_id": event["event_id"],

@@ -112,7 +112,7 @@ PROCESSING_MANIFESTS = PublishedSurfaceDefinition(
     surface_version=1,
     selector_kind="record_key",
     selector_fields=("processing_manifest_id",),
-    description="Immutable processing result rows for canonical-ready or failed revisions.",
+    description="Immutable processing result rows for canonical-ready, quarantined or failed revisions.",
     columns=(
         SurfaceColumn(
             "processing_manifest_id",
@@ -172,6 +172,12 @@ PROCESSING_MANIFESTS = PublishedSurfaceDefinition(
         SurfaceColumn("section_count", "integer", False, "Published section count."),
         SurfaceColumn("citation_count", "integer", False, "Published citation count."),
         SurfaceColumn("failure", "object", True, "Failure payload for failed processing."),
+        SurfaceColumn(
+            "quarantine",
+            "object",
+            True,
+            "Quarantine reason and evidence for a result withheld from canonical (ADR-0047).",
+        ),
     ),
 )
 

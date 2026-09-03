@@ -149,7 +149,7 @@ sources:
           - name: metadata
             description: "Additional section metadata."
       - name: processing_manifests
-        description: "Immutable processing result rows for canonical-ready or failed revisions."
+        description: "Immutable processing result rows for canonical-ready, quarantined or failed revisions."
         tests:
           - dbt_expectations.expect_table_columns_to_match_set:
               column_list:
@@ -171,6 +171,7 @@ sources:
                 - section_count
                 - citation_count
                 - failure
+                - quarantine
         columns:
           - name: processing_manifest_id
             description: "Immutable processing result ID."
@@ -232,6 +233,8 @@ sources:
               - not_null
           - name: failure
             description: "Failure payload for failed processing."
+          - name: quarantine
+            description: "Quarantine reason and evidence for a result withheld from canonical (ADR-0047)."
       - name: published_commentary_insights
         description: "Non-canonical extractive commentary insights published by document-intelligence."
         tests:

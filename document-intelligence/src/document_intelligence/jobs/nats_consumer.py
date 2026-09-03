@@ -4,6 +4,7 @@ Self-hosted replacement for the Pub/Sub pull consumer (ADR-0029 Slice 3). Mirror
 Pub/Sub delivery semantics:
 
 - success            -> ``ack`` the message
+- quarantined        -> ``ack``; handled correctly, but withheld from canonical (ADR-0047)
 - permanent error    -> ``term`` (drop; deterministic, content-driven — never retried)
 - transient error    -> ``nak`` with backoff, until ``max_deliver`` attempts are exhausted
 - exhausted transient -> publish the payload to the DLQ subject, then ``term``
@@ -77,7 +78,8 @@ async def dispatch_message(
 ) -> str:
     """Process one message and ack/nak/term it. Returns the outcome label.
 
-    Outcomes: ``processed`` | ``rejected_permanent`` | ``transient_retry`` | ``dead_lettered``.
+    Outcomes: ``processed`` | ``quarantined`` | ``rejected_permanent`` | ``transient_retry``
+    | ``dead_lettered``.
     """
     ctx = extract_event_context(message.data)
     try:
@@ -86,8 +88,29 @@ async def dispatch_message(
         if publisher is not None:
             for status_event in result.status_events:
                 await publisher.publish_status_event(status_event)
-            await publisher.publish_document_processed_event(result.document_processed_event)
+            if result.document_processed_event is not None:
+                await publisher.publish_document_processed_event(result.document_processed_event)
         await message.ack()
+        if result.is_quarantined:
+            # Acked, not naked: the message was handled correctly and redelivering it
+            # produces the same verdict. It is a distinct terminal outcome so the counter
+            # and the log say "withheld", never "processed" (ADR-0047 section 6).
+            quarantine = result.quarantine or {}
+            log_event(
+                logger,
+                logging.WARNING,
+                "document_quarantined",
+                event_type=ctx["event_type"],
+                event_id=ctx["event_id"],
+                correlation_id=ctx["correlation_id"],
+                run_id=ctx["run_id"],
+                num_delivered=message.num_delivered,
+                subject=subject,
+                quarantine_reason=quarantine.get("reason"),
+                quarantine_detail=quarantine.get("detail"),
+                processing_manifest_id=result.manifest.processing_manifest_id,
+            )
+            return "quarantined"
         log_event(
             logger,
             logging.INFO,

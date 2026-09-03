@@ -46,11 +46,12 @@
         "accepted",
         "processing",
         "canonical_ready",
+        "quarantined",
         "failed",
         "withdrawn",
         "skipped_duplicate"
       ],
-      "description": "Processing status for the result."
+      "description": "Processing status for the result. `quarantined` (ADR-0047) is neither success nor failure: processing completed and produced output whose extracted text cannot support the claim that it is law, so nothing was published to the canonical surfaces."
     },
     "provenance": {
       "$ref": "https://evidara.dev/common/provenance"
@@ -200,6 +201,48 @@
         }
       },
       "additionalProperties": false
+    },
+    "quarantine": {
+      "type": "object",
+      "description": "Why this result was withheld from the canonical corpus (ADR-0047). Present exactly when status is `quarantined`. Deliberately separate from `failure`: the two take opposite remedies — replay a failure, implement or fix the missing class for a quarantine — and merging them makes the queue undrainable.",
+      "required": [
+        "reason",
+        "detail"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "enum": [
+            "no_text_layer",
+            "below_content_floor",
+            "no_sections_extracted",
+            "unsupported_manifestation",
+            "format_signature_mismatch"
+          ],
+          "description": "Closed taxonomy (ADR-0047 section 3). A new reason requires an entry here and a row in the ADR's table naming which of the two exits it takes, so `miscellaneous` cannot become the largest bucket."
+        },
+        "detail": {
+          "type": "string",
+          "description": "Human-readable statement of what was measured and why it failed the floor."
+        },
+        "extracted_chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_extracted_chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "legal_marker_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_legal_markers": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
     }
   },
   "allOf": [
@@ -302,6 +345,68 @@
                 "failure"
               ]
             }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "quarantined"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "quarantine"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "published_document_ref"
+              ]
+            },
+            {
+              "required": [
+                "published_sections_ref"
+              ]
+            },
+            {
+              "required": [
+                "canonical_ready_at"
+              ]
+            },
+            {
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "not": {
+              "const": "quarantined"
+            }
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "quarantine"
           ]
         }
       }

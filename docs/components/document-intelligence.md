@@ -48,6 +48,49 @@ Document-intelligence should lean on Databricks-native lineage for internal trac
 
 The built-in HTML normalizer uses `html.parser` for common block tags (`p`, headings, list items, table cells, etc.). When no blocks are extracted (for example, prose only inside `<div>`), it falls back to tag-stripping with whitespace normalization. Normalized IR metadata includes `html_parse_used_fallback` when that fallback runs. Embedded chrome (`iframe`, `form`, `object`, `embed`, `picture`, `video`, `audio`, `track`, `map`, plus script/style/`header`/nav/footer/aside) is skipped to stabilize body text. If `feed()` raises on malformed markup, recovery uses the same strip path and sets `html_parse_recovery` to `exception`.
 
+### Quarantine — the text-level law assertion (ADR-0047)
+
+A manifestation whose **extracted text** cannot support the claim that it is law does not
+become a canonical document. It is *quarantined*: nothing is written to
+`published_documents` / `published_sections`, no `document.processed` event is emitted (so
+nothing reaches legal-search), and a `processing_manifests` row is written with
+`status: quarantined` and a `quarantine` block carrying the reason and the measurements.
+
+This is the gap the two acquisition gates leave. `acquisition_core.artifact_guard` judges
+the bytes as received; `acquisition_core.content_gate` counts legal-text markers but
+abstains on `application/pdf`. A structurally valid PDF whose text is a cover sheet, a
+consent interstitial or nothing at all therefore passes acquisition end to end, and
+judging it needs extraction — which lives here.
+
+The judgment is `normalize/quarantine.py`. Four checks, in order (the first that fires
+names the reason, so the recorded slug is the actual defect and not a downstream symptom):
+
+| Check | Reason slug | Applies to | Exit |
+|---|---|---|---|
+| `pdf_no_text_layer` set by the PDF normaliser | `no_text_layer` | all | implement (OCR) |
+| Normalisation produced no blocks / no text | `no_sections_extracted` | all | fix |
+| Extracted characters below the floor | `below_content_floor` | modalities `content_gate` abstains on | fix or implement |
+| Legal-text markers below the floor | `below_content_floor` | modalities `content_gate` abstains on | fix or implement |
+
+The reason vocabulary is closed (ADR-0047 §3) and mirrored in
+`contracts/schemas/processing-manifest.schema.json`.
+
+**Configuration.** Both floors default on — `DI_QUARANTINE_MIN_EXTRACTED_CHARS` (200) and
+`DI_QUARANTINE_MIN_LEGAL_MARKERS` (3, the same threshold and marker vocabulary as
+`content_gate`). A bundle narrows them per source via
+`di_overrides.quarantine_min_extracted_chars` / `di_overrides.quarantine_min_legal_markers`,
+because the honest minimum for a cantonal act is not the honest minimum for a one-article
+communal ordinance. A malformed override never lowers a floor.
+
+**Visibility.** `di_quarantined_documents_total{reason}` (Prometheus, on the consumers'
+existing `/metrics`), a `document_quarantined` structured log line, the consumer outcome
+label `quarantined` in `di_messages_total`, and the `processing_manifests` row itself.
+
+**Not a failure, not a DLQ item.** Processing completed; the output is what we should not
+trust. The message is acked, not naked — replay changes nothing until the missing class is
+implemented. Do not route quarantine through the DLQ (`docs/runbooks/dlq-triage-and-replay.md`),
+whose remedy is replay.
+
 ## Minimal next tasks
 
 - [x] Define canonical `Document` schema
@@ -197,3 +240,5 @@ Key tests:
 | Section structure changes unexpectedly | Invariant checks and section-count drift checks |
 | Reference snapshot changes alter outputs unexpectedly | Record snapshot set refs in `ProcessingManifest` |
 | Pipeline runs but publishes stale or partial data | Emit `document.processed` only after canonical-ready manifest state |
+| A document is admitted with no legal text in it (empty IR, scan, cover page) | Quarantine gate on extracted text (ADR-0047); `tests/test_quarantine.py` pins both directions — the image-only PDF is withheld, the real ZH ordinance is not |
+| The two legal-text gates drift into different opinions about what law looks like | `tests/test_quarantine.py::MarkerVocabularyDriftTests` reads `acquisition_core/content_gate.py` and fails when the marker vocabulary, threshold or assessable content types diverge |

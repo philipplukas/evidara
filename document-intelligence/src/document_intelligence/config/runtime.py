@@ -5,6 +5,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from document_intelligence.normalize.quarantine import (
+    DEFAULT_MIN_EXTRACTED_CHARS,
+    DEFAULT_MIN_LEGAL_MARKERS,
+    QuarantineThresholds,
+)
 from document_intelligence.persist.sinks import DeltaSinkConfig
 from document_intelligence.persist.surfaces import (
     PROCESSING_MANIFESTS,
@@ -57,6 +62,18 @@ class RuntimeSettings:
     enable_commentary_insights: bool = False
     commentary_insight_min_confidence: float = 0.7
     use_spark_delta: bool = False
+    # ADR-0047's two text-level floors. Environment-wide defaults; a bundle's
+    # `di_overrides` narrows them per source, because the honest minimum for a cantonal
+    # act is not the honest minimum for a one-article communal ordinance.
+    quarantine_min_extracted_chars: int = DEFAULT_MIN_EXTRACTED_CHARS
+    quarantine_min_legal_markers: int = DEFAULT_MIN_LEGAL_MARKERS
+
+    @property
+    def quarantine_thresholds(self) -> QuarantineThresholds:
+        return QuarantineThresholds(
+            min_extracted_chars=self.quarantine_min_extracted_chars,
+            min_legal_markers=self.quarantine_min_legal_markers,
+        )
 
     @classmethod
     def from_mapping(
@@ -78,6 +95,8 @@ class RuntimeSettings:
         enable_commentary_insights: Any | None = None,
         commentary_insight_min_confidence: Any | None = None,
         use_spark_delta: Any | None = None,
+        quarantine_min_extracted_chars: Any | None = None,
+        quarantine_min_legal_markers: Any | None = None,
     ) -> "RuntimeSettings":
         effective_processing_version = processing_version or mapping.get("DI_PROCESSING_VERSION") or "0.1.0-dev"
         effective_parser_backend = (parser_backend or mapping.get("DI_PARSER_BACKEND") or "legacy").strip()
@@ -133,6 +152,21 @@ class RuntimeSettings:
             else _parse_bool(mapping.get("DI_USE_SPARK_DELTA", "false"))
         )
 
+        effective_quarantine_min_extracted_chars = _coerce_int(
+            quarantine_min_extracted_chars
+            if quarantine_min_extracted_chars is not None
+            else mapping.get("DI_QUARANTINE_MIN_EXTRACTED_CHARS", str(DEFAULT_MIN_EXTRACTED_CHARS)),
+            name="DI_QUARANTINE_MIN_EXTRACTED_CHARS",
+            minimum=0,
+        )
+        effective_quarantine_min_legal_markers = _coerce_int(
+            quarantine_min_legal_markers
+            if quarantine_min_legal_markers is not None
+            else mapping.get("DI_QUARANTINE_MIN_LEGAL_MARKERS", str(DEFAULT_MIN_LEGAL_MARKERS)),
+            name="DI_QUARANTINE_MIN_LEGAL_MARKERS",
+            minimum=0,
+        )
+
         direct_documents_uri = published_documents_uri or mapping.get("DI_PUBLISHED_DOCUMENTS_URI")
         direct_sections_uri = published_sections_uri or mapping.get("DI_PUBLISHED_SECTIONS_URI")
         direct_manifests_uri = processing_manifests_uri or mapping.get("DI_PROCESSING_MANIFESTS_URI")
@@ -166,6 +200,8 @@ class RuntimeSettings:
             enable_commentary_insights=effective_enable_commentary_insights,
             commentary_insight_min_confidence=effective_commentary_insight_min_confidence,
             use_spark_delta=effective_use_spark_delta,
+            quarantine_min_extracted_chars=effective_quarantine_min_extracted_chars,
+            quarantine_min_legal_markers=effective_quarantine_min_legal_markers,
         )
 
     @classmethod

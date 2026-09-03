@@ -144,6 +144,11 @@ class ProcessingManifest:
     section_count: int = 0
     citation_count: int = 0
     failure: dict[str, str] | None = None
+    # ADR-0047. Deliberately *not* folded into `failure`: a quarantined document did not
+    # fail — processing completed and produced output we should not trust — and the two
+    # take opposite remedies (replay vs. implement the missing class). Storing them in one
+    # column is what would make the queue undrainable.
+    quarantine: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         output = {
@@ -171,14 +176,31 @@ class ProcessingManifest:
             output["supersedes_processing_manifest_id"] = self.supersedes_processing_manifest_id
         if self.failure is not None:
             output["failure"] = dict(self.failure)
+        if self.quarantine is not None:
+            output["quarantine"] = dict(self.quarantine)
         return output
 
 
 @dataclass(frozen=True)
 class ProcessingResult:
-    document: Document
+    """Terminal outcome of processing one artifact bundle.
+
+    ``document`` and ``document_processed_event`` are ``None`` exactly when the result is
+    quarantined (ADR-0047): no canonical document was published, so there is nothing for
+    the projection bridge to forward to legal-search. Callers must branch on
+    :attr:`is_quarantined` before dereferencing either — publishing a ``document.processed``
+    event for a manifestation we hold no legal text for is the confident fabrication the
+    quarantine invariant exists to prevent.
+    """
+
+    document: Document | None
     sections: list[Section]
     commentary_insights: list[CommentaryInsight]
     manifest: ProcessingManifest
     status_events: list[dict[str, Any]]
-    document_processed_event: dict[str, Any]
+    document_processed_event: dict[str, Any] | None
+    quarantine: dict[str, Any] | None = None
+
+    @property
+    def is_quarantined(self) -> bool:
+        return self.quarantine is not None

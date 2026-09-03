@@ -82,6 +82,7 @@ def build_processing_pipeline(
         llm_metadata_extractor=llm_metadata_extractor,
         enable_commentary_insights=runtime_settings.enable_commentary_insights,
         commentary_insight_min_confidence=runtime_settings.commentary_insight_min_confidence,
+        quarantine_thresholds=runtime_settings.quarantine_thresholds,
     )
 
 
@@ -105,7 +106,12 @@ def publish_processing_result_to_pubsub(
     *,
     publisher: EventPublisher | None = None,
 ) -> None:
-    """Publish status and document.processed events (same contract as runtime_consumer)."""
+    """Publish status and document.processed events (same contract as runtime_consumer).
+
+    A quarantined result has no ``document.processed`` event to publish: nothing reached
+    the canonical surfaces, so there is nothing for legal-search to project (ADR-0047).
+    Its status events still go out.
+    """
     topic_names = _outbound_pubsub_topic_names()
     if topic_names is None:
         return
@@ -121,7 +127,8 @@ def publish_processing_result_to_pubsub(
     )
     for status_event in result.status_events:
         pub.publish_status_event(status_event)
-    pub.publish_document_processed_event(result.document_processed_event)
+    if result.document_processed_event is not None:
+        pub.publish_document_processed_event(result.document_processed_event)
 
 
 def process_artifact_bundle_event(
@@ -138,6 +145,18 @@ def process_artifact_bundle_event(
         require_surface_uris=require_surface_uris,
     )
     event = ArtifactBundleAvailableEvent.from_dict(resolve_artifact_bundle_event(event_payload))
+    if result.is_quarantined:
+        # Reported, never omitted. An operator running this by hand must see that the
+        # bundle was handled *and* withheld — a summary that said "processed" over a
+        # document nothing was published for is the fabrication ADR-0047 is about.
+        return {
+            "status": "quarantined",
+            "event_id": event.event_id,
+            "bundle_manifest_id": event.payload.bundle_manifest_id,
+            "processing_manifest_id": result.manifest.processing_manifest_id,
+            "quarantine": dict(result.quarantine or {}),
+        }
+    assert result.document is not None  # guaranteed: not quarantined ⇒ a document was published
     return {
         "status": "processed",
         "event_id": event.event_id,

@@ -89,6 +89,27 @@ class RuntimeSettingsTests(unittest.TestCase):
         self.assertTrue(settings.enable_commentary_insights)
         self.assertEqual(settings.commentary_insight_min_confidence, 0.8)
 
+    def test_quarantine_floors_default_on_and_are_configurable(self) -> None:
+        # Defaults, not "off": a runtime configured with nothing still holds ADR-0047's
+        # invariant, and an operator narrows the floors deliberately rather than by
+        # forgetting to set them.
+        defaults = RuntimeSettings.from_mapping({})
+        self.assertEqual(defaults.quarantine_min_extracted_chars, 200)
+        self.assertEqual(defaults.quarantine_min_legal_markers, 3)
+        self.assertEqual(defaults.quarantine_thresholds.min_extracted_chars, 200)
+
+        configured = RuntimeSettings.from_mapping(
+            {
+                "DI_QUARANTINE_MIN_EXTRACTED_CHARS": "500",
+                "DI_QUARANTINE_MIN_LEGAL_MARKERS": "1",
+            }
+        )
+        self.assertEqual(configured.quarantine_thresholds.min_extracted_chars, 500)
+        self.assertEqual(configured.quarantine_thresholds.min_legal_markers, 1)
+
+        with self.assertRaises(ValueError):
+            RuntimeSettings.from_mapping({"DI_QUARANTINE_MIN_EXTRACTED_CHARS": "-1"})
+
     def test_rejects_unknown_parser_backend(self) -> None:
         with self.assertRaises(ValueError):
             RuntimeSettings.from_mapping({"DI_PARSER_BACKEND": "unknown"})

@@ -40,6 +40,19 @@ def test_projection_forwards_are_counted_by_outcome() -> None:
     assert _sample("di_projection_forwards_total", outcome="forwarded") == before + 1
 
 
+def test_quarantines_are_counted_per_reason() -> None:
+    # ADR-0047 section 6: the per-reason breakdown is the point. A bare total would say the
+    # corpus is losing documents without saying which class to implement next.
+    before = _sample("di_quarantined_documents_total", reason="no_text_layer")
+
+    metrics.record_quarantine("no_text_layer")
+    metrics.record_quarantine("no_text_layer")
+    metrics.record_quarantine("below_content_floor")
+
+    assert _sample("di_quarantined_documents_total", reason="no_text_layer") == before + 2
+    assert _sample("di_quarantined_documents_total", reason="below_content_floor") >= 1
+
+
 def _free_port() -> int:
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))

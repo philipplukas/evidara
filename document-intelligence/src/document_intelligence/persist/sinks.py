@@ -253,6 +253,15 @@ class CanonicalSink:
     ) -> None:
         raise NotImplementedError
 
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
+        """Record a quarantined result: the manifest row only, no canonical rows (ADR-0047).
+
+        The whole point is that no document and no sections are published — but the
+        judgment is still written down, with its reason, where an operator can group the
+        queue by it. A quarantine that leaves no row is silent failure with extra steps.
+        """
+        raise NotImplementedError
+
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
         raise NotImplementedError
 
@@ -300,6 +309,9 @@ class InMemoryCanonicalSink(CanonicalSink):
     ) -> None:
         self.published_documents.append(document)
         self.published_sections.extend(sections)
+        self.processing_manifests.append(manifest)
+
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
         self.processing_manifests.append(manifest)
 
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
@@ -359,6 +371,14 @@ class DeltaCanonicalSink(CanonicalSink):
             section_rows,
             always_present_keys=_PUBLISHED_SECTIONS_DELTA_KEYS,
         )
+        self._write_rows(
+            self._config.processing_manifests_uri,
+            [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
+        )
+
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
+        """Write the manifest row alone — no document, no sections (ADR-0047)."""
         self._write_rows(
             self._config.processing_manifests_uri,
             [_manifest_dict_for_delta(manifest)],
@@ -591,6 +611,14 @@ class IcebergCanonicalSink(CanonicalSink):
             always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
         )
 
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
+        """Write the manifest row alone — no document, no sections (ADR-0047)."""
+        self._write_rows(
+            self._config.processing_manifests_table,
+            [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
+        )
+
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
         self.status_events.extend(status_events)
 
@@ -731,6 +759,14 @@ class SparkDeltaCanonicalSink(CanonicalSink):
             section_rows,
             always_present_keys=_PUBLISHED_SECTIONS_DELTA_KEYS,
         )
+        self._write_rows(
+            self._config.processing_manifests_uri,
+            [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
+        )
+
+    def persist_quarantine(self, manifest: ProcessingManifest) -> None:
+        """Write the manifest row alone — no document, no sections (ADR-0047)."""
         self._write_rows(
             self._config.processing_manifests_uri,
             [_manifest_dict_for_delta(manifest)],
