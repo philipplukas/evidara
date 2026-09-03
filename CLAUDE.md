@@ -55,6 +55,7 @@ Run the narrowest gate for the surface you touched before pushing:
 | `eval/` | see `.github/workflows/eval-ris.yml` — two `-k`-filtered pytest selections |
 | `scripts/` | `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` — see note below; without pyyaml only 144 of 201 tests run |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `for c in AT CH DE FR IT EU; do python scripts/check_country_overlay_files.py --country $c; done` — `--country` is required; the bare command exits 2 on argparse |
+| `contracts/api/` or `contracts/events/` | `python3 scripts/check_contract_version_bump.py --base origin/main` — the manifest version bump. **Not** covered by `check-platform-control.sh`, which only checks that the generated spec still matches the app. |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
 
 Rows here must not be narrower than what CI runs: a clean local run against a
@@ -66,6 +67,13 @@ point — the gate must not depend on ambient state. Without it eleven test modu
 import and the runner reports `Ran 144 tests ... FAILED (errors=11)` — which reads as eleven
 broken tests and is really **fifty-seven that never ran**. `uv` is already required by this
 repo, so the command above needs no venv and no system package.
+
+The `contracts/` row above is the same trap in a second place: `check_contract_version_bump.py`
+compares the manifest's **top-level `version`** (`:47`, `:62`) — not `apis.<name>.version` — and fires on
+any change under `contracts/api/` or `contracts/events/` (`:14`). Two PRs from one lane hit it in a
+single day (2026-09-03) because the `platform-control/` row reads as exhaustive and is not. Note both
+numbers still move together: `check_contract_manifest.py` separately requires
+`apis.platform_control.version` to equal `platform_control.openapi.API_VERSION`.
 
 **`CI=true` is not optional either, on any suite that registers the CI-skip guard** —
 `document-intelligence/tests/conftest.py`, `platform-control/tests/conftest.py` and
