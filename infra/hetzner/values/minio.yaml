@@ -20,9 +20,16 @@ resources:
 # infra/hetzner/README.md, before Stage 1. Chart contract: when `existingSecret` is set,
 # `rootUser`/`rootPassword` here must stay empty or the chart prefers the inline values.
 #
+# Root is ADMINISTRATIVE ONLY (#813). No workload authenticates with it: each one has
+# its own MinIO user scoped to the buckets it actually uses, provisioned by
+# infra/hetzner/provision-minio-users.sh from infra/hetzner/minio-policies/ and asserted
+# by infra/hetzner/verify-minio-scoping.sh. Root is used by those two scripts and by an
+# operator at a console, and by nothing else.
+#
 # Rotating root re-encrypts MinIO's IAM data. Rotate with MINIO_ROOT_USER_OLD /
-# MINIO_ROOT_PASSWORD_OLD set for one deploy, or the `cnpg-backup` and `console` users
-# are orphaned and Postgres backups fail — see the runbook.
+# MINIO_ROOT_PASSWORD_OLD set for one deploy, or EVERY IAM user is orphaned —
+# `platform-control`, `di-consumer`, `document-service`, `trino`, `cnpg-backup` and
+# `console` — and both Postgres backups and the whole pipeline fail. See the runbook.
 existingSecret: minio-root
 
 # Buckets created on first start.

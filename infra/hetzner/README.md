@@ -70,47 +70,92 @@ kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/
 kubectl -n cnpg-system rollout status deploy/cnpg-controller-manager
 ```
 
-**Backup credentials first** — `postgres-cluster.yaml` references Secret
-`cnpg-minio-backup`, so provision it before applying the cluster. This creates a MinIO
-user scoped to the backup bucket *only*, so a leak of it cannot reach
-`evidara-raw-artifacts` or `evidara-lakehouse`. The password is generated inline and
-never printed or committed:
+### Per-workload MinIO service accounts
+
+**Root is administrative only.** No workload authenticates to MinIO with it. Each one has
+its own MinIO user, scoped by an IAM policy to the buckets and actions its code actually
+uses, delivered in its own Kubernetes Secret. Provision them before `deploy-stage4.sh`
+and before applying `postgres-cluster.yaml` (which references `cnpg-minio-backup`):
 
 ```bash
-NS=evidara
-POD=$(kubectl -n $NS get pod -l app=minio -o jsonpath='{.items[0].metadata.name}')
-RU=$(kubectl -n $NS get secret minio -o jsonpath='{.data.rootUser}' | base64 -d)
-RP=$(kubectl -n $NS get secret minio -o jsonpath='{.data.rootPassword}' | base64 -d)
-PW=$(openssl rand -hex 24)
-MC="mc --config-dir /tmp/mccfg"   # throwaway: default config persists root creds in-pod
-
-kubectl -n $NS exec "$POD" -- sh -c "$MC alias set bk http://localhost:9000 '$RU' '$RP'"
-kubectl -n $NS exec "$POD" -- sh -c "$MC mb --ignore-existing bk/evidara-pg-backups"
-printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::evidara-pg-backups","arn:aws:s3:::evidara-pg-backups/*"]}]}' \
-  | kubectl -n $NS exec -i "$POD" -- sh -c 'cat > /tmp/pol.json'
-kubectl -n $NS exec "$POD" -- sh -c "$MC admin policy create bk cnpg-backup /tmp/pol.json"
-kubectl -n $NS exec "$POD" -- sh -c "$MC admin user add bk cnpg-backup '$PW'"
-kubectl -n $NS exec "$POD" -- sh -c "$MC admin policy attach bk cnpg-backup --user cnpg-backup"
-kubectl -n $NS create secret generic cnpg-minio-backup \
-  --from-literal=ACCESS_KEY_ID=cnpg-backup --from-literal=ACCESS_SECRET_KEY="$PW"
-kubectl -n $NS exec "$POD" -- sh -c 'rm -rf /tmp/mccfg /tmp/pol.json'
-unset PW RP
+bash infra/hetzner/provision-minio-users.sh    # idempotent; passwords generated, never printed
+bash infra/hetzner/verify-minio-scoping.sh     # the allow/deny assertions — must be all PASS
 ```
 
-Verify the scoping actually holds (both `ls` commands must be denied):
+The source of truth is [`minio-policies/accounts.json`](minio-policies/accounts.json) plus
+the policy documents beside it. Both scripts and the CI guard
+(`scripts/check_hetzner_minio_credentials.py`) read that one file, via
+[`minio-policies/scoping_matrix.py`](minio-policies/scoping_matrix.py). It declares, per
+account per bucket, the **operations** (`ro` / `wo` / `rw`) and the **key prefix** — and
+the guard checks the policy documents' actions and prefixes against it, not just their
+bucket names.
+
+| MinIO user | Kubernetes Secret | Workloads | `evidara-raw-artifacts` | `evidara-lakehouse` | `evidara-pg-backups` |
+|---|---|---|---|---|---|
+| `platform-control` | `evidara-s3-platform-control` | `platform-control-api`, `platform-control-retention-sweep` | **write + delete** (no read) | denied | denied |
+| `di-consumer` | `evidara-s3-di-consumer` | `di-consumer` | read | **read/write** under `canonical/` | denied |
+| `document-service` | `evidara-s3-document-service` | `document-service` | denied | **read** under `canonical/` | denied |
+| `trino` | `evidara-s3-trino` | Trino coordinator + worker | denied | **read/write** | denied |
+| `cnpg-backup` | `cnpg-minio-backup` | CloudNativePG `barmanObjectStore` | denied | denied | **read/write** |
+| — | — | `projection-bridge` | **no credential at all** | | |
+
+Why each scope is what it is, from the code rather than from guesswork:
+
+- **platform-control** implements only `store_page_payload`, `store_bundle_manifest` and
+  `delete_blob` (`platform-control/src/platform_control/services/artifact_store.py`) — it
+  never reads an artifact back, so it has no `s3:GetObject`. **If you add a read path,
+  widen `minio-policies/platform-control.json` in the same PR**; `verify-minio-scoping.sh`
+  asserts the read is denied today, so it will tell you.
+- **di-consumer** reads bundles from `evidara-raw-artifacts`
+  (`document-intelligence/src/document_intelligence/ingest/loaders.py`) and writes the
+  Delta surfaces named by `DI_PUBLISHED_*_URI` / `DI_PROCESSING_MANIFESTS_URI` in
+  `apps/configmap.yaml`, all under `s3://evidara-lakehouse/canonical/`.
+- **document-service** only reads those same surfaces back
+  (`document_intelligence/service/store.py::DeltaPublishedDocumentStore`).
+- **trino** queries Iceberg with `default-warehouse-dir=s3://evidara-lakehouse`
+  (`values/trino.yaml`) and touches nothing else. Its policy is an explicit action list,
+  not `s3:*` — a wildcard on a bucket ARN includes `s3:DeleteBucket`.
+- **`di-consumer` and the Iceberg sink (ADR-0036).** The `canonical/` prefix is where the
+  Delta sink writes. The Iceberg sink reuses the same `DI_S3_*` credential against the
+  Nessie warehouse root `s3://evidara-lakehouse`, which is **outside** it. That path is
+  inert today (`DI_ICEBERG_CATALOG_URI` is unset in `apps/configmap.yaml`); enabling it
+  requires widening `di-consumer`'s `prefix` to `""` and `di-consumer.json`'s object
+  Resource to `arn:aws:s3:::evidara-lakehouse/*` in the same change.
+- **projection-bridge** makes no object-storage call at all — it consumes NATS and POSTs
+  HTTP. It held the shared root key until #813 only because it took `evidara-app-secrets`
+  via `envFrom`.
+
+`evidara-app-secrets` now carries **only** `PLATFORM_CONTROL_DATABASE_URL`. It is mounted
+by every platform-control workload; anything put in it is held by all of them at once,
+which is how one credential became five workloads' worth of blast radius.
+
+Verify one account by hand, the way ADR-0038 §2 first did for `cnpg-backup`:
 
 ```bash
-# using the cnpg-backup credential, not root
+# using the account's own credential, not root
 mc ls v/evidara-pg-backups/     # allowed
 mc ls v/evidara-raw-artifacts/  # MUST be "Access Denied"
 mc ls v/evidara-lakehouse/      # MUST be "Access Denied"
 ```
 
+`verify-minio-scoping.sh` does the same thing for every account, and additionally asserts
+reads and writes rather than only listings. It has root **seed a probe object first**: a
+read denied because the object is not there is not a permission result, and a deny test
+that cannot distinguish the two passes whatever the policy says.
+
+`console` is **not** managed here. It predates this change; audit it separately (Step 6 of
+the cutover runbook) — a `console` user carrying `consoleAdmin` is a second
+root-equivalent credential.
+
+Cutover from the previous shared-root arrangement, including rollback:
+[docs/runbooks/minio-least-privilege-cutover.md](../../docs/runbooks/minio-least-privilege-cutover.md).
+
 ### Rotating the MinIO root credential
 
 **MinIO encrypts its IAM data with the root credential.** Rotating root without telling
-MinIO the previous value orphans every IAM user — here `cnpg-backup` and `console` —
-and Postgres backups start failing with an auth error that looks nothing like the cause.
+MinIO the previous value orphans **every** IAM user — `platform-control`, `di-consumer`,
+`document-service`, `trino`, `cnpg-backup` and `console` — and Postgres backups plus the
+whole pipeline start failing with auth errors that look nothing like the cause.
 Pass the old credential for exactly one deploy so MinIO re-encrypts:
 
 ```bash
@@ -136,16 +181,22 @@ Confirm both users survived, then re-run the same `helm upgrade` **without** the
 POD=$(kubectl -n $NS get pod -l app=minio -o jsonpath='{.items[0].metadata.name}')
 kubectl -n $NS exec $POD -- sh -c "mc --config-dir /tmp/c alias set r http://localhost:9000 \
   \$MINIO_ROOT_USER \$MINIO_ROOT_PASSWORD && mc --config-dir /tmp/c admin user list r"
-# MUST list cnpg-backup and console
+# MUST list platform-control, di-consumer, document-service, trino, cnpg-backup, console
 ```
 
-Then propagate to the consumers — they each hold their own copy:
+**Rotating root does not rotate the workload credentials, and no longer needs to.** They
+are separate MinIO users; only their IAM records were re-encrypted. Re-run the
+verification to prove they survived — nothing else, and no app restart:
 
 ```bash
-bash infra/hetzner/deploy-stage4.sh        # re-seeds evidara-app-secrets from minio-root
-helm upgrade --install trino trino/trino -n $NS -f infra/hetzner/values/trino.yaml --wait
-kubectl -n $NS rollout restart deploy/platform-control-api deploy/di-consumer \
-  deploy/document-service deploy/projection-bridge
+bash infra/hetzner/verify-minio-scoping.sh
+```
+
+If a user *was* orphaned (the `admin user list` above is short), re-provision just that
+one and restart only its workloads — see the cutover runbook:
+
+```bash
+bash infra/hetzner/provision-minio-users.sh <user>
 ```
 
 Then the cluster:
@@ -422,8 +473,10 @@ create-once rule as `evidara-auth` in Stage 5.
 
 - **No credential is committed.** `values/zitadel.yaml` contains only Secret *names*;
   `scripts/check_hetzner_zitadel.py` fails the build if a password, DSN or masterkey
-  ever appears in it. (`values/minio.yaml` still carries a placeholder root password on
-  `main` — that is #792, and this stage deliberately does not repeat it.)
+  ever appears in it. (`values/minio.yaml` carried a placeholder root password on `main`
+  that was the live credential — #792, fixed; `scripts/check_hetzner_minio_credentials.py`
+  is the equivalent guard, and since #813 it also fails a workload that authenticates to
+  MinIO as root at all.)
 - **Its own Postgres role, unlike Nessie.** Nessie shares the `platform_control` owner;
   Zitadel does not. An IdP is the highest-value target in the runtime (ADR-0038 §2b),
   and a leak of its DSN must not also expose every run, approval and operator row.

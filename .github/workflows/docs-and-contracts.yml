@@ -123,7 +123,9 @@ jobs:
       - name: Validate MinIO credentials are referenced, not committed
         # Pure Python, no cluster and no chart — same reasoning as the Zitadel gate
         # above. Guards the regression #792 was: the storage root password committed
-        # to main and live, with Trino holding a second copy of it.
+        # to main and live, with Trino holding a second copy of it. Since #813 it also
+        # guards the half #792 left: no workload may authenticate to MinIO as root, and
+        # no per-workload policy may be wider than the scope its account declares.
         run: python scripts/check_hetzner_minio_credentials.py
 
       - name: Validate country overlay blueprint templates

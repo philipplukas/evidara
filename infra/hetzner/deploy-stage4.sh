@@ -22,22 +22,41 @@ kubectl -n "$NS" create secret docker-registry ghcr-pull \
 kubectl -n "$NS" patch serviceaccount default \
   -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}'
 
-echo "==> App secrets (DB URL from CNPG password + MinIO creds)"
+echo "==> App secrets (DB URL from CNPG password)"
 PGPW="$(kubectl -n "$NS" get secret evidara-pg-app -o jsonpath='{.data.password}' | base64 -d)"
-# MinIO creds are read from the `minio-root` Secret, never hardcoded — this script used
-# to seed the committed `change-me-minio-root`, which meant re-running it silently
-# reinstated the leaked credential after any rotation (#792).
-MINIO_USER="$(kubectl -n "$NS" get secret minio-root -o jsonpath='{.data.rootUser}' | base64 -d)"
-MINIO_PW="$(kubectl -n "$NS" get secret minio-root -o jsonpath='{.data.rootPassword}' | base64 -d)"
-: "${MINIO_USER:?Secret minio-root not found — provision it first (infra/hetzner/README.md)}"
-: "${MINIO_PW:?Secret minio-root has no rootPassword key}"
+# NO MinIO credentials here any more (#813). This Secret is mounted with `envFrom` by
+# every platform-control and DI workload, so putting object-storage credentials in it
+# handed all of them the same key — and until #813 that key was *root*, which reaches
+# `evidara-raw-artifacts`, `evidara-lakehouse` and the `evidara-pg-backups` PITR backups
+# alike. #792 stopped the credential being committed; it left that blast radius intact.
+#
+# Each workload now gets its own scoped MinIO user from its own Secret
+# (`evidara-s3-*`), provisioned by infra/hetzner/provision-minio-users.sh and asserted
+# by infra/hetzner/verify-minio-scoping.sh. `projection-bridge` gets none at all: it
+# makes no object-storage call (it consumes NATS and POSTs HTTP).
+#
+# Re-running this script removes the old keys from the Secret, because `kubectl apply`
+# prunes fields dropped from the previous applied configuration. That is intentional —
+# leaving them would keep root live in every pod.
 kubectl -n "$NS" create secret generic evidara-app-secrets \
   --from-literal=PLATFORM_CONTROL_DATABASE_URL="postgresql+asyncpg://platform_control:${PGPW}@evidara-pg-rw:5432/platform_control" \
-  --from-literal=PLATFORM_CONTROL_S3_ACCESS_KEY_ID="${MINIO_USER}" \
-  --from-literal=PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY="${MINIO_PW}" \
-  --from-literal=DI_S3_ACCESS_KEY_ID="${MINIO_USER}" \
-  --from-literal=DI_S3_SECRET_ACCESS_KEY="${MINIO_PW}" \
   --dry-run=client -o yaml | kubectl apply -f -
+
+echo "==> Per-workload MinIO credentials"
+# Fail before the apps roll rather than after: a workload whose scoped Secret is missing
+# starts with no S3 credential and fails at the first artifact write, not at startup.
+MISSING_S3_SECRETS=""
+for s3_secret in evidara-s3-platform-control evidara-s3-di-consumer evidara-s3-document-service; do
+  if ! kubectl -n "$NS" get secret "$s3_secret" >/dev/null 2>&1; then
+    MISSING_S3_SECRETS="${MISSING_S3_SECRETS} ${s3_secret}"
+  fi
+done
+if [ -n "$MISSING_S3_SECRETS" ]; then
+  echo "!! missing scoped MinIO Secret(s):${MISSING_S3_SECRETS}"
+  echo "   run: bash ${SCRIPT_DIR}/provision-minio-users.sh"
+  echo "   then: bash ${SCRIPT_DIR}/verify-minio-scoping.sh"
+  exit 1
+fi
 
 echo "==> Config"
 kubectl apply -f "${SCRIPT_DIR}/apps/configmap.yaml"

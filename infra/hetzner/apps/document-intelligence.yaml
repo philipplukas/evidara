@@ -31,8 +31,18 @@ spec:
           envFrom:
             - configMapRef:
                 name: evidara-config
+            # No evidara-app-secrets: once the MinIO keys moved out of it (#813) the only
+            # thing left in it is PLATFORM_CONTROL_DATABASE_URL, and no DI process reads
+            # a database URL (`grep -r DATABASE_URL document-intelligence/src` is empty).
+            # Mounting it here would hand the Postgres application credential to a
+            # service that has no use for it.
+            #
+            # Scoped MinIO credential — READ-ONLY on evidara-lakehouse/canonical/*.
+            # document-service only reads the published Delta surfaces back
+            # (service/store.py::DeltaPublishedDocumentStore); it writes nothing and has
+            # no business reaching raw artifacts or the PITR backups (#813).
             - secretRef:
-                name: evidara-app-secrets
+                name: evidara-s3-document-service
           readinessProbe:
             httpGet:
               path: /health
@@ -90,8 +100,14 @@ spec:
           envFrom:
             - configMapRef:
                 name: evidara-config
+            # No evidara-app-secrets — see document-service above (#813).
+            #
+            # Scoped MinIO credential — read evidara-raw-artifacts (ingest/loaders.py
+            # fetches the bundle manifest + artifacts), write evidara-lakehouse under
+            # canonical/ (persist/sinks.py::DeltaCanonicalSink, the three
+            # DI_*_URI values in evidara-config). No access to evidara-pg-backups (#813).
             - secretRef:
-                name: evidara-app-secrets
+                name: evidara-s3-di-consumer
           # Liveness and readiness answer different questions, and #722 is what happens
           # when only one of them is asked. /health is "the process is alive" — it stays
           # green through a broker outage on purpose, because the consumer now retries
@@ -168,8 +184,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: evidara-config
-            - secretRef:
-                name: evidara-app-secrets
+            # NO object-storage credential, deliberately (#813). projection-bridge makes
+            # no S3 call at all — it consumes NATS and POSTs HTTP to legal-search and
+            # platform-control. It nevertheless held the shared MinIO *root* key until
+            # #813, purely because it took `evidara-app-secrets` via envFrom. It gets
+            # neither that Secret (its only remaining key is the Postgres URL, which no
+            # DI process reads) nor an evidara-s3-* one.
           # See di-consumer above: liveness = process alive, readiness = broker reachable (#722).
           livenessProbe:
             httpGet:
