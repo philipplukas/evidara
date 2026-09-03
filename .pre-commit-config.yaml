@@ -208,15 +208,17 @@ repos:
         files: ^docs/adr/.*\.md$
 
       # Every Playwright spec must be selected by some CI command. Selection in
-      # that suite is entirely `-g <tag>` or by path, so an untagged spec runs
-      # nowhere while still looking maintained. Skips cleanly when the frontend
-      # node_modules is absent. See #686.
+      # these suites is entirely `-g <tag>` or by path, so an untagged spec runs
+      # nowhere while still looking maintained. Skips cleanly when a surface's
+      # node_modules is absent. Covers legal-search/frontend and
+      # platform-control/admin — the admin's six specs ran in no workflow at all
+      # until M16. See #686.
       - id: e2e-spec-coverage
         name: e2e spec coverage (every spec is reachable from CI)
         entry: bash scripts/check-e2e-spec-coverage.sh
         language: system
         pass_filenames: false
-        files: ^(legal-search/frontend/(e2e/.*|package\.json)|\.github/workflows/legal-search\.yml|scripts/check-e2e-spec-coverage\.sh)$
+        files: ^((legal-search/frontend|platform-control/admin)/(e2e/.*|package\.json)|\.github/workflows/(legal-search|platform-control)\.yml|scripts/check-e2e-spec-coverage\.sh)$
 
       # `legal-search/` is NOT an npm workspace root — the real packages are
       # `legal-search/frontend` and `legal-search/api`. This hook used to run

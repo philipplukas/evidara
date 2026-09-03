@@ -25,6 +25,10 @@ Commands:
   migrate       Run Alembic migrations against local Postgres
   seed          Seed reference data into local Postgres
   seed-dry-run  Validate and preview reference data changes
+  seed-demo-runs
+                Seed one run per lifecycle state (pending / running / completed /
+                failed / cancelled) so the admin run queue has something to triage.
+                LOCAL ONLY - refuses unless PLATFORM_CONTROL_ENVIRONMENT=development.
   bootstrap     Run up + sync + migrate + seed
   api           Start the platform-control API with reload
   admin         Start the platform-control/admin app
@@ -117,6 +121,18 @@ seed_reference_data_dry_run() {
   run_in_platform_control uv run platform-control-seed-reference-data --dry-run
 }
 
+# Runs acquired by the local acceptance loop are all `completed`, so the admin's
+# triage affordances (attention chip, cancel action, failure copy, the five
+# preset chips) had no rows to render and could not be reviewed locally. This
+# writes one fixture run per lifecycle state. The seeder refuses outside
+# PLATFORM_CONTROL_ENVIRONMENT=development, which this script exports as
+# "development" by default.
+seed_demo_runs() {
+  require_cmd uv
+  run_in_platform_control uv run platform-control-seed-demo-runs \
+    --i-know-this-writes-fake-runs
+}
+
 start_api() {
   require_cmd uv
   run_in_platform_control uv run uvicorn platform_control.main:app --reload --app-dir src
@@ -167,6 +183,9 @@ case "$COMMAND" in
     ;;
   seed-dry-run)
     seed_reference_data_dry_run
+    ;;
+  seed-demo-runs)
+    seed_demo_runs
     ;;
   bootstrap)
     bootstrap

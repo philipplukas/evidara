@@ -75,6 +75,30 @@ bash scripts/platform-control-demo.sh seed-dry-run
 bash scripts/platform-control-demo.sh seed
 ```
 
+### 4b. Seed one run per lifecycle state (optional, local only)
+
+Every run a local stack acquires naturally ends `completed` — the acceptance loop
+only leaves a row behind when it finishes. That makes the admin's whole triage
+surface unreviewable locally: the `Pending` / `Running` / `Failed` / `Cancelled`
+preset chips read `0`, the attention chip never fires, and the cancel action
+never renders, because those states have never existed on a developer machine.
+
+```bash
+bash scripts/platform-control-demo.sh seed-demo-runs
+```
+
+Writes five fixture runs — one per `RunStatus` — against a `Demo · run-state
+fixtures` source. Idempotent (fixed ids: `run_demo_failed`, …), so re-running
+updates the same five rows rather than growing the queue. Every row carries
+`metadata.demo_seed = true`, and its source version is `execution_mode: shadow`:
+**nothing here dispatched anything.**
+
+It refuses unless `PLATFORM_CONTROL_ENVIRONMENT=development` — which this script
+exports by default — and the underlying CLI additionally requires an explicit
+`--i-know-this-writes-fake-runs`. Do not point it at staging or production: a
+row that describes a run which never happened is indistinguishable from real
+acquisition history once it is out of a local database.
+
 ### 5. Start the API
 
 ```bash

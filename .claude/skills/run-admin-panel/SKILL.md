@@ -37,6 +37,20 @@ bash scripts/platform-control-demo.sh api         # uvicorn platform_control.mai
 
 Docker alternative: `docker compose -f docker-compose.local.yml --profile apps up platform-control-api`.
 
+**If you need to see the run queue's triage UI**, seed the missing states first:
+
+```bash
+bash scripts/platform-control-demo.sh seed-demo-runs
+```
+
+Every run a local stack acquires ends `completed`, so `pending` / `running` /
+`failed` / `cancelled` have never existed on a developer machine — which means
+the attention chip, the cancel row action, the failure copy and four of the five
+preset chips render nothing and cannot be reviewed. This writes one fixture run
+per state (idempotent, `metadata.demo_seed = true`, `execution_mode: shadow`,
+nothing dispatched). Local only: it refuses outside
+`PLATFORM_CONTROL_ENVIRONMENT=development`.
+
 ## 2. Auth env vars (or the app shows NO data)
 
 react-admin gates on a role. Without these the lists render empty / redirect:

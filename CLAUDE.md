@@ -49,7 +49,8 @@ Run the narrowest gate for the surface you touched before pushing:
 | `legal-search/api/` | `cd legal-search/api && npm run check` |
 | `legal-search/frontend/` | `cd legal-search/frontend && npm run check && npm run build` — build is a separate CI step; it catches SSR issues `tsc` misses |
 | `legal-search/` (both surfaces) | `bash scripts/check-legal-search.sh` |
-| `legal-search/frontend/e2e/` | `bash scripts/check-e2e-spec-coverage.sh` — asserts every spec is selected by some CI command (#686) |
+| `legal-search/frontend/e2e/` or `platform-control/admin/e2e/` | `bash scripts/check-e2e-spec-coverage.sh` — asserts every spec is selected by some CI command (#686). It skips a surface whose `node_modules` is absent, so run `npm ci` in the surface you touched first or the check passes having checked nothing. |
+| `platform-control/admin/e2e/` | `cd platform-control/admin && npm run e2e:browsers && npm run e2e` — the admin's Playwright suite. Every spec mocks the API with `page.route`, so no backend is needed. It is the only layer that sees layout, stylesheets and routing: jsdom has none of the three, which is how a clipped ACTIONS column, a UA-beveled sort header and an absent dark mode all passed `npm run check`. |
 | `marketing/` | `cd marketing && npm run check` (then `npm run build` — the static export is the deploy artifact) |
 | `tools/evidara-cli/` | `bash scripts/check-evidara-cli.sh` |
 | `eval/` | see `.github/workflows/eval-ris.yml` — two `-k`-filtered pytest selections |
