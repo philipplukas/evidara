@@ -53,18 +53,19 @@ Run the narrowest gate for the surface you touched before pushing:
 | `marketing/` | `cd marketing && npm run check` (then `npm run build` — the static export is the deploy artifact) |
 | `tools/evidara-cli/` | `bash scripts/check-evidara-cli.sh` |
 | `eval/` | see `.github/workflows/eval-ris.yml` — two `-k`-filtered pytest selections |
-| `scripts/` | `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` — see note below; a bare `python3` runs 97 of 134 tests |
-| `country-overlays/` or `platform-control/src/platform_control/seeds/` | `python scripts/check_country_overlay_files.py` |
+| `scripts/` | `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` — see note below; without pyyaml only 144 of 201 tests run |
+| `country-overlays/` or `platform-control/src/platform_control/seeds/` | `for c in AT CH DE FR IT EU; do python scripts/check_country_overlay_files.py --country $c; done` — `--country` is required; the bare command exits 2 on argparse |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
 
 Rows here must not be narrower than what CI runs: a clean local run against a
 narrower gate means nothing, and the gap surfaces as a surprise red (#664, #688).
 
 For `scripts/`, `--with pyyaml` is not optional either. CI installs it via
-`requirements-docs.txt`; a workstation `python3` generally has not. Without it seven test
-modules fail to import and the runner reports `Ran 97 tests ... FAILED (errors=7)` — which
-reads as seven broken tests and is really **thirty-seven that never ran**. `uv` is already
-required by this repo, so the command above needs no venv and no system package.
+`requirements-docs.txt`; a workstation `python3` may or may not have it, and that is the
+point — the gate must not depend on ambient state. Without it eleven test modules fail to
+import and the runner reports `Ran 144 tests ... FAILED (errors=11)` — which reads as eleven
+broken tests and is really **fifty-seven that never ran**. `uv` is already required by this
+repo, so the command above needs no venv and no system package.
 
 For `document-intelligence/`, the extras are not optional: a bare `uv run pytest` cannot collect
 `test_instructor_extractor` or `test_eval_docling_extractor` and reports green over a smaller suite
