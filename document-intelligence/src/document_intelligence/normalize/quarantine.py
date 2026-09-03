@@ -161,14 +161,20 @@ UPSTREAM_ASSESSED_CONTENT_TYPES = frozenset({"text/html", "application/xhtml+xml
 # The upstream gate judges a whole *HTML portal page*, where the failure mode is a
 # script-heavy navigation shell and marker density is high. This floor judges the extracted
 # text of a *single PDF manifestation*, and the shortest real law in this repo is a
-# municipal dog-tax decision of ~700 characters. Measured on the BS LexFind acceptance
-# evidence (`tests/fixtures/bs_municipal_hundesteuer.json`, both in force):
+# cantonal dog list of 871 characters. Measured on the BS LexFind acceptance evidence,
+# `docs/runbooks/evidence/2026-07-28-ch-canton-bs-lexfind-acceptance/` (all in force):
 #
-#   Bettingen, Festsetzung der Hundesteuer     960 chars   3 markers   (2 without furniture)
-#   Riehen, Festsetzung der Hundesteuer       1001 chars   3 markers   (2 without furniture)
 #   Regierungsratsbeschluss, gefährliche Hunde 871 chars   5 markers   (4 without furniture)
+#   Bettingen, Festsetzung der Hundesteuer      960 chars   3 markers   (2 without furniture)
+#   Riehen, Festsetzung der Hundesteuer        1001 chars   3 markers   (2 without furniture)
 #
-# A floor of 3 puts the first two *exactly on* it — zero headroom — and their third marker
+# Read the provenance carefully before recalibrating. `tests/fixtures/bs_municipal_hundesteuer.json`
+# carries the **last two rows only** — the two municipal decisions, verbatim — because those are
+# the ones a unit test can assert on. The 871-character Regierungsratsbeschluss is in the
+# acceptance evidence above, not in that fixture. This comment used to attribute all three rows
+# to the fixture and to call the shortest law "~700 characters", a number that appears in neither.
+#
+# A floor of 3 puts the two municipal decisions *exactly on* it — zero headroom — and their third marker
 # is the word `Artikel` inside LexFind's own change-table boilerplate ("Änderungstabelle -
 # Nach Artikel"), which is furniture, not legal structure. Strip the change table (a
 # first-enactment record without one, another canton's template, a marginalia filter that
@@ -186,8 +192,11 @@ UPSTREAM_ASSESSED_CONTENT_TYPES = frozenset({"text/html", "application/xhtml+xml
 DEFAULT_MIN_LEGAL_MARKERS = 1
 
 # Measured, not guessed, and calibrated on the *shortest* real law rather than the
-# cantonal act: the smallest genuine document above is 871 characters, so a floor of 200
-# leaves roughly 4x headroom. (The ZH Hundeverordnung, `tests/fixtures/zh_as_554_510.pdf`,
+# cantonal act: the smallest genuine document in the acceptance evidence above is 871
+# characters, so a floor of 200 leaves roughly 4x headroom. (Calibrating against
+# `tests/fixtures/bs_municipal_hundesteuer.json` alone gives 960 and 4.8x — a weaker
+# case, which is why the floor is pinned to the evidence set and not to the fixture.)
+# (The ZH Hundeverordnung, `tests/fixtures/zh_as_554_510.pdf`,
 # normalises to 3 080 characters — but calibrating on it would have been calibrating on the
 # comfortable case.) Low enough that a one-article communal ordinance is never refused,
 # high enough that an image-only PDF (0 characters) and a cover sheet cannot pass.

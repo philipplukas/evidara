@@ -24,17 +24,25 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     registry.register(FedlexSparqlProvider())
     registry.register(RisOgdProvider())
     # Sub-federal and supranational providers. `live_ready: bool` is DEPRECATED,
-    # not gone — `resolve_readiness` still honours it as a fallback for providers
-    # declaring no `readiness` (acquisition_core/providers.py:162,175),
-    # `ProviderRegistry.live_ready_names` (:231) keeps the name, and
-    # `source_service` still publishes `live_ready` on blueprint responses (:79).
+    # not gone — but the resolver that honours it is `provider_readiness`, not
+    # `resolve_readiness`: no symbol by that name exists, so grepping the name this
+    # comment used to carry found only the comment. `provider_readiness`
+    # (acquisition_core/providers.py:159) reads the bool only as a fallback for a
+    # provider declaring no `readiness` (:175); no provider registered in this file
+    # declares one any more, so that path now serves third-party and test doubles
+    # alone. The name survives at the boundary: `ProviderRegistry.live_ready_names`
+    # (providers.py:231) and `source_service` publishing `live_ready` on blueprint
+    # responses (source_service.py:79, derived from the enum at :56).
     # What replaced it as the source of truth is the three-valued
     # `AcquisitionReadiness` (#743), declared per provider on the class and not by
     # this grouping: eur_lex_sparql, bundesland_http and regione_http are `live`;
-    # legifrance is `scaffold` until PISTE credentials exist. Either way the code
-    # key is only one of the two: blueprint templates referencing them stay
-    # `enabled: false` until an operator captures acceptance-run evidence for each
-    # jurisdiction (ADR-0030).
+    # legifrance is `scaffold` until PISTE credentials exist. The code key is only
+    # one of the two — but do not read that as "the config key is always shut". It
+    # is per template, and it is not uniform here: bundesland_http and regione_http
+    # templates ship `enabled: false`, while **both eur_lex_sparql templates ship
+    # `enabled: true`** (hierarchies/source_blueprints.yaml:717, :732), deliberately,
+    # so an operator can capture ADR-0030 acceptance evidence against them. This
+    # comment used to assert `enabled: false` for all three.
     registry.register(EurLexSparqlProvider())
     registry.register(
         LegifranceProvider(

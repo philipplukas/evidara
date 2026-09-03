@@ -8,7 +8,8 @@ Registration: https://piste.gouv.fr/registration
 Prerequisite: OAuth client_id/client_secret must be configured as
 PLATFORM_CONTROL_LEGIFRANCE_CLIENT_ID / PLATFORM_CONTROL_LEGIFRANCE_CLIENT_SECRET
 in the platform-control settings. Until then the provider remains a scaffold
-(live_ready=False) and blueprint templates referencing it parse but reject runs.
+(`readiness = AcquisitionReadiness.SCAFFOLD`) and blueprint templates referencing
+it parse but reject runs.
 """
 
 from __future__ import annotations
@@ -57,7 +58,10 @@ class LegifranceProvider:
     """Scaffold provider for French law via the PISTE/DILA Legifrance API.
 
     This provider is NOT live-ready until PISTE API credentials are configured.
-    Set live_ready = True once credentials are available and tested.
+    Promote it by setting ``readiness = AcquisitionReadiness.LIVE`` below. Setting
+    a ``live_ready = True`` attribute — which this docstring used to instruct —
+    would do **nothing**: ``provider_readiness`` returns the declared ``readiness``
+    and never reaches the legacy bool fallback (acquisition_core/providers.py:168).
     """
 
     provider_name = "legifrance"

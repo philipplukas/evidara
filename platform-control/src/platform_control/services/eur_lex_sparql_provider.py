@@ -7,12 +7,19 @@ manifestation flow, but uses the CDM (Common Data Model) ontology
 instead of jolux.
 
 Two-key production lock:
-- `live_ready = True` here means the code is internally consistent and
-  mocked tests cover the logic. Templates referencing this provider
-  are still gated by `enabled: false` in
-  `source_blueprints.yaml` until an operator captures a live acceptance
-  run (see `docs/runbooks/eu-eur-lex-fast-loop-backlog.md` for the
-  GDPR and Copyright-Directive smoke targets).
+- `readiness = AcquisitionReadiness.LIVE` on the class below — not the
+  retired `live_ready = True` bool this docstring used to name (#743) —
+  means the code is internally consistent and mocked tests cover the
+  logic. It is the *code* key only.
+- The config key is **open**, not shut: both EUR-Lex templates ship
+  `enabled: true` (`hierarchies/source_blueprints.yaml:717`, `:732`),
+  deliberately, so that an operator can capture acceptance-run evidence
+  against them. This docstring claimed the opposite — that they "stay
+  `enabled: false` until an operator captures a live acceptance run" —
+  which would tell a reader the two-key lock is shut on a provider that
+  can dispatch a production run today. See
+  `docs/runbooks/eu-eur-lex-fast-loop-backlog.md` for the GDPR and
+  Copyright-Directive smoke targets.
 
 Language selection uses the EUR-Lex authority-list mapping between
 ISO 639-1 codes and three-letter ISO 639-2 uppercase codes on
