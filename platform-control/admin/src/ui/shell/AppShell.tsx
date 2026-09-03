@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AppBar } from "./AppBar";
 import { SidebarMenu, type SidebarMenuExtraItem } from "./SidebarMenu";
+import { ThemeSync } from "./ThemeToggle";
 import { ToastAdapter } from "./ToastAdapter";
 
 interface AppShellProps {
@@ -161,6 +162,9 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
           </aside>
         </>
       ) : null}
+
+      {/* Mirrors react-admin's theme mode onto <html>; renders nothing. */}
+      <ThemeSync />
 
       {/* Notifications portal */}
       <ToastAdapter />

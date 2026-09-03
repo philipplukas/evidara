@@ -25,6 +25,7 @@ import {
   classifyTemplate,
   describeCodeKey,
   describeConfigKey,
+  describeEnablementAction,
   describeProvenance,
   type KeyDescriptor,
   LOCK_CLASS_ORDER,
@@ -179,15 +180,24 @@ export default function BlueprintTemplateList() {
       header: "Actions",
       headerClassName: "sr-only",
       className: "text-right",
-      render: (record) => (
-        <Button
-          size="sm"
-          variant={record.enabled ? "secondary" : "primary"}
-          onClick={() => setPendingFlip(record)}
-        >
-          {record.enabled ? "Disable" : "Enable"}
-        </Button>
-      ),
+      render: (record) => {
+        const action = describeEnablementAction(record);
+        return (
+          <div className="flex flex-col items-end gap-1">
+            <Button size="sm" variant={action.variant} onClick={() => setPendingFlip(record)}>
+              {action.label}
+            </Button>
+            {action.futility ? (
+              <span
+                data-testid="enablement-futility-note"
+                className="max-w-[22ch] text-right text-[11px] leading-snug text-[var(--foreground-subtle)]"
+              >
+                {action.futility}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
     },
   ];
 

@@ -62,6 +62,83 @@ export function CancelRunButton({
   );
 }
 
+type RetryRunButtonProps = CancelRunButtonProps;
+
+/**
+ * `RetryRunButton` — the recovery lever for a failed or cancelled run.
+ *
+ * `POST /v1/runs/{id}/retry` has existed since runs did and no UI ever called
+ * it. So the queue offered CANCEL on the two states that are still moving and
+ * *nothing at all* on the one state that has stopped and needs a decision — the
+ * failed run's detail page had only "Jump to…" anchors. An operator's only
+ * recovery path was a hand-written POST.
+ *
+ * Deliberately mirrors `CancelRunButton`'s shape rather than inventing a second
+ * pattern: same `ConfirmButton`, same `useRecordContext` status gate, same
+ * notify/refresh. The gate here is the server's own
+ * (`RunService.retry_run` refuses anything but FAILED / CANCELLED), so the
+ * button never offers an action the API would reject.
+ *
+ * `tier="notable"`, not `"safe"`: retry drops the run's provider jobs and
+ * **re-dispatches against the live source**. It is recovery, not a refresh, and
+ * the confirmation says so.
+ */
+export function RetryRunButton({
+  size = "small",
+  variant = "outlined",
+  fullWidth = false,
+}: RetryRunButtonProps) {
+  const run = useRecordContext<RunRecord>();
+  const notify = useNotify();
+  const refresh = useRefresh();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!run || !canRetryRun(run)) {
+    return null;
+  }
+
+  const retryRun = async () => {
+    try {
+      setIsSubmitting(true);
+      await controlPlaneActions.retryRun(run.run_id);
+      notify("Run re-queued.", { type: "success" });
+      refresh();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Unable to retry run.", {
+        type: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <ConfirmButton
+      tier="notable"
+      color="primary"
+      size={size}
+      variant={variant}
+      fullWidth={fullWidth}
+      confirmTitle="Retry this run?"
+      confirmDescription="The run is reset to pending, its provider jobs are dropped, and it is dispatched again against the live source. Fix the cause first — a retry against an unchanged failure will fail the same way."
+      confirmLabel="Retry run"
+      onConfirm={retryRun}
+      disabled={isSubmitting}
+    >
+      {isSubmitting ? "Retrying..." : "Retry"}
+    </ConfirmButton>
+  );
+}
+
+/**
+ * Mirrors `RunService.retry_run`'s guard: only a run that has stopped in a
+ * recoverable way can be retried. A completed run has nothing to recover, and a
+ * pending/running one is still moving.
+ */
+export function canRetryRun(run: Pick<RunRecord, "status">): boolean {
+  return run.status === "failed" || run.status === "cancelled";
+}
+
 type PromoteButtonProps = {
   size?: "small" | "medium" | "large";
   variant?: "contained" | "outlined" | "text";
@@ -135,8 +212,17 @@ export function RunActionStack() {
 
   const canCancel = ["pending", "running"].includes(run.status);
   const canPromote = canPromoteRunToProduction(run);
-  const actionCopy =
-    run.status === "pending"
+  const canRetry = canRetryRun(run);
+  const actionCopy = canRetry
+    ? {
+        summary:
+          run.status === "failed"
+            ? "This run stopped on a failure. Read the failure reason below, fix the cause, then retry."
+            : "This run was cancelled before it finished. Retry it when you are ready to run it again.",
+        followUp:
+          "If you do nothing, nothing further happens — a failed run is not re-attempted on its own.",
+      }
+    : run.status === "pending"
       ? {
           summary:
             "The run is still queued. Cancel it only if you need to stop work before it starts.",
@@ -173,6 +259,7 @@ export function RunActionStack() {
         <p className="text-sm text-[var(--text-meta)] m-0">{actionCopy.summary}</p>
         <p className="text-xs text-[var(--text-meta)] m-0">{actionCopy.followUp}</p>
         {canCancel ? <CancelRunButton size="medium" variant="contained" fullWidth /> : null}
+        {canRetry ? <RetryRunButton size="medium" variant="contained" fullWidth /> : null}
         {canPromote ? (
           <PromoteToProductionButton size="medium" variant="contained" fullWidth />
         ) : null}

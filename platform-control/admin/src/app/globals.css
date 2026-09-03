@@ -10,6 +10,20 @@
  * Coexists with the shared token import below; once every surface ports
  * to Tailwind we can switch to a full `@import "tailwindcss"`.
  */
+/*
+ * Layer order, declared explicitly.
+ *
+ * We add a `base` layer below `utilities` for the small reset below. Without
+ * this statement the layer would be ordered by first appearance — after
+ * `utilities` — and, being later, would WIN over every Tailwind utility. A
+ * reset that beats `font-semibold` and `px-3` is not a reset, it is a
+ * regression. Declaring the order here fixes it regardless of import order.
+ *
+ * Note that the rest of this file is deliberately *unlayered*, which in the CSS
+ * cascade beats every layer. That is the existing behaviour and is unchanged.
+ */
+@layer theme, base, utilities;
+
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
@@ -20,6 +34,47 @@
  * and by v2 Tailwind primitives (e.g. `shadow-[var(--shadow-card)]`).
  */
 @import "../../../../styles/tokens/tokens.css";
+
+/*
+ * ─── The one piece of preflight this app cannot do without ───
+ *
+ * Skipping `@import "tailwindcss"` skips preflight, and preflight is where
+ * Tailwind neutralises the user-agent button styling. Without it every bare
+ * `<button>` in the Tailwind primitives kept the UA default —
+ * `border: 2px outset rgb(0,0,0)` on a grey `ButtonFace` ground. That is what
+ * put a beveled box around the sortable column header on every list; measured
+ * on the live app, it reads as a stuck focus ring.
+ *
+ * Scoped away from MUI by `:not([class*="Mui"])`. Every MUI control renders
+ * with `MuiButtonBase-root`, so the residual MUI surfaces (`ConfirmButton`'s
+ * dialog, `StatusBadge`'s Chip) keep their own base styles — which is the whole
+ * reason preflight was skipped in the first place.
+ *
+ * In `@layer base` so Tailwind utilities still win: see the layer statement at
+ * the top of this file.
+ */
+@layer base {
+  button:not([class*="Mui"]) {
+    /* `outset` is the UA default border-style and survives a `border-width`
+       utility, so the style must be reset as well as the width. */
+    border-style: solid;
+    border-width: 0;
+    border-color: currentColor;
+    background-color: transparent;
+    background-image: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: inherit;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  button:not([class*="Mui"]):disabled {
+    cursor: not-allowed;
+  }
+}
 
 :root {
   --admin-page-glow-brand: color-mix(in oklab, var(--brand) 10%, transparent);
@@ -71,6 +126,26 @@
   --admin-cta-shadow-hover: 0 18px 34px color-mix(in oklab, var(--brand) 28%, transparent);
 }
 
+/*
+ * ─── Dark mode ───
+ *
+ * The dark palette is NOT new: `styles/tokens/tokens.css` has carried a
+ * complete `.dark` block for every shared token — surfaces, the foreground and
+ * border ladders, status, badges, shadows — since it was written. Nothing ever
+ * put the class on. Light and dark screenshots of this app were byte-identical
+ * (same md5) and the compiled stylesheet contained zero `prefers-color-scheme`
+ * rules, so an operator on a dark OS got a full-brightness white panel.
+ *
+ * `react-admin` already owns the mode: `useTheme()` reads a `prefers-color-scheme`
+ * default, persists an explicit choice in its own store, and drives MUI. Rather
+ * than run a second theme system beside it, `ThemeSync` mirrors that one value
+ * onto `<html class="dark">`, which is what the token block below keys off. One
+ * source of truth, two consumers.
+ *
+ * Everything here is an *admin-local* override of an admin-local token. The
+ * shared tokens are already handled by `.dark` upstream, so components keep
+ * reading `var(--surface-panel)` and need no per-theme branch.
+ */
 html,
 body {
   min-height: 100%;
@@ -78,6 +153,53 @@ body {
 
 html {
   color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark {
+  /*
+   * The header is the one surface that cannot simply follow the shared tokens.
+   * `--brand` in dark is #4a9eda — a light blue chosen to read as an accent on
+   * a dark ground, not to *be* a ground. Left alone, the header gradient would
+   * become the brightest thing on the screen, which is the defect this whole
+   * block exists to remove. Rebuild it from the dark surfaces instead, tinted
+   * toward the brand rather than made of it.
+   */
+  --admin-shell-header-start: color-mix(in oklab, var(--surface-panel) 84%, var(--brand) 16%);
+  --admin-shell-header-end: color-mix(in oklab, var(--surface-page) 88%, var(--brand) 12%);
+  --admin-header-shadow: 0 18px 40px rgb(0 0 0 / 34%);
+
+  /*
+   * `--admin-on-brand` is the ink for the header, and it derives from
+   * `--primary-foreground`, which the dark palette flips to near-black for use
+   * on light violet buttons. On the dark header that is unreadable. Every
+   * `--admin-on-brand-*` rung is a color-mix of this one value and re-resolves
+   * from it, so redefining the base is enough.
+   */
+  --admin-on-brand: var(--foreground);
+
+  /*
+   * Page chrome. The light theme paints two soft radial glows over a
+   * light-to-lighter gradient; at dark-surface luminance the same mix reads as
+   * dirt. Keep the geometry, drop the intensity.
+   */
+  --admin-page-glow-brand: color-mix(in oklab, var(--brand) 14%, transparent);
+  --admin-page-glow-neutral: color-mix(in oklab, var(--brand) 8%, transparent);
+  --admin-page-top: color-mix(in oklab, var(--surface-page) 88%, var(--surface-panel));
+  --admin-page-bottom: var(--surface-page);
+  --admin-page-sheen-brand: color-mix(in oklab, var(--brand) 8%, transparent);
+  --admin-page-sheen-light: color-mix(in oklab, var(--surface-panel) 22%, transparent);
+
+  --admin-panel-bg: color-mix(in oklab, var(--surface-panel) 92%, transparent);
+
+  /* On the dark header the lattice already carries; no lift needed. */
+  --admin-brand-mark-accent: var(--accent-core);
+
+  --admin-cta-shadow: 0 16px 30px rgb(0 0 0 / 34%);
+  --admin-cta-shadow-hover: 0 18px 34px rgb(0 0 0 / 42%);
 }
 
 body {

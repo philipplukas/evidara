@@ -29,6 +29,57 @@ import { DataTable, type DataTableColumn, Panel, Pill, type PillLevel } from "..
 
 const EM_DASH = "—";
 
+/**
+ * The level presets.
+ *
+ * The list is 2,169 rows over 44 alphabetical pages, and — per the summary
+ * header this page already renders — four of them have any acquisition at all.
+ * Those four were unreachable without paging, because the table had no filter
+ * and no sort.
+ *
+ * `level` is the *only* narrowing `GET /v1/acquisition-coverage` accepts
+ * (`routers/coverage.py` takes `limit`, `offset`, `level`), and it is enough:
+ * 2,110 of the rows are municipal, so the two chips below reduce the table to
+ * ~59 rows — which is where every row with data lives today.
+ *
+ * A "has acquisition" preset would be the more direct answer and is
+ * deliberately NOT built client-side: the endpoint is server-paginated, so a
+ * filter applied to the loaded page would report "0 with acquisition" while
+ * sitting on page 1 of 44. That needs a server-side predicate, which is not
+ * this lane's to add.
+ */
+const LEVEL_PRESETS = [
+  { key: "federal", label: "Federal" },
+  { key: "cantonal", label: "Cantonal" },
+  { key: "municipal", label: "Municipal" },
+] as const;
+
+type LevelKey = (typeof LEVEL_PRESETS)[number]["key"];
+
+function PresetButton({
+  isActive,
+  onClick,
+  children,
+}: {
+  isActive: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center rounded-full border px-3 h-8 text-[12px] font-semibold transition-colors ${
+        isActive
+          ? "bg-[var(--brand-wash-8)] border-[var(--brand)]/50 text-[var(--brand)]"
+          : "bg-[var(--surface-panel)]/60 border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-strong)]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 /** A denominator's trustworthiness decides what the row is allowed to claim. */
 const TIER_PRESENTATION: Record<string, { level: PillLevel; hint: string }> = {
   published: {
@@ -128,6 +179,13 @@ export function AcquisitionCoverageList() {
     sort: { field: "jurisdiction_id", order: "ASC" },
   });
   const [summary, setSummary] = useState<AcquisitionCoverageSummary | null>(null);
+
+  const activeLevel =
+    typeof controller.filterValues?.level === "string"
+      ? (controller.filterValues.level as LevelKey)
+      : undefined;
+  const setLevel = (level: LevelKey | undefined) =>
+    controller.setFilters(level ? { level } : {}, undefined, false);
 
   useEffect(() => {
     let cancelled = false;
@@ -258,6 +316,38 @@ export function AcquisitionCoverageList() {
           </header>
 
           <SummaryPanel summary={summary} />
+
+          <section className="rounded-[18px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-4 space-y-2 shadow-[var(--shadow-card)] backdrop-blur-[12px]">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <PresetButton isActive={!activeLevel} onClick={() => setLevel(undefined)}>
+                All levels
+              </PresetButton>
+              {LEVEL_PRESETS.map((preset) => (
+                <PresetButton
+                  key={preset.key}
+                  isActive={activeLevel === preset.key}
+                  onClick={() => setLevel(preset.key)}
+                >
+                  {preset.label}
+                </PresetButton>
+              ))}
+            </div>
+            <p className="text-[12px] text-[var(--foreground-subtle)]">
+              {/*
+               * Says what the operator cannot do here, rather than leaving them
+               * to discover it by clicking headers that do not sort. The
+               * endpoint takes `level` and pagination and nothing else: no
+               * ordering parameter, no "has acquisition" predicate. Ordering is
+               * the server's (alphabetical), so a client-side sort control
+               * would reorder 50 of 2,169 rows and look like it had sorted the
+               * table.
+               */}
+              Filtered on the server, so the count and pager below describe the whole level — not
+              this page. Rows are ordered by the API (alphabetical) and this endpoint offers no
+              other ordering; most municipal rows carry no acquisition yet, which is what the header
+              counts say.
+            </p>
+          </section>
 
           <DataTable<AcquisitionCoverageRecord>
             records={controller.data}

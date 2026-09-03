@@ -46,4 +46,44 @@ describe("DataTable horizontal overflow", () => {
     expect(table).toHaveClass("min-w-full");
     expect(table).not.toHaveClass("w-full");
   });
+
+  it("publishes the overflow state so the cue has something to key off", () => {
+    renderTable();
+
+    // jsdom has no layout engine and reports every dimension as 0, so the only
+    // reachable state here is "none" — the geometry itself is covered by
+    // `tableOverflow.test.ts`. What this pins is that the attribute exists at
+    // all: a scroll container with no cue is what made ACTIONS invisible.
+    const scroller = screen.getByRole("table").parentElement;
+    expect(scroller).toHaveAttribute("data-overflow", "none");
+    expect(screen.queryByTestId("datatable-overflow-hint")).toBeNull();
+  });
+
+  it("pins an opted-in column so scroll cannot take the row's actions away", () => {
+    render(
+      <DataTable<Row>
+        records={[{ id: "1", name: "Fedlex" }]}
+        columns={[
+          ...COLUMNS,
+          {
+            key: "actions",
+            header: "Actions",
+            stickyRight: true,
+            render: () => <button type="button">Cancel</button>,
+          },
+        ]}
+        getRowId={(r) => r.id}
+      />,
+    );
+
+    for (const cell of [
+      screen.getByRole("columnheader", { name: "Actions" }),
+      screen.getByRole("cell", { name: "Cancel" }),
+    ]) {
+      expect(cell).toHaveClass("sticky");
+      expect(cell).toHaveClass("right-0");
+      // A transparent pinned cell would let the scrolling columns show through.
+      expect(cell.className).toContain("bg-[var(--surface-");
+    }
+  });
 });

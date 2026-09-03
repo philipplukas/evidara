@@ -65,7 +65,9 @@ export default function PreviewReviewShowV2() {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill level={runRecordStatusToLevel(run.status)}>{STATUS_LABEL[run.status]}</Pill>
-          <Pill level={runModeToLevel(run.mode)}>{runModeLabel(run.mode)}</Pill>
+          <Pill variant="tag" level={runModeToLevel(run.mode)}>
+            {runModeLabel(run.mode)}
+          </Pill>
           <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
         </div>
         <RecordContextProvider value={run}>

@@ -3,6 +3,7 @@ import {
   classifyTemplate,
   describeCodeKey,
   describeConfigKey,
+  describeEnablementAction,
   describeProvenance,
   summarizeInventory,
 } from "./blueprintLock";
@@ -103,5 +104,47 @@ describe("describeProvenance", () => {
     expect(
       describeProvenance({ source: "override", default_enabled: false, updated_by: "op_123" }),
     ).toContain("operator key");
+  });
+});
+
+describe("describeEnablementAction", () => {
+  it("gives the filled primary CTA only to the row where enabling finishes the job", () => {
+    expect(describeEnablementAction(lock(false, true))).toEqual({
+      label: "Enable",
+      variant: "primary",
+      futility: null,
+    });
+  });
+
+  it("demotes the CTA on a row whose own copy says enabling will do nothing", () => {
+    // The defect: the "Needs provider work" filter showed four rows each
+    // reading "Enabling the config key will not unlock it; this needs a
+    // provider change" — beside a filled violet Enable button, the most
+    // prominent affordance on the row.
+    const action = describeEnablementAction(lock(false, false));
+    expect(action.label).toBe("Enable");
+    expect(action.variant).not.toBe("primary");
+    expect(action.futility).toContain("provider needs a change");
+  });
+
+  it("also demotes a built-but-unproven provider, whose code key is equally shut", () => {
+    // `launchable = enabled and live_ready` in source_service.py, and
+    // `live_ready` is true only for readiness "live". Enabling here changes
+    // `enabled` and nothing an operator wants.
+    const action = describeEnablementAction(awaitingEvidence(false));
+    expect(action.variant).not.toBe("primary");
+    expect(action.futility).toContain("code key is still shut");
+  });
+
+  it("keeps Disable plain and never futile — including on a scaffold", () => {
+    // Turning a key off always does what it says; on a prematurely enabled
+    // scaffold it is the only way to undo the flip.
+    expect(describeEnablementAction(lock(true, true))).toEqual({
+      label: "Disable",
+      variant: "secondary",
+      futility: null,
+    });
+    expect(describeEnablementAction(lock(true, false)).label).toBe("Disable");
+    expect(describeEnablementAction(lock(true, false)).futility).toBeNull();
   });
 });

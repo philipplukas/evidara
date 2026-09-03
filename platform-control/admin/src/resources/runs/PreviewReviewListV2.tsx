@@ -56,7 +56,7 @@ function PresetButton({ isActive, onClick, children, tone = "accent" }: PresetBu
       className={`inline-flex items-center rounded-full border px-3 h-8 text-[12px] font-semibold transition-colors ${
         isActive
           ? toneActive
-          : "bg-white/60 border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-strong)]"
+          : "bg-[var(--surface-panel)]/60 border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-strong)]"
       }`}
     >
       {children}

@@ -11,7 +11,7 @@
  */
 "use client";
 
-import { FlaskConical } from "lucide-react";
+import { FlaskConical, LayoutDashboard } from "lucide-react";
 import { useResourceDefinitions } from "ra-core";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -101,6 +101,23 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
       className="flex flex-col h-full min-h-[calc(100vh-80px)] pt-4 md:pt-6"
     >
       <ul className="flex-shrink-0 list-none m-0 p-0">
+        {/*
+         * The dashboard, which nothing linked to.
+         *
+         * `useResourceDefinitions` enumerates *resources*, and the dashboard is
+         * not one — it is `<Admin dashboard={…}>` at `/`. So all thirteen
+         * generated links pointed at resources or create forms and the overview
+         * became unreachable the moment an operator navigated away from it.
+         * `end` (exact match) because every other route is a prefix of "/".
+         */}
+        <li>
+          <NavLink to="/" end className={({ isActive }) => navItemClass(isActive)}>
+            <span className="text-[var(--accent-core)] flex items-center" aria-hidden>
+              <LayoutDashboard size={16} strokeWidth={2} />
+            </span>
+            <span>Overview</span>
+          </NavLink>
+        </li>
         {resourceEntries.map((resource) => {
           const to = `/${resource.name}`;
           // Replicate NavLink's prefix match (`end={false}`) ourselves so that
