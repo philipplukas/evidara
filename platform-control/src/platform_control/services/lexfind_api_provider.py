@@ -298,6 +298,11 @@ def is_in_force(record: dict[str, Any], *, as_of: str | None = None) -> bool | N
     from dates downstream: a record with `is_active: False` is NOT in force even
     if its `version_inactive_since` is missing and its `version_active_since` is
     in the past.
+
+    `as_of` is not optional in spirit. The answer is only ever true *on a date*,
+    so acquisition passes the capture date explicitly and stores the result under
+    a capture-scoped key; the default of "today" is a convenience for tests and
+    ad-hoc inspection, not a licence to freeze the answer into a document.
     """
     if record.get("is_active") is False:
         return False
@@ -850,12 +855,14 @@ class LexFindApiProvider:
         # evidence rather than implied by its absence. See ADR-0047.
         assessment = assess_legal_text_density("", content_type="application/pdf")
 
+        fetched_at = datetime.now(UTC)
+
         metadata: dict[str, Any] = {
             "provider": self.provider_name,
             "tol_id": tol_id,
             "language": language,
             "run_id": run.run_id,
-            "fetched_at": datetime.now(UTC).isoformat(),
+            "fetched_at": fetched_at.isoformat(),
             "capture_guard": "passed",
             "legal_text_assessment": "abstained_binary_manifestation",
             "legal_text_evidence": assessment.as_evidence(),
@@ -881,9 +888,25 @@ class LexFindApiProvider:
                 metadata["lexfind_info_badge"] = version["info_badge"]
         metadata.update(temporal_metadata(version or {}))
 
-        in_force = is_in_force(version or record)
-        if in_force is not None:
-            metadata["in_force"] = in_force
+        # Point-in-time force is DERIVED from the window emitted just above, at
+        # query time, by whoever is asking and for the date they are asking
+        # about (`resolveInForceState` in legal-search, driven by `in_force_at`).
+        # It is never read back from a stored boolean, because a boolean is only
+        # true on the day it was computed and this corpus outlives its captures:
+        # #661 IS a law that was in force when it was fetched and is not now.
+        # This key used to be a bare `in_force`, which read as a claim about the
+        # present and silently became a lie the first time a captured law was
+        # repealed.
+        #
+        # What is honest to record is the capture-time *observation*, named so it
+        # cannot be mistaken for the answer and pinned to the same instant as
+        # `fetched_at` rather than to a second `now()`. Same shape as
+        # `fedlex_sparql`'s `in_force_at_selection`, which the acquisition gate in
+        # scripts/ch-fedlex-fast-loop.sh reads to refuse a corpus of law that was
+        # already out of force when it was acquired.
+        in_force_at_capture = is_in_force(version or record, as_of=fetched_at.date().isoformat())
+        if in_force_at_capture is not None:
+            metadata["in_force_at_capture"] = in_force_at_capture
 
         title = (version or {}).get("title") or record.get("title")
 
