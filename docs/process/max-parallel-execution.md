@@ -77,5 +77,6 @@ When multiple lanes need the same API or event shape:
 ## Related
 
 - [Parallel work streams (by component)](parallel-work-streams.md)
+- These serialization gates applied to multi-agent orchestration scripts: [Agent workflows](agent-workflows.md)
 - Change classification and gates: [AGENTS.md](../../AGENTS.md)
 - Contract location: [ADR-0004: Contract strategy](../adr/0004-contract-strategy.md)

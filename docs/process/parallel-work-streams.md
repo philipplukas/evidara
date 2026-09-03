@@ -30,5 +30,6 @@ Use this when several people or initiatives move at once. The goal is **parallel
 
 - MacConfig / Kubernetes migration lanes (GitOps, Argo, Terraform slimming): [Migration parallel workstreams](../migration/parallel-workstreams.md)
 - Max concurrency, stale-branch refresh policy, and serialization gates: [Max parallel execution](max-parallel-execution.md)
+- The same seams applied to multi-agent orchestration scripts: [Agent workflows](agent-workflows.md)
 - Change classification and required sync checks: [AGENTS.md](../../AGENTS.md)
 - Contract location (monorepo root only): [ADR-0004: Contract strategy](../adr/0004-contract-strategy.md)
