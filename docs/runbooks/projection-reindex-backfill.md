@@ -201,6 +201,118 @@ curl -s "$OS/evidara-documents-read-dev/_count" -H 'Content-Type: application/js
 If the shell count is non-zero, Step 0's preconditions were not met: fix the DI
 read API wiring and re-run the backfill (it will overwrite the shells in place).
 
+## Procedure: Audit a canonical table for metadata fields it silently dropped
+
+**Use this before you conclude a rebuild will fix a missing field** (#871). It usually will
+not, and this is the one failure mode where "canonical truth is Delta" is the problem
+rather than the answer.
+
+### What went wrong, and why a rebuild does not undo it
+
+`DeltaCanonicalSink._write_rows` reads the *existing* table's Arrow schema on every
+append and conforms the batch to it
+(`document-intelligence/src/document_intelligence/persist/sinks.py`). PyArrow applies
+that target type to nested fields too, and it **drops a struct field the target struct
+does not declare, without raising**. `metadata` is a single struct column, so the set of
+canonical metadata keys a table can ever hold is fixed by the **first batch written to
+it**. Every key absent from that batch is discarded on every append afterwards, in
+silence.
+
+Note the exact shape of the exposure: it is *not* "keys added to the pipeline after the
+table was created". Most keys in `_build_document` are conditional — `official_citation`
+is only set when one was resolved, `in_force_from` only when the window was established
+upstream — so a table created by a document that merely *happened* not to carry a key
+will drop that key from every later document too, even though the code was already
+emitting it. `provenance` is a struct column as well, and `Provenance.to_dict()` omits
+its optional fields when they are `None`, so `source_snapshot_id` and friends are
+exposed to the same loss with no code change at all.
+
+**A rebuild from canonical replays what Delta holds.**
+`build_document_processed_event_from_published_row` reads `row["metadata"]` and passes it
+on; the [Delta rebuild](#procedure-rebuild-from-canonical-delta-disaster-recovery)
+therefore reproduces the absence faithfully. So does a
+[versioned reindex](#procedure-delta-sourced-versioned-reindex-zero-downtime) and so does
+`_reindex` from the previous index. #806 is the live example: it proposes a clean rebuild
+to fix duplicate documents *and* notes `official_citation` is null on every production
+document. The rebuild fixes the first and cannot touch the second.
+
+### Step 1: Diff the table's metadata struct against what the pipeline emits
+
+Read-only, and safe against a live surface — it opens the Delta log, not the data.
+
+```bash
+cd document-intelligence
+export DI_S3_ENDPOINT_URL=... DI_S3_ACCESS_KEY_ID=... DI_S3_SECRET_ACCESS_KEY=...
+uv run --extra service python - <<'PY'
+import deltalake, pyarrow as pa
+from document_intelligence.persist.sinks import delta_storage_options
+
+URI = "s3://evidara-lakehouse/canonical/published_documents"   # or gs://.../published_documents
+options = delta_storage_options() or {}
+schema = deltalake.DeltaTable(URI, storage_options=options).to_pyarrow_dataset().schema
+for column in ("metadata", "provenance", "extensions"):
+    if column not in schema.names:
+        print(f"{column}: COLUMN ABSENT")
+        continue
+    field_type = schema.field(column).type
+    names = [field_type.field(i).name for i in range(field_type.num_fields)] if pa.types.is_struct(field_type) else []
+    print(f"{column}: {sorted(names)}")
+PY
+```
+
+Compare `metadata` against the keys `_build_document` and `process_event` can set
+(`document-intelligence/src/document_intelligence/pipeline.py`). Anything the pipeline
+emits and the struct does not declare has been dropped for the life of the table.
+`in_force_from` / `in_force_until` are the ones to check first: they only reached
+`document.metadata` on 2026-07-19 (#661, #663), while the MinIO surfaces were configured
+on 2026-07-12 (#523/#526) — so any table created in that window cannot hold ADR-0033's
+temporal window at all, and a point-in-time query over it answers `unknown` by
+construction rather than by evidence.
+
+To find out how much of the corpus is affected rather than whether the schema allows it,
+count the nulls:
+
+```bash
+uv run --extra service python - <<'PY'
+import deltalake, pyarrow.compute as pc
+from document_intelligence.persist.sinks import delta_storage_options
+
+URI = "s3://evidara-lakehouse/canonical/published_documents"
+table = deltalake.DeltaTable(URI, storage_options=delta_storage_options() or {}).to_pyarrow_table(
+    columns=["document_id", "metadata"]
+)
+metadata = table.column("metadata").combine_chunks()
+for key in ("official_citation", "in_force_from", "in_force_until", "regeste"):
+    try:
+        present = pc.sum(pc.is_valid(metadata.field(key))).as_py() or 0
+    except KeyError:
+        present = "field not in schema"
+    print(f"{key}: {present} of {table.num_rows}")
+PY
+```
+
+A field that is *in* the schema and null on every row is the same outcome by a different
+route — worth distinguishing, because it separates "the write dropped it" from "nothing
+ever produced it".
+
+### Step 2: Choose a remediation — and do not choose the rebuild
+
+| Situation | What actually restores the field |
+|---|---|
+| The table is disposable (dev, a handful of stub documents) | Delete the surface and re-run acquisition. Cheapest by far, and the honest option for #806's six-document production index. |
+| The documents matter and the raw bundles are still held | **Reprocess**, do not rebuild. Re-run the pipeline over each artifact bundle so it publishes a new `document_revision` carrying the full metadata, then run the Delta backfill — `iter_latest_document_rows` takes the newest revision, so the projection picks the repaired row up. |
+| The documents matter and the bundles are gone | The value is not recoverable from anything the platform holds. Re-acquire from the authority. |
+
+In every case, **deploy the widening fix first**. Until
+`_widen_for_new_nested_fields` is in the running image, a reprocessed document appends to
+the same narrow schema and is silently narrowed again — you would pay for the reprocess
+and get an unchanged table.
+
+Widening the schema does not backfill existing rows either: rows written before the fix
+read back with the new field as `null`. That is correct — the value was never captured —
+and it is exactly why "the schema now has the field" must not be mistaken for "the corpus
+now has the value".
+
 ## Procedure: Reconcile — remove indexed documents canonical does not back
 
 **Use this when the index contains documents that canonical Delta no longer has** —

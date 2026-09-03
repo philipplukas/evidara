@@ -1,5 +1,6 @@
 """Tests for SparkDeltaCanonicalSink using a mocked SparkSession."""
 
+import dataclasses
 import json
 import os
 import sys
@@ -15,7 +16,7 @@ from document_intelligence.persist.sinks import (
     SparkDeltaCanonicalSink,
 )
 from support import build_bundle_event, build_manifest_payload
-from test_adapters import build_commentary_insight
+from test_adapters import build_commentary_insight, build_processing_result
 
 
 def _make_mock_spark() -> MagicMock:
@@ -190,6 +191,40 @@ class SparkDeltaCanonicalSinkTests(unittest.TestCase):
         ):
             self.assertIn(key, doc_row, f"Expected column '{key}' missing from published_documents row")
         self.assertGreater(len(doc_row["extensions"]["citations"]), 0)
+
+    def test_a_new_metadata_key_reaches_spark_verbatim(self):
+        """The Spark sink is structurally immune to the nested-field loss — keep it that way (#871).
+
+        `DeltaCanonicalSink` and `IcebergCanonicalSink` both conform the batch to the
+        *existing table's* Arrow schema, and that conformance silently drops a struct field
+        the target type does not declare. This sink never reads the table's schema at all:
+        it serialises each row to JSON, lets `spark.read.json` infer, and evolves the table
+        with `mergeSchema`. So the whole class of loss cannot occur here.
+
+        That is a property worth a test rather than a comment, because the obvious
+        "harmonise the three sinks" refactor is exactly what would destroy it.
+        """
+        from document_intelligence.canonical.models import Document
+
+        sink, spark = self._make_sink()
+        result = build_processing_result()
+        document = dataclasses.replace(
+            result.document,
+            metadata={**result.document.metadata, "regeste": "Art. 754 OR; Verantwortlichkeit."},
+        )
+        self.assertIsInstance(document, Document)
+        sink.persist(document, [], result.manifest)
+
+        doc_row = json.loads(spark.sparkContext.parallelize.call_args_list[0].args[0][0])
+        self.assertEqual(doc_row["metadata"]["regeste"], "Art. 754 OR; Verantwortlichkeit.")
+        # Every surface goes JSON -> inferred schema -> mergeSchema. Nothing in this sink
+        # reads a committed schema, so there is no target type for a field to be lost to.
+        self.assertEqual(
+            spark.read.json.call_count,
+            spark.sparkContext.parallelize.call_count,
+        )
+        for opt_call in spark.read.json.return_value.write.option.call_args_list:
+            self.assertEqual(opt_call, call("mergeSchema", "true"))
 
 
 if __name__ == "__main__":

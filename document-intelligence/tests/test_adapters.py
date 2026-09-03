@@ -263,6 +263,97 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             # The pre-existing row keeps its shape; widening the schema did not rewrite it.
             self.assertIsNone(rows[without.document_id]["metadata"].get("regeste"))
 
+    def test_an_optional_provenance_field_survives_append_to_an_existing_table(self) -> None:
+        """The loss is not about `metadata` — it is about every struct column (#871).
+
+        `metadata` is the loudest case because canonical keys are added to it often, but the
+        cast that drops a nested field is applied to `provenance` too, and that one needs no
+        code change to bite: `Provenance.to_dict` omits its optional fields when they are
+        `None`, so the struct the table is *created* with is whatever the first row happened
+        to carry. A first document acquired without a `source_snapshot_id` therefore freezes
+        `provenance` without that field, and every later document's snapshot id — its link
+        back to the exact upstream capture — is dropped on the way to Delta.
+
+        Which restates the exposure correctly: not "keys added after the table was created",
+        but "keys absent from the batch that created the table".
+        """
+        import deltalake
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            documents_uri = os.path.join(temp_dir, "published_documents")
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=documents_uri,
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                )
+            )
+
+            first = build_processing_result()
+            self.assertEqual(first.document.provenance.source_snapshot_id, SOURCE_SNAPSHOT_ID)
+            # Create the table from a document whose provenance carries no snapshot id.
+            without = dataclasses.replace(
+                first.document,
+                provenance=first.document.provenance.with_updates(source_snapshot_id=None),
+            )
+            sink.persist(without, [], first.manifest)
+            self.assertNotIn(
+                "source_snapshot_id",
+                deltalake.DeltaTable(documents_uri).to_pyarrow_table().to_pylist()[0]["provenance"],
+            )
+
+            with_snapshot = dataclasses.replace(
+                first.document,
+                document_id="doc_01hx000000000000000000003x",
+            )
+            sink.persist(with_snapshot, [], first.manifest)
+
+            rows = {
+                row["document_id"]: row for row in deltalake.DeltaTable(documents_uri).to_pyarrow_table().to_pylist()
+            }
+            self.assertEqual(
+                rows[with_snapshot.document_id]["provenance"]["source_snapshot_id"],
+                SOURCE_SNAPSHOT_ID,
+            )
+
+    def test_a_new_section_metadata_key_survives_append_to_an_existing_table(self) -> None:
+        """`published_sections` is cast to its own table schema too (#871).
+
+        Every canonical surface goes through the same `_write_rows`, so proving the fix on
+        `published_documents` alone would leave three tables asserted by nothing. Sections
+        carry the section-level metadata the detail page renders, and the sections table is
+        appended to on *every* publication, so it accumulates the drift fastest.
+        """
+        import deltalake
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            sections_uri = os.path.join(temp_dir, "published_sections")
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
+                    published_sections_uri=sections_uri,
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                )
+            )
+
+            first = build_processing_result()
+            self.assertTrue(first.sections, "the fixture must produce at least one section")
+            plain = [dataclasses.replace(section, metadata={"heading_level": 1}) for section in first.sections]
+            sink.persist(first.document, plain, first.manifest)
+
+            annotated = [
+                dataclasses.replace(
+                    section,
+                    section_id=f"{section.section_id}_v2",
+                    metadata={"heading_level": 1, "marginal_note": "Randtitel"},
+                )
+                for section in first.sections
+            ]
+            sink.persist(first.document, annotated, first.manifest)
+
+            rows = {row["section_id"]: row for row in deltalake.DeltaTable(sections_uri).to_pyarrow_table().to_pylist()}
+            self.assertEqual(rows[annotated[0].section_id]["metadata"]["marginal_note"], "Randtitel")
+
     def test_latest_document_revision_reads_back_published_history(self) -> None:
         # The read side of #652: the pipeline asks the sink what it already published so a
         # re-acquisition can be revision N+1 instead of another row pinned at 1.
