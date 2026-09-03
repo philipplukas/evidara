@@ -900,10 +900,23 @@ class LexFindApiProvider:
         #
         # What is honest to record is the capture-time *observation*, named so it
         # cannot be mistaken for the answer and pinned to the same instant as
-        # `fetched_at` rather than to a second `now()`. Same shape as
-        # `fedlex_sparql`'s `in_force_at_selection`, which the acquisition gate in
-        # scripts/ch-fedlex-fast-loop.sh reads to refuse a corpus of law that was
-        # already out of force when it was acquired.
+        # `fetched_at` rather than to a second `now()`. Same SHAPE as
+        # `fedlex_sparql`'s `in_force_at_selection` (fedlex_sparql_provider.py:306)
+        # — a time-scoped observation rather than a timeless claim — but not the
+        # same key, and therefore NOT covered by the same gate:
+        # scripts/ch-fedlex-fast-loop.sh:643-645 filters on the literal name
+        # `in_force_at_selection`, so it will never see this one. Unifying the two
+        # names would let one gate cover both providers and is worth doing when
+        # something other than that fedlex-shaped canary needs it; `capture` is
+        # the accurate word here, because this provider selects no consolidation
+        # member.
+        #
+        # `fetched_at` is UTC, so `as_of` is the UTC date. A capture made in
+        # Switzerland between midnight and 01:00/02:00 local falls on the previous
+        # UTC day and is therefore evaluated one day early against an exclusive
+        # end boundary. Not introduced here — `is_in_force`'s default was already
+        # UTC — but it is a real one-day error in a corpus of Swiss law, and it
+        # belongs with the other boundary question in #843.
         in_force_at_capture = is_in_force(version or record, as_of=fetched_at.date().isoformat())
         if in_force_at_capture is not None:
             metadata["in_force_at_capture"] = in_force_at_capture
