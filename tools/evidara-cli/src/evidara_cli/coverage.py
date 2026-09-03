@@ -40,6 +40,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from evidara_cli.gate_coverage import gate_coverage_verdict
+
 # --- ADR-0030 code key (provider readiness) --------------------------------------
 READINESS_SCAFFOLD = "scaffold"
 READINESS_AWAITING_EVIDENCE = "awaiting_evidence"
@@ -354,11 +356,23 @@ def acceptance_evidence_verdict(
     run: dict[str, Any],
     execution_mode: str | None = None,
     captured_resources_count: int | None = None,
+    evidence_bundle: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Decide whether a run may be cited as ADR-0030 acceptance evidence.
 
     Refuses loudly rather than reporting a green-looking run as evidence. The SHADOW
     refusal is the one ADR-0030 §2 calls out by name.
+
+    ``evidence_bundle`` is the harness `summary.json` for the run, when the caller has
+    it. Its gate ledger is the only thing that can say whether the gates the run reports
+    as absent were *excluded* (not applicable — still evidence) or *not evaluated*
+    (asked for and missing — not evidence). See :mod:`evidara_cli.gate_coverage`; the
+    rule is implemented there and nowhere else, so `flip_refusals` inherits it through
+    ``is_acceptance_evidence`` rather than re-deriving it.
+
+    Omitting the bundle keeps the pre-#744-split behaviour exactly: the run-level rules
+    below decide alone. That is a real gap — a bundle nobody passes cannot refuse — and
+    it is why the note names the bundle rather than leaving the reader to remember.
     """
     refusals: list[str] = []
     if bool(run.get("refused")):
@@ -375,17 +389,24 @@ def acceptance_evidence_verdict(
     if isinstance(count, int) and count <= 0:
         refusals.append(EVIDENCE_NO_CAPTURED_RESOURCES)
 
+    gate_coverage = gate_coverage_verdict(evidence_bundle)
+    items = [{"code": code, "detail": _EVIDENCE_DETAIL[code]} for code in refusals]
+    items.extend(gate_coverage["refusals"])
+
     return {
-        "is_acceptance_evidence": not refusals,
-        "refusals": [{"code": code, "detail": _EVIDENCE_DETAIL[code]} for code in refusals],
+        "is_acceptance_evidence": not items,
+        "refusals": items,
         "run_id": run.get("run_id"),
         "mode": run.get("mode"),
         "execution_mode": execution_mode,
         "captured_resources_count": count,
+        "gate_coverage": gate_coverage,
         "note": (
-            "A pass here justifies only the gates that actually ran. ADR-0030 §5: read the "
-            "harness's Gate coverage / skipped_gates before flipping `enabled: true`, and "
-            "treat a skipped gate as unverified, not as verified-and-green (#744)."
+            "A pass here justifies only the gates that actually ran. ADR-0030 §5: a gate "
+            "the operator excluded is still a defensible pass; a gate that was asked for "
+            "and could not run leaves a hole and refuses the flip (#744). Cite the "
+            "harness bundle with --evidence-bundle so `gate_coverage` is derived rather "
+            "than assumed — without it, only the run-level rules above ran."
         ),
     }
 

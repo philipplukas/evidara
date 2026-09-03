@@ -180,10 +180,53 @@ workflow, not a code change:
 A `pass` verdict is only justification for the gates that actually ran. Several
 gates self-skip when they do not apply to a template (the title regex, the body
 language hint, the indexed-language facet), and a skipped gate used to render as
-an unqualified pass. The evidence markdown now carries a **Gate coverage**
-section listing every skipped gate by name (`checks.skipped_gates` in
-`summary.json`); read it before step 3 and treat a skipped gate as unverified,
-not as verified-and-green (#744).
+an unqualified pass. The evidence markdown carries a **Gate coverage**
+section listing every absent gate by name; read it before step 3 and treat an
+absent gate as unverified, not as verified-and-green (#744).
+
+> **Amended 2026-09-03 (#744).** "Absent" was one bucket, `checks.skipped_gates`,
+> and it carried two claims that mean opposite things:
+>
+> - **`excluded`** — nobody asked for the gate. This template declares no title
+>   pattern, no language to assert. The gate is not applicable, and a run without
+>   it is still acceptance evidence for the gates that did run.
+> - **`not_evaluated`** — the gate was asked for and could not run: legal-search
+>   was unreachable, the projection never became queryable, no document reached
+>   `document.processed` to assert over. That is a hole in the evidence, and a
+>   `pass` over it is the green-over-nothing failure this ADR exists to prevent
+>   (#605, #675, #713, #728).
+>
+> One list could not say which, so an unreachable legal-search rendered as *"not
+> applicable to this template"* — a false statement about the template. The
+> harness now emits `checks.gate_coverage`, an entry per absent gate carrying
+> `{gate, outcome, reason}`, alongside `checks.excluded_gates` and
+> `checks.not_evaluated_gates`. `checks.skipped_gates` is retained as the union of
+> the two so every existing reader keeps working.
+>
+> **The escalation rule: a run whose gates were only *excluded* may still be cited
+> here; a run with any *not-evaluated* gate may not, and the refusal names which.**
+> It is implemented once — `gate_coverage_verdict()` in
+> [`tools/evidara-cli/src/evidara_cli/gate_coverage.py`](../../tools/evidara-cli/src/evidara_cli/gate_coverage.py)
+> — and folded into `acceptance_evidence_verdict()`, so `coverage enable` inherits
+> it through the existing `evidence_run_is_not_acceptance_evidence` refusal rather
+> than re-deriving it. Cite the bundle with `--evidence-bundle <path to
+> summary.json>`; platform-control stores no gate ledger, so without the file the
+> hole is invisible to the CLI and only the run-level rules above apply.
+>
+> The vocabulary is Soda Core v4's (`CheckOutcome.EXCLUDED` / `NOT_EVALUATED`),
+> which draws the same line and escalates only the second, *"[because] exiting 0
+> would leave it under-asserting silently."* Adopting a published vocabulary was
+> preferred over inventing a third: OpenLineage's `TestRunFacet` (`pass|fail|skip`)
+> stays the interchange target but has one bucket for both reasons, and dbt's
+> `skipped` means only "not run because the DAG upstream failed".
+>
+> **Bundles written before this date are read conservatively, not migrated.** A
+> pre-split bundle cannot say why a gate is absent, so every entry in its
+> `skipped_gates` is read as `not_evaluated` — the direction that can only refuse
+> evidence that might have been fine, never accept evidence that is not. This
+> costs nothing on what exists: all five persisted bundles under
+> [`docs/runbooks/evidence/`](../runbooks/evidence/README.md) report
+> `skipped_gates: []`, which means the same thing under either reading.
 
 `scripts/ch-fedlex-fast-loop.sh` and `scripts/ch-fedlex-compose-e2e.sh` take the
 corpus shape as flags — `--expect-content-type`, `--url-pattern`,

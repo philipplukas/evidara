@@ -1,9 +1,15 @@
 """Gate-coverage rendering in `scripts/fast-loop-evidence.sh` (#744).
 
 The evidence markdown these tests exercise is the artifact an operator reads before
-flipping `enabled: true` under ADR-0030. A gate that self-skipped must read as
-skipped there — reporting it as a pass is the green-because-it-never-ran defect
-this repo keeps paying for (#605, #675, #713).
+flipping `enabled: true` under ADR-0030. A gate that did not run must read as not-run
+there — reporting it as a pass is the green-because-it-never-ran defect this repo keeps
+paying for (#605, #675, #713).
+
+Since 2026-09-03 that is two claims, not one. A gate the operator EXCLUDED (no title
+pattern to assert for this corpus) is unverified but not a hole; a gate that was NOT
+EVALUATED (asked for, and legal-search was unreachable) is a hole, and the run is not
+acceptance evidence. The single `skipped_gates` list rendered both as "skipped (not
+applicable to this template)" — which is a false statement about the second.
 """
 
 from __future__ import annotations
@@ -63,34 +69,182 @@ def summary(**checks: object) -> dict:
     }
 
 
+def ledger(*entries: tuple[str, str, str]) -> dict:
+    """A `gate_coverage` ledger plus its union, as the harnesses emit both."""
+    return {
+        "gate_coverage": [
+            {"gate": gate, "outcome": outcome, "reason": reason}
+            for gate, outcome, reason in entries
+        ],
+        "skipped_gates": [gate for gate, _outcome, _reason in entries],
+    }
+
+
 class GateCoverageTests(unittest.TestCase):
-    def test_skipped_gate_is_named_and_marked_unverified(self) -> None:
+    def test_an_excluded_gate_reads_as_excluded_and_carries_its_reason(self) -> None:
         markdown = render(
-            summary(skipped_gates=["title_ok", "indexed_language_ok"], title_ok=1)
+            summary(**ledger(("title_ok", "excluded", "no_expected_title_declared")))
         )
 
         self.assertIn("## Gate coverage", markdown)
-        self.assertIn("`title_ok` — **skipped (not applicable to this template)**", markdown)
-        self.assertIn("`indexed_language_ok` — **skipped", markdown)
+        self.assertIn("`title_ok` — **excluded** (`no_expected_title_declared`)", markdown)
+        # Excluded is unverified but not a hole; the bundle stays citable.
+        self.assertIn("> Gates NOT EVALUATED (asked for, could not run): none.", markdown)
+        self.assertNotIn("not ADR-0030 acceptance evidence", markdown)
 
-    def test_skipped_gates_appear_in_the_paste_block(self) -> None:
+    def test_a_not_evaluated_gate_is_named_a_hole_not_an_inapplicable_gate(self) -> None:
+        markdown = render(
+            summary(**ledger(("indexed_title_ok", "not_evaluated", "no_legal_search_url")))
+        )
+
+        self.assertIn(
+            "`indexed_title_ok` — **NOT EVALUATED** (`no_legal_search_url`)", markdown
+        )
+        # The old renderer said "not applicable to this template" here. An unreachable
+        # legal-search is not a statement about the template.
+        self.assertNotIn("not applicable to this template", markdown)
+        self.assertIn("not ADR-0030 acceptance evidence", markdown)
+
+    def test_the_two_outcomes_are_told_apart_in_the_paste_block(self) -> None:
+        markdown = render(
+            summary(
+                **ledger(
+                    ("title_ok", "excluded", "no_expected_title_declared"),
+                    ("indexed_title_ok", "not_evaluated", "projection_not_queryable"),
+                )
+            )
+        )
+
+        self.assertIn(
+            "> Gates excluded (not applicable, not asserted): `title_ok`.", markdown
+        )
+        self.assertIn(
+            "> Gates NOT EVALUATED (asked for, could not run): `indexed_title_ok` — "
+            "this run is NOT ADR-0030 acceptance evidence.",
+            markdown,
+        )
+
+    def test_empty_coverage_reports_full_coverage(self) -> None:
+        markdown = render(summary(gate_coverage=[], skipped_gates=[]))
+
+        self.assertIn("None — every gate below was evaluated.", markdown)
+        self.assertIn("> Gates excluded (not applicable, not asserted): none.", markdown)
+        self.assertIn("> Gates NOT EVALUATED (asked for, could not run): none.", markdown)
+
+    def test_a_legacy_bundle_is_read_as_not_evaluated(self) -> None:
+        # A bundle from before the split cannot say WHY a gate is absent. Reading it as
+        # excluded would upgrade an unknown into a pass; reading it as NOT EVALUATED can
+        # only refuse evidence that might have been fine. Same rule as
+        # `tools/evidara-cli/src/evidara_cli/gate_coverage.py`.
         markdown = render(summary(skipped_gates=["title_ok"]))
 
-        self.assertIn("> Skipped gates (not verified): `title_ok`.", markdown)
+        self.assertIn("`title_ok` — **NOT EVALUATED** (`reason_not_recorded`)", markdown)
+        self.assertIn("not ADR-0030 acceptance evidence", markdown)
 
-    def test_empty_skipped_gates_reports_full_coverage(self) -> None:
+    def test_a_legacy_bundle_with_an_empty_list_still_reads_as_full_coverage(self) -> None:
+        # Why the conservative read costs nothing: every bundle persisted under
+        # docs/runbooks/evidence/ reports `skipped_gates: []`, which means the same
+        # thing under both readings.
         markdown = render(summary(skipped_gates=[]))
 
         self.assertIn("None — every gate below was evaluated.", markdown)
-        self.assertIn("> Skipped gates (not verified): none.", markdown)
+        self.assertIn("> Gates NOT EVALUATED (asked for, could not run): none.", markdown)
+        self.assertNotIn("not ADR-0030 acceptance evidence", markdown)
 
     def test_run_without_the_key_is_unknown_not_covered(self) -> None:
-        # The five sibling fast-loop scripts do not emit `skipped_gates` yet. Their
+        # The five sibling fast-loop scripts do not emit gate coverage yet. Their
         # evidence must not claim a coverage they never reported.
         markdown = render(summary())
 
-        self.assertIn("Unknown — this run did not report gate coverage.", markdown)
+        self.assertIn("Unknown — this run reported no gate coverage at all.", markdown)
+        self.assertIn("> Gate coverage: NOT REPORTED by this run", markdown)
         self.assertNotIn("every gate below was evaluated", markdown)
+
+
+class GateLedgerHelpers(unittest.TestCase):
+    """The ledger the harnesses build, exercised without running a harness."""
+
+    def _ledger(self, script: str) -> dict:
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'log() {{ :; }}; source "{EVIDENCE_LIB}"; gate_ledger_reset; {script}; '
+                'printf "%s\n%s\n%s\n" "$(gate_ledger_json)" '
+                '"$(gate_ledger_names_json excluded)" "$(gate_ledger_names_json not_evaluated)"',
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise AssertionError(f"ledger failed: {result.stderr}")
+        full, excluded, not_evaluated = result.stdout.strip().splitlines()
+        return {
+            "gate_coverage": json.loads(full),
+            "excluded": json.loads(excluded),
+            "not_evaluated": json.loads(not_evaluated),
+        }
+
+    def test_an_empty_ledger_serialises_as_an_empty_array(self) -> None:
+        # `[]` and `null` are different claims: the first says every gate ran.
+        self.assertEqual(
+            self._ledger(":"),
+            {"gate_coverage": [], "excluded": [], "not_evaluated": []},
+        )
+
+    def test_each_outcome_lands_in_its_own_list(self) -> None:
+        got = self._ledger(
+            "gate_excluded title_ok no_expected_title_declared; "
+            "gate_not_evaluated indexed_title_ok no_legal_search_url"
+        )
+
+        self.assertEqual(
+            got["gate_coverage"],
+            [
+                {
+                    "gate": "title_ok",
+                    "outcome": "excluded",
+                    "reason": "no_expected_title_declared",
+                },
+                {
+                    "gate": "indexed_title_ok",
+                    "outcome": "not_evaluated",
+                    "reason": "no_legal_search_url",
+                },
+            ],
+        )
+        self.assertEqual(got["excluded"], ["title_ok"])
+        self.assertEqual(got["not_evaluated"], ["indexed_title_ok"])
+
+
+class EveryHarnessThatReportsCoverageSaysWhy(unittest.TestCase):
+    """A harness must not reintroduce the collapsed list (#744).
+
+    `skipped_gates` alone cannot distinguish a gate nobody asked for from a gate that
+    could not run, and only the second must refuse the flip. A harness that emits the
+    old key without the ledger is the partial port this asserts against.
+    """
+
+    def test_no_harness_emits_skipped_gates_without_gate_coverage(self) -> None:
+        scripts_dir = REPO_ROOT / "scripts"
+        harnesses = sorted(
+            [*scripts_dir.glob("*-fast-loop.sh"), scripts_dir / "ch-fedlex-compose-e2e.sh"]
+        )
+        self.assertGreaterEqual(len(harnesses), 6, "fast-loop harnesses disappeared")
+
+        offenders = []
+        for script in harnesses:
+            body = script.read_text(encoding="utf-8")
+            if "skipped_gates:" not in body:
+                continue  # emits no coverage at all; the renderer reports that as unknown
+            if "gate_coverage:" not in body:
+                offenders.append(f"{script.name}: emits skipped_gates with no gate_coverage")
+            if "skipped_gates+=(" in body:
+                offenders.append(
+                    f"{script.name}: builds the collapsed list directly instead of the ledger"
+                )
+        self.assertEqual(offenders, [], "; ".join(offenders))
 
 
 class ContentTypeLabelTests(unittest.TestCase):

@@ -305,8 +305,11 @@ def test_good_acceptance_run_is_accepted() -> None:
     )
     assert verdict["is_acceptance_evidence"] is True
     assert verdict["refusals"] == []
-    # A pass still carries the skipped-gate warning (#744).
-    assert "skipped_gates" in verdict["note"]
+    # A pass still carries the gate-coverage warning, and now names the flag that
+    # turns it from a warning into a check (#744).
+    assert "--evidence-bundle" in verdict["note"]
+    # No bundle was cited, so nothing about gate coverage was established.
+    assert verdict["gate_coverage"]["reported"] is False
 
 
 def test_preview_run_is_not_acceptance_evidence() -> None:

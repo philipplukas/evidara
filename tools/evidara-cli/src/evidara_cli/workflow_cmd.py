@@ -34,6 +34,7 @@ from evidara_cli.envelope import (
     evidence_count,
     evidence_http,
 )
+from evidara_cli.gate_coverage import load_evidence_bundle
 from evidara_cli.proposal import SourceSpecProposal
 
 # ---------------------------------------------------------------------------
@@ -892,6 +893,16 @@ def run_status(
 @workflow_run_app.command("evidence")
 def run_evidence(
     run_id: Annotated[str, typer.Option("--run-id", help="Workflow run id.")],
+    evidence_bundle: Annotated[
+        str | None,
+        typer.Option(
+            "--evidence-bundle",
+            help=(
+                "Path to the acceptance harness `summary.json` for this run, so the "
+                "verdict reads the gate ledger instead of assuming every gate ran."
+            ),
+        ),
+    ] = None,
     human: Annotated[bool, typer.Option("--human", help="Pretty-print JSON")] = False,
     correlation_id: Annotated[str | None, typer.Option("--correlation-id")] = None,
 ) -> None:
@@ -902,9 +913,21 @@ def run_evidence(
     refuses a SHADOW-mode version outright — it replays cassettes and never reaches the
     live portal, so it proves nothing about it (ADR-0030 §2) — as well as a refused run,
     a non-acceptance mode, and a run that captured nothing.
+
+    With `--evidence-bundle` it also refuses a run whose harness reports a gate that was
+    asked for and could not run. platform-control holds no gate ledger, so without the
+    bundle that hole is invisible here (#744).
     """
     step = "run.evidence"
-    inputs: dict[str, Any] = {"run_id": run_id}
+    inputs: dict[str, Any] = {"run_id": run_id, "evidence_bundle": evidence_bundle}
+
+    bundle: dict[str, Any] | None = None
+    if evidence_bundle:
+        try:
+            bundle = load_evidence_bundle(evidence_bundle)
+        except (OSError, ValueError) as exc:
+            typer.echo(f"--evidence-bundle could not be read: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
     pc_base = platform_control_base_url()
     pc_headers = platform_control_headers(correlation_id=correlation_id)
 
@@ -1010,6 +1033,7 @@ def run_evidence(
             run=run_payload if isinstance(run_payload, dict) else {},
             execution_mode=execution_mode,
             captured_resources_count=artifacts.get("captured_resource_count"),
+            evidence_bundle=bundle,
         )
         artifacts["acceptance_verdict"] = verdict
         ev.append(
@@ -1043,8 +1067,9 @@ def run_evidence(
                 if verdict["is_acceptance_evidence"]
                 else "verify",
                 "reason": (
-                    "Acceptance evidence captured. Read the harness's skipped-gate list "
-                    "before flipping `enabled: true` (ADR-0030 §5)."
+                    "Acceptance evidence captured. Read the harness's gate ledger — "
+                    "excluded gates are a defensible pass, not-evaluated gates are not "
+                    "— before flipping `enabled: true` (ADR-0030 §5)."
                     if verdict["is_acceptance_evidence"]
                     else "Evidence collected, but this run is not ADR-0030 acceptance "
                     "evidence. Review `acceptance_verdict.refusals`."

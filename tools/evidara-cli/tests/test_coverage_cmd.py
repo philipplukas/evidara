@@ -821,3 +821,110 @@ def test_enable_exit_codes_through_the_real_cli(_pc: object, _req: object) -> No
 
     missing_note = runner.invoke(app, [*base, "--disable"])
     assert missing_note.exit_code == 2
+
+
+# ---------------------------------------------------------------------------------
+# The gate ledger reaches the flip (#744)
+# ---------------------------------------------------------------------------------
+
+
+def _bundle_file(tmp_path: Any, *entries: tuple[str, str, str]) -> str:
+    path = tmp_path / "summary.json"
+    path.write_text(
+        json.dumps(
+            {
+                "verdict": "pass",
+                "checks": {
+                    "captured_count": 3,
+                    "gate_coverage": [
+                        {"gate": gate, "outcome": outcome, "reason": reason}
+                        for gate, outcome, reason in entries
+                    ],
+                    "skipped_gates": [gate for gate, _o, _r in entries],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return str(path)
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_refuses_a_bundle_whose_gate_could_not_run(
+    _pc: object, req_mock: Any, emit_mock: Any, tmp_path: Any
+) -> None:
+    """A gate that was asked for and could not run is a hole, not a pass.
+
+    Everything else about this run is good — completed, `mode=acceptance`, live
+    execution mode, the right provider. Only the ledger disqualifies it, and the
+    refusal has to name which gate.
+    """
+    req_mock.side_effect = [_LIVE_NEVER_TURNED, _ACCEPTANCE_RUN, _VERSIONS_LIVE]
+
+    with pytest.raises(typer.Exit) as exc:
+        _enable(
+            evidence_run_id="run_ok",
+            evidence_bundle=_bundle_file(
+                tmp_path, ("indexed_title_ok", "not_evaluated", "no_legal_search_url")
+            ),
+        )
+
+    assert exc.value.exit_code == 1
+    payload = _payload(emit_mock)
+    assert _codes(payload) == ["evidence_run_is_not_acceptance_evidence"]
+    verdict = payload["artifacts"]["acceptance_verdict"]
+    assert [r["code"] for r in verdict["refusals"]] == ["gate_not_evaluated"]
+    assert "indexed_title_ok" in verdict["refusals"][0]["detail"]
+    # Three reads, no write.
+    assert req_mock.call_count == 3
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_accepts_a_bundle_whose_gates_were_only_excluded(
+    _pc: object, req_mock: Any, emit_mock: Any, tmp_path: Any
+) -> None:
+    """The other half of the split: a deselected gate must not block the flip.
+
+    Without this, the escalation would be indistinguishable from refusing every run
+    that ever skipped a gate — which is the old behaviour with extra steps.
+    """
+    req_mock.side_effect = [
+        _LIVE_NEVER_TURNED,
+        _ACCEPTANCE_RUN,
+        _VERSIONS_LIVE,
+        {"enabled": True, "source": "override"},
+        _LIVE_FLIPPED,
+    ]
+
+    _enable(
+        evidence_run_id="run_ok",
+        note="Evidence bundle under docs/runbooks/evidence/",
+        evidence_bundle=_bundle_file(
+            tmp_path, ("title_ok", "excluded", "no_expected_title_declared")
+        ),
+    )
+
+    payload = _payload(emit_mock)
+    assert payload["artifacts"]["acceptance_verdict"]["refusals"] == []
+    assert payload["artifacts"]["verification"]["applied"] is True
+
+
+@patch("evidara_cli.coverage_cmd._emit")
+@patch("evidara_cli.coverage_cmd.request_json")
+@patch("evidara_cli.coverage_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_enable_stops_on_an_unreadable_bundle_rather_than_ignoring_it(
+    _pc: object, req_mock: Any, _emit_mock: Any, tmp_path: Any
+) -> None:
+    """Degrading to "no gates skipped" would restore the defect the flag closes."""
+    path = tmp_path / "summary.json"
+    path.write_text("{not json", encoding="utf-8")
+
+    with pytest.raises(typer.Exit) as exc:
+        _enable(evidence_run_id="run_ok", evidence_bundle=str(path))
+
+    assert exc.value.exit_code == 2
+    assert req_mock.call_count == 0
