@@ -90,8 +90,10 @@ class ReferenceDataSeeder:
         )
 
         # Policies land before jurisdictions so jurisdictions.compliance_policy_id
-        # resolves its FK on the first run. Jurisdictions without a policy
-        # stay unconstrained (absence is the explicit operator signal).
+        # resolves its FK on the first run. A jurisdiction left without a policy
+        # is INERT, not unconstrained: a source under it is refused at dispatch
+        # (`compliance_policy_missing`) rather than acquiring unpaced. There is no
+        # parent fallback — see `errors.CompliancePolicyMissingError`.
         await self._upsert_compliance_policies(
             session, bundles["compliance_policies"].items, summary
         )

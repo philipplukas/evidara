@@ -17,135 +17,181 @@ items:
     compliance_policy_id: cp_ch_fedlex_open_data
     level: federal
   # ─── Swiss cantons (ISO 3166-2:CH, alphabetical by code) ───
+  # Every canton binds `cp_ch_lexfind`. Until this line existed, NO cantonal
+  # jurisdiction carried a compliance policy at all, and none inherited one —
+  # `_resolve_policy_for_source` has no parent fallback, by design (see the
+  # policy file's header for the argument). So every LexFind run this repo has
+  # ever produced ran with no rate limiter, no robots enforcement and no
+  # attribution block, including the acceptance bundles under
+  # `docs/evidence/`.
+  #
+  # It binds at JURISDICTION level, not authority level, on purpose: LexFind
+  # serves all 26 cantons from one host, and `RateLimiterRegistry` keys its
+  # limiters by `compliance_policy_id` with per-host buckets inside — so one
+  # policy id shared by 26 jurisdictions yields ONE shared budget at
+  # lexfind.ch, which is the pacing an operator of that host would expect.
+  # Twenty-six separate policies would each start with a full bucket.
+  #
+  # A cantonal source that is NOT LexFind must not inherit this: it would carry
+  # an attribution line naming a mirror it never touched. Bind its own policy at
+  # the AUTHORITY level, which wins over the jurisdiction (see
+  # `authorities.yaml` — `auth_zh_obergericht` already does exactly this with
+  # `cp_ch_court_decisions`).
   - jurisdiction_id: jur_ch_zh
     slug: ch-zh
     name: Kanton Zürich
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_be
     slug: ch-be
     name: Kanton Bern / Canton de Berne
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_lu
     slug: ch-lu
     name: Kanton Luzern
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ur
     slug: ch-ur
     name: Kanton Uri
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_sz
     slug: ch-sz
     name: Kanton Schwyz
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ow
     slug: ch-ow
     name: Kanton Obwalden
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_nw
     slug: ch-nw
     name: Kanton Nidwalden
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_gl
     slug: ch-gl
     name: Kanton Glarus
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_zg
     slug: ch-zg
     name: Kanton Zug
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_fr
     slug: ch-fr
     name: Canton de Fribourg / Kanton Freiburg
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_so
     slug: ch-so
     name: Kanton Solothurn
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_bs
     slug: ch-bs
     name: Kanton Basel-Stadt
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_bl
     slug: ch-bl
     name: Kanton Basel-Landschaft
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_sh
     slug: ch-sh
     name: Kanton Schaffhausen
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ar
     slug: ch-ar
     name: Kanton Appenzell Ausserrhoden
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ai
     slug: ch-ai
     name: Kanton Appenzell Innerrhoden
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_sg
     slug: ch-sg
     name: Kanton St. Gallen
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_gr
     slug: ch-gr
     name: Kanton Graubünden / Chantun Grischun / Cantone dei Grigioni
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ag
     slug: ch-ag
     name: Kanton Aargau
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_tg
     slug: ch-tg
     name: Kanton Thurgau
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ti
     slug: ch-ti
     name: Cantone Ticino
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_vd
     slug: ch-vd
     name: Canton de Vaud
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_vs
     slug: ch-vs
     name: Canton du Valais / Kanton Wallis
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ne
     slug: ch-ne
     name: Canton de Neuchâtel
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ge
     slug: ch-ge
     name: Canton de Genève
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   - jurisdiction_id: jur_ch_ju
     slug: ch-ju
     name: Canton du Jura
     parent_id: jur_ch
+    compliance_policy_id: cp_ch_lexfind
     level: cantonal
   # ─── Swiss municipalities (BFS-keyed, generated; see scripts/generate_ch_municipality_seeds.py) ───
   - jurisdiction_id: jur_ch_gemeinde_1

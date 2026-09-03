@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from conftest import dispatchable_compliance_policy
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio.testing import WorkflowEnvironment
@@ -331,7 +332,14 @@ async def _seed_source_fixtures(
 
     Returns (source_id, source_version_id).
     """
-    jur = Jurisdiction(jurisdiction_id="jur_test", name="Test", slug="test")
+    policy = dispatchable_compliance_policy()
+    session.add(policy)
+    jur = Jurisdiction(
+        jurisdiction_id="jur_test",
+        name="Test",
+        slug="test",
+        compliance_policy_id=policy.compliance_policy_id,
+    )
     session.add(jur)
     auth = Authority(
         authority_id="auth_test", jurisdiction_id="jur_test", name="Test Auth", slug="test-auth"

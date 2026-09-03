@@ -74,6 +74,11 @@ Before running, confirm for the chosen host:
 - [ ] `robots.txt` permits the decision / index paths you will fetch. The
       `cp_ch_court_decisions` policy is `robots_mode: strict`, so a disallowed
       path **must not** be used — pick a different path or the aggregator.
+      `strict` also honours the file's `Crawl-delay` / `Request-rate`: the
+      declared gap is applied per host and can only make the run *slower* than
+      the policy corridor below, never faster. So a host asking for 10 s between
+      requests will pace this run at 6 rpm regardless of the corridor — expect
+      the canary to take correspondingly longer, and do not read that as a stall.
 - [ ] The index/listing page actually exposes per-decision links that match the
       provider's `link_pattern` (docket-in-URL or `.html`). Spot-check by opening
       the listing and confirming ruling links carry a docket like `1C_123/2024`

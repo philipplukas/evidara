@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import httpx
 import pytest
+from conftest import dispatchable_compliance_policy
 from sqlalchemy import select
 
 import platform_control.routers.health as health_router
@@ -111,7 +112,16 @@ async def test_readiness_endpoint_returns_503_when_database_check_fails() -> Non
 @pytest.mark.asyncio
 async def test_preview_run_reaches_terminal_state_and_exposes_summary(session_maker) -> None:
     async with session_maker() as seed_session:
-        seed_session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+        policy = dispatchable_compliance_policy()
+        seed_session.add(policy)
+        seed_session.add(
+            Jurisdiction(
+                jurisdiction_id="jur_ch",
+                name="Switzerland",
+                slug="ch",
+                compliance_policy_id=policy.compliance_policy_id,
+            )
+        )
         seed_session.add(
             Authority(
                 authority_id="auth_zh_admin",
@@ -291,7 +301,16 @@ async def test_preview_run_reaches_terminal_state_and_exposes_summary(session_ma
 @pytest.mark.asyncio
 async def test_failed_preview_run_is_surfaced(session_maker) -> None:
     async with session_maker() as seed_session:
-        seed_session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+        policy = dispatchable_compliance_policy()
+        seed_session.add(policy)
+        seed_session.add(
+            Jurisdiction(
+                jurisdiction_id="jur_ch",
+                name="Switzerland",
+                slug="ch",
+                compliance_policy_id=policy.compliance_policy_id,
+            )
+        )
         seed_session.add(
             Authority(
                 authority_id="auth_zh_admin",
