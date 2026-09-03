@@ -87,8 +87,9 @@ _REMEDY_TEXT = {
     ),
     BLOCKER_TEMPLATE_DISABLED_BY_OPERATOR: (
         "An operator explicitly turned the config key off. Acceptance mode does NOT waive "
-        "an operator's kill switch. Turn it back on from the admin panel's Blueprints "
-        "inventory (ADR-0030 §2)."
+        "an operator's kill switch. Ask them first; reopening it is `evidara workflow "
+        "coverage enable --reopen-operator-kill-switch` (or the admin panel's Blueprints "
+        "inventory) (ADR-0030 §2)."
     ),
     BLOCKER_TEMPLATE_NEVER_ENABLED: (
         "The config key has never been turned. Acceptance mode waives it, so capture "
@@ -447,6 +448,9 @@ FLIP_NO_EVIDENCE_RUN = "no_evidence_run_cited"
 FLIP_EVIDENCE_NOT_ACCEPTANCE = "evidence_run_is_not_acceptance_evidence"
 FLIP_EVIDENCE_PROVIDER_UNRESOLVED = "evidence_run_provider_unresolved"
 FLIP_PROVIDER_MISMATCH = "evidence_run_provider_mismatch"
+FLIP_EVIDENCE_CAPTURE_COUNT_UNKNOWN = "evidence_run_capture_count_unknown"
+FLIP_CLASSIFICATION_DISAGREES = "classification_disagrees_with_server"
+FLIP_PROVIDER_NOT_LIVE = "provider_not_live_not_acknowledged"
 FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED = "operator_kill_switch_not_acknowledged"
 
 _FLIP_DETAIL = {
@@ -468,6 +472,25 @@ _FLIP_DETAIL = {
         "The cited run ran a different acquisition provider than this template uses. "
         "Evidence about one portal is not evidence about another (ADR-0030 §2)."
     ),
+    FLIP_EVIDENCE_CAPTURE_COUNT_UNKNOWN: (
+        "The cited run reports no `captured_resources_count`, so the 'it captured "
+        "something' check did not run. A check that cannot run must refuse, not pass "
+        "(#744)."
+    ),
+    FLIP_CLASSIFICATION_DISAGREES: (
+        "The client-side lock derivation disagrees with the server's `launchable`. "
+        "This command gates a *write* on that derivation, so a disagreement is "
+        "disqualifying. Trust /v1/runs/readiness and file a bug."
+    ),
+    FLIP_PROVIDER_NOT_LIVE: (
+        "ADR-0030 §2: a template may only be `enabled: true` if its provider is LIVE — "
+        "not merely AWAITING_EVIDENCE, because an enabled template would dispatch "
+        "production runs on evidence nobody captured. That invariant is asserted over "
+        "`source_blueprints.yaml` by test_blueprint_provider_parity.py but NOT over the "
+        "override table this writes, so the ordering is on you: move the code key "
+        "first. Pass --acknowledge-provider-below-live to arm the key ahead of it "
+        "anyway."
+    ),
     FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED: (
         "This key was turned off by an operator — a deliberate kill switch, not a key "
         "that was never earned. Acceptance evidence does not waive it. Pass "
@@ -483,12 +506,20 @@ def flip_refusals(
     evidence_verdict: dict[str, Any] | None = None,
     evidence_provider: str | None = None,
     reopen_acknowledged: bool = False,
+    below_live_acknowledged: bool = False,
 ) -> list[dict[str, str]]:
     """Reasons the ADR-0030 config key must not be flipped to ``desired_enabled``.
 
     ``template`` is a :func:`classify_template` verdict. Turning the key **off** is a
     kill switch and needs no evidence; turning it **on** needs a run that survives
-    :func:`acceptance_evidence_verdict` and that ran this template's provider.
+    :func:`acceptance_evidence_verdict`, a provider that matches, and both ADR-0030
+    ordering rules acknowledged where they are not met.
+
+    Every check here keys off ``config_key`` / ``code_key`` — the *states* — never off
+    ``blocker``, which is a single priority-ordered value. Keying the kill-switch check
+    off ``blocker`` is what let a scaffold provider mask a closed key and flip it
+    unacknowledged: ``classify_template`` reports ``provider_scaffold`` for that
+    template and the closed key never surfaces.
     """
     if not desired_enabled:
         return []
@@ -499,13 +530,23 @@ def flip_refusals(
     else:
         if not evidence_verdict.get("is_acceptance_evidence"):
             codes.append(FLIP_EVIDENCE_NOT_ACCEPTANCE)
+        if evidence_verdict.get("captured_resources_count") is None:
+            codes.append(FLIP_EVIDENCE_CAPTURE_COUNT_UNKNOWN)
         template_provider = template.get("provider")
         if not evidence_provider:
             codes.append(FLIP_EVIDENCE_PROVIDER_UNRESOLVED)
         elif template_provider and str(evidence_provider) != str(template_provider):
             codes.append(FLIP_PROVIDER_MISMATCH)
 
-    if template.get("blocker") == BLOCKER_TEMPLATE_DISABLED_BY_OPERATOR and not reopen_acknowledged:
+    # `enable` is the only coverage command whose client-side derivation gates a write,
+    # so unlike `templates` and `preflight` a disagreement here is disqualifying.
+    if template.get("agrees_with_server") is False:
+        codes.append(FLIP_CLASSIFICATION_DISAGREES)
+
+    if template.get("code_key") != READINESS_LIVE and not below_live_acknowledged:
+        codes.append(FLIP_PROVIDER_NOT_LIVE)
+
+    if template.get("config_key") == CONFIG_KEY_CLOSED_BY_OPERATOR and not reopen_acknowledged:
         codes.append(FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED)
 
     return [{"code": code, "detail": _FLIP_DETAIL[code]} for code in codes]
@@ -514,11 +555,14 @@ def flip_refusals(
 def evidence_binding_strength(*, evidence_provider: str | None, template: dict[str, Any]) -> str:
     """How tightly the cited run is bound to *this* template.
 
-    ``provider`` is the strongest answer available: a run resolves to a provider, and
-    several templates share one. Binding a run to the template itself needs
-    ``overlay_id`` / ``provider_template_id`` on ``SourceVersionResponse``, which
-    platform-control does not expose. Named so the envelope states that limit rather
-    than implying a stronger check than was made.
+    ``provider`` is the strongest answer available today, and it is **weak**: all 26
+    cantons and Bund sit behind the single ``lexfind`` provider, so one passing run for
+    any canton satisfies this check for every LexFind template — the exact source this
+    was built to serve. Treat it as a prompt to confirm the run by hand, not as a floor.
+    Binding a run to its template needs ``overlay_id`` / ``provider_template_id`` on
+    ``SourceVersionResponse``; comparing the version's ``acquisition_spec`` against
+    ``POST /v1/sources/blueprint-preview`` would get near-template-exact with no
+    platform-control change (#846).
     """
     template_provider = template.get("provider")
     if not evidence_provider or not template_provider:
@@ -526,6 +570,23 @@ def evidence_binding_strength(*, evidence_provider: str | None, template: dict[s
     if str(evidence_provider) != str(template_provider):
         return "none"
     return "provider"
+
+
+def is_already_in_desired_state(*, template: dict[str, Any], desired_enabled: bool) -> bool:
+    """Whether the flip would genuinely change nothing — provenance included.
+
+    The effective boolean alone is not the state. ``enabled: false`` with provenance
+    ``default`` is ``never_turned``, which ADR-0030's acceptance waiver still dispatches
+    at; ``enabled: false`` with provenance ``override`` is an operator kill switch, which
+    it does not (see :func:`config_key_state`, #768). Short-circuiting a ``--disable`` on
+    the boolean alone therefore reports "already off" and installs no kill switch, and
+    the operator believes they shut a portal off that is still live.
+
+    The desired state is the *pair*: the requested value, recorded as an override.
+    """
+    if bool(template.get("enabled")) is not bool(desired_enabled):
+        return False
+    return str(template.get("source") or "default").strip().lower() == "override"
 
 
 FLIP_READ_BACK_DISAGREES = "read_back_disagrees"

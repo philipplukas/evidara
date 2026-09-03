@@ -183,7 +183,7 @@ for the cited run and refuses when it does not earn the flip, and — the part t
 write that silently did nothing (#631, #713). If `verification.applied` is false, the key
 is **not** flipped; say so and stop.
 
-Its refusals write nothing, and none of them are talk-past-able:
+Its refusals write nothing:
 
 | refusal | what to do |
 |---|---|
@@ -191,11 +191,25 @@ Its refusals write nothing, and none of them are talk-past-able:
 | `evidence_run_is_not_acceptance_evidence` | Read `acceptance_verdict.refusals` — usually `execution_mode_shadow`. Re-run live. |
 | `evidence_run_provider_unresolved` | Nothing ties the run to this template. Do not "assume it's fine"; find the right run. |
 | `evidence_run_provider_mismatch` | You cited a run from another corpus. |
+| `evidence_run_capture_count_unknown` | The run reports no capture count, so that check did not run. A check that cannot run is not a pass. |
+| `classification_disagrees_with_server` | The CLI's lock mirror has drifted from the server's `launchable`. Do not write against a derivation you cannot trust — report it. |
+| `provider_not_live_not_acknowledged` | **Move the code key first.** ADR-0030 §2 wants LIVE before `enabled: true`; the invariant test that enforces it covers only `source_blueprints.yaml`, never the override table this writes. `--acknowledge-provider-below-live` arms it anyway. |
 | `operator_kill_switch_not_acknowledged` | **Ask the operator first.** `--reopen-operator-kill-switch` exists so reopening is a deliberate act, not an accident. |
 
-The binding to the template is provider-level only (`artifacts.evidence_binding`) — the
-version read model exposes no overlay/template — so a same-provider run of a *different*
-template also passes that check. Confirm the run is the right one yourself.
+Two things the command deliberately will **not** decide for you, so a successful flip
+comes back `needs_human` rather than `passed` whenever either applies — read every
+evidence item marked `passed: false` before calling it done:
+
+- **The binding to the template is provider-level only** (`artifacts.evidence_binding`).
+  The version read model exposes no overlay/template, and all 26 cantons plus Bund sit
+  behind the single `lexfind` provider — so one canton's run satisfies the check for
+  every LexFind template. Confirm by hand that the cited run is this template's (#846).
+- **Arming the config key ahead of the code key** is reported, not waved through.
+
+Turning the key **off** takes no evidence, but it does take `--note`, and it is a real
+write even when the key merely reads `false` today: a `never_turned` key is waived by
+acceptance mode, an operator's `false` is not (#768). Do not read "it's already off" as
+"the portal is shut".
 
 The admin panel's Blueprints inventory does the same flip through the UI; see the
 `run-admin-panel` skill. It does not do the read-back check.
@@ -209,9 +223,13 @@ still admits when the provider is short of `live`.
 
 - Never weaken a gate, a query, or an assertion to make a run pass. Fix the thing it
   caught.
-- Never reopen a `template_disabled_by_operator` key without asking — it is somebody's
-  deliberate kill switch, and the remedy code exists to keep you from misreading it as an
-  un-earned key.
+- Never reopen an operator's closed config key without asking — it is somebody's
+  deliberate kill switch, and the refusal code exists to keep you from misreading it as an
+  un-earned key. Read it off `config_key == closed_by_operator`, **not** off `blocker`:
+  `blocker` is a single priority-ordered value, and a `provider_scaffold` outranks and
+  hides the kill switch. `scaffold` is also the server's fail-closed default for a
+  provider it cannot resolve, so keying off `blocker` turns a fail-closed signal into a
+  fail-open one.
 - `acceptance` mode is a rehearsal. Reporting it as "the lock is open" is exactly the
   overstatement ADR-0030 exists to prevent.
 

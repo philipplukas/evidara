@@ -49,6 +49,7 @@ from evidara_cli.coverage import (
     evidence_binding_strength,
     find_source_version,
     flip_refusals,
+    is_already_in_desired_state,
     summarise_templates,
     verify_flip,
     version_execution_mode,
@@ -740,6 +741,16 @@ def coverage_enable(
             help="Acknowledge that you are reopening a key an operator deliberately shut.",
         ),
     ] = False,
+    acknowledge_provider_below_live: Annotated[
+        bool,
+        typer.Option(
+            "--acknowledge-provider-below-live",
+            help=(
+                "Acknowledge arming the config key before the provider's code key "
+                "reaches `live` (ADR-0030 §2 requires LIVE)."
+            ),
+        ),
+    ] = False,
     human: Annotated[bool, typer.Option("--human", help="Pretty-print JSON")] = False,
     correlation_id: Annotated[str | None, typer.Option("--correlation-id")] = None,
 ) -> None:
@@ -748,13 +759,15 @@ def coverage_enable(
     This is the loop's last step and the one worth getting wrong quietly. Enabling
     requires an `--evidence-run-id` whose run survives the ADR-0030 acceptance verdict
     *and* ran this template's provider; it refuses outright otherwise, including for a
-    key an operator deliberately shut. After the `PUT` it re-reads
-    `/v1/sources/blueprint-templates` and asserts both the effective key **and** that the
-    read model attributes it to an operator override — a 200 alone cannot tell a flip
-    from a write that silently did nothing (#631, #713).
+    key an operator deliberately shut and for a provider whose code key is still below
+    `live`. After the `PUT` it re-reads `/v1/sources/blueprint-templates` and asserts
+    both the effective key **and** that the read model attributes it to an operator
+    override — a 200 alone cannot tell a flip from a write that silently did nothing
+    (#631, #713).
 
-    Turning the key on does not open the code key: a provider still short of `live`
-    admits only `mode=acceptance`, and the envelope says so.
+    The desired state is a *pair*, value and provenance: `--disable` on a key that is
+    merely `never_turned` still writes, because ADR-0030's acceptance waiver dispatches
+    at a never-turned key and does not at an operator's kill switch (#768).
     """
     if not enabled and not (note or "").strip():
         typer.echo("--note is required when disabling: record why the key was shut.", err=True)
@@ -767,6 +780,7 @@ def coverage_enable(
         "enabled": enabled,
         "evidence_run_id": evidence_run_id,
         "reopen_operator_kill_switch": reopen_operator_kill_switch,
+        "acknowledge_provider_below_live": acknowledge_provider_below_live,
     }
     pc_base = platform_control_base_url()
     pc_headers = platform_control_headers(correlation_id=correlation_id)
@@ -808,9 +822,10 @@ def coverage_enable(
         before = classify_template(match)
         artifacts: dict[str, Any] = {"template_before": before}
 
-        # Already in the desired state: write nothing, and say so rather than
-        # reporting a flip that did not happen.
-        if bool(match.get("enabled")) is enabled:
+        # Already in the desired state — value *and* provenance. A `--disable` on a key
+        # that is merely `never_turned` is NOT a no-op: it must write the override, or
+        # the operator believes they installed a kill switch they did not (#768).
+        if is_already_in_desired_state(template=match, desired_enabled=enabled):
             _emit(
                 build_envelope(
                     ok=True,
@@ -826,9 +841,9 @@ def coverage_enable(
                             value=bool(match.get("enabled")),
                             passed=True,
                             note=(
-                                f"The effective config key is already {enabled}, from the "
-                                f"'{before['config_key']}' state "
-                                f"(provenance: {match.get('source')}). Nothing was written."
+                                f"The config key is already {enabled} and recorded as an "
+                                f"operator override ('{before['config_key']}'). Nothing "
+                                "was written."
                             ),
                         )
                     ],
@@ -861,6 +876,7 @@ def coverage_enable(
             evidence_verdict=verdict,
             evidence_provider=evidence_provider,
             reopen_acknowledged=reopen_operator_kill_switch,
+            below_live_acknowledged=acknowledge_provider_below_live,
         )
         if refusals:
             artifacts["refusals"] = refusals
@@ -947,60 +963,81 @@ def coverage_enable(
                 ),
             ),
         ]
-        if enabled and verdict is not None:
+        # The binding is provider-level at best, and for `lexfind` that is 26 cantons
+        # plus Bund behind one name. Surfaced as a check that did NOT pass, so a human
+        # confirms the run is for this template rather than reading a quiet field (#846).
+        weak_binding = enabled and verdict is not None
+        if weak_binding:
             ev.append(
                 evidence_assertion(
                     "adr-0030:acceptance-evidence",
                     value=evidence_run_id,
-                    passed=True,
+                    passed=False,
                     note=(
-                        f"Run {evidence_run_id} passed the acceptance verdict. Binding to "
-                        f"this template is '{artifacts.get('evidence_binding')}'-level: the "
-                        "version read model exposes no overlay/template, so a same-provider "
-                        "run of a different template would also satisfy this check."
+                        f"Run {evidence_run_id} passed the acceptance verdict, but binding "
+                        f"to this template is only '{artifacts.get('evidence_binding')}'-"
+                        "level: the version read model exposes no overlay/template, so a "
+                        "same-provider run of a DIFFERENT template satisfies this check "
+                        "too — for `lexfind` that is every canton plus Bund. Confirm by "
+                        "hand that the cited run is this template's (#846)."
                     ),
                 )
             )
-        if after and after["code_key"] != "live":
+        # Only meaningful when arming the key; shutting one is safe at any code key.
+        if enabled and after and after["code_key"] != "live":
             ev.append(
                 evidence_assertion(
                     "adr-0030:code-key",
                     value=after["code_key"],
-                    # Expected, not a failure: the config key is only one of the two.
-                    passed=True,
+                    passed=False,
                     note=(
-                        "The config key is flipped, but the code key is still "
-                        f"'{after['code_key']}', so the lock admits "
-                        f"{after['dispatchable_modes'] or 'no mode'} — not production. "
-                        "Moving the code key is a platform-control code change."
+                        "The config key is armed ahead of the code key, which is still "
+                        f"'{after['code_key']}'. ADR-0030 §2 wants LIVE first; the lock "
+                        f"admits {after['dispatchable_modes'] or 'no mode'} meanwhile, so "
+                        "harm is deferred, not absent. Moving the code key is a "
+                        "platform-control code change."
                     ),
                 )
             )
 
         ok = verification["applied"]
+        needs_human = ok and any(item.get("passed") is False for item in ev)
         compensate_cmd = (
             "evidara workflow coverage enable --disable "
             f"--overlay {overlay} --template {template} --note '<why>'"
         )
+        if not ok:
+            status, reason = (
+                "failed_terminal",
+                "The PUT was accepted but the read-back does not confirm it. "
+                "Do not report this key as flipped.",
+            )
+        elif needs_human:
+            status, reason = (
+                "needs_human",
+                f"Config key for '{overlay}/{template}' is now enabled={enabled}, confirmed "
+                "by re-reading the template — but at least one check did not pass. Read the "
+                "evidence items marked `passed: false` before treating this as done.",
+            )
+        else:
+            status, reason = (
+                "passed",
+                f"Config key for '{overlay}/{template}' is now enabled={enabled}, confirmed "
+                "by re-reading the template.",
+            )
         _emit(
             build_envelope(
                 ok=ok,
                 workflow=_WORKFLOW,
                 step=step,
-                status="passed" if ok else "failed_terminal",
+                status=status,
                 side_effect_level="reversible",
                 inputs=inputs,
                 artifacts=artifacts,
                 evidence=ev,
                 decision={
-                    "recommended_action": "inspect" if ok else "needs-human",
-                    "reason": (
-                        f"Config key for '{overlay}/{template}' is now enabled={enabled}, "
-                        "confirmed by re-reading the template."
-                        if ok
-                        else "The PUT was accepted but the read-back does not confirm it. "
-                        "Do not report this key as flipped."
-                    ),
+                    "recommended_action": "inspect" if ok and not needs_human else "needs-human",
+                    "reason": reason,
                 },
                 next_actions=["inspect", "preflight"],
                 compensation={

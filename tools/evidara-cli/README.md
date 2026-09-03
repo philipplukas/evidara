@@ -192,10 +192,24 @@ and refuses when it does not earn the flip. Refusal codes:
 | `evidence_run_is_not_acceptance_evidence` | The run failed the verdict — read `acceptance_verdict.refusals`. |
 | `evidence_run_provider_unresolved` | The run's provider could not be resolved, so nothing ties it to this template. Refused rather than skipped-and-passed (#744). |
 | `evidence_run_provider_mismatch` | The run used a different acquisition provider. |
-| `operator_kill_switch_not_acknowledged` | The key was shut by an operator. Pass `--reopen-operator-kill-switch` only after asking them. |
+| `evidence_run_capture_count_unknown` | The run reports no `captured_resources_count`, so that check did not run. |
+| `classification_disagrees_with_server` | The client-side lock mirror disagrees with the server's `launchable`. This is the one command where that derivation gates a write, so a disagreement is disqualifying. |
+| `provider_not_live_not_acknowledged` | ADR-0030 §2 admits `enabled: true` only for a LIVE provider. `test_blueprint_provider_parity.py` asserts that over `source_blueprints.yaml` but **not** over the override table this writes, so the ordering is enforced here. `--acknowledge-provider-below-live` arms it anyway. |
+| `operator_kill_switch_not_acknowledged` | The key was shut by an operator. Pass `--reopen-operator-kill-switch` only after asking them. Keyed off `config_key`, never off `blocker` — `blocker` is single and priority-ordered, so a `provider_scaffold` (the server's fail-closed default for an unresolvable provider) hides the kill switch. |
 
-A refusal writes nothing (`side_effect_level: none`), and a template already in the
-requested state is reported as `already_in_desired_state` rather than as a flip.
+A refusal writes nothing (`side_effect_level: none`).
+
+**"Already in the desired state" is a pair, not a boolean** — the requested value *and*
+an `override` provenance. `--disable` on a key that merely reads `false` today still
+writes: `never_turned` is waived by ADR-0030's acceptance mode and an operator's `false`
+is not (#768), so short-circuiting on the boolean would report a kill switch that was
+never installed while live traffic kept flowing. The mirror case writes too — a key open
+only by shipped default has no evidence citation recorded against it.
+
+A flip that lands still comes back `needs_human` rather than `passed` when a check did
+not pass: the provider-level evidence binding always, and arming the key ahead of the
+code key. `ok` tracks the write; `status` tracks whether a human still has something to
+confirm.
 
 **The `200` is not the proof.** After the `PUT` the command re-reads
 `/v1/sources/blueprint-templates` and requires *both* that the effective key is what was
@@ -211,7 +225,10 @@ switch — it needs no evidence but does need `--note`.
 The binding between the cited run and the template is **provider-level**, reported as
 `artifacts.evidence_binding`. `SourceVersionResponse` exposes no `overlay_id` /
 `provider_template_id`, so a same-provider run of a different template also satisfies the
-check; the envelope states that limit rather than implying a stronger one.
+check — and for `lexfind` that is all 26 cantons plus Bund behind one name, so one run
+covers every LexFind template. The envelope marks that check `passed: false` so it is
+confirmed by a human rather than read as proven; #846 tracks binding it near-exactly by
+comparing the version's acquisition spec against `POST /v1/sources/blueprint-preview`.
 
 **Agent skill:** `.claude/skills/coverage-acceptance-loop/SKILL.md` routes the whole loop,
 including the compose env vars whose defaults silently break it.
