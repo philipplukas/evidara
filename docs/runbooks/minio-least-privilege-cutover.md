@@ -241,7 +241,8 @@ stated plainly: **every workload's previous root credential remains valid MinIO 
 root is rotated.** A copy that leaked before today is not revoked by this change; it is
 only no longer *in use*.
 
-Rotate root as a scheduled follow-up once this cutover is verified — procedure in
+Rotate root as a scheduled follow-up once this cutover is verified — **issue #849** —
+procedure in
 [`infra/hetzner/README.md`](../../infra/hetzner/README.md#rotating-the-minio-root-credential).
 That procedure is now cheap: the per-workload users are separate IAM records, so no app
 restart is needed, only `verify-minio-scoping.sh` afterwards.
