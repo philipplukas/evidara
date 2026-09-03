@@ -126,8 +126,19 @@ its entry-into-force window:
 
 - `jolux:dateApplicability` — first day the consolidation is in force (VERIFIED
   against the live endpoint, 2026-07-17)
-- `jolux:dateEndApplicability` — last day in force; absent/open on the current
-  consolidation
+- `jolux:dateEndApplicability` — last day in force, **inclusive**; absent/open on
+  the current consolidation
+
+"Last day in force" was asserted when this was written and is now measured
+(2026-09-03, #843): one query pulled 3000 consolidation members across 1193 works
+carrying both dates, and **1800 of 1806 adjacent pairs have `successor
+dateApplicability = predecessor dateEndApplicability + 1 day`, with zero pairs
+equal**. An exclusive end-date would produce equal dates. The six outliers are
+13-8767 day gaps — missing consolidations, not a second convention. The value is
+therefore emitted as `in_force_until` unconverted. Sources disagree with each
+other on this (LexFind's equivalent field is exclusive), so see
+[boundary-contracts.md](boundary-contracts.md) "The in-force boundary" for the
+convention and the per-provider table.
 
 The provider selects the consolidation **in force at a requested date**, defaulting
 to today — never simply the newest member. Taking the newest unconditionally

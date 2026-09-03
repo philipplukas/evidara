@@ -168,6 +168,45 @@ Canonical C4 relationships live in [`structurizr/workspace.dsl`](../../structuri
 - Legal lifecycle changes such as `superseded` or `repealed` also flow through `document.processed`.
 - True public-search removal flows through `document.withdrawn`.
 
+### The in-force boundary: `in_force_until` is inclusive (#843)
+
+`in_force_until` is the **last date the norm WAS in force — inclusive**. That is the
+one meaning it has anywhere past acquisition:
+[`contracts/schemas/document.schema.json`](../../contracts/schemas/document.schema.json),
+[`search-projection.schema.json`](../../contracts/schemas/search-projection.schema.json),
+`legal-search.openapi.yaml`, and the consumer that answers the question —
+`legal-search/api/src/core/norm-hierarchy/in-force.ts`, which repeals only on
+`asOf > in_force_until` and filters the index with `lt`, not `lte`.
+
+**Upstream sources do not agree with each other, and the field name never tells you
+which convention you have.** Measured live on 2026-09-03:
+
+| Provider | Upstream field | Reading | How it was established |
+|---|---|---|---|
+| `ris_ogd` | `Ausserkrafttretensdatum` | **inclusive** — pass through | B-VG (GN 10000138): version ends 2024-04-30, successor starts 2024-05-01; `Fassung.FassungVom=2024-04-30` still returns the ending version |
+| `fedlex_sparql` | `jolux:dateEndApplicability` | **inclusive** — pass through | 3000 consolidation members over 1193 works: 1800 of 1806 adjacent pairs are `successor start = end + 1 day`, **zero** pairs equal |
+| `lexfind_api` | `version_inactive_since` | **exclusive** — converted (`− 1 day`) | null on all 7 versions of ZH 554.5 (so it is the act's repeal date, not a window end); 26 of 27 real values across ZH+BE fall on the 1st of a month, none on a month-end |
+| `gemeinde_http` | `ausserkrafttretendatum` | **not established** — passed through unconverted | no repealed Stadt-Zürich AS page exists in the repo or was found to compare a successor's `inkrafttretendatum` against |
+
+Two consequences worth stating plainly:
+
+- **A producer converts; nothing downstream compensates.** The conversion belongs at
+  the edge where the source is known. A consumer that "adjusts for LexFind" would have
+  to know which provider produced each row, which is exactly the coupling the boundary
+  exists to prevent.
+- **A passthrough test proves nothing about the reading.** Feeding `2018-12-31` in and
+  asserting `2018-12-31` out pins that the value survives the mapping. Every one of the
+  four providers had such a test and none had a boundary test, which is how the LexFind
+  off-by-one reached the index. The boundary date itself is now pinned on both sides:
+  `test_lexfind_api_provider.py` emits `2026-06-30` from real record ZH 415.611 and
+  `in-force.spec.ts` consumes that same date.
+
+The `gemeinde_http` row is the honest state, not a TODO to be closed by inference: the
+identical German field name is inclusive at RIS and exclusive at LexFind, so the name is
+not evidence. The probe that would settle it is a repealed Stadt-Zürich AS number whose
+successor's `inkrafttretendatum` can be read off the next page — equal implies exclusive,
+one day later implies inclusive.
+
 ## Scope Model
 
 `scope_type` defines the visibility boundary for a corpus and every document lineage record inside it.

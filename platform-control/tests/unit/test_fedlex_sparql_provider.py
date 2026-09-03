@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 
 import httpx
@@ -242,6 +242,54 @@ def test_select_member_between_windows_uses_last_effective_and_flags_expired():
     )
     assert selected == _BV_PAST
     assert in_force is True
+
+
+def test_the_fedlex_end_date_is_the_inclusive_last_day_in_force():
+    """The boundary, measured — and the same one the consumer uses (#843).
+
+    `jolux:dateEndApplicability` is INCLUSIVE, so it is emitted as
+    `in_force_until` unconverted. Measured live 2026-09-03: one SPARQL query
+    pulled 3000 consolidation members across 1193 works carrying both dates, and
+    every consecutive pair within a work was compared. **1800 of 1806 adjacent
+    pairs have successor start = predecessor end + 1 day, and ZERO pairs are
+    equal.** An exclusive end-date would produce equal dates; that case does not
+    occur. (The six outliers are 13-8767 day gaps — missing consolidations, not a
+    second convention.)
+
+    The members below are a real adjacent pair from that sample,
+    `eli/cc/1/1_1_1`, which is why the dates look nothing like the `_BV_*`
+    fixtures above: those have a deliberate gap and cannot express adjacency.
+
+    The assertion that matters is the last one. `_select_consolidation_member`
+    reads the end date inclusively (`in_force_until >= as_of`), and so does
+    `resolveInForceState` in legal-search
+    (`in-force.ts:60-61` repeals only on `asOf > until`). On 1885-12-21 the
+    earlier consolidation is selected and reported in force; on 1885-12-22 the
+    successor takes over. Neither day is claimed twice and none falls between.
+    """
+    earlier = _ConsolidationMember(
+        uri="https://fedlex.data.admin.ch/eli/cc/1/1_1_1/18790401",
+        in_force_from=date(1879, 4, 1),
+        in_force_until=date(1885, 12, 21),
+    )
+    later = _ConsolidationMember(
+        uri="https://fedlex.data.admin.ch/eli/cc/1/1_1_1/18851222",
+        in_force_from=date(1885, 12, 22),
+        in_force_until=date(1887, 12, 19),
+    )
+    assert later.in_force_from - earlier.in_force_until == timedelta(days=1)
+
+    provider = FedlexSparqlProvider()
+
+    selected, in_force = provider._select_consolidation_member(
+        members=[earlier, later], as_of=date(1885, 12, 21)
+    )
+    assert (selected, in_force) == (earlier, True)
+
+    selected, in_force = provider._select_consolidation_member(
+        members=[earlier, later], as_of=date(1885, 12, 22)
+    )
+    assert (selected, in_force) == (later, True)
 
 
 def test_select_member_before_any_consolidation_flags_not_in_force():

@@ -141,7 +141,7 @@ import random
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from urllib.parse import urljoin
 
@@ -241,6 +241,37 @@ _MIRROR_CHECK_USER_AGENT = "evidara-mirror-check/1.0 (+https://evidara.ai)"
 # whose `inForceStatus` is "No longer in force", so consolidation dates alone
 # report repealed law as currently in force. Here `version_inactive_since` is its
 # own field and cannot be masqueraded by an open-ended newest version.
+#
+# THE BOUNDARY (#843). `version_inactive_since` is **EXCLUSIVE** — the first day
+# the act is NO LONGER in force, not the last day it was. This is measured, not
+# inferred from the field name:
+#
+#   1. It is null on every superseded version. `GET /api/frontend/v1/de/
+#      texts-of-law/22871/with-version-groups` (ZH Hundegesetz, 2026-09-03)
+#      returns 7 versions — active_since 01.01.1987, 01.01.2007 ×3, 01.01.2010,
+#      01.01.2023, 01.06.2025 — and `version_inactive_since` is `null` on ALL of
+#      them, including the six that are `is_active: false`. So the field is not a
+#      version-window end at all; it is the **repeal date of the act**, which is
+#      why it is mirrored by `info_badge: abrogated` + `info_badge_date`.
+#   2. Its values are repeal EFFECTIVE dates. `GET /entities/{26,1}/recent-changes`
+#      (ZH + BE, 5 pages each, 2026-09-03) yielded 150 changes of which 27 carry a
+#      non-null `version_inactive_since`. **26 of 27 fall on the 1st of a month**
+#      (01.05.2026, 01.06.2026, 01.07.2026, 01.08.2026, 01.09.2026, …); the lone
+#      exception is 02.06.2018. NOT ONE is a month-end. Swiss repeals take effect
+#      at the start of a month, so a field holding the *last day in force* would
+#      cluster on 30/31 — this one holds the day the repeal took effect.
+#   3. LexFind's own UI renders it under the i18n key
+#      `text_of_law.info_badge.abrogated_since` — "abrogated **since** X".
+#
+# `version_active_since` is the mirror image and is inclusive, so a LexFind window
+# is the half-open interval [version_active_since, version_inactive_since).
+#
+# Our boundary contract is the CLOSED one: `in_force_until` is the inclusive last
+# day in force (contracts/schemas/document.schema.json, and
+# legal-search/api/src/core/norm-hierarchy/in-force.ts:24-28). LexFind is the only
+# one of the four providers whose upstream disagrees — ris_ogd and fedlex_sparql
+# were both measured inclusive (see their own field constants) — so this provider,
+# and only this provider, converts. See `_inclusive_end_date`.
 _LEXFIND_IN_FORCE_FROM_FIELD = "version_active_since"
 _LEXFIND_IN_FORCE_UNTIL_FIELD = "version_inactive_since"
 
@@ -356,6 +387,30 @@ def _iso_date_or_none(value: Any) -> str | None:
     return None
 
 
+def _inclusive_end_date(exclusive_iso: str | None) -> str | None:
+    """Convert an EXCLUSIVE upstream end-date to our INCLUSIVE `in_force_until`.
+
+    LexFind's `version_inactive_since` is the first day the act is no longer in
+    force (measured — see `_LEXFIND_IN_FORCE_UNTIL_FIELD`). Our boundary contract
+    is closed: `in_force_until` is the LAST day it WAS in force. The two differ by
+    exactly one day, and shipping the raw value is a one-day error in the
+    dangerous direction — `resolveInForceState` repeals only on `asOf > until`, so
+    an unconverted date reports a repealed norm as good law on its repeal date.
+
+    Returns None for an unparseable input, on the same rule as `_iso_date_or_none`:
+    a mangled boundary is worse than an absent one, because absence resolves to
+    `unknown` and a wrong date resolves confidently to the wrong answer.
+    """
+    if exclusive_iso is None:
+        return None
+    try:
+        parsed = date.fromisoformat(exclusive_iso)
+    except ValueError:
+        logger.warning("lexfind: unparseable end date %r — dropped", exclusive_iso)
+        return None
+    return (parsed - timedelta(days=1)).isoformat()
+
+
 def _positive_int_or_none(value: Any) -> int | None:
     """A denominator, or None — never zero.
 
@@ -403,6 +458,13 @@ def temporal_metadata(record: dict[str, Any]) -> dict[str, str]:
     reaches `document.metadata.in_force_from` / `.in_force_until` — the paths the
     search projection already coalesces (same contract as `ris_ogd_provider`).
 
+    **The end-date is converted, not passed through (#843).** LexFind's
+    `version_inactive_since` is exclusive and `in_force_until` is inclusive, so
+    the emitted value is one day earlier — see `_inclusive_end_date`. This is the
+    one provider of the four that converts; `ris_ogd` and `fedlex_sparql` were
+    measured to publish an inclusive end-date already, so converting them would
+    introduce the very off-by-one this fixes here.
+
     `is_active: False` with no `version_inactive_since` is recorded as
     `amendment_relation: repealed_by` WITHOUT inventing an end date: we know it
     is no longer in force, and we do not know when it stopped. Those are
@@ -411,7 +473,7 @@ def temporal_metadata(record: dict[str, Any]) -> dict[str, str]:
     """
     out: dict[str, str] = {}
     since = _iso_date_or_none(record.get(_LEXFIND_IN_FORCE_FROM_FIELD))
-    until = _iso_date_or_none(record.get(_LEXFIND_IN_FORCE_UNTIL_FIELD))
+    until = _inclusive_end_date(_iso_date_or_none(record.get(_LEXFIND_IN_FORCE_UNTIL_FIELD)))
     if since:
         out["in_force_from"] = since
     if until:
@@ -1430,8 +1492,11 @@ class LexFindApiProvider:
         # Switzerland between midnight and 01:00/02:00 local falls on the previous
         # UTC day and is therefore evaluated one day early against an exclusive
         # end boundary. Not introduced here — `is_in_force`'s default was already
-        # UTC — but it is a real one-day error in a corpus of Swiss law, and it
-        # belongs with the other boundary question in #843.
+        # UTC — but it is a real one-day error in a corpus of Swiss law. #843
+        # settled the *boundary* (exclusive upstream, converted at
+        # `temporal_metadata`) and deliberately did NOT touch this: the timezone of
+        # `fetched_at` is a separate defect with a separate fix, and folding it in
+        # would have made the boundary change unfalsifiable.
         in_force_at_capture = is_in_force(version or record, as_of=fetched_at.date().isoformat())
         if in_force_at_capture is not None:
             metadata["in_force_at_capture"] = in_force_at_capture

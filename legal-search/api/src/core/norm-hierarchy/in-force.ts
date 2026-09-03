@@ -22,8 +22,22 @@ export type InForceFields = {
    */
   in_force_from?: string;
   /**
-   * Last date the norm WAS in force — inclusive. Absent means "not repealed as
+   * Last date the norm WAS in force — INCLUSIVE. Absent means "not repealed as
    * far as we know", which is not the same as "never repealed".
+   *
+   * Inclusive is the boundary contract for the whole platform, not a local
+   * choice: `contracts/schemas/document.schema.json` says so, and acquisition
+   * converts to it. Upstream sources do not agree with each other — measured
+   * 2026-09-03 (#843), AT RIS `Ausserkrafttretensdatum` and Fedlex
+   * `jolux:dateEndApplicability` are inclusive, while LexFind
+   * `version_inactive_since` is exclusive and is shifted by a day at the
+   * producer. Nothing on this side of the boundary compensates for a producer
+   * that did not convert, and nothing should: one meaning, converted once, at
+   * the edge where the source is known.
+   *
+   * The boundary date itself is pinned on both sides — here in `in-force.spec.ts`
+   * and at the producers in `platform-control/tests/unit/test_*_provider.py` —
+   * so the two agree deliberately rather than by coincidence.
    */
   in_force_until?: string;
   lifecycle_status?: string;

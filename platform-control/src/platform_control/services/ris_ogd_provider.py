@@ -57,6 +57,25 @@ _MAX_PAGES = 50
 # `Ausserkrafttretensdatum`. Both are already ISO-8601 in the JSON listing — the
 # per-document RIS XML publishes the same two values as `ct="ikra"` / `ct="akra"`
 # in DD.MM.YYYY, which is why acquisition is the better place to read them.
+#
+# THE BOUNDARY (#843). `Ausserkrafttretensdatum` is **INCLUSIVE** — the last day
+# the version WAS in force, which is exactly what `in_force_until` means at our
+# boundary (contracts/schemas/document.schema.json;
+# legal-search/api/src/core/norm-hierarchy/in-force.ts:24-28). It is therefore
+# passed through unconverted, and that is now a decision rather than an accident.
+#
+# Measured live 2026-09-03 against B-VG (Gesetzesnummer 10000138), the probe #843
+# named — a version's end date compared with its successor's start date:
+#
+#   Art. 11  NOR40211942  2020-01-01 -> 2024-04-30
+#            NOR40261486  2024-05-01 -> (open)          successor = end + 1 day
+#   Art. 15  NOR40211946  2019-02-01 -> 2024-02-26
+#            NOR40260251  2024-02-27 -> 2024-07-18      successor = end + 1 day
+#
+# An exclusive end-date would make those two dates EQUAL. They differ by one day,
+# so the end date is the last day in force. Corroborated by RIS's own
+# point-in-time query: `Fassung.FassungVom=2024-04-30` returns NOR40211942 — the
+# version whose `Ausserkrafttretensdatum` is 2024-04-30 — not its successor.
 _RIS_IN_FORCE_FROM_FIELD = "Inkrafttretensdatum"
 _RIS_IN_FORCE_UNTIL_FIELD = "Ausserkrafttretensdatum"
 

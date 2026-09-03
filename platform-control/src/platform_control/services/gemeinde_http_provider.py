@@ -279,6 +279,25 @@ def parse_amtliche_sammlung_page(html_text: str, *, page_url: str) -> dict[str, 
         # Empty while the enactment is in force. This is the repeal/until date
         # ADR-0033 records as missing from the corpus — the municipal layer
         # publishes it, so it should survive into the document metadata.
+        #
+        # THE BOUNDARY (#843): **NOT MEASURED, and deliberately not guessed.**
+        # Our `in_force_until` is the inclusive last day in force
+        # (contracts/schemas/document.schema.json;
+        # legal-search/api/src/core/norm-hierarchy/in-force.ts:24-28). Whether
+        # Stadt Zürich's `ausserkrafttretendatum` agrees is unknown: the only AS
+        # page held in this repo
+        # (tests/fixtures/gemeinde_http/stadt_zuerich_as_554_510.html) has the
+        # field EMPTY, and #843 found no repealed AS page anywhere in the tree to
+        # compare against. `ris_ogd` and `fedlex_sparql` were measured inclusive
+        # and `lexfind_api` exclusive, so the field name settles nothing — the
+        # German is identical across all three and the readings are not.
+        #
+        # The value is therefore passed through unconverted, which is the
+        # status-quo behaviour and the only defensible one: converting on a guess
+        # would move a real date by a day on no evidence. The probe that would
+        # settle it is a repealed Stadt-Zürich AS number whose successor's
+        # `inkrafttretendatum` can be read off the next page — equal implies
+        # exclusive, one day later implies inclusive.
         "in_force_until": _iso_date(_read_field(unescaped, "ausserkrafttretendatum")),
         "document_url": document_url,
         "document_content_type": content_type,

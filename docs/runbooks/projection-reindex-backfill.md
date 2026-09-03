@@ -436,6 +436,53 @@ When the index mapping has changed:
 4. Verify document counts
 5. Clean up old index
 
+## When a producer's semantics change, not its mapping (#843)
+
+A reindex is also required when a producer starts emitting a **different value**
+for a field whose mapping is unchanged. Nothing fails, nothing errors, and no
+drift check fires — the index simply holds two populations that disagree, and a
+point-in-time query answers differently depending on which run captured the
+document.
+
+**The instance of this that exists today: LexFind `in_force_until` (#843).**
+`lexfind_api_provider.temporal_metadata` used to pass `version_inactive_since`
+through unconverted. That field is exclusive (the first day out of force) and
+`in_force_until` is inclusive (the last day in force), so every LexFind document
+captured before #843 carries an `in_force_until` **one day later than it should**.
+The visible symptom is precise and small: a repealed cantonal norm resolves to
+`in_force` on its own repeal date, and `?in_force_at=<repeal date>` returns it.
+
+- **Affected:** documents produced by `lexfind_api` that carry a non-null
+  `in_force_until`. Not `ris_ogd`, not `fedlex_sparql` (both measured inclusive
+  upstream, unchanged), not `gemeinde_http` (unchanged).
+- **Expected blast radius: small, possibly zero.** Every LexFind blueprint
+  template still ships `enabled: false`, and every acceptance bundle under
+  `docs/runbooks/evidence/` was captured `compose-local`. No evidence bundle in
+  the repo carries a non-null `version_inactive_since`. **Confirm against the live
+  index rather than assuming** — the count below is cheap.
+- **Detection**, against the read alias:
+
+  ```bash
+  curl -s "$OPENSEARCH_URL/$READ_ALIAS/_count" -H 'Content-Type: application/json' -d '{
+    "query": {"bool": {"filter": [
+      {"term": {"provider": "lexfind_api"}},
+      {"exists": {"field": "in_force_until"}}
+    ]}}
+  }'
+  ```
+
+  A non-zero count is the number of rows that are a day out. (Substitute the
+  field your projection actually carries the producer under if `provider` is
+  absent — the point is to scope the count to LexFind, not to reindex blind.)
+- **Fix:** re-acquire, then rebuild from canonical Delta
+  ([above](#procedure-rebuild-from-canonical-delta-disaster-recovery)). Do **not**
+  patch the index in place and do not adjust the query to compensate: the wrong
+  date is in the canonical document, so an index-only fix leaves canonical truth
+  wrong and re-breaks on the next projection.
+
+The general rule: **a producer semantics change is a reindex trigger even when the
+mapping is identical.** State it in the PR body, because nothing in CI will.
+
 ## Procedure: Fresh Reindex (No Data Copy)
 
 When you want to start from a clean index and rebuild it from canonical truth:
