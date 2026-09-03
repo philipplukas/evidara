@@ -74,6 +74,9 @@ Before running, confirm for the chosen host:
 - [ ] `robots.txt` permits the decision / index paths you will fetch. The
       `cp_ch_court_decisions` policy is `robots_mode: strict`, so a disallowed
       path **must not** be used — pick a different path or the aggregator.
+      `strict` is enforced by an RFC 9309 parser (`protego`), so wildcard rules
+      such as `Disallow: /*.pdf$` are honoured; until that swap they were
+      silently ignored and a run could fetch what the host forbade.
       `strict` also honours the file's `Crawl-delay` / `Request-rate`: the
       declared gap is applied per host and can only make the run *slower* than
       the policy corridor below, never faster. So a host asking for 10 s between

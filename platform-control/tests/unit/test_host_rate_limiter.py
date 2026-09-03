@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 
 import pytest
 
-from platform_control.services.politeness import HostRateLimiter
+from platform_control.services.politeness import HostRateLimiter, _parse_retry_after
 
 
 class _FakeClock:
@@ -464,3 +465,44 @@ async def test_a_non_positive_interval_is_not_a_pace(monkeypatch: pytest.MonkeyP
         await _acquire(limiter, "example.ch")
 
     assert clock.now == 0.0
+
+
+# --- Retry-After parsing (RFC 9110 §10.2.3) -------------------------------
+#
+# The header has two forms and a server picks either. Only `delay-seconds` was
+# handled; the HTTP-date form returned None, so the one signal a host sends to
+# say exactly how long to stay away was dropped. Every date case below returned
+# None before `email.utils.parsedate_to_datetime` was adopted.
+
+_NOW = datetime(2026, 9, 3, 12, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        # delay-seconds — unchanged behaviour, pinned so the date branch cannot
+        # regress it.
+        ("120", 120.0),
+        ("  30  ", 30.0),
+        ("-5", 0.0),
+        (None, None),
+        ("", None),
+        ("soon", None),
+        # `float()` accepts these; an infinite pause would strand the host with
+        # no way back short of a process restart.
+        ("inf", None),
+        ("Infinity", None),
+        # HTTP-date, the form that used to be discarded. IMF-fixdate is the
+        # form RFC 9110 requires a sender to produce.
+        ("Thu, 03 Sep 2026 12:02:00 GMT", 120.0),
+        # A date already past means "retry now", not a negative pause.
+        ("Thu, 03 Sep 2026 11:00:00 GMT", 0.0),
+        # RFC 850 and asctime forms a receiver must still accept.
+        ("Thursday, 03-Sep-26 12:02:00 GMT", 120.0),
+        ("Thu Sep  3 12:02:00 2026", 120.0),
+        # A non-GMT offset must be honoured, not read as local time.
+        ("Thu, 03 Sep 2026 14:02:00 +0200", 120.0),
+    ],
+)
+def test_parse_retry_after(header: str | None, expected: float | None) -> None:
+    assert _parse_retry_after(header, now=_NOW) == expected

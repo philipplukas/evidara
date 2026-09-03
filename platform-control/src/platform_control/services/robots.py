@@ -28,6 +28,32 @@ keeps fighting, so the name and the behaviour now agree.
 The rule is **one-directional**: the site's number may only slow us down. A
 ``Crawl-delay: 1`` at a host our policy paces at 10 rpm does not license 60 rpm —
 robots is a floor on politeness, not a grant.
+
+**Why `protego` and not `urllib.robotparser`.** The stdlib parser predates
+RFC 9309 (Robots Exclusion Protocol, September 2022) and disagrees with it in
+two directions, both of which matter here because two seeded compliance
+policies — `cp_ch_court_decisions` and the municipal tier — run
+``robots_mode: strict``:
+
+- **It fails OPEN on wildcards.** ``RuleLine.applies_to`` is a bare
+  ``path.startswith``: no ``*``, no ``$``. Measured against a robots.txt
+  carrying ``Disallow: /*.pdf$`` and ``Disallow: /*/download``, the stdlib
+  parser allows ``/dokumente/urteil.pdf`` and ``/akten/2020/download``;
+  ``protego`` refuses both. Those two shapes are how a portal protects bulk
+  PDF download, so "strict" was quietly fetching what the site forbade.
+- **It fails CLOSED on the ``Allow`` override.** RFC 9309 §2.2.2 makes the
+  *longest* matching rule win. The stdlib parser is first-match-in-file-order,
+  so ``Disallow: /admin`` followed by ``Allow: /admin/public`` refuses
+  ``/admin/public/index.html``. That direction is not a compliance breach —
+  it is worse for this platform's purpose, because a permitted path is dropped
+  and the operator reads the absence as "the canton disallows us". A refusal
+  we invented, presented as the source's, is the confident fabrication
+  ADR-0033 exists to prevent.
+
+``protego`` is BSD-3-Clause, has no runtime dependencies, and is maintained by
+the Scrapy project as its robots parser. It implements the whole protocol —
+wildcards, longest-match, ``Sitemap``, ``Crawl-delay``, ``Request-rate`` — so
+there is no hand-rolled remainder here to drift.
 """
 
 from __future__ import annotations
@@ -39,9 +65,9 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from urllib.parse import urlparse
-from urllib.robotparser import RobotFileParser
 
 import httpx
+from protego import Protego
 
 from platform_control.domain import RobotsMode
 
@@ -73,7 +99,7 @@ def _call_if_present(parser: object, method: str, user_agent: str) -> object | N
 @dataclass(slots=True)
 class _CachedParser:
     expires_at_monotonic: float
-    parser: RobotFileParser | None
+    parser: Protego | None
 
 
 class RobotsChecker:
@@ -93,10 +119,17 @@ class RobotsChecker:
         ttl_seconds: int = 3600,
         timeout_seconds: float = 10.0,
         monotonic: Callable[[], float] = time.monotonic,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.ttl_seconds = ttl_seconds
         self.timeout_seconds = timeout_seconds
         self._monotonic = monotonic
+        # Injected only by tests. It exists so a test can drive the REAL
+        # `_fetch_and_parse` — the previous test double overrode that method
+        # and reimplemented the fetch/status/parse policy inside the test file,
+        # so every robots assertion was made against a copy of the code rather
+        # than against the code. A parser swap would have gone unnoticed.
+        self._transport = transport
         self._cache: dict[str, _CachedParser] = {}
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
@@ -110,7 +143,9 @@ class RobotsChecker:
         parser = await self._get_parser(origin)
         if parser is None:
             return True
-        return parser.can_fetch(user_agent, url)
+        # NOTE the argument order: protego is `can_fetch(url, user_agent)`,
+        # the stdlib parser was `can_fetch(user_agent, url)`.
+        return parser.can_fetch(url, user_agent)
 
     async def min_interval_seconds(self, url: str, user_agent: str) -> float | None:
         """Smallest gap the site itself asks for between requests, or ``None``.
@@ -124,7 +159,7 @@ class RobotsChecker:
           requests`` seconds apart.
 
         Deliberately parser-agnostic: ``urllib.robotparser`` and ``protego``
-        (PR #866) expose the same two method names and the same
+        (swapped in #866) expose the same two method names and the same
         ``RequestRate(requests, seconds)`` shape, so this reads whichever parser
         ``_fetch_and_parse`` returned rather than pinning one. A parser that
         offers neither method yields ``None``.
@@ -160,7 +195,7 @@ class RobotsChecker:
             return None
         return max(candidates)
 
-    async def _get_parser(self, origin: str) -> RobotFileParser | None:
+    async def _get_parser(self, origin: str) -> Protego | None:
         async with self._locks[origin]:
             cached = self._cache.get(origin)
             now = self._monotonic()
@@ -188,15 +223,15 @@ class RobotsChecker:
         )
 
     @staticmethod
-    def _parse(robots_txt: str) -> RobotFileParser:
-        parser = RobotFileParser()
-        parser.parse(robots_txt.splitlines())
-        return parser
+    def _parse(robots_txt: str) -> Protego:
+        return Protego.parse(robots_txt)
 
-    async def _fetch_and_parse(self, origin: str) -> RobotFileParser | None:
+    async def _fetch_and_parse(self, origin: str) -> Protego | None:
         url = f"{origin}/robots.txt"
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout_seconds, transport=self._transport
+            ) as client:
                 response = await client.get(url)
         except httpx.HTTPError:
             return None
