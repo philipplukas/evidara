@@ -5,9 +5,10 @@ them**, turns the captured bytes into canonical structured documents, and serves
 with every step of that path gated on evidence that it actually worked, and with full provenance
 back to the issuing source kept on every record.
 
-Coverage today spans Swiss federal and cantonal law, Austria, Germany, Italy, France and the EU —
-as *implemented acquisition paths*. What has actually been ingested, and where, is stated below and
-is much narrower. That distinction is the point, not a hedge.
+There are working acquisition paths for Swiss federal and cantonal law, Austria, Germany, Italy and
+the EU. France has a provider, but it is a scaffold that cannot dispatch a run, so it is not one.
+And an *implemented path* is not an *ingested corpus*: what has actually been acquired, and in which
+environment, is stated below and is much narrower. That distinction is the point, not a hedge.
 
 ## The bet
 
@@ -34,14 +35,19 @@ would demo convincingly and be wrong.
 document → OpenSearch projection → search UI, on Docker Compose, brought up and self-verified by
 [`scripts/dev-loop-stack.sh`](scripts/dev-loop-stack.sh).
 
-**Acquisition providers.** Twelve are registered, plus a fixture-replay provider for shadow runs
-([`provider_registry_factory.py`](platform-control/src/platform_control/services/provider_registry_factory.py)).
-Each carries a code-owner readiness state —
-`scaffold` / `awaiting_evidence` / `live` — defined in
-[`acquisition_core/providers.py`](platform-control/src/acquisition_core/providers.py). `fedlex_sparql`,
-`ris_ogd`, `eur_lex_sparql`, `deterministic_http`, `bundesland_http`, `regione_http`, `lexfind_api`
-and `gemeinde_http` are `live`; `ch_court_decisions` is `awaiting_evidence`; `canton_http` and
-`legifrance` are `scaffold` — registered so templates parse, and unable to dispatch any run.
+**Acquisition providers.** Thirteen are registered in
+[`provider_registry_factory.py`](platform-control/src/platform_control/services/provider_registry_factory.py):
+twelve acquisition paths, plus `cassette`, a fixture-replay provider for shadow runs that acquires
+nothing. Each carries a code-owner readiness state — `scaffold` / `awaiting_evidence` / `live` —
+defined in [`acquisition_core/providers.py`](platform-control/src/acquisition_core/providers.py).
+The twelve, in full:
+
+- `live` (9) — `deterministic_http`, `fedlex_sparql`, `ris_ogd`, `eur_lex_sparql`, `firecrawl`,
+  `bundesland_http`, `regione_http`, `lexfind_api`, `gemeinde_http`.
+- `awaiting_evidence` (1) — `ch_court_decisions`. Implemented and tested; only an acceptance run may
+  dispatch, and that run is how it earns its evidence.
+- `scaffold` (2) — `canton_http`, `legifrance`. Registered so blueprint templates parse. **No run of
+  any mode dispatches.** The remedy is engineering, not an operator action.
 
 **Acceptance evidence exists for the cantonal and communal rungs, in `compose-local` only.** Four
 ADR-0030 bundles under [`docs/runbooks/evidence/`](docs/runbooks/evidence/) — Zürich (v3), Bern,
@@ -52,11 +58,11 @@ The ZH bundle captured 4 PDFs, put 4/4 through document-intelligence, and return
 **No cantonal or communal blueprint template is turned on.** `enabled` is the operator-owner key of
 the ADR-0030 two-key lock and it fails closed. In
 [`source_blueprints.yaml`](platform-control/src/platform_control/hierarchies/source_blueprints.yaml)
-17 templates are `enabled: true` and 17 are `enabled: false` — and every LexFind, `gemeinde_http`,
-`canton_http`, court-decision and federal animal-protection template is among the `false` ones.
-So the acquired Swiss cantonal and communal corpus exists in a local compose stack and nowhere else.
-The evidence was captured in an environment that is not the deployed one, and the config key that
-would let a production run fire has deliberately not been turned.
+33 templates are defined: 16 are `enabled: true` and 17 are `enabled: false` — and every LexFind,
+`gemeinde_http`, `canton_http`, court-decision and federal animal-protection template is among the
+`false` ones. So the acquired Swiss cantonal and communal corpus exists in a local compose stack and
+nowhere else. The evidence was captured in an environment that is not the deployed one, and the
+config key that would let a production run fire has deliberately not been turned.
 
 **What that means, plainly:** this repository holds a working platform and a demonstrated loop. It
 does not hold Swiss law. Three cantons *onboarded* is not three cantons *held* — the ZH acceptance
