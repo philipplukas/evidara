@@ -158,15 +158,30 @@ class WizardRunWorkflow:
     async def _persist_outcome(
         self,
         wizard_run_id: str,
-        state: str,
+        state: str | None,
         event: str,
         failure_reason: str | None = None,
-    ) -> None:
-        await workflow.execute_activity_method(
+        expected_states: list[str] | None = None,
+    ) -> bool:
+        """Record the workflow's own verdict. Returns whether the write landed.
+
+        A generous retry budget on purpose. This is one small DB write, and if it
+        exhausts its attempts the activity fails, the workflow fails, and the row
+        is left at whatever it said before with the execution closed-failed — no
+        future signal and no future timer can rescue it. That is strictly worse
+        than the "parked forever" this whole change exists to remove, so the
+        budget covers hours of database unavailability rather than minutes.
+        """
+        return await workflow.execute_activity_method(
             WizardStateActivities.persist_wizard_outcome,
-            args=[wizard_run_id, state, failure_reason, event],
+            args=[wizard_run_id, state, failure_reason, event, expected_states],
             start_to_close_timeout=timedelta(minutes=5),
-            retry_policy=RetryPolicy(maximum_attempts=5, backoff_coefficient=2.0),
+            retry_policy=RetryPolicy(
+                maximum_attempts=20,
+                backoff_coefficient=2.0,
+                initial_interval=timedelta(seconds=5),
+                maximum_interval=timedelta(minutes=10),
+            ),
         )
 
     @workflow.run
@@ -197,7 +212,15 @@ class WizardRunWorkflow:
                 # The fallback is always "do not scale". Auto-approving a fan-out
                 # of crawls against live government portals because nobody
                 # answered is the one outcome that must never be reachable.
-                await self._persist_outcome(
+                #
+                # `expected_states` makes this a claim, not an overwrite. The timer
+                # firing and an operator clicking approve are concurrent: the API
+                # sends its signal and *then* writes `ScaledRun`, and the signal
+                # arrives too late to be seen by the `wait_condition` we have
+                # already left. Whoever claims the row first decides, and the other
+                # side is told it lost — the API raises a 409 rather than
+                # reporting a success that never happened.
+                claimed = await self._persist_outcome(
                     wizard_run_id,
                     WizardRunState.GATE_EXPIRED.value,
                     "gate_expired",
@@ -205,8 +228,19 @@ class WizardRunWorkflow:
                         f"Human gate expired after {int(gate_timeout.total_seconds())}s "
                         "with no approve or reject decision."
                     ),
+                    expected_states=[WizardRunState.HUMAN_GATE_APPROVAL.value],
                 )
-                return "gate_expired"
+                # Awaiting the activity gave any in-flight signal a workflow task
+                # to land on, so `self._approved` is now current.
+                if claimed or not self._approved:
+                    return "gate_expired"
+                # The operator got in first and the API already recorded it.
+                # Honour the approval rather than discarding a decision a human
+                # was told had been accepted.
+                workflow.logger.info(
+                    "Gate timer fired but the operator's approval had already been "
+                    "recorded; scaling instead of expiring."
+                )
         else:
             await workflow.wait_condition(lambda: self._approved or self._rejected)
 
@@ -219,6 +253,10 @@ class WizardRunWorkflow:
                     wizard_run_id,
                     WizardRunState.DISCOVERY_PLAN.value,
                     "gate_rejected",
+                    expected_states=[
+                        WizardRunState.HUMAN_GATE_APPROVAL.value,
+                        WizardRunState.DISCOVERY_PLAN.value,
+                    ],
                 )
             return "rejected"
 
@@ -256,9 +294,17 @@ class WizardRunWorkflow:
             if gate_hardened:
                 # Leave the run where it is, but say why it stopped. A failed
                 # scaled run used to be indistinguishable from a running one.
+                #
+                # `state=None` deliberately: the run *is* in `ScaledRun`, and
+                # re-stamping the state it already had would bump
+                # `state_entered_at` for a transition that did not happen,
+                # corrupting the state-dwell metric the battle-test scenarios
+                # track. `failure_reason` is what distinguishes "scaling" from
+                # "died an hour ago"; the state cannot, and adding a `Failed`
+                # state is a state-machine change this PR is not making.
                 await self._persist_outcome(
                     wizard_run_id,
-                    WizardRunState.SCALED_RUN.value,
+                    None,
                     "scaled_failed",
                     failure_reason=f"Scaled run failed: {exc}",
                 )
@@ -272,6 +318,13 @@ class WizardRunWorkflow:
                 wizard_run_id,
                 WizardRunState.REVIEW_ROUTING.value,
                 "scaled_completed",
+                expected_states=[
+                    WizardRunState.SCALED_RUN.value,
+                    # The API writes `ScaledRun` when it forwards the approve
+                    # signal, but the workflow must not require that to have
+                    # happened — the signal can arrive by other routes.
+                    WizardRunState.HUMAN_GATE_APPROVAL.value,
+                ],
             )
         return "scaled"
 

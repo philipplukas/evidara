@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.domain import ReviewTaskStatus, WizardProjectStatus, WizardRunState
@@ -174,22 +174,140 @@ class WizardService:
         await self.session.refresh(wizard_run)
         return wizard_run
 
-    async def approve_run(self, wizard_run_id: str, reason: str | None = None) -> WizardRun:
-        wizard_run = await self.get_run(wizard_run_id)
-        result = await self.orchestrator.signal_approve(wizard_run, reason=reason)
-        wizard_run.state = result.next_state or wizard_run.state
-        wizard_run.state_entered_at = result.state_entered_at or datetime.now(UTC)
-        await self._append_transition(wizard_run, "gate_approved", reason=reason)
+    async def _claim_gate_decision(
+        self,
+        wizard_run: WizardRun,
+        *,
+        next_state: WizardRunState,
+        entered_at: datetime,
+        event: str,
+        reason: str | None,
+    ) -> WizardRun:
+        """Record an operator's gate decision, but only if the gate is still open.
+
+        The guard at the top of `approve_run` reads the row, then a **network
+        round trip** to Temporal happens, then the state is written. In that
+        window the gate's timer can fire and `persist_wizard_outcome` can commit
+        `GateExpired`. The old unconditional assignment then wrote `ScaledRun`
+        over it and returned 200: the row said `ScaledRun`, the workflow was
+        closed `gate_expired`, no shard ever started, and because `ScaledRun` is
+        not terminal nothing surfaced it. That is exactly the divergence #560 §3
+        is about, rebuilt at the new boundary.
+
+        So the write is conditional on the state the guard actually saw. The
+        workflow's expiry write is conditional in the same way
+        (`WizardStateActivities.persist_wizard_outcome`), so exactly one of the
+        two can land and the loser is told, rather than silently overwriting or
+        being silently overwritten.
+        """
+        # Read both off the instance *before* the write: a rollback expires every
+        # mapped object, and touching an attribute afterwards triggers a lazy
+        # refresh outside an await — which surfaces as `MissingGreenlet`, not as
+        # the conflict message we are trying to raise.
+        run_id = wizard_run.wizard_run_id
+        expected = wizard_run.state
+        result = await self.session.execute(
+            update(WizardRun)
+            .where(WizardRun.wizard_run_id == run_id, WizardRun.state == expected)
+            .values(state=next_state, state_entered_at=entered_at)
+        )
+        if result.rowcount != 1:
+            await self.session.rollback()
+            current = await self.session.scalar(
+                select(WizardRun.state).where(WizardRun.wizard_run_id == run_id)
+            )
+            raise ConflictError(
+                f"Wizard run {run_id} left {expected.value} while the decision was in "
+                f"flight and is now {current.value if current else 'gone'}; the decision "
+                "was not applied."
+            )
+        await self.session.refresh(wizard_run)
+        await self._append_transition(wizard_run, event, reason=reason)
         await self.session.commit()
         await self.session.refresh(wizard_run)
         return wizard_run
 
+    async def approve_run(self, wizard_run_id: str, reason: str | None = None) -> WizardRun:
+        wizard_run = await self.get_run(wizard_run_id)
+        result = await self.orchestrator.signal_approve(wizard_run, reason=reason)
+        return await self._claim_gate_decision(
+            wizard_run,
+            next_state=result.next_state or wizard_run.state,
+            entered_at=result.state_entered_at or datetime.now(UTC),
+            event="gate_approved",
+            reason=reason,
+        )
+
     async def reject_run(self, wizard_run_id: str, reason: str | None = None) -> WizardRun:
         wizard_run = await self.get_run(wizard_run_id)
         result = await self.orchestrator.signal_reject(wizard_run, reason=reason)
-        wizard_run.state = result.next_state or wizard_run.state
-        wizard_run.state_entered_at = result.state_entered_at or datetime.now(UTC)
-        await self._append_transition(wizard_run, "gate_rejected", reason=reason)
+        return await self._claim_gate_decision(
+            wizard_run,
+            next_state=result.next_state or wizard_run.state,
+            entered_at=result.state_entered_at or datetime.now(UTC),
+            event="gate_rejected",
+            reason=reason,
+        )
+
+    async def restart_run(self, wizard_run_id: str) -> WizardRun:
+        """Start a fresh run for the project behind a terminally-ended one (#560).
+
+        `GateExpired` is terminal *for a run*, and without this it was terminal for
+        the whole project: every mutating endpoint guards on a state an expired run
+        can never be in, so at hour 73 the project became unusable and its scope and
+        discovery plan had to be re-entered somewhere else. Rejection, by contrast,
+        returns to `DiscoveryPlan` and stays recoverable — expiry must not be worse
+        than rejection.
+
+        The exit is at the *project* level, which is why it is not a transition in
+        the run state machine: the expired run keeps its record and a new run
+        starts at `DiscoveryPlan`, reusing the project's scope and discovery plan.
+        A new run also means a new Temporal workflow id, which matters — restarting
+        in place would collide with the closed execution's id and be silently
+        swallowed by the `WorkflowAlreadyStartedError` handler.
+        """
+        previous = await self.get_run(wizard_run_id)
+        if previous.state is not WizardRunState.GATE_EXPIRED:
+            raise InvalidStateTransitionError(
+                f"Only a terminally-ended run can be restarted; {wizard_run_id} is "
+                f"{previous.state.value}."
+            )
+        project = await self.get_project(previous.wizard_project_id)
+        if not project.discovery_plan:
+            raise InvalidStateTransitionError(
+                f"Wizard project {project.wizard_project_id} has no discovery plan to restart "
+                "from; create a new project instead."
+            )
+
+        now = datetime.now(UTC)
+        wizard_run = WizardRun(
+            wizard_project_id=project.wizard_project_id,
+            state=WizardRunState.DISCOVERY_PLAN,
+            state_entered_at=now,
+            progress={},
+            quality={},
+            health={},
+        )
+        self.session.add(wizard_run)
+        await self.session.flush()
+        self.session.add(
+            WizardRunLedger(
+                wizard_run_id=wizard_run.wizard_run_id,
+                state_transitions={
+                    "events": [
+                        {
+                            "state": WizardRunState.DISCOVERY_PLAN.value,
+                            "entered_at": now.isoformat(),
+                            "event": "restarted_after_gate_expiry",
+                            "restarted_from_wizard_run_id": previous.wizard_run_id,
+                        }
+                    ]
+                },
+                retry_counters={},
+                error_summary={},
+                sla_markers={},
+            )
+        )
         await self.session.commit()
         await self.session.refresh(wizard_run)
         return wizard_run

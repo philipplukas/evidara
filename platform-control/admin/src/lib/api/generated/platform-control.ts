@@ -686,6 +686,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/wizard/runs/{run_id}/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restart Wizard Run
+         * @description Start a fresh run for the project behind a run that ended terminally (#560).
+         *
+         *     `GateExpired` is terminal for the run. Without this it was terminal for the
+         *     whole project: every other mutating endpoint guards on a state an expired run
+         *     can never reach, so the operator's only recovery was re-entering the scope and
+         *     discovery plan in a brand-new project. Returns the **new** run.
+         */
+        post: operations["restartWizardRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reviews/tasks": {
         parameters: {
             query?: never;
@@ -5966,6 +5991,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A referenced entity does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restartWizardRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardRunStatusResponse"];
                 };
             };
             /** @description A referenced entity does not exist. */

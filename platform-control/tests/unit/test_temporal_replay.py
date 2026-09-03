@@ -24,10 +24,23 @@ that. This module closes the gap with two layers:
   time-skipping test server against stub activities, then replays the history it
   just produced. Marked ``temporal`` because it needs that server.
 
+* :func:`test_recorded_post_patch_history_replays` — the same regression guard
+  for a workflow behind a ``workflow.patched`` gate (#560). A history recorded
+  *before* the gate replays down the legacy branch, because ``patched()`` returns
+  False for it — so without a second, post-patch history the branch that actually
+  runs today is guarded by nothing, and an edit inside it replays green while
+  breaking every execution started since. See ``PATCHED_WORKFLOWS``.
+
 Regenerating the checked-in histories (only ever do this deliberately — a
 regenerated history no longer guards the change you just made):
 
     cd platform-control && RECORD_TEMPORAL_HISTORIES=1 uv run pytest \
+        tests/unit/test_temporal_replay.py -k live_execution
+
+The post-patch histories are on their own switch, so regenerating one family
+cannot silently overwrite the other:
+
+    cd platform-control && RECORD_POST_PATCH_TEMPORAL_HISTORIES=1 uv run pytest \
         tests/unit/test_temporal_replay.py -k live_execution
 
 Note the activities below are stubs. Replay never calls activities — their
@@ -75,11 +88,14 @@ async def _persist_pilot_completed(wizard_run_id: str) -> None:
 @activity.defn(name="persist_wizard_outcome")
 async def _persist_wizard_outcome(
     wizard_run_id: str,
-    state_value: str,
+    state_value: str | None,
     failure_reason: str | None,
     event: str,
-) -> None:
-    return None
+    expected_states: list[str] | None = None,
+) -> bool:
+    # True: the stub always "wins" its claim, so the recorded history follows the
+    # ordinary path rather than the lost-race branch.
+    return True
 
 
 @activity.defn(name="fetch_scope_shards")
@@ -141,6 +157,22 @@ _STUB_ACTIVITIES = [
 
 def _history_path(workflow_cls: type) -> Path:
     return HISTORY_DIR / f"{workflow_cls.__name__}.json"
+
+
+#: Workflows that carry a `workflow.patched` gate, and therefore need a *second*
+#: recorded history — one captured after the patch (#560).
+#:
+#: A history recorded before the gate replays down the **legacy** branch, because
+#: `patched()` returns False for it. That is what makes the checked-in
+#: `WizardRunWorkflow.json` a real regression guard for old executions — and it
+#: means the hardened branch is exercised by no replay at all. A future edit
+#: inside `if gate_hardened:` would replay green while breaking every execution
+#: started after the patch. This closes that hole.
+PATCHED_WORKFLOWS: list[type] = [WizardRunWorkflow]
+
+
+def _post_patch_history_path(workflow_cls: type) -> Path:
+    return HISTORY_DIR / f"{workflow_cls.__name__}.post-patch.json"
 
 
 async def _execute(env: WorkflowEnvironment, workflow_cls: type) -> WorkflowHistory:
@@ -257,3 +289,39 @@ async def test_live_execution_replays(
     if os.environ.get("RECORD_TEMPORAL_HISTORIES") == "1":
         HISTORY_DIR.mkdir(parents=True, exist_ok=True)
         _history_path(workflow_cls).write_text(history.to_json() + "\n")
+
+    # A patched workflow's post-patch history is recorded on a separate switch, so
+    # regenerating the legacy fixtures cannot silently overwrite the guard that
+    # covers the *other* branch, and vice versa.
+    if (
+        workflow_cls in PATCHED_WORKFLOWS
+        and os.environ.get("RECORD_POST_PATCH_TEMPORAL_HISTORIES") == "1"
+    ):
+        HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+        _post_patch_history_path(workflow_cls).write_text(history.to_json() + "\n")
+
+
+def test_every_patched_workflow_has_a_post_patch_history() -> None:
+    """A `workflow.patched` gate leaves the new branch unguarded until this exists."""
+    missing = [wf.__name__ for wf in PATCHED_WORKFLOWS if not _post_patch_history_path(wf).exists()]
+    assert not missing, (
+        f"No post-patch Temporal history for: {', '.join(missing)}. Record one with "
+        "RECORD_POST_PATCH_TEMPORAL_HISTORIES=1 (see PATCHED_WORKFLOWS)."
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("workflow_cls", PATCHED_WORKFLOWS, ids=lambda cls: cls.__name__)
+async def test_recorded_post_patch_history_replays(workflow_cls: type) -> None:
+    """The hardened branch must replay too, not just the legacy one it is gated behind.
+
+    `test_recorded_history_replays` proves an execution started before the patch
+    still works. It says nothing about executions started after it, because
+    `patched()` sends the old history down the old branch. This is the same guard
+    for the branch that actually runs now.
+    """
+    history = WorkflowHistory.from_json(
+        f"replay-{workflow_cls.__name__}",
+        _post_patch_history_path(workflow_cls).read_text(),
+    )
+    await Replayer(workflows=ALL_WORKFLOWS).replay_workflow(history)

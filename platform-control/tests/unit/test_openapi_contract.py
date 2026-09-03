@@ -213,6 +213,9 @@ EXPECTED_ERROR_RESPONSES = {
     "recordReviewDecision": {"404", "409"},
     "rejectSourceVersion": {"404", "409"},
     "rejectWizardRun": {"400", "404", "409"},
+    # 404 unknown run; 409 the run is not in a terminal state, or its project
+    # has no discovery plan to restart from (#560).
+    "restartWizardRun": {"404", "409"},
     "retryRun": {"400", "404", "409"},
     "saveWizardDiscoveryPlan": {"404", "409"},
     "saveWizardScope": {"404", "409"},

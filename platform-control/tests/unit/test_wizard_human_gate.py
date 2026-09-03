@@ -16,6 +16,8 @@ rather than asserted about in the abstract.
 from __future__ import annotations
 
 import asyncio
+import os
+import sqlite3
 
 import pytest
 from sqlalchemy import select
@@ -24,12 +26,12 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 from platform_control.domain import WizardRunState
-from platform_control.errors import InvalidStateTransitionError
+from platform_control.errors import ConflictError, InvalidStateTransitionError
 from platform_control.models.wizard_project import WizardProject
 from platform_control.models.wizard_run import WizardRun
 from platform_control.models.wizard_run_ledger import WizardRunLedger
 from platform_control.schemas.wizard import CreateWizardProjectRequest
-from platform_control.services.orchestrator import TemporalOrchestrator
+from platform_control.services.orchestrator import InMemoryOrchestrator, TemporalOrchestrator
 from platform_control.services.wizard_service import WizardService
 from platform_control.temporal.activities import (
     ReviewDrainActivities,
@@ -41,6 +43,12 @@ from platform_control.temporal.workflows import (
     ScopeShardWorkflow,
     WizardRunWorkflow,
 )
+
+
+def _sqlite_path() -> str:
+    """Filesystem path behind the test session factory's SQLite URL."""
+    return os.environ["PLATFORM_CONTROL_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+
 
 #: Short enough to read as a deadline, long enough that nothing races it. The
 #: time-skipping server fast-forwards the timer, so the wall clock never waits.
@@ -225,3 +233,203 @@ async def test_persist_wizard_outcome_refuses_an_unknown_state(session_maker) ->
     acts = WizardStateActivities(session_factory=session_maker)
     with pytest.raises(ValueError):
         await acts.persist_wizard_outcome("wrn_whatever", "NotAState", None, "bogus")
+
+
+# ---------------------------------------------------------------------------
+# The approve/expire race (#560): exactly one side may win, and the other is told
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_expiry_write_is_a_claim_not_an_overwrite(session_maker) -> None:
+    """`persist_wizard_outcome` must refuse a state the workflow no longer owns.
+
+    The gate timer firing and an operator clicking approve are concurrent. If the
+    API records the approval first, the expiry activity must not stamp
+    `GateExpired` over it — and must say it lost, so the workflow can honour the
+    decision instead of discarding one a human was told had been accepted.
+    """
+    async with session_maker() as session:
+        project = WizardProject(name="claim")
+        session.add(project)
+        await session.flush()
+        run = WizardRun(
+            wizard_project_id=project.wizard_project_id,
+            state=WizardRunState.SCALED_RUN,
+        )
+        session.add(run)
+        await session.commit()
+        wizard_run_id = run.wizard_run_id
+
+    acts = WizardStateActivities(session_factory=session_maker)
+    won = await acts.persist_wizard_outcome(
+        wizard_run_id,
+        WizardRunState.GATE_EXPIRED.value,
+        "expired",
+        "gate_expired",
+        [WizardRunState.HUMAN_GATE_APPROVAL.value],
+    )
+
+    assert won is False
+    async with session_maker() as session:
+        run = await session.get(WizardRun, wizard_run_id)
+        assert run is not None
+        assert run.state is WizardRunState.SCALED_RUN
+        assert run.failure_reason is None
+
+
+@pytest.mark.asyncio
+async def test_an_approval_that_loses_the_race_is_a_conflict_not_a_false_success(
+    session_maker,
+) -> None:
+    """The operator must not be told a decision was applied when it was discarded.
+
+    Reproduces the interleaving exactly: `approve_run` reads the row while the gate
+    is open, the signal round-trips to Temporal, and the expiry activity commits
+    `GateExpired` in that window. The old code wrote `ScaledRun` over it and
+    returned 200 — leaving the row non-terminal, the workflow closed
+    `gate_expired`, no shards ever started, and nothing surfacing any of it.
+    """
+    async with session_maker() as session:
+        project = WizardProject(name="race")
+        session.add(project)
+        await session.flush()
+        run = WizardRun(
+            wizard_project_id=project.wizard_project_id,
+            state=WizardRunState.HUMAN_GATE_APPROVAL,
+        )
+        session.add(run)
+        await session.flush()
+        session.add(
+            WizardRunLedger(wizard_run_id=run.wizard_run_id, state_transitions={"events": []})
+        )
+        await session.commit()
+        wizard_run_id = run.wizard_run_id
+
+    class _ExpiresDuringTheSignal(InMemoryOrchestrator):
+        """The gate times out while the approve signal is in flight to Temporal.
+
+        This is the exact window the review found: `approve_run` has already read
+        the row and passed its guard, and the state write has not happened yet.
+        """
+
+        async def signal_approve(self, wizard_run, reason=None):
+            # The expiry activity commits from its own connection, exactly as it
+            # would from the Temporal worker. Stdlib sqlite3 keeps this out of the
+            # caller's SQLAlchemy session entirely.
+            connection = sqlite3.connect(_sqlite_path())
+            try:
+                connection.execute(
+                    "UPDATE wizard_runs SET state = ?, failure_reason = ? WHERE wizard_run_id = ?",
+                    (WizardRunState.GATE_EXPIRED.value, "Human gate expired.", wizard_run_id),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+            # Temporal accepts the signal — the workflow is open, it has simply
+            # already left the `wait_condition`, so the approval is discarded.
+            return await super().signal_approve(wizard_run, reason=reason)
+
+    async with session_maker() as session:
+        service = WizardService(session, _ExpiresDuringTheSignal())
+        with pytest.raises(ConflictError):
+            await service.approve_run(wizard_run_id, reason="I clicked in time")
+
+    async with session_maker() as session:
+        run = await session.get(WizardRun, wizard_run_id)
+        assert run is not None
+        assert run.state is WizardRunState.GATE_EXPIRED
+
+
+@pytest.mark.asyncio
+async def test_a_failed_scaled_run_records_a_reason_without_faking_a_transition(
+    session_maker,
+) -> None:
+    """`scaled_failed` records why, and must not re-stamp the state it already had.
+
+    Re-writing `ScaledRun` over `ScaledRun` would bump `state_entered_at` for a
+    transition that never happened, corrupting the state-dwell metric the
+    battle-test scenarios track.
+    """
+    async with session_maker() as session:
+        project = WizardProject(name="scaled failure")
+        session.add(project)
+        await session.flush()
+        run = WizardRun(
+            wizard_project_id=project.wizard_project_id,
+            state=WizardRunState.SCALED_RUN,
+        )
+        session.add(run)
+        await session.commit()
+        wizard_run_id, entered_at = run.wizard_run_id, run.state_entered_at
+
+    acts = WizardStateActivities(session_factory=session_maker)
+    assert await acts.persist_wizard_outcome(
+        wizard_run_id, None, "Scaled run failed: boom", "scaled_failed"
+    )
+
+    async with session_maker() as session:
+        run = await session.get(WizardRun, wizard_run_id)
+        assert run is not None
+        assert run.state is WizardRunState.SCALED_RUN
+        assert run.failure_reason == "Scaled run failed: boom"
+        # SQLite hands back a naive datetime; the point is that it did not move.
+        assert run.state_entered_at.replace(tzinfo=None) == entered_at.replace(tzinfo=None)
+
+
+# ---------------------------------------------------------------------------
+# The way out of a terminal state (#560)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_an_expired_run_can_be_restarted_without_re_entering_the_project(
+    session_maker,
+) -> None:
+    """`GateExpired` is terminal for the run, not for the project.
+
+    Without this, every mutating endpoint guarded on a state an expired run can
+    never be in, so at hour 73 the project was unusable and the scope and
+    discovery plan had to be re-entered in a brand-new one. Rejection returns to
+    `DiscoveryPlan` and stays recoverable; expiry must not be worse than rejection.
+    """
+    async with session_maker() as session:
+        service = WizardService(session, InMemoryOrchestrator())
+        project = await service.create_project(CreateWizardProjectRequest(name="restart"))
+        await service.update_scope(project.wizard_project_id, {"domains": ["example.ch"]})
+        await service.update_discovery_plan(
+            project.wizard_project_id, {"seed_urls": ["https://example.ch"]}
+        )
+        expired = await service._get_latest_run_for_project(project.wizard_project_id)
+        expired.state = WizardRunState.GATE_EXPIRED
+        await session.commit()
+        expired_id = expired.wizard_run_id
+        project_id = project.wizard_project_id
+
+    async with session_maker() as session:
+        service = WizardService(session, InMemoryOrchestrator())
+        restarted = await service.restart_run(expired_id)
+        assert restarted.wizard_run_id != expired_id
+        assert restarted.state is WizardRunState.DISCOVERY_PLAN
+
+        # The project's work survived, so the operator starts a pilot, not a project.
+        resumed = await service.start_pilot_run(project_id)
+        assert resumed.state is WizardRunState.HUMAN_GATE_APPROVAL
+        assert resumed.wizard_run_id == restarted.wizard_run_id
+
+    async with session_maker() as session:
+        # The expired run keeps its record; restarting is not a rewrite of history.
+        previous = await session.get(WizardRun, expired_id)
+        assert previous is not None
+        assert previous.state is WizardRunState.GATE_EXPIRED
+
+
+@pytest.mark.asyncio
+async def test_only_a_terminally_ended_run_can_be_restarted(session_maker) -> None:
+    """Restart is a recovery from a dead end, not a way to abandon a live run."""
+    async with session_maker() as session:
+        service = WizardService(session, InMemoryOrchestrator())
+        project = await service.create_project(CreateWizardProjectRequest(name="live"))
+        run = await service._get_latest_run_for_project(project.wizard_project_id)
+        with pytest.raises(InvalidStateTransitionError):
+            await service.restart_run(run.wizard_run_id)

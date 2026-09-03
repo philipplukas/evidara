@@ -98,10 +98,11 @@ class WizardStateActivities:
     async def persist_wizard_outcome(
         self,
         wizard_run_id: str,
-        state_value: str,
+        state_value: str | None,
         failure_reason: str | None,
         event: str,
-    ) -> None:
+        expected_states: list[str] | None = None,
+    ) -> bool:
         """Write the workflow's own view of where the run ended up (#560).
 
         Before this existed, ``persist_pilot_completed`` was the *only* activity
@@ -111,20 +112,55 @@ class WizardStateActivities:
         running. The database and the workflow diverged permanently the moment
         anything went wrong, and nothing said so.
 
-        Idempotent, so Temporal's retries are free: writing the same state twice is
-        a no-op and appends no second ledger event.
+        ``expected_states`` makes the write a **claim** rather than an overwrite,
+        and returns whether it won. It has to: the gate timer firing and an
+        operator clicking approve are concurrent, and both used to write
+        unconditionally. The losing order left the row at ``ScaledRun`` with the
+        workflow closed ``gate_expired``, no shards ever starting, and nothing
+        surfacing it because ``ScaledRun`` is not terminal — #560 §3's divergence
+        rebuilt at the new boundary. ``WizardService`` guards the other side the
+        same way, so exactly one of the two can win.
+
+        ``state_value=None`` records ``failure_reason`` without moving the state:
+        a scaled run that died is still in ``ScaledRun``, and re-stamping the state
+        it already had would bump ``state_entered_at`` and corrupt the state-dwell
+        metric the battle-test scenarios track.
+
+        Idempotent, so Temporal's retries are free: writing the same state and
+        reason twice is a no-op and appends no second ledger event.
         """
-        state = WizardRunState(state_value)
+        state = WizardRunState(state_value) if state_value is not None else None
+        expected = (
+            {WizardRunState(value) for value in expected_states}
+            if expected_states is not None
+            else None
+        )
         async with self.session_factory() as session:
             wizard_run = await session.get(WizardRun, wizard_run_id)
             if wizard_run is None:
                 raise RuntimeError(f"WizardRun not found: {wizard_run_id}")
-            if wizard_run.state is state and wizard_run.failure_reason == failure_reason:
-                return
+            if expected is not None and wizard_run.state not in expected:
+                logger.info(
+                    "Not writing %s for wizard run %s: state is %s, expected one of %s.",
+                    state.value if state else "failure_reason",
+                    wizard_run_id,
+                    wizard_run.state.value,
+                    sorted(s.value for s in expected),
+                )
+                return False
+            if (
+                state is not None
+                and wizard_run.state is state
+                and wizard_run.failure_reason == failure_reason
+            ):
+                return True
+            if state is None and wizard_run.failure_reason == failure_reason:
+                return True
 
             now = datetime.now(UTC)
-            wizard_run.state = state
-            wizard_run.state_entered_at = now
+            if state is not None:
+                wizard_run.state = state
+                wizard_run.state_entered_at = now
             wizard_run.failure_reason = failure_reason
             ledger = await session.scalar(
                 select(WizardRunLedger).where(WizardRunLedger.wizard_run_id == wizard_run_id)
@@ -134,7 +170,7 @@ class WizardStateActivities:
                 events = list(transitions.get("events", []))
                 events.append(
                     {
-                        "state": state.value,
+                        "state": (state or wizard_run.state).value,
                         "entered_at": now.isoformat(),
                         "event": event,
                         **({"failure_reason": failure_reason} if failure_reason else {}),
@@ -143,6 +179,7 @@ class WizardStateActivities:
                 transitions["events"] = events
                 ledger.state_transitions = transitions
             await session.commit()
+            return True
 
     @activity.defn
     async def fetch_scope_shards(self, wizard_run_id: str) -> list[str]:
