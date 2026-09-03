@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio import activity
 
 from platform_control.domain import ReviewTaskStatus, RunMode, RunStatus, WizardRunState
+from platform_control.ids import generate_prefixed_id
 from platform_control.models.review_task import ReviewTask
 from platform_control.models.run import Run
 from platform_control.models.source import Source
@@ -19,6 +20,7 @@ from platform_control.models.wizard_project import WizardProject
 from platform_control.models.wizard_run import WizardRun
 from platform_control.models.wizard_run_ledger import WizardRunLedger
 from platform_control.services.provider_registry import ProviderRegistry
+from platform_control.services.wizard_progress import roll_up_shard_totals, update_wizard_progress
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,18 @@ logger = logging.getLogger(__name__)
 def _sanitize_shard_key(key: str) -> str:
     """Return a safe Temporal workflow-ID segment from an arbitrary shard key string."""
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in key)[:100] or "default"
+
+
+def shard_run_idempotency_key(wizard_run_id: str, scope_shard_key: str) -> str:
+    """Attempt-invariant dedupe key for the ``Run`` one shard crawl may create (#561).
+
+    Derived from the wizard run and the shard alone — deliberately *not* from the
+    Temporal attempt number, run id, or timestamp. That is the whole point: every
+    retry of ``run_shard_crawl`` computes the same key, so the UNIQUE index on
+    ``runs.idempotency_key`` lets exactly one of them create a run and dispatch a
+    provider.
+    """
+    return f"wizard:{wizard_run_id}:shard:{scope_shard_key}"
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +125,96 @@ class WizardStateActivities:
 # ---------------------------------------------------------------------------
 
 
+#: Run states that mean "an earlier attempt is still working on this shard".
+#: A claim in one of these is durable before any result exists, so it must not be
+#: read as an outcome.
+_NON_TERMINAL_RUN_STATUSES = frozenset({RunStatus.PENDING, RunStatus.RUNNING})
+
+
+class ShardDispatchInFlightError(RuntimeError):
+    """Raised when an earlier attempt at this shard has not finished yet.
+
+    Retryable on purpose: Temporal's backoff is the wait. The alternative —
+    returning the in-flight run's zeroed counters — reports success with no data,
+    and `ScopeShardWorkflow` does not inspect `status`, so the shard would be
+    recorded complete having captured nothing.
+    """
+
+
+def _run_summary(run: Run, *, status: str | None = None, **extra: Any) -> dict[str, Any]:
+    """Summary stats the shard activity returns to the workflow, read off the run."""
+    return {
+        "status": status or run.status.value,
+        "run_id": run.run_id,
+        "nodes_discovered": run.captured_resources_count,
+        "records_accepted": run.captured_resources_count,
+        "records_sent_to_review": 0,
+        "fatal_error_count": 1 if run.status is RunStatus.FAILED else 0,
+        **extra,
+    }
+
+
+def _insert_for_dialect(session: AsyncSession):
+    """Return the dialect-specific ``insert`` supporting ``ON CONFLICT``.
+
+    Mirrors ``FirecrawlWebhookService._insert_for_current_dialect``: the same two
+    engines, the same reason.
+    """
+    if session.get_bind().dialect.name == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert as insert_fn
+    else:
+        from sqlalchemy.dialects.sqlite import insert as insert_fn
+    return insert_fn
+
+
+async def _claim_shard_run(
+    *,
+    session: AsyncSession,
+    idempotency_key: str,
+    source: Source,
+    source_version: SourceVersion,
+    run_metadata: dict[str, Any],
+) -> tuple[Run, bool]:
+    """Claim the single ``Run`` this shard is allowed to have.
+
+    Returns ``(run, created)``. ``created`` is True only for the caller whose
+    ``INSERT`` actually landed — the database decides that, atomically, via the
+    UNIQUE index on ``runs.idempotency_key``. Every retry of the activity that
+    finds ``created=False`` must not dispatch: some earlier attempt already did.
+    """
+    now = datetime.now(UTC)
+    insert_fn = _insert_for_dialect(session)
+    stmt = (
+        insert_fn(Run)
+        .values(
+            run_id=generate_prefixed_id("run"),
+            source_id=source.source_id,
+            source_version_id=source_version.source_version_id,
+            mode=RunMode.PREVIEW,
+            status=RunStatus.PENDING,
+            started_at=now,
+            artifacts_count=0,
+            captured_resources_count=0,
+            idempotency_key=idempotency_key,
+            run_metadata=run_metadata,
+            created_at=now,
+            updated_at=now,
+        )
+        .on_conflict_do_nothing(index_elements=["idempotency_key"])
+        .returning(Run.run_id)
+    )
+    inserted_run_id = (await session.execute(stmt)).scalar_one_or_none()
+    if inserted_run_id is not None:
+        run = await session.get(Run, inserted_run_id)
+        assert run is not None  # just inserted in this transaction
+        return run, True
+
+    existing = await session.scalar(select(Run).where(Run.idempotency_key == idempotency_key))
+    if existing is None:  # pragma: no cover - only reachable if the row vanished
+        raise RuntimeError(f"Run for idempotency key {idempotency_key!r} disappeared.")
+    return existing, False
+
+
 async def _dispatch_provider_run(
     *,
     session: AsyncSession,
@@ -126,6 +230,12 @@ async def _dispatch_provider_run(
     Reuses :class:`RunService` so inline-resource persistence, artifact-bundle
     publishing, rate-limiting, and robots compliance all work identically to the
     regular (non-wizard) run path.
+
+    **Idempotent (#561).** The run is claimed under an attempt-invariant dedupe
+    key, so a retried activity returns the earlier attempt's run instead of
+    dispatching the provider a second time. These are government legal portals;
+    re-scraping one five times because the DB blipped after a successful crawl is
+    both wasteful and a politeness problem.
     """
     from platform_control.services.run_service import RunService
 
@@ -159,15 +269,54 @@ async def _dispatch_provider_run(
         "wizard_run_id": wizard_run_id,
         "scope_shard_key": scope_shard_key,
     }
-    run = Run(
-        source_id=source.source_id,
-        source_version_id=source_version.source_version_id,
-        mode=RunMode.PREVIEW,
-        status=RunStatus.PENDING,
+    run, created = await _claim_shard_run(
+        session=session,
+        idempotency_key=shard_run_idempotency_key(wizard_run_id, scope_shard_key),
+        source=source,
+        source_version=source_version,
         run_metadata=run_metadata,
     )
-    session.add(run)
-    await session.flush()
+    if not created:
+        # An earlier attempt claimed this shard. What happens next depends entirely
+        # on how that attempt ended — idempotency must mean "do not redo work that
+        # succeeded", never "cache the first failure forever".
+        if run.status is RunStatus.COMPLETED:
+            logger.info(
+                "Shard %s of wizard run %s already completed as run %s; not re-crawling.",
+                scope_shard_key,
+                wizard_run_id,
+                run.run_id,
+            )
+            return _run_summary(run, deduplicated=True)
+
+        if run.status in _NON_TERMINAL_RUN_STATUSES:
+            # An async/webhook provider commits its run while it is still RUNNING
+            # (`RunService`), so the claim outlives the results. Returning the row's
+            # zeros here would be a *successful* return with no data, and the
+            # workflow does not inspect `status` — the shard would be recorded
+            # complete having captured nothing. Raise instead, so Temporal's
+            # backoff gives the in-flight attempt time to land.
+            raise ShardDispatchInFlightError(
+                f"Shard {scope_shard_key} of wizard run {wizard_run_id} is already "
+                f"dispatched as run {run.run_id} and is still {run.status.value}."
+            )
+
+        # Terminal but unsuccessful (FAILED / CANCELLED). Re-arm the *same* row and
+        # dispatch again: that is what the retry policy is for. Reusing the row is
+        # what #561 asked for — one run per shard — and is not the same thing as
+        # refusing to ever retry a transient provider error.
+        logger.info(
+            "Re-dispatching shard %s of wizard run %s on run %s after %s.",
+            scope_shard_key,
+            wizard_run_id,
+            run.run_id,
+            run.status.value,
+        )
+        run.status = RunStatus.PENDING
+        run.failure_reason = None
+        run.completed_at = None
+        run.started_at = datetime.now(UTC)
+        await session.flush()
 
     run_service = RunService(session, provider_registry=registry)
     try:
@@ -210,14 +359,7 @@ async def _dispatch_provider_run(
         )
         await session.refresh(run)
 
-    return {
-        "status": run.status.value,
-        "run_id": run.run_id,
-        "nodes_discovered": run.captured_resources_count,
-        "records_accepted": run.captured_resources_count,
-        "records_sent_to_review": 0,
-        "fatal_error_count": 1 if run.status is RunStatus.FAILED else 0,
-    }
+    return _run_summary(run)
 
 
 # ---------------------------------------------------------------------------
@@ -276,31 +418,37 @@ class ScopeShardActivities:
             scope = dict(project.scope if project else {})
             discovery_plan = dict(project.discovery_plan if project else {})
 
-            # Mark shard as running.
-            progress = dict(wizard_run.progress or {})
-            shards_progress: dict = dict(progress.get("shards", {}))
-            shard_entry = dict(shards_progress.get(scope_shard_key, {}))
+        # Mark the shard running. Concurrent shards write the same JSON column, so
+        # this goes through the compare-and-set writer rather than a
+        # read-modify-write that would drop a sibling shard's entry (#561).
+        started_at = datetime.now(UTC).isoformat()
+
+        def _mark_running(progress: dict) -> dict:
+            shards_progress: dict = dict(progress.get("shards") or {})
+            shard_entry = dict(shards_progress.get(scope_shard_key) or {})
             shard_entry["status"] = "running"
-            shard_entry["started_at"] = datetime.now(UTC).isoformat()
+            shard_entry["started_at"] = started_at
             if resume_token:
                 shard_entry["resume_token"] = resume_token
             shards_progress[scope_shard_key] = shard_entry
             progress["shards"] = shards_progress
-            wizard_run.progress = progress
-            await session.commit()
+            return progress
 
-            # Resolve source + version from discovery plan (or scope fallback).
-            source_id = discovery_plan.get("source_id") or scope.get("source_id")
-            source_version_id = discovery_plan.get("source_version_id") or scope.get(
-                "source_version_id"
-            )
-            if not source_id or not source_version_id:
-                return {
-                    "wizard_run_id": wizard_run_id,
-                    "scope_shard_key": scope_shard_key,
-                    "status": "skipped_no_source_ref",
-                }
+        await update_wizard_progress(self.session_factory, wizard_run_id, _mark_running)
 
+        # Resolve source + version from discovery plan (or scope fallback).
+        source_id = discovery_plan.get("source_id") or scope.get("source_id")
+        source_version_id = discovery_plan.get("source_version_id") or scope.get(
+            "source_version_id"
+        )
+        if not source_id or not source_version_id:
+            return {
+                "wizard_run_id": wizard_run_id,
+                "scope_shard_key": scope_shard_key,
+                "status": "skipped_no_source_ref",
+            }
+
+        async with self.session_factory() as session:
             result = await _dispatch_provider_run(
                 session=session,
                 provider_registry_factory=self.provider_registry_factory,
@@ -328,36 +476,30 @@ class ScopeShardActivities:
 
         ``stats`` may contain ``nodes_discovered``, ``records_accepted``,
         ``records_sent_to_review``, and ``fatal_error_count``.
-        """
-        async with self.session_factory() as session:
-            wizard_run = await session.get(WizardRun, wizard_run_id)
-            if wizard_run is None:
-                return
 
-            progress = dict(wizard_run.progress or {})
-            shards_progress = dict(progress.get("shards", {}))
-            shard_entry = dict(shards_progress.get(scope_shard_key, {}))
+        Two properties this must hold and did not (#561):
+
+        * **Concurrent shards do not lose each other's writes.** The update is a
+          compare-and-set against ``wizard_runs.progress_version``, re-applied on
+          top of the winner when a sibling shard commits first.
+        * **A retried report does not double-count.** The aggregates are derived
+          from the per-shard entries, not incremented — this activity carries
+          ``RetryPolicy(maximum_attempts=3)``, and ``+=`` counted a retried shard
+          twice even with no concurrency at all.
+        """
+        completed_at = datetime.now(UTC).isoformat()
+
+        def _record_completion(progress: dict) -> dict:
+            shards_progress = dict(progress.get("shards") or {})
+            shard_entry = dict(shards_progress.get(scope_shard_key) or {})
             shard_entry["status"] = "complete"
-            shard_entry["completed_at"] = datetime.now(UTC).isoformat()
+            shard_entry["completed_at"] = completed_at
             shard_entry.update(stats)
             shards_progress[scope_shard_key] = shard_entry
             progress["shards"] = shards_progress
+            return roll_up_shard_totals(progress)
 
-            # Roll up aggregate progress counters.
-            total_nodes = int(progress.get("total_nodes", 0)) + int(
-                stats.get("nodes_discovered", 0)
-            )
-            accepted = int(progress.get("accepted_records", 0)) + int(
-                stats.get("records_accepted", 0)
-            )
-            routed = int(progress.get("routed_to_review", 0)) + int(
-                stats.get("records_sent_to_review", 0)
-            )
-            progress["total_nodes"] = total_nodes
-            progress["accepted_records"] = accepted
-            progress["routed_to_review"] = routed
-            wizard_run.progress = progress
-            await session.commit()
+        await update_wizard_progress(self.session_factory, wizard_run_id, _record_completion)
 
 
 # ---------------------------------------------------------------------------

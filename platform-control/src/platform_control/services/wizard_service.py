@@ -18,6 +18,7 @@ from platform_control.schemas.wizard import (
     ReviewTaskResponse,
 )
 from platform_control.services.orchestrator import Orchestrator
+from platform_control.services.wizard_progress import update_wizard_progress_in_session
 
 
 class WizardService:
@@ -154,12 +155,22 @@ class WizardService:
         wizard_run.workflow_id = result.workflow_id or wizard_run.workflow_id
         wizard_run.state = result.next_state or WizardRunState.PILOT_RUN
         wizard_run.state_entered_at = result.state_entered_at or datetime.now(UTC)
-        wizard_run.progress = {
-            **dict(wizard_run.progress or {}),
-            "sample_limit": sample_limit or 0,
-        }
         await self._append_transition(wizard_run, "pilot_started")
         await self.session.commit()
+
+        # `progress` is a compare-and-set column (#561): every writer must go
+        # through `update_wizard_progress`, or it clobbers whatever a shard
+        # activity committed *and* leaves `progress_version` unchanged, so no CAS
+        # writer can even detect the loss. This used to be a plain assignment from
+        # a snapshot read before `orchestrator.start_pilot_run` returned, which is
+        # exactly the unguarded read-modify-write the column exists to prevent.
+        # Written after the commit above so it is its own short transaction rather
+        # than a second uncommitted writer holding the row.
+        await update_wizard_progress_in_session(
+            self.session,
+            wizard_run.wizard_run_id,
+            lambda progress: {**progress, "sample_limit": sample_limit or 0},
+        )
         await self.session.refresh(wizard_run)
         return wizard_run
 

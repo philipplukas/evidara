@@ -348,6 +348,20 @@ Each review task sent to Argilla should contain:
 ## Reliability, Safety, and Rollback
 
 - Idempotent writes for discovery, extraction, and review ingestion activities.
+  - **How, for the scope-shard crawl (#561):** `run_shard_crawl` claims its `Run`
+    under `runs.idempotency_key = wizard:<wizard_run_id>:shard:<shard_key>` via
+    `INSERT … ON CONFLICT DO NOTHING`. The key is attempt-invariant, so a retried
+    activity finds the earlier attempt's run and reports it rather than
+    re-dispatching the provider — these are government legal portals, and the
+    retry policy allows five attempts.
+  - **How, for `WizardRun.progress`:** shards fan out concurrently and share one
+    JSON column, so writers go through
+    `platform_control.services.wizard_progress.update_wizard_progress`, a
+    compare-and-set against `wizard_runs.progress_version` that re-applies its
+    mutation when it loses a race. Aggregate counters are *derived* from the
+    per-shard entries, never incremented, so a retried report cannot double-count.
+    A new write path to `progress` that skips this helper reintroduces the lost
+    update.
 - Retry policy:
   - transient/network: exponential backoff with jitter.
   - deterministic schema errors: no retry, immediate review routing.

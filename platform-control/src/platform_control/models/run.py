@@ -45,6 +45,17 @@ class Run(TimestampMixin, Base):
     artifacts_count: Mapped[int] = mapped_column(default=0)
     captured_resources_count: Mapped[int] = mapped_column(default=0)
     failure_reason: Mapped[str | None] = mapped_column(nullable=True)
+    #: Caller-supplied dedupe key making run creation idempotent (#561).
+    #:
+    #: NULL for every ordinary run — an operator pressing "run" twice means it
+    #: twice. It is set by callers that are *retried by machinery* and must not
+    #: produce a second dispatch: the Temporal shard crawl writes
+    #: `wizard:<wizard_run_id>:shard:<shard_key>` here, so a retried activity
+    #: finds the run its earlier attempt created instead of re-scraping a
+    #: government portal. The UNIQUE constraint is what enforces that — an
+    #: application-level "have I already done this?" check has a race window
+    #: exactly as wide as the bug it replaces.
+    idempotency_key: Mapped[str | None] = mapped_column(nullable=True, unique=True)
     run_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
 
     source = relationship("Source", back_populates="runs")
