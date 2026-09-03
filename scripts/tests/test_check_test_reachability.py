@@ -104,6 +104,28 @@ class PlaywrightSelectionTests(unittest.TestCase):
                 checker.playwright_reaches(invocation, self.surface, self.e2e / name), name
             )
 
+    def test_a_command_in_another_package_reaches_nothing_here(self):
+        """A bare `playwright test` elsewhere must not retire this surface's debt.
+
+        Playwright loads its config from the working directory, so a command run
+        in `platform-control/admin` cannot collect a spec in
+        `legal-search/frontend` — but `playwright_reaches` used to ignore the
+        directory entirely. The blind spot was invisible while every CI
+        Playwright command carried a `-g` filter (a filter fails to match a
+        foreign spec's titles anyway); the first *unfiltered* command fell
+        through to "selects everything" and marked every spec in the repo
+        reachable, including one this register still owes debt for.
+        """
+        other_package = self.root / "other-surface"
+        other_package.mkdir()
+        invocation = checker.Invocation(
+            cwd=other_package, argv=["playwright", "test"], source="test"
+        )
+        for name in ("smoke.spec.ts", "workspace-panels.spec.ts", "visual.spec.ts"):
+            self.assertFalse(
+                checker.playwright_reaches(invocation, self.surface, self.e2e / name), name
+            )
+
 
 class VitestConfigSelectionTests(unittest.TestCase):
     """`legal-search/api` runs three vitest projects off three configs.

@@ -83,27 +83,13 @@ KNOWN_UNREACHABLE: dict[str, str] = {
         "`npm run test:smoke` the spec's own header documents is not in package.json. "
         "Needs a running app on :3102, so it needs a job that starts one."
     ),
-    "platform-control/admin/e2e/preview-review-v2.spec.ts": (
-        "`platform-control/admin` has an `e2e` script but no workflow invokes it. "
-        "`npm run lint` covers `e2e/`, so these specs are linted and never run."
-    ),
-    "platform-control/admin/e2e/blueprint-inventory.spec.ts": (
-        "Same as preview-review-v2.spec.ts — admin Playwright has no CI job. "
-        "(#668 added it; it needs a running backend, so it needs a job that starts one.)"
-    ),
-    "platform-control/admin/e2e/reference-data.spec.ts": (
-        "Same as preview-review-v2.spec.ts — admin Playwright has no CI job."
-    ),
-    "platform-control/admin/e2e/run-launch-dialog.spec.ts": (
-        "Same as preview-review-v2.spec.ts — admin Playwright has no CI job."
-    ),
-    "platform-control/admin/e2e/runs-v2-parity.spec.ts": (
-        "Same as preview-review-v2.spec.ts — admin Playwright has no CI job."
-    ),
-    "platform-control/admin/e2e/source-create.spec.ts": (
-        "Same as preview-review-v2.spec.ts — admin Playwright has no CI job. "
-        "(#646 green'd this spec locally; nothing keeps it green.)"
-    ),
+    # The six `platform-control/admin/e2e/*.spec.ts` entries that stood here are
+    # gone, not moved: the `Admin e2e (Playwright)` job in
+    # `.github/workflows/platform-control.yml` now runs them. Their reason —
+    # "admin Playwright has no CI job", and the note that it "needs a running
+    # backend" — was true when written and stopped being true twice over: every
+    # one of those specs mocks platform-control with `page.route`, so the job
+    # needs no backend at all.
     "infra/coordinator/tests/test_app.py": (
         "`infra/coordinator` is a standalone uv package with its own pyproject; "
         "no workflow runs pytest in that directory."
@@ -545,6 +531,24 @@ def playwright_reaches(inv: Invocation, surface: Surface, spec: Path) -> bool:
     args = inv.argv[1:]
     if not args or args[0] != "test":
         return False
+
+    # An invocation only reaches the surface whose config it would actually
+    # load. Playwright resolves `playwright.config.ts` from the working
+    # directory, so `cd legal-search/frontend && playwright test` can never
+    # collect a spec belonging to `platform-control/admin`.
+    #
+    # Without this the surfaces leaked into each other, and the leak was
+    # invisible for exactly as long as *every* CI Playwright command carried a
+    # `-g` filter: an unfiltered invocation falls through to `return True`
+    # below, which — matched against every surface — marked every spec in the
+    # repo reachable. The first unfiltered command (the admin's `npm run e2e`)
+    # made `legal-search/frontend/e2e/demo-queries.spec.ts` report as reachable
+    # by a job in a different package that cannot see it. A reachability check
+    # that answers "yes" for the wrong reason is worse than one that answers
+    # "no": it retires debt that is still owed.
+    if surface.config.parent != inv.cwd:
+        return False
+
     args = args[1:]
 
     grep: list[str] = []
