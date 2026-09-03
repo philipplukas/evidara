@@ -87,11 +87,65 @@ jobs:
       # Keep the extras in sync with scripts/check-document-intelligence.sh. `llm`
       # carries `dspy`, without which 12 tests over the production LLM extraction
       # path silently never ran (#685).
+      #
+      # This resolves `pyproject.toml`'s FLOORS against PyPI on the day it runs — it is
+      # deliberately NOT the versions the image ships, which `document-intelligence-locked`
+      # below covers from `uv.lock` (#848). Keeping one job on the floors is what turns a
+      # breaking upstream `deltalake`/`pyarrow` release into a signal instead of a
+      # surprise at the next image build.
       - name: Install document-intelligence dependencies
         run: python -m pip install -e "./document-intelligence[dev,service,test,llm]"
 
       - name: Check (ruff + pytest + contracts + dbt)
         run: bash scripts/check-document-intelligence.sh
+
+  # The suite against the dependency set the **image** ships (#848).
+  #
+  # `document-intelligence-check` above installs with `pip install -e .[...]`, which
+  # resolves `pyproject.toml`'s floors against PyPI on the day it runs. That is useful —
+  # it is the early warning that a new `deltalake`/`pyarrow` broke us — but it is not
+  # what is deployed: the Dockerfiles install from `uv.lock`, so without this job the
+  # versions in production are tested by no CI job at all. Measured on 2026-09-03, the
+  # two resolutions were `deltalake` 1.6.3 / `pyarrow` 25.0.1 (floors) against 1.5.0 /
+  # 23.0.1 (lock, before this change).
+  #
+  # `uv sync --frozen` fails if `uv.lock` and `pyproject.toml` disagree, so a floor
+  # change that nobody re-locked stops here rather than shipping an image built from a
+  # lock the gate never saw.
+  document-intelligence-locked:
+    name: Locked dependency set (what the image ships)
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy-v2' }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          # Must match the Dockerfiles' base image and document-intelligence/.python-version.
+          python-version: "3.12"
+
+      - name: Install uv
+        run: python -m pip install uv
+
+      - name: Install the locked dependency set
+        working-directory: document-intelligence
+        run: uv sync --frozen --extra dev --extra service --extra test --extra llm
+
+      - name: Report the versions under test
+        working-directory: document-intelligence
+        run: |
+          uv run --frozen python -c "import sys, deltalake, pyarrow; print(f'python={sys.version.split()[0]} deltalake={deltalake.__version__} pyarrow={pyarrow.__version__}')"
+
+      - name: Tests (pytest)
+        working-directory: document-intelligence
+        run: uv run --frozen pytest tests/ -q
 
   # The single required status check for this workflow. Individual jobs are
   # path-filtered and GitHub reports no conclusion for a job skipped by `if:`,
@@ -102,6 +156,7 @@ jobs:
     needs:
       - changes
       - document-intelligence-check
+      - document-intelligence-locked
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

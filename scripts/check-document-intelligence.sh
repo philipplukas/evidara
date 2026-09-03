@@ -16,6 +16,13 @@ if ! python3 -c 'import sys; assert sys.version_info >= (3, 12), "need 3.12+"' 2
 fi
 # Keep in sync with .github/workflows/document-intelligence.yml (dev + service + test + llm).
 #
+# This installs `pyproject.toml`'s FLOORS, resolved against PyPI on the day it runs — the
+# early-warning axis, deliberately NOT the dependency set that ships. The Dockerfiles install
+# from `uv.lock` (`uv sync --frozen`), and the `document-intelligence-locked` CI job is what
+# runs the suite against that. Do not "fix" the divergence by pointing this script at the lock:
+# then nothing would notice a breaking `deltalake`/`pyarrow` release until someone re-locked.
+# See #848 and the dependency-set table in CLAUDE.md.
+#
 # `llm` is here for coverage, not for the runtime. It carries `dspy`, and without it
 # `tests/test_dspy_modules.py` (11 tests) was dropped at collection and
 # `test_eval_dspy_extraction.py::test_eval_harness_runs_mock` skipped — 12 tests over

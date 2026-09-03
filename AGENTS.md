@@ -194,6 +194,8 @@ pre-commit and CI.
 
 The pre-commit hooks and CI workflows must run the same checks. If you add a check to one, add it to the other. `scripts/` is the shared entry point.
 
+A gate must also run the same **dependency set** as the artifact it claims to cover. `document-intelligence`'s Dockerfiles install from `uv.lock` (`uv sync --frozen`), so the locked set is what ships and the `document-intelligence-locked` CI job is what tests it; the floors-resolving job beside it is the early warning, not the gate. See the dependency-set table in `CLAUDE.md` and #848 — the image used to float to whatever PyPI had on build day, so two images built a week apart were not the same software and no gate ran either of them.
+
 ### Source of truth hierarchy
 
 | Thing | Source of truth |
