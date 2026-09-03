@@ -57,6 +57,10 @@ describe("RunList helpers", () => {
     expect(summarizeRunFilters({ mode: "production", status: "pending" })).toBe(
       "mode: production · status: pending",
     );
+    // `refused: false` is a narrowing filter ("hide refusals"), not an absent
+    // one, so it has to appear in the summary the caption prints.
+    expect(summarizeRunFilters({ refused: false })).toBe("refused: false");
+    expect(summarizeRunFilters({ refused: true })).toBe("refused: true");
   });
 
   it("prioritizes failed runs over running and pending work", () => {
@@ -77,6 +81,17 @@ describe("RunList helpers", () => {
   it("describes the queue state in operator language", () => {
     expect(describeRunState(failedRun)).toBe("Blocked. Fix the cause, then retry.");
     expect(describeRunState(completedRun)).toContain("Finished successfully");
+  });
+
+  it("describes a refused run as a lock decision, not as a provider failure", () => {
+    // ADR-0035 persists a refusal as terminal FAILED. Without this branch the
+    // queue told an operator to "review the failure reason" of a provider that
+    // was never called — refusals polluting failure triage, the exact thing the
+    // `?refused=true` filter was built to prevent (#634).
+    const refusedRun = { ...failedRun, refused: true };
+    expect(describeRunState(refusedRun)).toContain("Refused before dispatch");
+    expect(describeRunState(refusedRun)).toContain("fix the key, not the provider");
+    expect(describeRunState(refusedRun)).not.toContain("Blocked.");
   });
 
   it("ignores slash shortcuts inside text-entry targets", () => {
@@ -166,6 +181,21 @@ describe("queue count honesty during an outage", () => {
     expect(
       describeQueueScope({ scope, loadedCount: 0, total: undefined, filterSummary: "" }),
     ).toContain("not zeros");
+  });
+
+  it("does not tell an operator the queue failed to load when it is merely narrowed", () => {
+    // Two different worlds produce `unknown`. Telling someone looking at a full
+    // table that it "could not be loaded" teaches them to ignore the line — and
+    // the line is the only thing standing between a `—` and a believed `0`.
+    const caption = describeQueueScope({
+      scope: "unknown",
+      loadedCount: 3,
+      total: 3,
+      filterSummary: "refused: true",
+    });
+    expect(caption).toContain("refused: true");
+    expect(caption).toContain("not zero");
+    expect(caption).not.toContain("could not be loaded");
   });
 
   it("reports a genuinely empty queue as zero", () => {

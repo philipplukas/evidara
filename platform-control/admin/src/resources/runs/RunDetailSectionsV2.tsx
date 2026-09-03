@@ -19,7 +19,7 @@
 "use client";
 
 import { type Identifier, useGetList, useRecordContext } from "ra-core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import type {
   CapturedResourceRecord,
   DocumentLifecycleRecord,
@@ -29,7 +29,6 @@ import type {
   RunPipelineHealth,
   RunRecord,
 } from "../../lib/admin/dataProvider";
-import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import {
   AccordionContent,
@@ -38,6 +37,7 @@ import {
   AccordionTrigger,
   DataTable,
   type DataTableColumn,
+  InlineAlert,
   Pill,
   type PillLevel,
 } from "../../ui/primitives";
@@ -95,46 +95,24 @@ function CodeBlock({ value }: { value: unknown }) {
 
 function PipelineHealthBanner({
   run,
+  health,
+  isPending,
+  error,
   onJumpToSection,
 }: {
   run: RunRecord;
+  // Fetched once by `RunShowV2` via `useRunPipelineHealth` and handed down. This
+  // banner used to own the fetch, which was fine while it was the only reader;
+  // the stall diagnosis on the overview is a second one, and two fetches of one
+  // endpoint can render two different answers about the same run.
+  health: RunPipelineHealth | null;
+  isPending: boolean;
+  error: unknown;
   onJumpToSection: (href: string) => void;
 }) {
-  const [health, setHealth] = useState<RunPipelineHealth | null>(null);
-  const [isPending, setIsPending] = useState(true);
-  const [error, setError] = useState<unknown>(null);
   const legalSearchUrl = process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim();
   const evidenceRunbookPath =
     "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
-
-  useEffect(() => {
-    let cancelled = false;
-    setIsPending(true);
-    setError(null);
-
-    void controlPlaneActions
-      .getRunPipelineHealth(run.run_id)
-      .then((response) => {
-        if (!cancelled) {
-          setHealth(response);
-        }
-      })
-      .catch((reason) => {
-        if (!cancelled) {
-          setError(reason);
-          setHealth(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsPending(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [run.run_id]);
 
   const decisionSupport = useMemo(
     () => buildPipelineDecisionSupport({ run, health }),
@@ -308,6 +286,14 @@ interface RunSectionProps<TRecord extends { id: Identifier }> {
   sectionId?: string;
   title: string;
   description: string;
+  /**
+   * What this section cannot tell you, rendered above the rows.
+   *
+   * Not decoration: a section whose rows are honest but whose *absence of rows*
+   * is not (the DI stage cannot see a quarantine at all) has to say so where the
+   * rows are, not in a doc comment.
+   */
+  caveat?: ReactNode;
   rows: TRecord[] | undefined;
   isPending: boolean;
   error: unknown;
@@ -321,6 +307,7 @@ function RunAccordionSection<TRecord extends { id: Identifier }>({
   sectionId,
   title,
   description,
+  caveat,
   rows,
   isPending,
   error,
@@ -344,6 +331,8 @@ function RunAccordionSection<TRecord extends { id: Identifier }>({
       <AccordionContent>
         <div className="space-y-3">
           <p className="text-[13px] text-[var(--foreground-subtle)]">{description}</p>
+
+          {caveat ? <InlineAlert tone="warning">{caveat}</InlineAlert> : null}
 
           {isPending ? (
             <p className="text-[13px] text-[var(--foreground-subtle)]">
@@ -530,7 +519,15 @@ const documentLifecycleColumns: DataTableColumn<DocumentLifecycleRecord>[] = [
 // Root — binds the five `useGetList` fetches and renders the accordion stack.
 // ---------------------------------------------------------------------------
 
-export default function RunDetailSectionsV2() {
+export default function RunDetailSectionsV2({
+  health,
+  healthIsPending,
+  healthError,
+}: {
+  health: RunPipelineHealth | null;
+  healthIsPending: boolean;
+  healthError: unknown;
+}) {
   const run = useRecordContext<RunRecord>();
 
   // Controls which accordion sections are open. The pipeline jump links reveal
@@ -578,7 +575,13 @@ export default function RunDetailSectionsV2() {
 
   return (
     <div className="space-y-4">
-      <PipelineHealthBanner run={run} onJumpToSection={handleJumpToSection} />
+      <PipelineHealthBanner
+        run={run}
+        health={health}
+        isPending={healthIsPending}
+        error={healthError}
+        onJumpToSection={handleJumpToSection}
+      />
 
       <AccordionRoot
         type="multiple"
@@ -625,10 +628,29 @@ export default function RunDetailSectionsV2() {
           sectionId="di-processing-status-section"
           title="DI Processing Status"
           description="Document-intelligence processing updates correlated to this run."
+          caveat={
+            <div className="space-y-1">
+              <p className="font-semibold text-[var(--foreground)]">
+                Quarantined documents do not appear here
+              </p>
+              <p>
+                ADR-0047 withholds a manifestation whose extracted text cannot support the claim
+                that it is law. document-intelligence records that on its own processing-manifest
+                surface with a reason slug and a metric, and deliberately emits{" "}
+                <strong>no further status event</strong> — the status flow ends at{" "}
+                <code>processing</code>. platform-control&apos;s own status vocabulary has no{" "}
+                <code>quarantined</code> member either, so nothing on this screen can count them.
+              </p>
+              <p>
+                Read the rows below as “what DI reported”, never as “nothing was withheld”. A
+                document can be quarantined and leave this list looking clean.
+              </p>
+            </div>
+          }
           rows={processingStatus.data}
           isPending={processingStatus.isPending}
           error={processingStatus.error}
-          emptyMessage="No DI processing status updates have been received for this run."
+          emptyMessage="No DI processing status updates have been received for this run. That is not the same as “nothing was withheld” — see the note above."
           columns={processingStatusColumns}
           getRowId={(update) => update.event_id}
         />

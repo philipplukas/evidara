@@ -45,7 +45,7 @@ import {
 
 type RunStatus = RunListRecord["status"];
 type RunMode = RunListRecord["mode"];
-type RunQueueFilterValues = Partial<Pick<RunListRecord, "mode" | "status">>;
+type RunQueueFilterValues = Partial<Pick<RunListRecord, "mode" | "status" | "refused">>;
 
 type StatusPreset = {
   key: RunStatus;
@@ -127,8 +127,14 @@ export default function RunListV2() {
   // called it `complete` and printed a confident `0` over a non-empty queue. The
   // scope is `unknown` here so the chips render the `—` this module already has
   // for exactly this case. Zero and "I could not ask" must not look the same.
-  const isStatusFiltered = Boolean(filterValues.status);
-  const countScope = isStatusFiltered
+  //
+  // The refusal preset narrows the collection the same way a status filter does,
+  // so it makes the per-status counts equally unknowable and gets the same
+  // treatment. Sending it through `Boolean(...)` would be wrong for `refused:
+  // false`, which is also a narrowing filter.
+  const isCollectionNarrowed =
+    Boolean(filterValues.status) || typeof filterValues.refused === "boolean";
+  const countScope = isCollectionNarrowed
     ? "unknown"
     : resolveQueueCountScope({
         hasError: Boolean(controller.error),
@@ -172,6 +178,8 @@ export default function RunListV2() {
     controller.setFilters({ ...filterValues, status }, undefined, false);
   const setMode = (mode: RunMode | undefined) =>
     controller.setFilters({ ...filterValues, mode }, undefined, false);
+  const setRefused = (refused: boolean | undefined) =>
+    controller.setFilters({ ...filterValues, refused }, undefined, false);
   const clearFilters = () => controller.setFilters({}, undefined, false);
 
   const columns: DataTableColumn<RunListRecord>[] = [
@@ -182,10 +190,16 @@ export default function RunListV2() {
       render: (record) => (
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[12px] text-[var(--foreground)]">{record.run_id}</span>
-          <div>
+          <div className="flex flex-wrap items-center gap-1">
             <Pill variant="tag" level={runModeToLevel(record.mode)}>
               {record.mode}
             </Pill>
+            {/*
+             * ADR-0035 built the refusal record and #634 built the filter; until
+             * now nothing rendered either, so a refusal was indistinguishable
+             * from a provider failure in the queue.
+             */}
+            {record.refused ? <Pill level="degraded">refused</Pill> : null}
           </div>
         </div>
       ),
@@ -264,10 +278,20 @@ export default function RunListV2() {
                */
               <span
                 data-testid="run-failure-reason"
-                className="text-[12px] text-[var(--status-critical)] line-clamp-3"
+                className={
+                  record.refused
+                    ? "text-[12px] text-[var(--status-degraded)] line-clamp-3"
+                    : "text-[12px] text-[var(--status-critical)] line-clamp-3"
+                }
                 title={record.failure_reason}
               >
-                Failure: {record.failure_reason}
+                {/*
+                 * A refused run is FAILED on the wire but the reason is a lock
+                 * decision, not a failure. Labelling it "Failure:" is what put
+                 * refusals into failure triage in the first place (#634).
+                 */}
+                {record.refused ? "Refusal: " : "Failure: "}
+                {record.failure_reason}
               </span>
             ) : null}
           </div>
@@ -400,6 +424,27 @@ export default function RunListV2() {
                   {preset.label}
                 </PresetButton>
               ))}
+              {/*
+               * The refusal log (#634 item 4, ADR-0035 Consequences): the record
+               * of what people TRIED to onboard and what the lock turned away —
+               * the cheapest signal there is about where the platform blocks its
+               * own operators. No count is printed on these two chips: the page
+               * holds only the runs the current filter returned, so a number here
+               * would describe the view and read as the queue.
+               */}
+              <PresetButton
+                isActive={filterValues.refused === true}
+                onClick={() => setRefused(true)}
+                tone="warning"
+              >
+                Refused only
+              </PresetButton>
+              <PresetButton
+                isActive={filterValues.refused === false}
+                onClick={() => setRefused(false)}
+              >
+                Hide refusals
+              </PresetButton>
             </div>
             {attentionRun ? (
               <button
@@ -448,6 +493,24 @@ export default function RunListV2() {
             })}
           </p>
         </section>
+
+        {filterValues.refused === true ? (
+          <InlineAlert tone="warning" testId="run-queue-refusal-log">
+            <div className="space-y-1">
+              <p className="font-semibold text-[var(--foreground)]">Refusal log</p>
+              <p>
+                These runs never reached a portal. The ADR-0030 two-key lock blocked the dispatch
+                and platform-control kept the attempt as a terminal record so it can be asked what
+                was tried and why it was refused. The remedy is a config or code key on the
+                template, not provider debugging — open a run for the reason it names.
+              </p>
+              <p>
+                A refusal records <strong>what</strong> was attempted and why it was blocked. It
+                does not record <strong>who</strong> attempted it.
+              </p>
+            </div>
+          </InlineAlert>
+        ) : null}
 
         {/*
          * #669: the outage used to be a footnote inside the table body while

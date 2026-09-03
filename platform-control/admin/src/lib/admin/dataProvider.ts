@@ -489,6 +489,14 @@ const toRunsQueryString = (params: GetListParams): string => {
   if (typeof filter.source_id === "string" && !isMissingFilterValue(filter.source_id)) {
     query.set("source_id", filter.source_id);
   }
+  // ADR-0030 two-key-lock refusals (#634). `GET /v1/runs?refused=true` was built
+  // specifically so refusals can be audited "without them polluting failure
+  // triage" — and then no client ever sent the parameter, so the record ADR-0035
+  // built reached no screen. Only an explicit boolean is forwarded: an absent
+  // filter must keep meaning "both", not "false".
+  if (typeof filter.refused === "boolean") {
+    query.set("refused", String(filter.refused));
+  }
   setPaginationParams(query, params);
 
   return `?${query.toString()}`;

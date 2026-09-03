@@ -28,7 +28,19 @@ import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
 import { PrimaryDecisionCell } from "./PrimaryDecisionCell";
 import { RunActionStack } from "./RunActions";
 import RunDetailSectionsV2 from "./RunDetailSectionsV2";
-import { buildRunDecisionSupport, buildRunHandoffGuidance } from "./RunShow";
+import {
+  RunAcceptanceEvidencePanel,
+  RunCaptureLedgerPanel,
+  RunRefusalBanner,
+  RunStallPanel,
+} from "./RunEvidencePanels";
+import {
+  buildRunDecisionSupport,
+  buildRunHandoffGuidance,
+  describeRunReplay,
+  describeRunScope,
+} from "./RunShow";
+import { useRunPipelineHealth } from "./useRunPipelineHealth";
 
 export function formatDuration(run: RunRecord): string {
   if (!run.started_at || !run.completed_at) return "—";
@@ -43,6 +55,11 @@ export function formatDuration(run: RunRecord): string {
 }
 
 function describeRunNextStep(run: RunRecord): string {
+  // A refusal is not a failure and must not be triaged as one: nothing was
+  // dispatched, so there is no blocked stage to pinpoint (ADR-0035, #634).
+  if (run.refused) {
+    return "This run was refused before dispatch. Read the refusal banner above; the remedy is a key on the blueprint template, not the pipeline sections.";
+  }
   if (run.status === "failed") {
     return "Open the pipeline sections below and use the failure reason to pinpoint the blocked stage.";
   }
@@ -50,7 +67,10 @@ function describeRunNextStep(run: RunRecord): string {
     return "The run is active. Watch the pipeline health and stage sections for the next operator cue.";
   }
   if (run.status === "pending") {
-    return "The run is queued. Review readiness and wait for the first stage update.";
+    // "Wait for the first stage update" was one sentence for six causes, and the
+    // most common one — no worker picked the run up — is not something waiting
+    // fixes. The named cause is in the stall panel below.
+    return "The run is queued and nothing has dispatched it yet. See the named cause below rather than waiting on it.";
   }
   if (run.status === "completed") {
     return "The run completed successfully. Use the lifecycle sections as the audit trail.";
@@ -73,6 +93,9 @@ export default function RunShowV2() {
     id,
   });
   const run = controller.record;
+  // One fetch of pipeline health for the whole page: the stall diagnosis and the
+  // stage list must not derive from two snapshots that can disagree.
+  const pipelineHealth = useRunPipelineHealth(run?.run_id);
 
   if (controller.isPending) {
     return (
@@ -89,10 +112,16 @@ export default function RunShowV2() {
 
   const decision = buildRunDecisionSupport(run);
   const duration = formatDuration(run);
+  const scope = describeRunScope(run);
+  const replay = describeRunReplay(run);
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[var(--container-max)] mx-auto space-y-6">
       <RunHandoffCard run={run} />
+
+      {/* Leads the page: a refused run was never dispatched, and every other
+          panel below reads differently once that is known. */}
+      <RunRefusalBanner run={run} />
 
       {/* Header — parity with v1 `RunPageContextBar`, incl. the action stack. */}
       <header className="space-y-3">
@@ -110,6 +139,16 @@ export default function RunShowV2() {
           <Pill variant="tag" level={runModeToLevel(run.mode)}>
             {runModeLabel(run.mode)}
           </Pill>
+          {run.refused ? <Pill level="degraded">Refused</Pill> : null}
+          {run.replay ? <Pill variant="meta">{`Replay · ${run.replay.mode}`}</Pill> : null}
+          {/*
+           * `scope` may genuinely be absent here even though `RunResponse`
+           * declares it: react-admin seeds `useShowController` from the list
+           * cache, whose rows are `RunListItemResponse` — which carries neither
+           * `scope` nor `replay`. So this renders over the list row for one frame
+           * before the `getOne` lands, and `run.scope.kind` threw on it.
+           */}
+          {scope.known ? <Pill variant="meta">{`Scope ${scope.value}`}</Pill> : null}
           <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
         </div>
         <RecordContextProvider value={run}>
@@ -175,6 +214,35 @@ export default function RunShowV2() {
         </FieldCell>
         <FieldCell label="Mode">{run.mode}</FieldCell>
         <FieldCell label="Status">{run.status}</FieldCell>
+        {/*
+         * Already on the wire and dropped by this grid until now: `refused`
+         * (ADR-0035), and `scope`/`replay`, without which a replay run is
+         * indistinguishable from a fresh one.
+         */}
+        <FieldCell label="Refused by the two-key lock">{run.refused ? "yes" : "no"}</FieldCell>
+        <FieldCell label="Scope">
+          <span
+            className={scope.known ? "font-mono text-[13px]" : "text-[var(--foreground-faint)]"}
+          >
+            {scope.value}
+          </span>
+        </FieldCell>
+        <FieldCell label="Replay">
+          {/*
+           * Three states, and "not a replay" is a claim: it must not be printed
+           * off a list-cache record that never carried the field. See
+           * `describeRunReplay`.
+           */}
+          <span
+            className={
+              replay.known && run.replay
+                ? "font-mono text-[13px]"
+                : "text-[var(--foreground-faint)]"
+            }
+          >
+            {replay.value}
+          </span>
+        </FieldCell>
         <FieldCell label="Captured resources">
           <span className="tabular-nums">{run.captured_resources_count}</span>
         </FieldCell>
@@ -203,9 +271,27 @@ export default function RunShowV2() {
         <FieldCell label="Updated">{formatSwissDateTime(run.updated_at)}</FieldCell>
       </DetailGrid>
 
+      {/*
+       * M15 read surfaces. Ordered by the question an operator arrives with:
+       * why did nothing happen → does this justify the flip → what did it
+       * actually capture, publish and refuse.
+       */}
+      <RunStallPanel
+        run={run}
+        health={pipelineHealth.health}
+        healthIsPending={pipelineHealth.isPending}
+        healthError={pipelineHealth.error}
+      />
+      <RunAcceptanceEvidencePanel run={run} />
+      <RunCaptureLedgerPanel run={run} />
+
       {/* Lifecycle stack — pipeline health banner + 5 collapsed accordion sections. */}
       <RecordContextProvider value={run}>
-        <RunDetailSectionsV2 />
+        <RunDetailSectionsV2
+          health={pipelineHealth.health}
+          healthIsPending={pipelineHealth.isPending}
+          healthError={pipelineHealth.error}
+        />
       </RecordContextProvider>
     </div>
   );
