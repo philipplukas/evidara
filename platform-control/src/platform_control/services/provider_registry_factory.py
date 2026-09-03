@@ -23,9 +23,18 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     registry.register(DeterministicHttpProvider())
     registry.register(FedlexSparqlProvider())
     registry.register(RisOgdProvider())
-    # Sub-federal and supranational providers: live_ready but blueprint
-    # templates referencing them stay `enabled: false` until an operator
-    # captures acceptance-run evidence for each jurisdiction.
+    # Sub-federal and supranational providers. `live_ready: bool` is DEPRECATED,
+    # not gone — `resolve_readiness` still honours it as a fallback for providers
+    # declaring no `readiness` (acquisition_core/providers.py:162,175),
+    # `ProviderRegistry.live_ready_names` (:231) keeps the name, and
+    # `source_service` still publishes `live_ready` on blueprint responses (:79).
+    # What replaced it as the source of truth is the three-valued
+    # `AcquisitionReadiness` (#743), declared per provider on the class and not by
+    # this grouping: eur_lex_sparql, bundesland_http and regione_http are `live`;
+    # legifrance is `scaffold` until PISTE credentials exist. Either way the code
+    # key is only one of the two: blueprint templates referencing them stay
+    # `enabled: false` until an operator captures acceptance-run evidence for each
+    # jurisdiction (ADR-0030).
     registry.register(EurLexSparqlProvider())
     registry.register(
         LegifranceProvider(
@@ -48,16 +57,20 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     # Swiss cantonal legislation via LexFind (26 cantons + Bund behind one
     # unauthenticated JSON API) — the answer to CantonHttpProvider's scaffold
     # above, which cannot work because ZH-Lex serves metadata-only pages whose
-    # only text link is a host that refuses TCP (#716). readiness=awaiting_evidence:
-    # the capture path is verified live and md5-identical to the canton's own PDF,
-    # but no operator has captured acceptance evidence and the discovery payload is
-    # not yet confirmed against the live contract (#731).
+    # only text link is a host that refuses TCP (#716). readiness=live since
+    # 2026-07-28 (#815): three ADR-0030 acceptance runs — ZH, BE, BS, each
+    # `execution_mode: live` with `skipped_gates=[]` — are captured under
+    # docs/runbooks/evidence/, and the discovery payload is confirmed against the
+    # live contract. The provider's own class comment names the three bundles and
+    # says why a rollback goes to SCAFFOLD, not AWAITING_EVIDENCE (#731).
     registry.register(LexFindApiProvider())
     # Swiss communal (Gemeinde) legal collections — where the ADR-0033 acceptance
-    # test lives. readiness=awaiting_evidence: the PDF blockers this comment used
-    # to cite have both landed (binary manifestations #590/ADR-0037, the
-    # layout-aware normaliser #650/ADR-0041). What remains is acceptance evidence,
-    # which a mode=acceptance run produces (#735, #743).
+    # test lives. readiness=live: the PDF blockers this comment used to cite have
+    # both landed (binary manifestations #590/ADR-0037, the layout-aware
+    # normaliser #650/ADR-0041) and the acceptance run against live Zürich
+    # AS 554.510 on 2026-07-20 captured the evidence with no gate skipped (#735):
+    # docs/runbooks/evidence/2026-07-20-ch-gemeinde-zuerich-acceptance.md.
+    # Templates still ship `enabled: false` — that key is the operator's.
     registry.register(GemeindeHttpProvider())
     # Fixture-backed replay for SHADOW execution mode.
     registry.register(CassetteProvider(cassette_dir=settings.cassette_dir))
