@@ -1,6 +1,6 @@
 "use client";
 
-import { parseAsArrayOf, parseAsBoolean, parseAsString, useQueryStates } from "nuqs";
+import { useQueryStates } from "nuqs";
 import {
   createContext,
   type Dispatch,
@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { DEFAULT_JURISDICTIONS, DEFAULT_LANGUAGES, searchParamsParsers } from "./search-params";
 import type { ContextConstraints, SearchConstraintsState, SearchRefinement } from "./types";
 
 export type SearchConstraintsAction =
@@ -71,14 +72,14 @@ const SUPPORTED_SOURCE_TYPES = ["all", "law", "decision", "rechtssatz", "comment
 
 function normalizeJurisdictions(jurisdictions: string[]): string[] {
   const validated = normalizeAndValidateValues("jurisdiction", jurisdictions);
-  // Ensure at least one jurisdiction is selected, default to CH
-  return validated.length > 0 ? validated : ["ch"];
+  // Ensure at least one jurisdiction is selected.
+  return validated.length > 0 ? validated : [...DEFAULT_JURISDICTIONS];
 }
 
 function normalizeLanguages(languages: string[]): string[] {
   const validated = normalizeAndValidateValues("language", languages);
-  // Ensure at least one language is selected, default to de
-  return validated.length > 0 ? validated : ["de"];
+  // Ensure at least one language is selected.
+  return validated.length > 0 ? validated : [...DEFAULT_LANGUAGES];
 }
 
 function normalizeSourceType(sourceType: string | null): string | null {
@@ -168,13 +169,9 @@ export function hasActiveSearchConstraints(state: SearchConstraintsState): boole
  * means.
  */
 export function countActiveSearchConstraints(state: SearchConstraintsState): number {
-  // `normalizeJurisdictions` / `normalizeLanguages` lowercase incoming values,
-  // so compare against the normalized defaults (`"ch"` / `"de"`), not the
-  // `RESET_ALL` payload (`"CH"` / `"de"`).
   const { context, refinements } = state;
-  const jurisdictionsChanged =
-    context.jurisdictions.length !== 1 || context.jurisdictions[0] !== "ch";
-  const languagesChanged = context.languages.length !== 1 || context.languages[0] !== "de";
+  const jurisdictionsChanged = context.jurisdictions.join(",") !== DEFAULT_JURISDICTIONS.join(",");
+  const languagesChanged = context.languages.join(",") !== DEFAULT_LANGUAGES.join(",");
 
   return (
     (jurisdictionsChanged ? 1 : 0) +
@@ -190,12 +187,16 @@ interface SearchConstraintsProviderProps {
 }
 
 export function SearchConstraintsProvider({ children }: SearchConstraintsProviderProps) {
+  // Parsers come from `search-params.ts` — the `CH` / `de` defaults used to be
+  // declared here as well as there, and the two copies disagreed: this file
+  // defaulted to `["CH"]` / `["de"]` while `searchParamsParsers` gave both no
+  // default at all (#822).
   const [urlState, setUrlState] = useQueryStates({
-    jurisdictions: parseAsArrayOf(parseAsString).withDefault(["CH"]),
-    languages: parseAsArrayOf(parseAsString).withDefault(["de"]),
-    sourceType: parseAsString,
-    officialOnly: parseAsBoolean.withDefault(false),
-    refinements: parseAsString,
+    jurisdictions: searchParamsParsers.jurisdictions,
+    languages: searchParamsParsers.languages,
+    sourceType: searchParamsParsers.sourceType,
+    officialOnly: searchParamsParsers.officialOnly,
+    refinements: searchParamsParsers.refinements,
   });
 
   const refinements = useMemo(() => parseRefinements(urlState.refinements), [urlState.refinements]);
@@ -308,8 +309,8 @@ export function SearchConstraintsProvider({ children }: SearchConstraintsProvide
           // pre-reset constraints if the user hits "Undo".
           captureSnapshot();
           void setUrlState({
-            jurisdictions: ["CH"],
-            languages: ["de"],
+            jurisdictions: DEFAULT_JURISDICTIONS,
+            languages: DEFAULT_LANGUAGES,
             sourceType: null,
             officialOnly: false,
             refinements: null,

@@ -33,6 +33,7 @@ import {
   SearchConstraintsProvider,
   useSearchConstraints,
 } from "@/lib/search-constraints-store";
+import { DEFAULT_JURISDICTIONS, DEFAULT_LANGUAGES } from "@/lib/search-params";
 import type { SearchRefinement } from "@/lib/types";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -64,6 +65,14 @@ describe("SearchConstraintsProvider", () => {
 
     expect(result.current.state.context.jurisdictions).toEqual(["ch"]);
     expect(result.current.state.context.languages).toEqual(["de"]);
+    // The exported defaults must be the values the store actually reports, not
+    // just the values the parser returns. `searchParamsParsers.jurisdictions`
+    // used to be documented as canonical while holding `["CH"]`, which
+    // `normalizeJurisdictions` lower-cases on the way in — so no consumer ever
+    // saw it, and a Server Component adopting `searchParamsCache` would have
+    // rendered `CH` and hydrated `ch` (#822).
+    expect(result.current.state.context.jurisdictions).toEqual(DEFAULT_JURISDICTIONS);
+    expect(result.current.state.context.languages).toEqual(DEFAULT_LANGUAGES);
     expect(result.current.state.context.sourceType).toBeNull();
     expect(result.current.state.context.officialOnly).toBe(false);
     expect(result.current.state.refinements).toEqual([]);

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { parseAsString, useQueryState } from "nuqs";
+import { useQueryState } from "nuqs";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
 import { PreferencesDialog } from "@/components/layout/PreferencesDialog";
@@ -28,6 +28,7 @@ import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { buildControlPanelHref } from "@/lib/control-plane-entry";
 import { SUPPORTED_LOCALES, useLocale } from "@/lib/locale-context";
 import { describeResultSetScope } from "@/lib/scope-label";
+import { searchParamsParsers } from "@/lib/search-params";
 import { useWorkspace } from "@/lib/workspace-store";
 
 const RECENT_QUERIES_STORAGE_KEY = "evidara.recent-queries";
@@ -77,9 +78,11 @@ export function AppHeader({
   const t = useTranslations();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [urlQuery, setUrlQuery] = useQueryState("q", parseAsString.withDefault(""));
-  const [selectedId] = useQueryState("item", parseAsString);
-  const storeQuery = state.resultSet.source.type === "search" ? state.resultSet.source.query : "";
+  const [urlQuery, setUrlQuery] = useQueryState("q", searchParamsParsers.q);
+  const [selectedId] = useQueryState("item", searchParamsParsers.item);
+  const resultSetSource = state.resultSet.source;
+  const isSearchResultSet = resultSetSource.type === "search";
+  const storeQuery = resultSetSource.type === "search" ? resultSetSource.query : "";
 
   // Local input state — syncs with store query but allows free typing
   const [inputValue, setInputValue] = useState(storeQuery);
@@ -104,7 +107,16 @@ export function AppHeader({
     ? (buildControlPanelHref({
         controlPanelUrl: resolvedControlPanelUrl,
         returnTo: returnToUrl,
-        query: urlQuery || storeQuery,
+        // The store first, not the URL: `scopeLabel` below is derived from
+        // `state.resultSet`, so taking the query from anywhere else lets the two
+        // halves of one handoff describe different result sets. A pivot has no
+        // search query at all while `?q=` still holds the stale one it was
+        // reached from, so the pivot sends no `ls_query` rather than a wrong
+        // one. This read used to be `urlQuery || storeQuery`, which was correct
+        // only because `q` defaulted to `""` here and was therefore falsy on
+        // boot — it stopped being safe the moment `q` got one honest default
+        // (#822).
+        query: isSearchResultSet ? storeQuery || urlQuery : undefined,
         scopeLabel: describeResultSetScope(state.resultSet, (key, values) =>
           t(`results.scope.${key}`, values),
         ),
@@ -145,14 +157,22 @@ export function AppHeader({
     }
   }, []);
 
-  // On mount or when the URL ?q= param changes (e.g. browser back/forward),
-  // resync the store search state if needed.
+  // On mount, and whenever the URL's ?q= stops matching the store, resync by
+  // re-running it. (Not "browser back/forward", as this comment used to say:
+  // nuqs writes with `history: "replace"` by default and the app never asks for
+  // "push", so a search creates no history entry to go back to.)
+  //
+  // Only while the result set *is* a search. A pivot ("cited by", "citing")
+  // leaves `storeQuery` empty while `?q=` keeps the query the pivot was reached
+  // from, so without this guard the effect reads that as drift and re-runs the
+  // search, throwing the user out of the pivot they just opened.
   useEffect(() => {
     if (!onSearch) return;
+    if (!isSearchResultSet) return;
     if (urlQuery && urlQuery !== storeQuery) {
       void onSearch(urlQuery);
     }
-  }, [urlQuery, storeQuery, onSearch]);
+  }, [urlQuery, storeQuery, isSearchResultSet, onSearch]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
