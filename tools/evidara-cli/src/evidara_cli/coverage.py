@@ -387,3 +387,184 @@ def acceptance_evidence_verdict(
             "treat a skipped gate as unverified, not as verified-and-green (#744)."
         ),
     }
+
+
+# ---------------------------------------------------------------------------------
+# Source-version lookup
+# ---------------------------------------------------------------------------------
+
+
+def find_source_version(versions_payload: Any, source_version_id: Any) -> dict[str, Any] | None:
+    """Pick one version out of ``GET /v1/sources/{source_id}/versions``.
+
+    There is no ``GET /v1/versions/{id}``, so everything that needs a version's
+    ``execution_mode`` or provider has to resolve it through its source's list.
+    """
+    if not source_version_id:
+        return None
+    if isinstance(versions_payload, dict):
+        versions = versions_payload.get("data")
+    else:
+        versions = versions_payload
+    for version in versions or []:
+        if isinstance(version, dict) and version.get("source_version_id") == source_version_id:
+            return version
+    return None
+
+
+def version_execution_mode(version: dict[str, Any] | None) -> str | None:
+    """The version's ``execution_mode`` — ``shadow`` is what disqualifies evidence."""
+    if not isinstance(version, dict):
+        return None
+    mode = version.get("execution_mode")
+    return str(mode) if mode is not None else None
+
+
+def version_provider(version: dict[str, Any] | None) -> str | None:
+    """The acquisition provider the version actually ran.
+
+    ``SourceVersionResponse`` does not expose ``overlay_id`` / ``provider_template_id``
+    even though the ORM model carries both
+    (``platform_control/schemas/source.py:460-471`` vs ``run_service.py:210-229``), so
+    the provider on the acquisition spec is the *only* binding between a run and the
+    blueprint template it came from that the API makes visible. It is provider-level,
+    not template-level — see :func:`evidence_binding_strength`.
+    """
+    if not isinstance(version, dict):
+        return None
+    spec = version.get("acquisition_spec")
+    if not isinstance(spec, dict):
+        return None
+    provider = spec.get("provider")
+    return str(provider) if provider is not None else None
+
+
+# ---------------------------------------------------------------------------------
+# ADR-0030 config-key flip (`enabled: true`)
+# ---------------------------------------------------------------------------------
+
+FLIP_NO_EVIDENCE_RUN = "no_evidence_run_cited"
+FLIP_EVIDENCE_NOT_ACCEPTANCE = "evidence_run_is_not_acceptance_evidence"
+FLIP_EVIDENCE_PROVIDER_UNRESOLVED = "evidence_run_provider_unresolved"
+FLIP_PROVIDER_MISMATCH = "evidence_run_provider_mismatch"
+FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED = "operator_kill_switch_not_acknowledged"
+
+_FLIP_DETAIL = {
+    FLIP_NO_EVIDENCE_RUN: (
+        "ADR-0030 §5: the config key is turned *after* acceptance-run evidence is "
+        "captured, not on confidence. Cite the run with --evidence-run-id."
+    ),
+    FLIP_EVIDENCE_NOT_ACCEPTANCE: (
+        "The cited run cannot serve as acceptance evidence. Read "
+        "`acceptance_verdict.refusals` for which rule it broke — "
+        "`execution_mode_shadow` is the one that looks greenest and proves least."
+    ),
+    FLIP_EVIDENCE_PROVIDER_UNRESOLVED: (
+        "The cited run's acquisition provider could not be resolved, so the evidence "
+        "cannot be tied to this template at all. Refused rather than skipped-and-passed "
+        "(#744)."
+    ),
+    FLIP_PROVIDER_MISMATCH: (
+        "The cited run ran a different acquisition provider than this template uses. "
+        "Evidence about one portal is not evidence about another (ADR-0030 §2)."
+    ),
+    FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED: (
+        "This key was turned off by an operator — a deliberate kill switch, not a key "
+        "that was never earned. Acceptance evidence does not waive it. Pass "
+        "--reopen-operator-kill-switch only after asking them."
+    ),
+}
+
+
+def flip_refusals(
+    *,
+    template: dict[str, Any],
+    desired_enabled: bool,
+    evidence_verdict: dict[str, Any] | None = None,
+    evidence_provider: str | None = None,
+    reopen_acknowledged: bool = False,
+) -> list[dict[str, str]]:
+    """Reasons the ADR-0030 config key must not be flipped to ``desired_enabled``.
+
+    ``template`` is a :func:`classify_template` verdict. Turning the key **off** is a
+    kill switch and needs no evidence; turning it **on** needs a run that survives
+    :func:`acceptance_evidence_verdict` and that ran this template's provider.
+    """
+    if not desired_enabled:
+        return []
+
+    codes: list[str] = []
+    if evidence_verdict is None:
+        codes.append(FLIP_NO_EVIDENCE_RUN)
+    else:
+        if not evidence_verdict.get("is_acceptance_evidence"):
+            codes.append(FLIP_EVIDENCE_NOT_ACCEPTANCE)
+        template_provider = template.get("provider")
+        if not evidence_provider:
+            codes.append(FLIP_EVIDENCE_PROVIDER_UNRESOLVED)
+        elif template_provider and str(evidence_provider) != str(template_provider):
+            codes.append(FLIP_PROVIDER_MISMATCH)
+
+    if template.get("blocker") == BLOCKER_TEMPLATE_DISABLED_BY_OPERATOR and not reopen_acknowledged:
+        codes.append(FLIP_KILL_SWITCH_NOT_ACKNOWLEDGED)
+
+    return [{"code": code, "detail": _FLIP_DETAIL[code]} for code in codes]
+
+
+def evidence_binding_strength(*, evidence_provider: str | None, template: dict[str, Any]) -> str:
+    """How tightly the cited run is bound to *this* template.
+
+    ``provider`` is the strongest answer available: a run resolves to a provider, and
+    several templates share one. Binding a run to the template itself needs
+    ``overlay_id`` / ``provider_template_id`` on ``SourceVersionResponse``, which
+    platform-control does not expose. Named so the envelope states that limit rather
+    than implying a stronger check than was made.
+    """
+    template_provider = template.get("provider")
+    if not evidence_provider or not template_provider:
+        return "none"
+    if str(evidence_provider) != str(template_provider):
+        return "none"
+    return "provider"
+
+
+FLIP_READ_BACK_DISAGREES = "read_back_disagrees"
+FLIP_NO_OVERRIDE_RECORDED = "no_override_recorded"
+
+_FLIP_VERIFY_DETAIL = {
+    FLIP_READ_BACK_DISAGREES: (
+        "The PUT returned 200 but the blueprint-template read model still reports the "
+        "old effective key. The key was NOT flipped — do not report it as flipped."
+    ),
+    FLIP_NO_OVERRIDE_RECORDED: (
+        "The effective key is what was asked for, but the read model still attributes "
+        "it to the shipped default rather than an operator override. `set_enabled` "
+        "always writes an override row, so the write did not land and the value merely "
+        "happens to agree."
+    ),
+}
+
+
+def verify_flip(*, after_template: dict[str, Any], desired_enabled: bool) -> dict[str, Any]:
+    """Prove the flip landed by re-reading the template, not by trusting the 200.
+
+    Both conditions must hold: the effective key is what was asked for, **and** the read
+    model attributes it to an operator override. Either alone is also satisfied by a
+    write that silently did nothing — the failure mode behind #631 and #713.
+    """
+    effective = bool(after_template.get("enabled"))
+    provenance = str(after_template.get("source") or "default").strip().lower()
+    codes: list[str] = []
+    if effective is not bool(desired_enabled):
+        codes.append(FLIP_READ_BACK_DISAGREES)
+    if provenance != "override":
+        codes.append(FLIP_NO_OVERRIDE_RECORDED)
+    return {
+        "applied": not codes,
+        "effective_enabled": effective,
+        "provenance": provenance,
+        "problems": [{"code": code, "detail": _FLIP_VERIFY_DETAIL[code]} for code in codes],
+        "updated_by": after_template.get("updated_by"),
+        "updated_at": after_template.get("updated_at"),
+        "note": after_template.get("note"),
+    }

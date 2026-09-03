@@ -166,13 +166,44 @@ flag does this).
 
 ## 6. Flip the key
 
-Two keys, two owners, and only one is yours:
+Two keys, two owners, and only one is yours.
 
-- **Config key** — `template.enabled`. An operator flips it from the admin panel's
-  Blueprints inventory (or `PUT /v1/sources/blueprint-templates/{overlay}/{template}/enablement`),
-  recording the evidence link in `note`. See the `run-admin-panel` skill to drive the UI.
-- **Code key** — moving a provider from `awaiting_evidence` to `live` is a **code change**
-  in platform-control. Attach the evidence to that request; do not flip it on confidence.
+**Config key** — `template.enabled`. Flip it with the CLI, citing the run:
+
+```bash
+uv run evidara workflow coverage enable \
+  --overlay ch --template <template_id> --evidence-run-id <run_id> \
+  --note "Evidence bundle: docs/runbooks/evidence/<dir>" --human
+```
+
+Use this rather than a hand-rolled `PUT`: the command re-derives the acceptance verdict
+for the cited run and refuses when it does not earn the flip, and — the part that matters
+— it **re-reads the template afterwards** and requires both the effective key *and* an
+`override` provenance before reporting success. A `200` alone cannot tell a flip from a
+write that silently did nothing (#631, #713). If `verification.applied` is false, the key
+is **not** flipped; say so and stop.
+
+Its refusals write nothing, and none of them are talk-past-able:
+
+| refusal | what to do |
+|---|---|
+| `no_evidence_run_cited` | Go capture evidence (§3–§5). The key is turned after evidence, not on confidence. |
+| `evidence_run_is_not_acceptance_evidence` | Read `acceptance_verdict.refusals` — usually `execution_mode_shadow`. Re-run live. |
+| `evidence_run_provider_unresolved` | Nothing ties the run to this template. Do not "assume it's fine"; find the right run. |
+| `evidence_run_provider_mismatch` | You cited a run from another corpus. |
+| `operator_kill_switch_not_acknowledged` | **Ask the operator first.** `--reopen-operator-kill-switch` exists so reopening is a deliberate act, not an accident. |
+
+The binding to the template is provider-level only (`artifacts.evidence_binding`) — the
+version read model exposes no overlay/template — so a same-provider run of a *different*
+template also passes that check. Confirm the run is the right one yourself.
+
+The admin panel's Blueprints inventory does the same flip through the UI; see the
+`run-admin-panel` skill. It does not do the read-back check.
+
+**Code key** — moving a provider from `awaiting_evidence` to `live` is a **code change**
+in platform-control. Attach the evidence to that request; do not flip it on confidence.
+Enabling the config key does not open it: `coverage enable` reports which modes the lock
+still admits when the provider is short of `live`.
 
 ## Boundaries
 

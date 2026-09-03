@@ -52,6 +52,7 @@ evidara workflow coverage templates --blocker provider_awaiting_evidence
 evidara workflow coverage preflight --overlay ch --template <template_id>
 evidara workflow coverage watch --run-id <run_id> --until processed
 evidara workflow run evidence --run-id <run_id>
+evidara workflow coverage enable --overlay ch --template <template_id> --evidence-run-id <run_id>
 
 # Legal-search (needs OpenSearch + API running for ping/search)
 evidara legal-search ping
@@ -172,6 +173,45 @@ never touches the live portal, so a green SHADOW run proves nothing about it (AD
 §2) — as well as a refused run, a non-acceptance mode, and a run that captured nothing.
 A pass still carries the reminder that it justifies only the gates that actually ran
 (#744).
+
+### `coverage enable` — flip the config key, then prove it flipped
+
+```bash
+uv run evidara workflow coverage enable \
+  --overlay ch --template <template_id> --evidence-run-id <run_id> \
+  --note "Evidence bundle: docs/runbooks/evidence/<dir>" --human
+```
+
+The loop's last step, and the one worth getting wrong quietly. Enabling **requires** an
+`--evidence-run-id`; the command re-derives the ADR-0030 acceptance verdict for that run
+and refuses when it does not earn the flip. Refusal codes:
+
+| code | meaning |
+|---|---|
+| `no_evidence_run_cited` | ADR-0030 §5: the key is turned after evidence, not on confidence. |
+| `evidence_run_is_not_acceptance_evidence` | The run failed the verdict — read `acceptance_verdict.refusals`. |
+| `evidence_run_provider_unresolved` | The run's provider could not be resolved, so nothing ties it to this template. Refused rather than skipped-and-passed (#744). |
+| `evidence_run_provider_mismatch` | The run used a different acquisition provider. |
+| `operator_kill_switch_not_acknowledged` | The key was shut by an operator. Pass `--reopen-operator-kill-switch` only after asking them. |
+
+A refusal writes nothing (`side_effect_level: none`), and a template already in the
+requested state is reported as `already_in_desired_state` rather than as a flip.
+
+**The `200` is not the proof.** After the `PUT` the command re-reads
+`/v1/sources/blueprint-templates` and requires *both* that the effective key is what was
+asked for **and** that the read model attributes it to an operator `override`. Either
+alone is also satisfied by a write that silently did nothing — the failure mode behind
+#631 and #713 — so a mismatch exits nonzero with `verification.problems`
+(`read_back_disagrees`, `no_override_recorded`).
+
+Flipping the config key does not open the code key: when the provider is short of `live`
+the envelope says which modes the lock still admits. Turning the key **off** is a kill
+switch — it needs no evidence but does need `--note`.
+
+The binding between the cited run and the template is **provider-level**, reported as
+`artifacts.evidence_binding`. `SourceVersionResponse` exposes no `overlay_id` /
+`provider_template_id`, so a same-provider run of a different template also satisfies the
+check; the envelope states that limit rather than implying a stronger one.
 
 **Agent skill:** `.claude/skills/coverage-acceptance-loop/SKILL.md` routes the whole loop,
 including the compose env vars whose defaults silently break it.

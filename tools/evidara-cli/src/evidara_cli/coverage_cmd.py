@@ -1,6 +1,6 @@
 """Coverage-loop workflow commands (ADR-0030 / ADR-0033).
 
-Three commands covering the parts of the loop an operator or agent previously had to
+Commands covering the parts of the loop an operator or agent previously had to
 hand-roll with `curl`:
 
 - ``templates``  — inventory blueprint templates by *why* they are inert and *who* can
@@ -10,6 +10,9 @@ hand-roll with `curl`:
   exist; this needs nothing.
 - ``watch``      — poll a run to terminal (optionally through DI and projection) and, on
   a stall, name the likely cause instead of returning a bare timeout.
+- ``enable``     — the loop's last step: flip the ADR-0030 config key against a cited
+  acceptance run, refuse when the run does not earn it, and **read the key back** to
+  prove the flip landed.
 
 Driving the loop itself stays with ``scripts/ch-fedlex-compose-e2e.sh`` — it already
 does creation, approval, dispatch, the content gates and the evidence bundle, and
@@ -43,7 +46,13 @@ from evidara_cli.coverage import (
     acceptance_evidence_verdict,
     classify_template,
     diagnose_stall,
+    evidence_binding_strength,
+    find_source_version,
+    flip_refusals,
     summarise_templates,
+    verify_flip,
+    version_execution_mode,
+    version_provider,
 )
 from evidara_cli.envelope import build_envelope, evidence_assertion, evidence_count, evidence_http
 
@@ -51,8 +60,8 @@ coverage_app = typer.Typer(
     no_args_is_help=True,
     help=(
         "Coverage-loop commands (ADR-0030): inventory blueprint templates by blocker, "
-        "pre-flight a template before anything is created, and watch a run with a stall "
-        "diagnosis."
+        "pre-flight a template before anything is created, watch a run with a stall "
+        "diagnosis, and flip the config key against cited acceptance evidence."
     ),
 )
 
@@ -638,6 +647,366 @@ def coverage_watch(
                     "command": f"evidara workflow source compensate --run-id {run_id}"
                     if not ok and not refused
                     else None,
+                },
+            ),
+            human=human,
+        )
+        if not ok:
+            raise typer.Exit(code=1)
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        _fail(exc, step=step, inputs=inputs, human=human)
+
+
+# ---------------------------------------------------------------------------------
+# coverage enable
+# ---------------------------------------------------------------------------------
+
+
+def _find_template(
+    raw: list[dict[str, Any]], *, overlay: str, template: str
+) -> dict[str, Any] | None:
+    return next(
+        (
+            item
+            for item in raw
+            if item.get("overlay_id") == overlay and item.get("provider_template_id") == template
+        ),
+        None,
+    )
+
+
+def _acceptance_context(
+    run_id: str, *, correlation_id: str | None
+) -> tuple[dict[str, Any], dict[str, Any], str | None]:
+    """Fetch the cited run and derive its acceptance verdict and provider.
+
+    Returns ``(run, verdict, provider)``. The provider comes from the source version's
+    acquisition spec because the version read model exposes no template binding — see
+    ``coverage.version_provider``.
+    """
+    pc_base = platform_control_base_url()
+    pc_headers = platform_control_headers(correlation_id=correlation_id)
+    run_payload = request_json("GET", join_url(pc_base, f"/v1/runs/{run_id}"), headers=pc_headers)
+    run = run_payload if isinstance(run_payload, dict) else {}
+
+    version: dict[str, Any] | None = None
+    source_id = run.get("source_id")
+    if source_id:
+        try:
+            versions_payload = request_json(
+                "GET",
+                join_url(pc_base, f"/v1/sources/{source_id}/versions"),
+                headers=pc_headers,
+            )
+            version = find_source_version(versions_payload, run.get("source_version_id"))
+        except HttpJsonError:
+            version = None
+
+    verdict = acceptance_evidence_verdict(
+        run=run,
+        execution_mode=version_execution_mode(version),
+    )
+    return run, verdict, version_provider(version)
+
+
+@coverage_app.command("enable")
+def coverage_enable(
+    overlay: Annotated[str, typer.Option("--overlay", help="Overlay id, e.g. ch.")],
+    template: Annotated[
+        str,
+        typer.Option("--template", help="provider_template_id whose config key to flip."),
+    ],
+    evidence_run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--evidence-run-id",
+            help="Run id that earns the flip. Required to enable; ignored when disabling.",
+        ),
+    ] = None,
+    note: Annotated[
+        str | None,
+        typer.Option("--note", help="Audit note stored with the flip. Required to disable."),
+    ] = None,
+    enabled: Annotated[
+        bool,
+        typer.Option("--enable/--disable", help="Turn the config key on (default) or off."),
+    ] = True,
+    reopen_operator_kill_switch: Annotated[
+        bool,
+        typer.Option(
+            "--reopen-operator-kill-switch",
+            help="Acknowledge that you are reopening a key an operator deliberately shut.",
+        ),
+    ] = False,
+    human: Annotated[bool, typer.Option("--human", help="Pretty-print JSON")] = False,
+    correlation_id: Annotated[str | None, typer.Option("--correlation-id")] = None,
+) -> None:
+    """Flip the ADR-0030 config key — against cited evidence, and verified afterwards.
+
+    This is the loop's last step and the one worth getting wrong quietly. Enabling
+    requires an `--evidence-run-id` whose run survives the ADR-0030 acceptance verdict
+    *and* ran this template's provider; it refuses outright otherwise, including for a
+    key an operator deliberately shut. After the `PUT` it re-reads
+    `/v1/sources/blueprint-templates` and asserts both the effective key **and** that the
+    read model attributes it to an operator override — a 200 alone cannot tell a flip
+    from a write that silently did nothing (#631, #713).
+
+    Turning the key on does not open the code key: a provider still short of `live`
+    admits only `mode=acceptance`, and the envelope says so.
+    """
+    if not enabled and not (note or "").strip():
+        typer.echo("--note is required when disabling: record why the key was shut.", err=True)
+        raise typer.Exit(code=2)
+
+    step = "coverage.enable"
+    inputs: dict[str, Any] = {
+        "overlay": overlay,
+        "template": template,
+        "enabled": enabled,
+        "evidence_run_id": evidence_run_id,
+        "reopen_operator_kill_switch": reopen_operator_kill_switch,
+    }
+    pc_base = platform_control_base_url()
+    pc_headers = platform_control_headers(correlation_id=correlation_id)
+
+    try:
+        raw = _fetch_templates(correlation_id=correlation_id)
+        match = _find_template(raw, overlay=overlay, template=template)
+        if match is None:
+            _emit(
+                build_envelope(
+                    ok=False,
+                    workflow=_WORKFLOW,
+                    step=step,
+                    status="failed_terminal",
+                    side_effect_level="none",
+                    inputs=inputs,
+                    evidence=[
+                        evidence_assertion(
+                            "coverage:template-exists",
+                            value=f"{overlay}/{template}",
+                            passed=False,
+                            note=(
+                                "No such blueprint template. Nothing was written. List what "
+                                "exists with `evidara workflow coverage templates`."
+                            ),
+                        )
+                    ],
+                    decision={
+                        "recommended_action": "inspect",
+                        "reason": f"Template '{overlay}/{template}' does not exist.",
+                    },
+                    next_actions=["inspect"],
+                    compensation={"available": False},
+                ),
+                human=human,
+            )
+            raise typer.Exit(code=1)
+
+        before = classify_template(match)
+        artifacts: dict[str, Any] = {"template_before": before}
+
+        # Already in the desired state: write nothing, and say so rather than
+        # reporting a flip that did not happen.
+        if bool(match.get("enabled")) is enabled:
+            _emit(
+                build_envelope(
+                    ok=True,
+                    workflow=_WORKFLOW,
+                    step=step,
+                    status="passed",
+                    side_effect_level="none",
+                    inputs=inputs,
+                    artifacts={**artifacts, "already_in_desired_state": True},
+                    evidence=[
+                        evidence_assertion(
+                            "coverage:config-key",
+                            value=bool(match.get("enabled")),
+                            passed=True,
+                            note=(
+                                f"The effective config key is already {enabled}, from the "
+                                f"'{before['config_key']}' state "
+                                f"(provenance: {match.get('source')}). Nothing was written."
+                            ),
+                        )
+                    ],
+                    decision={
+                        "recommended_action": "inspect",
+                        "reason": "No flip was needed; no request was sent.",
+                    },
+                    next_actions=["inspect"],
+                    compensation={"available": False},
+                ),
+                human=human,
+            )
+            return
+
+        verdict: dict[str, Any] | None = None
+        evidence_provider: str | None = None
+        if enabled and evidence_run_id:
+            run, verdict, evidence_provider = _acceptance_context(
+                evidence_run_id, correlation_id=correlation_id
+            )
+            artifacts["evidence_run"] = run
+            artifacts["acceptance_verdict"] = verdict
+            artifacts["evidence_binding"] = evidence_binding_strength(
+                evidence_provider=evidence_provider, template=before
+            )
+
+        refusals = flip_refusals(
+            template=before,
+            desired_enabled=enabled,
+            evidence_verdict=verdict,
+            evidence_provider=evidence_provider,
+            reopen_acknowledged=reopen_operator_kill_switch,
+        )
+        if refusals:
+            artifacts["refusals"] = refusals
+            _emit(
+                build_envelope(
+                    ok=False,
+                    workflow=_WORKFLOW,
+                    step=step,
+                    status="needs_human",
+                    side_effect_level="none",
+                    inputs=inputs,
+                    artifacts=artifacts,
+                    evidence=[
+                        evidence_assertion(
+                            "adr-0030:flip-justified",
+                            value=[item["code"] for item in refusals],
+                            passed=False,
+                            note="; ".join(item["detail"] for item in refusals),
+                        )
+                    ],
+                    decision={
+                        "recommended_action": "needs-human",
+                        "reason": (
+                            "Refused to flip the config key. Nothing was written. "
+                            + refusals[0]["detail"]
+                        ),
+                    },
+                    next_actions=["inspect"],
+                    compensation={"available": False},
+                ),
+                human=human,
+            )
+            raise typer.Exit(code=1)
+
+        audit_note = (note or "").strip()
+        if enabled:
+            citation = f"ADR-0030 acceptance evidence: run {evidence_run_id}."
+            audit_note = f"{citation} {audit_note}".strip()
+
+        try:
+            put_response = request_json(
+                "PUT",
+                join_url(
+                    pc_base,
+                    f"/v1/sources/blueprint-templates/{overlay}/{template}/enablement",
+                ),
+                headers={**pc_headers, "Content-Type": "application/json"},
+                json_body={"enabled": enabled, "note": audit_note},
+            )
+        except typer.Exit:
+            raise
+        except Exception as exc:
+            # The write may or may not have landed, so the envelope must not claim
+            # "none" for its side-effect level.
+            _fail(exc, step=step, inputs=inputs, human=human, side_effect_level="reversible")
+        artifacts["enablement_response"] = put_response
+
+        # The 200 is not the proof. Re-read the operator read model and check both the
+        # effective key and its provenance.
+        after_raw = _fetch_templates(correlation_id=correlation_id)
+        after_match = _find_template(after_raw, overlay=overlay, template=template) or {}
+        verification = verify_flip(after_template=after_match, desired_enabled=enabled)
+        after = classify_template(after_match) if after_match else None
+        artifacts["template_after"] = after
+        artifacts["verification"] = verification
+
+        ev: list[dict[str, Any]] = [
+            evidence_http(
+                f"platform-control:PUT /v1/sources/blueprint-templates/{overlay}/{template}"
+                "/enablement",
+                status_code=200,
+                note=f"Config key requested: enabled={enabled}.",
+            ),
+            evidence_assertion(
+                "coverage:config-key-read-back",
+                value=verification["effective_enabled"],
+                passed=verification["applied"],
+                note=(
+                    "Re-read the blueprint-template read model: the key is "
+                    f"{verification['effective_enabled']} with provenance "
+                    f"'{verification['provenance']}'."
+                    if verification["applied"]
+                    else "; ".join(item["detail"] for item in verification["problems"])
+                ),
+            ),
+        ]
+        if enabled and verdict is not None:
+            ev.append(
+                evidence_assertion(
+                    "adr-0030:acceptance-evidence",
+                    value=evidence_run_id,
+                    passed=True,
+                    note=(
+                        f"Run {evidence_run_id} passed the acceptance verdict. Binding to "
+                        f"this template is '{artifacts.get('evidence_binding')}'-level: the "
+                        "version read model exposes no overlay/template, so a same-provider "
+                        "run of a different template would also satisfy this check."
+                    ),
+                )
+            )
+        if after and after["code_key"] != "live":
+            ev.append(
+                evidence_assertion(
+                    "adr-0030:code-key",
+                    value=after["code_key"],
+                    # Expected, not a failure: the config key is only one of the two.
+                    passed=True,
+                    note=(
+                        "The config key is flipped, but the code key is still "
+                        f"'{after['code_key']}', so the lock admits "
+                        f"{after['dispatchable_modes'] or 'no mode'} — not production. "
+                        "Moving the code key is a platform-control code change."
+                    ),
+                )
+            )
+
+        ok = verification["applied"]
+        compensate_cmd = (
+            "evidara workflow coverage enable --disable "
+            f"--overlay {overlay} --template {template} --note '<why>'"
+        )
+        _emit(
+            build_envelope(
+                ok=ok,
+                workflow=_WORKFLOW,
+                step=step,
+                status="passed" if ok else "failed_terminal",
+                side_effect_level="reversible",
+                inputs=inputs,
+                artifacts=artifacts,
+                evidence=ev,
+                decision={
+                    "recommended_action": "inspect" if ok else "needs-human",
+                    "reason": (
+                        f"Config key for '{overlay}/{template}' is now enabled={enabled}, "
+                        "confirmed by re-reading the template."
+                        if ok
+                        else "The PUT was accepted but the read-back does not confirm it. "
+                        "Do not report this key as flipped."
+                    ),
+                },
+                next_actions=["inspect", "preflight"],
+                compensation={
+                    "available": ok,
+                    "command": compensate_cmd if ok else None,
+                    "note": "Flip the config key back." if ok else None,
                 },
             ),
             human=human,
