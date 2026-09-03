@@ -52,6 +52,22 @@ ALLOWED_SKIPS: dict[str, str] = {
         "spaCy NER is opt-in behind DI_ENABLE_SPACY and lives in the `nlp` extra; it is "
         "not on the default extraction path."
     ),
+    "set EVIDARA_MINIO_IT=1": (
+        "The weakest entry on this list, and it should be argued honestly: unlike the rows "
+        "above, `s3://` + DI_S3_* is NOT an optional backend — it is the default production "
+        "path on Hetzner (ADR-0029). The excuse is environmental, not architectural: the "
+        "`evidara-heavy-v2` pool this suite runs on has no Docker daemon "
+        "(infra/hetzner/runners/values-heavy.yaml declares no containerMode: dind and mounts "
+        "no socket), so testcontainers cannot start MinIO there at all. What CI does cover "
+        "without it (#825): the read path itself — `_open_dataset` -> "
+        "`to_pyarrow_dataset(filesystem=...)` — runs end to end in "
+        "BackfillProcessExitCodeTests, including the subprocess exit-code assertion for the "
+        "teardown abort; and NativeDeltaFilesystemTests asserts the *resolved* "
+        "endpoint_override / scheme / region / credentials the S3 branch is constructed with. "
+        "What it does not cover is that branch reaching a real endpoint, which is checked at "
+        "cutover (docs/runbooks/hetzner-cutover.md). Delete this entry the moment the pool "
+        "grows a Docker daemon, or the job moves somewhere that has one."
+    ),
 }
 
 
