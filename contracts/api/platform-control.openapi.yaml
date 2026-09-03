@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.22.0
+  version: 0.23.0
 paths:
   /health:
     get:

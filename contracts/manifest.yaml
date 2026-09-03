@@ -5,7 +5,9 @@
 # regardless of which licence the project eventually adopts. `name:
 # Proprietary` is kept and is conformant on its own. No API shape changed, so
 # no `apis.*.version` moved.
-version: "2.33.0"
+# 2.34.0: platform-control 0.23.0 — the wizard human gate expires into a terminal
+# state (#560). Additive; no locked path changed shape.
+version: "2.34.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -36,7 +38,10 @@ apis:
     # 0.22.0: adds `quarantined` to the processing-status enum on the locked
     # `/v1/runs/{run_id}/processing-status` path (#731, ADR-0047). Additive: a
     # reader that does not know the value only sees a status it never sent.
-    version: "0.22.0"
+    # 0.23.0: adds the wizard human gate's terminal states, so an expired gate
+    # resolves instead of hanging forever (#560). Additive: existing gate
+    # outcomes are unchanged.
+    version: "0.23.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
