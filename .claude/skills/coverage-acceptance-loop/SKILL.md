@@ -81,9 +81,25 @@ you may do next:
 - **`side_effect_level`** — `none` for `inspect`/`propose`/`verify`, `reversible` for
   `apply` and `compensate`. Only `apply` mutates, and it creates a **draft** source.
 - **`status`** — `passed`, `needs_human`, `failed_retriable`, `failed_terminal`, or
-  `compensated`. `propose` returns `needs_human` when its duplicate check reports a
-  risk above `none`; that is a stop, not a warning. Do not create a second source for a
-  corpus the platform already holds.
+  `compensated`. This is the field to branch on.
+- **`decision.recommended_action`** — advisory, and **not** the same as `status`.
+
+`propose`'s duplicate check is where that distinction bites. `proposal.py:68` defines the
+domain as `none` / `low` / `high`, and both backends grade it the same way — rule-based at
+`:102-108`, DSPy at `:187-194`. Then `workflow_cmd.py:261` marks the evidence item
+`passed = duplicate_risk != "high"`, and `:267` derives `status` from it. So:
+
+| `duplicate_risk` | `status` | exit | `recommended_action` |
+|---|---|---|---|
+| `none` | `passed` | 0 | `apply` |
+| `low` | `passed` | 0 | `needs-human` |
+| `high` | `needs_human` | 1 | `needs-human` |
+
+**Only `high` stops the command.** At `low` — the display name appears *inside* an
+existing source's name — the envelope is `passed` and exit 0, and the only signal is
+`recommended_action: needs-human` plus the evidence item's `value`. An agent branching on
+`status` alone will sail past it. Read `artifacts.proposal.duplicate_risk` before `apply`;
+do not create a second source for a corpus the platform already holds.
 
 `compensate` is a **real corrective action**, not an in-memory undo: it cancels the run
 (`POST /v1/runs/{id}/cancel`) and rejects the latest `pending_approval`/`draft` version
@@ -225,11 +241,12 @@ With the bundle, two more refusal codes can appear in `acceptance_verdict.refusa
 bundle reported no coverage at all). Both refuse the flip in §6. Without the bundle only
 the run-level rules above run, and a hole in the gates stays invisible.
 
-Persist the bundle under `docs/runbooks/evidence/`. **`ch-fedlex-compose-e2e.sh` — the
-driver §3 recommends — has no `--copy-evidence` flag** (its own comment says so at
-`:65`); pass `--out-dir` and copy the directory yourself. `--copy-evidence` exists on
-`scripts/ch-fedlex-fast-loop.sh` (`:185`) and its siblings, which run against a deployed
-environment rather than local compose.
+Persist the bundle under `docs/runbooks/evidence/`. **`ch-fedlex-compose-e2e.sh` has
+no `--copy-evidence` flag** — its own comment says so (`:64-65`); pass `--out-dir` and
+copy it yourself. `--copy-evidence` exists on `scripts/ch-fedlex-fast-loop.sh` (`:185`) and
+`scripts/ch-bger-fast-loop.sh` (`:149`), which run against a deployed environment rather
+than local compose. `--url-pattern` and `--corpus-slug` exist on **`ch-fedlex-fast-loop.sh`
+only** (`:113`, `:129`) — `ch-bger-fast-loop.sh` has 18 flags and neither is among them.
 
 Whether the captured bytes were law at all is a separate question this harness does not
 answer — see the `validate-acquisition-provider` skill before citing a run as coverage.
