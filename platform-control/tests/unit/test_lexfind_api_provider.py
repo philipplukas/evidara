@@ -19,6 +19,7 @@ service.
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -294,7 +295,56 @@ async def test_capture_carries_canton_provenance_not_the_mirror(provider, monkey
     assert hundegesetz.metadata["systematic_number"] == "554.5"
     assert hundegesetz.metadata["lexfind_entity"] == "ZH"
     assert hundegesetz.metadata["in_force_from"] == "2025-06-01"
-    assert hundegesetz.metadata["in_force"] is True
+    assert hundegesetz.metadata["in_force_at_capture"] is True
+
+
+@pytest.mark.asyncio
+async def test_capture_publishes_no_timeless_in_force_boolean(provider, monkeypatch):
+    """A bare `in_force` becomes a lie the day the captured law is repealed.
+
+    The window (`in_force_from` / `in_force_until`) is what travels; force on a
+    given date is derived from it downstream, per document and per question.
+    Acquisition may record only what it *observed* on the day it fetched, under
+    a name that says so.
+    """
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26], max_documents=4),
+        _run(),
+    )
+    for resource in result.inline_resources:
+        assert "in_force" not in resource.metadata
+
+
+@pytest.mark.asyncio
+async def test_a_law_already_repealed_at_capture_is_observed_as_not_in_force(provider, monkeypatch):
+    """Proves the observation is evaluated against a date, not assumed True.
+
+    Feeds the real fixture back with one edit — the Hundegesetz version closed
+    in 2020 — so the capture-time window is already shut. The interval still
+    ships in full; only the observation flips.
+    """
+    page = copy.deepcopy(_FIXTURE)
+    for tol in page["texts_of_law_with_matches"]:
+        if tol["systematic_number"] == "554.5":
+            for match in tol["matches"]:
+                match["version_inactive_since"] = "30.06.2020"
+
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(page=page),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26], max_documents=4),
+        _run(),
+    )
+    hundegesetz = next(r for r in result.inline_resources if r.title == "Hundegesetz")
+    assert hundegesetz.metadata["in_force_until"] == "2020-06-30"
+    assert hundegesetz.metadata["in_force_at_capture"] is False
 
 
 @pytest.mark.asyncio
