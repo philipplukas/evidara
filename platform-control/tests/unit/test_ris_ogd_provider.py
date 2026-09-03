@@ -218,3 +218,118 @@ def test_extract_metadata_survives_a_missing_application_block() -> None:
     assert meta["in_force_from"] is None
     assert meta["in_force_until"] is None
     assert meta["amendment_relation"] is None
+
+
+# ---------------------------------------------------------------------------
+# The capture guard (#631/#716)
+#
+# RIS promises a format out of band: the listing's `DataType` says Html/Xml/Pdf
+# *before* the download URL is fetched, so `check_capture` is what holds the OGD
+# endpoint to that promise. It is load-bearing here beyond the stub case, because
+# `_fetch_single_document` decodes every body as text — a binary arriving where
+# `Xml` was promised would be UTF-8-mangled and captured as a document.
+#
+# Mutation check: delete either guard block in `_fetch_single_document` and the two
+# refusal tests below fail with `captured == 1`.
+# ---------------------------------------------------------------------------
+
+_REAL_NORM_HTML = (
+    "<html><body><h1>Verordnung des Bundesministers</h1>"
+    "<p>§ 1. Diese Verordnung gilt für ...</p>"
+    "<p>§ 2. Abs. 1 Die Behörde hat ...</p>"
+    "<p>§ 3. Abs. 2 Ziff. 1 In Kraft ab ...</p>"
+    "</body></html>"
+)
+
+
+class _RisClient:
+    """Serves the listing above plus one document response the test chooses."""
+
+    document_response: tuple[int, bytes, dict[str, str]] = (
+        200,
+        _REAL_NORM_HTML.encode("utf-8"),
+        {"content-type": "text/html; charset=utf-8"},
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        del args, kwargs
+
+    async def __aenter__(self) -> _RisClient:
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        del exc_type, exc, tb
+
+    async def get(self, url: str, *, params=None):
+        request = httpx.Request("GET", url, params=params)
+        if url == "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht":
+            return await TimeoutingRisAsyncClient().get(url, params=params)
+        status, content, headers = self.document_response
+        return httpx.Response(status, content=content, headers=headers, request=request)
+
+
+async def _run_ris(monkeypatch: pytest.MonkeyPatch, client_cls: type[_RisClient]):
+    monkeypatch.setattr(httpx, "AsyncClient", client_cls)
+    return await RisOgdProvider().start_run(
+        SimpleNamespace(),
+        SimpleNamespace(
+            acquisition_spec={
+                "provider": "ris_ogd",
+                "base_url": "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht",
+                "applikation": "BrKons",
+                "preferred_formats": ["Html"],
+                "page_size": 1,
+                "max_pages": 1,
+            }
+        ),
+        SimpleNamespace(run_id="run_guard", scope=None),
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_genuine_norm_passes_both_guards(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The honest capture must survive: Austrian federal law cites `§` and `Abs.`."""
+    result = await _run_ris(monkeypatch, _RisClient)
+
+    assert result.response_payload["captured"] == 1
+    metadata = result.inline_resources[0].metadata
+    assert metadata["capture_guard"] == "passed"
+    assert metadata["legal_text_evidence"]["legal_marker_count"] >= 3
+
+
+@pytest.mark.asyncio
+async def test_a_pdf_where_the_listing_promised_html_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without the guard this body is decoded as UTF-8 text and captured as a norm."""
+
+    class _Client(_RisClient):
+        document_response = (
+            200,
+            b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n",
+            {"content-type": "application/pdf"},
+        )
+
+    result = await _run_ris(monkeypatch, _Client)
+
+    assert result.response_payload["captured"] == 0
+    assert result.inline_resources == []
+    assert "content_type_mismatch" in result.response_payload["failures"][0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_a_navigation_shell_is_refused_rather_than_captured_as_a_norm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Client(_RisClient):
+        document_response = (
+            200,
+            b"<html><head><script>var x=1;</script></head><body>"
+            b"<nav>Startseite Suche Kontakt</nav></body></html>",
+            {"content-type": "text/html; charset=utf-8"},
+        )
+
+    result = await _run_ris(monkeypatch, _Client)
+
+    assert result.response_payload["captured"] == 0
+    assert "no_legal_text_markers" in result.response_payload["failures"][0]["error"]

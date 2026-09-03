@@ -32,9 +32,18 @@ class FakeAsyncClient:
         ):
             return httpx.Response(
                 200,
+                # Three articles, not one. The single-`Art.` fixture this replaced
+                # scored below `content_gate`'s marker floor of three, so it was
+                # indistinguishable from a filestore error page — which is what the
+                # density gate is for. Real Fedlex HTML clears the floor in its first
+                # screenful; `scripts/ch-fedlex-fast-loop.sh` has asserted exactly
+                # this (`art_density >= 3`) against the live endpoint all along.
                 text=(
                     "<html><body><h1>Bundesverfassung der Schweizerischen Eidgenossenschaft</h1>"
                     "<article><h2>Art. 1</h2><p>Das Schweizervolk und die Kantone ...</p></article>"
+                    "<article><h2>Art. 2 Abs. 1</h2><p>Die Schweizerische Eidgenossenschaft "
+                    "schützt die Freiheit ...</p></article>"
+                    "<article><h2>Art. 3</h2><p>Die Kantone sind souverän ...</p></article>"
                     "</body></html>"
                 ),
                 headers={"content-type": "text/html; charset=utf-8"},
@@ -581,3 +590,102 @@ def test_plan_only_offers_the_federal_seed_mode() -> None:
     )
     assert plan.mode == "work_to_expression"
     assert plan.seed_urls == ["https://fedlex.data.admin.ch/eli/cc/1999/404"]
+
+
+# ─── The legal-text density gate (#631/#635) ────────────────────
+#
+# `scripts/ch-fedlex-fast-loop.sh` has gated on `art_density >= 3` against this
+# provider's output since it was written, and #635 lifted that heuristic into
+# `acquisition_core.content_gate` so every provider could share it — but the sharing
+# never reached the provider it came from. Until `start_run` called the gate, the
+# check ran only in a canary script somebody has to remember to run.
+#
+# Mutation check: delete the `assess_legal_text_density(...)` block in
+# `FedlexSparqlProvider.start_run` and `test_filestore_shell_is_refused...` fails —
+# `captured` reads 1 and the shell is emitted as the Bundesverfassung.
+
+_FILESTORE_URL = (
+    "https://www.fedlex.admin.ch/filestore/fedlex.data.admin.ch/"
+    "eli/cc/1999/404/20240303/de/html/"
+    "fedlex-data-admin-ch-eli-cc-1999-404-20240303-de-html.html"
+)
+
+
+class ShellManifestationClient(FakeAsyncClient):
+    """Serves a 200 carrying chrome where the filestore should carry the act."""
+
+    async def get(self, url: str, *, params=None, headers=None):
+        if url == _FILESTORE_URL:
+            return httpx.Response(
+                200,
+                text=(
+                    "<html><head><script>var app=1;</script></head><body>"
+                    "<nav>Startseite Recht Bundesrecht Kontakt</nav>"
+                    "<p>Die angeforderte Seite konnte nicht geladen werden.</p>"
+                    "</body></html>"
+                ),
+                headers={"content-type": "text/html; charset=utf-8"},
+                request=httpx.Request("GET", url),
+            )
+        return await super().get(url, params=params, headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_filestore_shell_is_refused_rather_than_captured_as_the_act(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", ShellManifestationClient)
+    provider = FedlexSparqlProvider()
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(
+            acquisition_spec={
+                "seed_url": "https://fedlex.data.admin.ch/eli/cc/1999/404",
+                "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+                "preferred_languages": ["de"],
+                "max_expressions": 1,
+            }
+        ),
+        SimpleNamespace(run_id="run_shell"),
+    )
+
+    assert result.response_payload["captured"] == 0
+    assert result.inline_resources == []
+    assert result.response_payload["skipped"] == 1
+    skipped = result.response_payload["skipped_documents"][0]
+    assert skipped["reason"] == "no_legal_text_markers"
+    assert skipped["legal_marker_count"] == 0
+    # The SPARQL half succeeded, so the refusal must not read as "nothing found".
+    assert "legal-text density gate" in result.inline_failure_reason
+
+
+@pytest.mark.asyncio
+async def test_a_genuine_act_passes_the_gate_and_carries_its_verdict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other half: the gate must not refuse honest law.
+
+    Asserted on the same fixture the rest of this file uses, so a future edit that
+    tightens the gate past what real Fedlex HTML carries fails here rather than in
+    production.
+    """
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+    provider = FedlexSparqlProvider()
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(
+            acquisition_spec={
+                "seed_url": "https://fedlex.data.admin.ch/eli/cc/1999/404",
+                "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+                "preferred_languages": ["de"],
+                "max_expressions": 1,
+            }
+        ),
+        SimpleNamespace(run_id="run_ok"),
+    )
+
+    assert result.response_payload["captured"] == 1
+    assert result.response_payload["skipped"] == 0
+    metadata = result.inline_resources[0].metadata
+    assert metadata["legal_text_assessment"] == "passed"
+    assert metadata["legal_text_evidence"]["legal_marker_count"] >= 3

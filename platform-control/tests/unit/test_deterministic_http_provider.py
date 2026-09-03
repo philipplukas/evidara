@@ -184,3 +184,114 @@ async def test_get_with_rate_limit_noop_when_no_limiter() -> None:
 
     assert response.status_code == 200
     assert client.calls == ["https://example.com/b"]
+
+
+# ─── The legal-text density gate (#631) ─────────────────────────
+#
+# Every blueprint template pointing at this provider targets a DE/CH/IT collection
+# (source_blueprints.yaml:114,129,176,672), which is the vocabulary `content_gate`
+# was built for. Mutation check: delete the `assess_legal_text_density(...)` block in
+# `start_run` and `test_navigation_shell_is_refused...` fails with `captured == 1`.
+
+
+def _serving(body: bytes, content_type: str):
+    async def fake_request_with_safe_redirects(*, client, url, headers):
+        del client, headers
+        return url, httpx.Response(
+            200,
+            request=httpx.Request("GET", url),
+            content=body,
+            headers={"content-type": content_type},
+        )
+
+    return fake_request_with_safe_redirects
+
+
+@pytest.mark.asyncio
+async def test_navigation_shell_is_refused_rather_than_captured_as_law(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = DeterministicHttpProvider()
+    monkeypatch.setattr(
+        provider,
+        "_request_with_safe_redirects",
+        _serving(
+            b"<html><head><script>var app=1;</script></head><body>"
+            b"<nav>Startseite Impressum Datenschutz</nav></body></html>",
+            "text/html; charset=utf-8",
+        ),
+    )
+
+    result = await provider.start_run(
+        source=SimpleNamespace(),
+        source_version=_source_version_with_spec(
+            {"provider": "deterministic_http", "seed_url": "https://www.gesetze-im-internet.de/x"}
+        ),
+        run=_run("run_shell"),
+    )
+
+    assert result.response_payload["captured"] == 0
+    assert result.inline_resources == []
+    assert result.response_payload["skipped"] == 1
+    assert result.response_payload["skipped_documents"][0]["reason"] == "no_legal_text_markers"
+    assert "legal-text density gate" in result.inline_failure_reason
+
+
+@pytest.mark.asyncio
+async def test_a_genuine_statute_page_passes_and_carries_its_verdict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = DeterministicHttpProvider()
+    monkeypatch.setattr(
+        provider,
+        "_request_with_safe_redirects",
+        _serving(
+            "<html><body><h1>Bundes-Immissionsschutzgesetz</h1>"
+            "<p>§ 1 Zweck des Gesetzes ...</p>"
+            "<p>§ 2 Abs. 1 Geltungsbereich ...</p>"
+            "<p>§ 3 Abs. 2 Ziff. 1 Begriffsbestimmungen ...</p>"
+            "</body></html>".encode(),
+            "text/html; charset=utf-8",
+        ),
+    )
+
+    result = await provider.start_run(
+        source=SimpleNamespace(),
+        source_version=_source_version_with_spec(
+            {"provider": "deterministic_http", "seed_url": "https://www.gesetze-im-internet.de/y"}
+        ),
+        run=_run("run_ok"),
+    )
+
+    assert result.response_payload["captured"] == 1
+    metadata = result.inline_resources[0].metadata
+    assert metadata["legal_text_assessment"] == "passed"
+    assert metadata["legal_text_evidence"]["legal_marker_count"] >= 3
+
+
+@pytest.mark.asyncio
+async def test_the_gate_abstains_on_a_content_type_it_cannot_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A marker floor on `text/plain` would refuse honest captures, so it abstains.
+
+    This is the failure mode the wiring has to avoid: a gate configured for the
+    wrong modality is worse than no gate, because it rejects real documents.
+    """
+    provider = DeterministicHttpProvider()
+    monkeypatch.setattr(
+        provider,
+        "_request_with_safe_redirects",
+        _serving(b"Ein Gesetzestext ohne Markierungen.", "text/plain; charset=utf-8"),
+    )
+
+    result = await provider.start_run(
+        source=SimpleNamespace(),
+        source_version=_source_version_with_spec(
+            {"provider": "deterministic_http", "seed_url": "https://www.gesetze-im-internet.de/z"}
+        ),
+        run=_run("run_plain"),
+    )
+
+    assert result.response_payload["captured"] == 1
+    assert result.response_payload["skipped"] == 0

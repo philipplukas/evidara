@@ -41,13 +41,19 @@ _INDEX_HTML = """
 </body></html>
 """
 
+# The Erwägungen now cite articles, as a real ruling does. The previous fixture
+# carried zero legal-text markers, so it scored the same as a consent interstitial
+# under `content_gate` — the gate the provider now runs. A decision that cites no
+# provision at all is not a shape this corpus needs to admit.
 _DECISION_HTML = """
 <html><head><title>Urteil 1C_123/2024 vom 12. März 2024</title></head><body>
   <h1>Bundesgericht</h1>
   <p>Urteil vom 12. März 2024 (1C_123/2024)</p>
   <p>ECLI:CH:BGER:2024:1C_123.2024.1</p>
   <p>Publiziert als BGE 150 II 1.</p>
-  <p>Erwägungen ...</p>
+  <p>Erwägungen: Nach Art. 82 lit. a BGG ist die Beschwerde zulässig.</p>
+  <p>Art. 89 Abs. 1 BGG verlangt ein schutzwürdiges Interesse.</p>
+  <p>Vgl. Art. 29 Abs. 2 BV.</p>
 </body></html>
 """
 
@@ -401,3 +407,72 @@ def test_link_discovery_unescapes_html_entities() -> None:
         _DEFAULT_ALLOWED_HOSTS,
     )
     assert links == ["https://www.bger.ch/decisions/list?docid=1C_9/2024&lang=de"]
+
+
+# ─── The legal-text density gate (#631) ─────────────────────────
+#
+# An index walk reaches consent interstitials and "Dokument nicht gefunden" pages;
+# all are `200 text/html` with visible text, so nothing else in this provider
+# objects. Mutation check: delete the `assess_legal_text_density(...)` block in
+# `_fetch_decision` and the refusal below captures the interstitial instead.
+
+
+class _InterstitialCourtClient(_FakeCourtClient):
+    async def get(self, url: str, **kwargs):
+        if url == _CANTONAL_DECISION_URL:
+            return httpx.Response(
+                200,
+                html=(
+                    "<html><head><title>Hinweis</title></head><body>"
+                    "<p>Bitte akzeptieren Sie die Nutzungsbedingungen, um fortzufahren.</p>"
+                    "</body></html>"
+                ),
+                headers={"content-type": "text/html"},
+                request=httpx.Request("GET", url),
+            )
+        return await super().get(url, **kwargs)
+
+
+@pytest.mark.asyncio
+async def test_consent_interstitial_is_refused_rather_than_captured_as_a_decision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", _InterstitialCourtClient)
+    result = await ChCourtDecisionsProvider().start_run(
+        SimpleNamespace(),
+        _source_version(
+            {
+                "provider": "ch_court_decisions",
+                "seed_url": _CANTONAL_DECISION_URL,
+                "court": "zh",
+            }
+        ),
+        SimpleNamespace(run_id="run_ch_court_interstitial", scope=None),
+    )
+
+    assert result.response_payload["captured"] == 0
+    assert result.inline_resources == []
+    assert "no_legal_text_markers" in result.response_payload["failures"][0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_a_genuine_ruling_passes_the_gate_and_carries_its_verdict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeCourtClient)
+    result = await ChCourtDecisionsProvider().start_run(
+        SimpleNamespace(),
+        _source_version(
+            {
+                "provider": "ch_court_decisions",
+                "seed_url": _CANTONAL_DECISION_URL,
+                "court": "zh",
+            }
+        ),
+        SimpleNamespace(run_id="run_ch_court_ok", scope=None),
+    )
+
+    assert result.response_payload["captured"] == 1
+    metadata = result.inline_resources[0].metadata
+    assert metadata["legal_text_assessment"] == "passed"
+    assert metadata["legal_text_evidence"]["legal_marker_count"] >= 3

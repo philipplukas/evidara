@@ -58,6 +58,7 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from acquisition_core.content_gate import assess_legal_text_density
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
@@ -422,6 +423,24 @@ class ChCourtDecisionsProvider:
             response.headers.get("content-type", "text/html").split(";")[0].strip().lower()
         )
         final_url = str(response.url)
+
+        # Legal-text density (#631). `bger.ch` / `bvger.ch` are server-rendered, but
+        # an index walk reaches consent interstitials, "Dokument nicht gefunden"
+        # pages and search-result chrome — all of which are `200 text/html` with
+        # visible text, so nothing else here objects. A Swiss federal decision cites
+        # `Art.`, `Abs.` and `E.` throughout, well clear of the shared DE/IT
+        # vocabulary's floor of three. The gate abstains on anything it cannot read.
+        assessment = assess_legal_text_density(body, content_type=normalized_ct)
+        if not assessment.is_legal_text:
+            return {
+                "url": url,
+                "error": (
+                    f"no_legal_text_markers: {assessment.reason}"
+                    if assessment.reason
+                    else "no_legal_text_markers"
+                ),
+            }
+
         citation = _extract_citation_metadata(body)
 
         return ProviderResource(
@@ -448,5 +467,7 @@ class ChCourtDecisionsProvider:
                 "decision_date": citation.get("decision_date"),
                 "fetched_at": datetime.now(UTC).isoformat(),
                 "run_id": run.run_id,
+                "legal_text_assessment": "passed",
+                "legal_text_evidence": assessment.as_evidence(),
             },
         )

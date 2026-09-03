@@ -147,6 +147,32 @@ Key tests:
 - Contract tests for consumed `document.processing_status.updated` values, including invalid-status handling
 - Smoke test for one source family lifecycle
 
+## Capture guards
+
+Two gates decide whether captured bytes may enter the artifact pipeline. They answer
+different questions and neither subsumes the other, so a provider fetching a binary
+manifestation needs the first before the second is even meaningful:
+
+| Gate | Question | Catches | Blind to |
+|---|---|---|---|
+| `acquisition_core.artifact_guard.check_capture` | "are these the bytes I asked for?" | declared/expected content-type mismatch, missing format magic, HTML where a binary was expected, a size floor (#716) | a well-formed page whose text is not law |
+| `acquisition_core.content_gate.assess_legal_text_density` | "does this text look like law?" | a JavaScript or navigation shell served as a statute (#631) | binaries — it abstains on anything outside HTML/XML, deliberately |
+
+Neither judges the **text inside a PDF**; that needs extraction and belongs to
+document-intelligence's quarantine gate (ADR-0047). `artifact_guard` must not grow a
+marker check of its own: the vocabulary and threshold live in `content_gate` and are
+pinned across both components by
+`document-intelligence/tests/test_quarantine.py::MarkerVocabularyDriftTests`.
+
+**Which provider calls which is a decision, not a default.** A gate configured for the
+wrong modality or the wrong language is worse than none, because it refuses honest
+captures while looking like protection — `eur_lex_sparql` defaults to English and
+`legifrance` is French, both outside `content_gate`'s DE/IT marker vocabulary, so both
+are deliberately ungated. The matrix, including those reasons, lives in
+`platform-control/tests/unit/test_capture_guard_coverage.py` and is **asserted**: a
+provider registered without a recorded decision, or whose capture path stops matching
+the one it has, fails that test. Read it before adding a provider.
+
 ## Drift risks
 
 | Risk | Mitigation |
@@ -155,3 +181,4 @@ Key tests:
 | Run state becomes inconsistent | Unit tests for valid and invalid transitions |
 | Bundle manifests drift from DI expectations | Schema validation and example payload tests |
 | Scope metadata changes accidentally | Source-version governance, manifest provenance, and audit trail |
+| A capture gate is wired to a provider it does not fit, or a new provider is added with neither | `tests/unit/test_capture_guard_coverage.py` — the matrix is an assertion over the live registry, not a comment |
