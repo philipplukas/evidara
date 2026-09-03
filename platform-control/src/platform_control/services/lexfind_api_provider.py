@@ -2,12 +2,27 @@
 
 LexFind (`www.lexfind.ch`, a project of the *Schweizerische
 Staatsschreiberkonferenz*) exposes an unauthenticated JSON API over the same
-texts of law the cantons publish themselves. It exists here because the obvious
-design — scraping each canton's own portal — **cannot work** for Zürich, and #716
-measured why: the ZH-Lex `erlass-*.html` page is metadata-only (`§ = 0` on all 18
-sampled pages, 1879→2026), its only text link points at `www.notes.zh.ch` which
-refuses TCP on 443 and 80, and the canton's own search API returns 503/204 for
-every filter parameter.
+texts of law the cantons publish themselves. It exists here because in 2026-07
+the obvious design — scraping each canton's own portal — could not work for
+Zürich, and #716 measured why: the ZH-Lex `erlass-*.html` page is metadata-only
+(`§ = 0` on all 18 sampled pages, 1879→2026), its only text link points at
+`www.notes.zh.ch`, which was then refusing TCP on 443 and 80, and the canton's
+own search API returned 503/204 for every filter parameter.
+
+**That was a snapshot, and it has expired.** Re-measured 2026-09-03:
+`www.notes.zh.ch` answers on 443 and 80 (`Server: Lotus-Domino`), the full direct
+path works end to end — erlass page → a 154-byte JS stub → `WebView/$File/` →
+`200 application/pdf`, 84 740 bytes, `%PDF-1.4`, 42 `§` markers — the ZH sitemap
+404s on 0/20 sampled entries (was ~5/18), and the search API returns 200 with
+correct results on every filter. Do not quote the paragraph above as a live fact.
+
+The mirror is kept anyway, and the outage is the argument for it rather than
+against: LexFind covers 26 cantons for a third of the requests, is LIVE on banked
+evidence, and stayed up through the exact seven weeks the canton's own host was
+refusing connections. What the outage does *not* buy is an exemption from the
+product principle — Evidara acquires from the issuing source and keeps full
+source provenance — so a mirror is only admissible while we keep proving it
+equals the source. See the next section for how that proof is now kept live.
 
 One provider covers the cantonal rung for all 28 entities, which is the point:
 #628 measures *the cost of the Nth source*, and 28 jurisdictions behind one
@@ -16,13 +31,66 @@ homogeneous contract is the cheapest available test of whether that cost falls.
 PROVENANCE IS PROVABLE, NOT ASSERTED
 ------------------------------------
 LexFind is a mirror, and a mirror needs justifying. #716 verified the mirrored
-file is byte-identical to the canton's own:
+file is byte-identical to the canton's own, and 2026-09-03 re-verified it from
+both live sides (`cmp`-identical):
 
-    461c614535cb7b5aa33175904f7d3229  Wayback copy of the official notes.zh.ch file
+    461c614535cb7b5aa33175904f7d3229  the official notes.zh.ch file
     461c614535cb7b5aa33175904f7d3229  LexFind /tol/22871/de, fetched live
+
+Two things keep that from decaying into a claim in a comment:
+
+  * **Provenance cannot degrade to the mirror.** A record whose `original_url`
+    is missing is REFUSED, with the slug `original_url_missing`, rather than
+    captured with the LexFind URL substituted as its source. See :meth:`_capture`.
+  * **Byte-identity is re-checked, not remembered.** :func:`verify_mirror_fidelity`
+    fetches the canton's own file for a small *sample* of each run's captures and
+    compares md5. A divergence fails the run. See the section below.
 
 Every record also carries `original_url` back to the canton's own page, so the
 canonical citation survives the mirror.
+
+THE MIRROR SPOT-CHECK (#731)
+----------------------------
+The gap this closes is **independence**, not provenance: nothing would have
+noticed if LexFind stopped mirroring faithfully, because the identity was
+asserted once, in prose, in 2026-07.
+
+It is a *sample*, deliberately, and not a second fetch per capture. Doubling
+every acquisition's request count against a public-sector service is not an
+acceptable price for the check, so the posture from #797 holds: one request at a
+time, seconds apart, an identifying User-Agent (its own — the canton is told what
+is knocking, not the name of the mirror being checked), a handful of requests per
+run. Defaults are `mirror_spot_check_sample: 1` and
+`mirror_spot_check_delay_seconds: 3.0`; `0` disables it. Both are clamped —
+config may tune the politeness, not defeat it — and the delay is applied before
+EVERY request to the canton, not merely between sampled documents.
+
+Four outcomes, and the difference between them is the whole design:
+
+  * ``identical`` — the canton's file and the mirrored bytes have the same md5.
+  * ``diverged`` — they do not. **This fails the run and discards the whole batch
+    unpublished.** Failing the run alone would not be enough: `_dispatch_run`
+    persists and publishes inline resources before it reads the failure reason,
+    so a check that flagged a divergence while still handing the documents down
+    would put the divergent corpus in the index, cited to the canton's own URL,
+    and make the corpus worse than not checking at all. The unsampled documents
+    are discarded with the sampled one: a mirror that has stopped being faithful
+    is not trustworthy for the records we happened not to draw.
+  * ``source_unreachable`` / ``source_document_not_found`` — the canton's host
+    did not answer, or its page did not lead to a document. Recorded and
+    **warned about**, but NOT a failure. Seven weeks of #716 are the reason: an
+    unreachable canton is the condition the mirror exists to survive, and failing
+    runs on it would hand the outage the power the mirror was chosen to deny it.
+    A run whose every sampled document came back unverified says so loudly — that
+    is the state in which the mirror is trusted on assertion again.
+  * ``check_error`` — this code raised. Kept distinct from an outage on purpose:
+    a regression in the resolver would otherwise render the check permanently
+    inert while reporting the same slug as a canton that is merely down.
+
+The resolver spends at most a handful of requests per document, across all hops
+and all candidate links, and considers at most a few candidates per page. It is
+not a crawler and must not become one; if a canton needs bespoke traversal, that
+is an argument for a direct provider, not for widening this.
 
 THE CONTRACT, VERIFIED LIVE 2026-07-22
 --------------------------------------
@@ -66,14 +134,20 @@ Captures are PDFs, so both acquisition gates matter and neither is redundant:
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import logging
+import random
 import re
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urljoin
 
 import httpx
 
-from acquisition_core.artifact_guard import check_capture
+from acquisition_core.artifact_guard import check_capture, has_format_magic, looks_like_html
 from acquisition_core.content_gate import assess_legal_text_density
 from platform_control.domain import DenominatorTier
 from platform_control.models.run import Run
@@ -100,6 +174,64 @@ _MAX_PAGES = 40
 # (Hundegesetz, 33 pages); the floor is set far below that so a short ordinance is
 # not refused, while a 142-byte stub cannot pass.
 _DEFAULT_MIN_PDF_BYTES = 2_000
+
+# Mirror spot-check (#731). Conservative on purpose: one sampled document per
+# run, with the pace applied before every request to the canton, is the #797
+# posture. `0` disables the check entirely.
+_DEFAULT_MIRROR_SPOT_CHECK_SAMPLE = 1
+_DEFAULT_MIRROR_SPOT_CHECK_DELAY_SECONDS = 3.0
+
+# Hard ceilings. An acquisition spec is operator-supplied config, and without a
+# cap `{"mirror_spot_check_sample": 5000, "mirror_spot_check_delay_seconds": 0}`
+# is a plausible-looking typo that turns a verifier into thousands of unpaced
+# requests at a cantonal host. The knobs tune politeness; they may not defeat it.
+_MAX_MIRROR_SPOT_CHECK_SAMPLE = 5
+_MAX_MIRROR_SPOT_CHECK_DELAY_SECONDS = 60.0
+
+# Total requests the resolver may spend reaching ONE document, across all hops
+# and all candidate links. Three is the measured ZH path (erlass page -> JS stub
+# -> `WebView/$File/`); the fourth buys exactly one retry when a candidate is a
+# dead end. This is the crawler ceiling and it is deliberately tight.
+_MIRROR_SPOT_CHECK_MAX_REQUESTS = 4
+
+# At most this many candidate links are considered per page. A page offering
+# more than a handful is not a document landing page, and following them all is
+# crawling.
+_MIRROR_SPOT_CHECK_MAX_CANDIDATES_PER_PAGE = 3
+
+# Candidate document links, ordered by how specific the TARGET is — not by the
+# shape of the markup carrying it. Ordering by markup shape was a real hazard:
+# a `window.location.href = …` pattern searched over the whole page wins
+# globally, so any cookie banner, language switch or analytics snippet on a
+# modern cantonal page is followed instead of the document.
+#
+# Note the first two also match `window.location.href='…'`, because `.href=` is
+# `href\s*=`. So the #716 JavaScript stub is still resolved by pattern 1 or 2
+# whenever its target looks like a document, and pattern 3 — any JS redirect at
+# all — is the last resort it should always have been.
+_SOURCE_LINK_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"""href\s*=\s*['"]([^'"]*/\$[Ff]ile/[^'"]+)['"]"""),
+    re.compile(r"""href\s*=\s*['"]([^'"]+\.pdf(?:\?[^'"]*)?)['"]""", re.IGNORECASE),
+    re.compile(r"""window\.location\.href\s*=\s*['"]([^'"]+)['"]""", re.IGNORECASE),
+)
+
+_MIRROR_STATUS_IDENTICAL = "identical"
+_MIRROR_STATUS_DIVERGED = "diverged"
+_MIRROR_STATUS_SOURCE_UNREACHABLE = "source_unreachable"
+_MIRROR_STATUS_SOURCE_DOCUMENT_NOT_FOUND = "source_document_not_found"
+# The check itself broke — a bug here, not a fact about the canton. Kept distinct
+# from the two above so a regression in the resolver cannot hide as an outage.
+_MIRROR_STATUS_CHECK_ERROR = "check_error"
+
+_MIRROR_STATUSES_UNVERIFIED = (
+    _MIRROR_STATUS_SOURCE_UNREACHABLE,
+    _MIRROR_STATUS_SOURCE_DOCUMENT_NOT_FOUND,
+    _MIRROR_STATUS_CHECK_ERROR,
+)
+
+# The canton is a different host with a different operator; it is told what is
+# actually knocking, not the name of the mirror we happen to be checking.
+_MIRROR_CHECK_USER_AGENT = "evidara-mirror-check/1.0 (+https://evidara.ai)"
 
 # Temporal validity (#731, and the #661 trap it avoids).
 #
@@ -318,6 +450,226 @@ def is_in_force(record: dict[str, Any], *, as_of: str | None = None) -> bool | N
     return True
 
 
+@dataclass(frozen=True, slots=True)
+class MirrorFidelityResult:
+    """One document's answer to "does the mirror still equal the source?".
+
+    ``status`` is a stable machine-readable slug, following
+    :class:`acquisition_core.artifact_guard.GuardResult`'s vocabulary rather than
+    inventing a second one: it is written into the run's response payload and read
+    by an operator deciding whether the mirror is still admissible.
+
+    The two md5s are both recorded even when they agree, because "we checked and
+    they matched" is the evidence; "no divergence reported" is not.
+    """
+
+    status: str
+    source_url: str
+    tol_id: int | None = None
+    mirror_md5: str | None = None
+    source_md5: str | None = None
+    source_document_url: str | None = None
+    detail: str | None = None
+
+    @property
+    def diverged(self) -> bool:
+        return self.status == _MIRROR_STATUS_DIVERGED
+
+    def as_record(self) -> dict[str, Any]:
+        record: dict[str, Any] = {"status": self.status, "source_url": self.source_url}
+        for key, value in (
+            ("tol_id", self.tol_id),
+            ("mirror_md5", self.mirror_md5),
+            ("source_md5", self.source_md5),
+            ("source_document_url", self.source_document_url),
+            ("detail", self.detail),
+        ):
+            if value is not None:
+                record[key] = value
+        return record
+
+
+def _bounded_spec_int(value: Any, *, default: int, maximum: int) -> int:
+    """An operator-supplied count, clamped into a range the host can survive.
+
+    Raises ``ValueError`` with an operator-readable message rather than letting
+    `int()` throw an unnamed one out of `start_run`; a malformed spec is a
+    configuration refusal, not a transport failure.
+    """
+    if value is None:
+        return default
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"expected a whole number, got {value!r}") from exc
+    return max(0, min(number, maximum))
+
+
+def _bounded_spec_float(value: Any, *, default: float, maximum: float) -> float:
+    if value is None:
+        return default
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"expected a number, got {value!r}") from exc
+    return max(0.0, min(number, maximum))
+
+
+def source_link_candidates(body: bytes) -> list[str]:
+    """Links on a canton page that plausibly lead to the document, best first.
+
+    A LIST, not a first match. First-match-wins was a real hazard: the pattern
+    for a JavaScript redirect matches anywhere on the page, so a cookie banner or
+    a language switch on a modern cantonal page would be followed instead of the
+    document — and with nothing to fall back to, the run recorded
+    `source_document_not_found` and said nothing. Ordering by target specificity
+    fixes the common case; returning alternatives fixes the rest.
+
+    Capped at :data:`_MIRROR_SPOT_CHECK_MAX_CANDIDATES_PER_PAGE`. A page offering
+    more than a handful is not a document landing page, and following them all is
+    crawling — which this module has no permission to do.
+    """
+    text = body.decode("utf-8", errors="ignore")
+    candidates: list[str] = []
+    for pattern in _SOURCE_LINK_PATTERNS:
+        for match in pattern.finditer(text):
+            candidate = match.group(1)
+            if candidate not in candidates:
+                candidates.append(candidate)
+            if len(candidates) >= _MIRROR_SPOT_CHECK_MAX_CANDIDATES_PER_PAGE:
+                return candidates
+    return candidates
+
+
+async def _resolve_source_document(
+    client: httpx.AsyncClient,
+    page_url: str,
+    *,
+    max_requests: int = _MIRROR_SPOT_CHECK_MAX_REQUESTS,
+    pace: Callable[[], Awaitable[None]] | None = None,
+) -> tuple[bytes, str] | None:
+    """Walk from a canton's page to its actual document, or give up.
+
+    Returns ``(body, url)`` for the first response whose bytes carry a PDF
+    signature, or ``None`` when the request budget runs out or nothing on the
+    pages reached looks like a document link. The magic number is the authority,
+    not the declared content type — #716's stub was served as a download and was
+    154 bytes of JavaScript.
+
+    Depth-first over the candidates of each page, bounded by ``max_requests``
+    across the WHOLE resolution rather than per hop, so one bad candidate costs a
+    request instead of the answer. ``pace`` is awaited before every request,
+    including the first: the politeness posture belongs to the host being
+    knocked on, not to the loop that happens to be iterating.
+    """
+    budget = max_requests
+    frontier: list[str] = [page_url]
+
+    while frontier and budget > 0:
+        url = frontier.pop(0)
+        if pace is not None:
+            await pace()
+        budget -= 1
+        response = await client.get(url)
+        response.raise_for_status()
+        body = response.content
+        if has_format_magic(body, "application/pdf") and not looks_like_html(body):
+            return body, str(response.url)
+        resolved_url = str(response.url)
+        # Candidates from this page go to the FRONT: the document is more likely
+        # one hop below the page we just read than beside an earlier dead end.
+        frontier = [
+            urljoin(resolved_url, candidate) for candidate in source_link_candidates(body)
+        ] + frontier
+
+    return None
+
+
+async def verify_mirror_fidelity(
+    client: httpx.AsyncClient,
+    *,
+    original_url: str,
+    mirrored_body: bytes,
+    tol_id: int | None = None,
+    max_requests: int = _MIRROR_SPOT_CHECK_MAX_REQUESTS,
+    pace: Callable[[], Awaitable[None]] | None = None,
+) -> MirrorFidelityResult:
+    """Compare the mirrored bytes against the issuing source's own file.
+
+    An unreachable source is NOT a divergence. Conflating the two would make the
+    canton's uptime a precondition for ingesting from the mirror that exists
+    because the canton's uptime cannot be relied on — #716 was seven weeks long.
+
+    A bug in this function is not an outage either. Only `httpx` failures become
+    `source_unreachable`; anything else is `check_error`, logged with a
+    traceback, so a regression in the resolver cannot masquerade as a canton that
+    happens to be down and quietly render the check inert forever.
+    """
+    mirror_md5 = hashlib.md5(mirrored_body, usedforsecurity=False).hexdigest()
+    try:
+        resolved = await _resolve_source_document(
+            client, original_url, max_requests=max_requests, pace=pace
+        )
+    except httpx.HTTPError as exc:
+        # Includes HTTPStatusError: a 404 at the canton may mean the document
+        # moved, which is a provenance signal rather than a clean outage. Both
+        # are `unverified` and both are warned about by the caller; the detail
+        # carries the distinction for whoever reads the payload.
+        return MirrorFidelityResult(
+            status=_MIRROR_STATUS_SOURCE_UNREACHABLE,
+            source_url=original_url,
+            tol_id=tol_id,
+            mirror_md5=mirror_md5,
+            detail=f"{type(exc).__name__}: {exc}",
+        )
+    except Exception as exc:  # noqa: BLE001 — our bug, reported as ours
+        logger.exception(
+            "lexfind mirror check raised while resolving %s — the check did NOT run",
+            original_url,
+        )
+        return MirrorFidelityResult(
+            status=_MIRROR_STATUS_CHECK_ERROR,
+            source_url=original_url,
+            tol_id=tol_id,
+            mirror_md5=mirror_md5,
+            detail=f"{type(exc).__name__}: {exc}",
+        )
+
+    if resolved is None:
+        return MirrorFidelityResult(
+            status=_MIRROR_STATUS_SOURCE_DOCUMENT_NOT_FOUND,
+            source_url=original_url,
+            tol_id=tol_id,
+            mirror_md5=mirror_md5,
+            detail=f"no document reached within {max_requests} requests of the source page",
+        )
+
+    source_body, source_document_url = resolved
+    source_md5 = hashlib.md5(source_body, usedforsecurity=False).hexdigest()
+    if source_md5 == mirror_md5:
+        return MirrorFidelityResult(
+            status=_MIRROR_STATUS_IDENTICAL,
+            source_url=original_url,
+            tol_id=tol_id,
+            mirror_md5=mirror_md5,
+            source_md5=source_md5,
+            source_document_url=source_document_url,
+        )
+
+    return MirrorFidelityResult(
+        status=_MIRROR_STATUS_DIVERGED,
+        source_url=original_url,
+        tol_id=tol_id,
+        mirror_md5=mirror_md5,
+        source_md5=source_md5,
+        source_document_url=source_document_url,
+        detail=(
+            f"mirror {len(mirrored_body)} bytes / md5 {mirror_md5} != "
+            f"source {len(source_body)} bytes / md5 {source_md5}"
+        ),
+    )
+
+
 class LexFindApiProvider:
     """Acquisition provider for LexFind's texts-of-law API."""
 
@@ -370,12 +722,47 @@ class LexFindApiProvider:
         enumeration = str(spec.get("enumeration") or "").strip()
         enumerating = enumeration == _ENUMERATION_STRATEGY_DIGIT_UNION
 
+        try:
+            mirror_sample = _bounded_spec_int(
+                spec.get("mirror_spot_check_sample"),
+                default=_DEFAULT_MIRROR_SPOT_CHECK_SAMPLE,
+                maximum=_MAX_MIRROR_SPOT_CHECK_SAMPLE,
+            )
+        except ValueError:
+            mirror_sample = -1  # planned as malformed; start_run refuses it by name
+
         notes = [
             "Capture path verified live (#716): /tol/{id}/{lang} returns "
             "application/pdf, md5-identical to the canton's own file.",
             "Search contract verified live 2026-07-22: all 11 fields required, "
             "results under `texts_of_law_with_matches`, dates DD.MM.YYYY.",
+            "PROVENANCE: a record LexFind publishes without `original_url` is "
+            "REFUSED (`original_url_missing`), not captured with the mirror URL "
+            "substituted as its source.",
         ]
+        if mirror_sample < 0:
+            notes.append(
+                "BLOCKING: acquisition_spec.mirror_spot_check_sample is not a whole "
+                "number — this run would be refused before any request is made."
+            )
+        elif mirror_sample > 0:
+            notes.append(
+                f"MIRROR SPOT-CHECK: {mirror_sample} captured document(s) per run are "
+                "re-fetched from the CANTON's own host (up to "
+                f"{_MIRROR_SPOT_CHECK_MAX_REQUESTS} requests each, paced) and compared "
+                "by md5. A divergence FAILS the run AND DISCARDS the whole batch "
+                "unpublished; an unreachable canton is recorded, warned about, and does "
+                "not fail the run (the mirror exists to survive that — #716 lasted seven "
+                "weeks). Set `mirror_spot_check_sample: 0` to disable, "
+                f"`mirror_spot_check_delay_seconds` to pace it. Capped at "
+                f"{_MAX_MIRROR_SPOT_CHECK_SAMPLE} documents per run."
+            )
+        else:
+            notes.append(
+                "MIRROR SPOT-CHECK DISABLED (`mirror_spot_check_sample: 0`): nothing in "
+                "this run re-proves that LexFind still serves bytes identical to the "
+                "issuing source. The identity is then an assertion, not a measurement."
+            )
         if enumerating:
             notes.append(
                 "ENUMERATION: digit union over systematic numbers (0-9, deduplicated "
@@ -449,6 +836,31 @@ class LexFindApiProvider:
         max_documents = int(spec.get("max_documents") or 0)
         min_pdf_bytes = int(spec.get("min_pdf_bytes") or _DEFAULT_MIN_PDF_BYTES)
         timeout_seconds = float(spec.get("request_timeout_seconds") or 20.0)
+        # `0` disables the mirror spot-check; the default samples one document per
+        # run. Read with an explicit None test rather than `or`, so a deliberate
+        # `0` is honoured instead of falling back to the default. A malformed
+        # value is a named configuration refusal, like every other spec error in
+        # this method — never a raw ValueError out of `start_run`.
+        try:
+            mirror_sample = _bounded_spec_int(
+                spec.get("mirror_spot_check_sample"),
+                default=_DEFAULT_MIRROR_SPOT_CHECK_SAMPLE,
+                maximum=_MAX_MIRROR_SPOT_CHECK_SAMPLE,
+            )
+            mirror_delay = _bounded_spec_float(
+                spec.get("mirror_spot_check_delay_seconds"),
+                default=_DEFAULT_MIRROR_SPOT_CHECK_DELAY_SECONDS,
+                maximum=_MAX_MIRROR_SPOT_CHECK_DELAY_SECONDS,
+            )
+        except ValueError as exc:
+            return ProviderStartResult(
+                external_job_id=f"lexfind-{run.run_id}",
+                provider=self.provider_name,
+                request_payload={"language": language, "entity_ids": entity_ids},
+                response_payload={"captured": 0, "skipped": [], "failures": []},
+                inline_resources=[],
+                inline_failure_reason=f"acquisition_spec: {exc}",
+            )
 
         coverage: dict[str, Any] | None = None
         resources: list[ProviderResource] = []
@@ -579,6 +991,58 @@ class LexFindApiProvider:
                 if resource is not None:
                     resources.append(resource)
 
+        # Outside the LexFind client: these requests go to the CANTON, with their
+        # own client, their own pacing and their own failure semantics.
+        mirror_fidelity = await self._spot_check_mirror_fidelity(
+            resources,
+            run=run,
+            sample_size=mirror_sample,
+            delay_seconds=mirror_delay,
+            timeout_seconds=timeout_seconds,
+        )
+
+        # A divergence outranks a transport failure as a reason to fail the run:
+        # "some requests failed" is routine, "the mirror is no longer the source"
+        # invalidates the reason this provider is allowed to exist.
+        #
+        # AND IT MUST DISCARD THE BATCH, not merely rename the run. `_dispatch_run`
+        # persists `inline_resources` and builds the bundle events FIRST
+        # (run_service.py:1320-1345); the `inline_failure_reason` block that
+        # follows (:1348-1353) flips the run to FAILED, but
+        # `_publish_pending_dispatch_events` (:1765-1787) publishes every
+        # `raw_artifact.available` and `artifact_bundle.available` with no check on
+        # `run.status`. Handing resources down alongside a failure reason therefore
+        # ships the divergent corpus and marks the run red afterwards — the check
+        # would make the corpus WORSE than not checking, since the documents land
+        # cited to the canton's own URL. Every other provider in this repo gates on
+        # `if not resources`, and _dispatch_run was written on that invariant.
+        #
+        # A whole-batch discard is the right blast radius, not just the diverged
+        # document: a mirror that has stopped being faithful is not trustworthy for
+        # the documents we happened not to sample.
+        failure_reason: str | None = None
+        published_resources = resources
+        if mirror_fidelity and mirror_fidelity["diverged"]:
+            discarded = len(resources)
+            published_resources = []
+            failure_reason = (
+                f"mirror fidelity check FAILED for {mirror_fidelity['diverged']} of "
+                f"{mirror_fidelity['sampled']} sampled document(s): LexFind no longer "
+                "serves bytes identical to the issuing source. All "
+                f"{discarded} captured document(s) were DISCARDED unpublished — the "
+                "unsampled ones are no more trustworthy than the sampled one. Do not "
+                "ingest from this mirror until the divergence is explained; see "
+                "response_payload.mirror_fidelity."
+            )
+            logger.error(
+                "lexfind run %s discarded %d captured document(s) unpublished: "
+                "the mirror diverged from the issuing source",
+                run.run_id,
+                discarded,
+            )
+        elif failures and not resources:
+            failure_reason = failures[0]["error"]
+
         return ProviderStartResult(
             external_job_id=f"lexfind-{run.run_id}",
             provider=self.provider_name,
@@ -589,13 +1053,17 @@ class LexFindApiProvider:
                 "search_payload_verified": _SEARCH_PAYLOAD_VERIFIED,
             },
             response_payload={
+                # What was captured, which is not what was published when the
+                # mirror check discarded the batch. Both numbers are recorded.
                 "captured": len(resources),
+                "published": len(published_resources),
                 "skipped": skipped,
                 "failures": failures,
                 **({"coverage": coverage} if coverage is not None else {}),
+                **({"mirror_fidelity": mirror_fidelity} if mirror_fidelity is not None else {}),
             },
-            inline_resources=resources,
-            inline_failure_reason=failures[0]["error"] if failures and not resources else None,
+            inline_resources=published_resources,
+            inline_failure_reason=failure_reason,
         )
 
     async def _discover(
@@ -827,6 +1295,55 @@ class LexFindApiProvider:
         dta = _download_entry(record, language)
         pdf_url = (dta or {}).get("url") or f"/tol/{tol_id}/{language}"
 
+        # PROVENANCE MAY NOT DEGRADE TO THE MIRROR.
+        #
+        # `original_url` is the canton's own page — the thing that makes a
+        # mirrored capture admissible under "acquire from the issuing source and
+        # keep full source provenance". This used to be `if original_url:`, with
+        # `source_url=original_url or <the LexFind URL>` further down: when
+        # LexFind omitted the field, the capture silently recorded the *mirror*
+        # as the document's source and nothing said so. That is the quiet
+        # substitution this repo refuses everywhere else (#631, #675, #713).
+        #
+        # Refusing rather than marking is deliberate. A marker would only live in
+        # provider metadata, which no query reads: the document would enter the
+        # corpus citing lexfind.ch as its source and nothing downstream could
+        # tell it apart. A skip is ENFORCED — the document does not enter the
+        # corpus at all — and it is named twice, in `response_payload.skipped`
+        # and in the log.
+        #
+        # Note what the refusal does NOT do, since an earlier draft of this
+        # comment claimed it: it does not show up in the coverage reconciliation.
+        # `_reconcile` counts discovered RECORDS and runs before this loop, so a
+        # record refused here still counts as observed — and coverage is computed
+        # only for enumeration runs, so in search mode there is no coverage block
+        # at all. That is why the log line below exists rather than being
+        # redundant with a count somewhere else.
+        #
+        # Measured 2026-09-03: 100/100 sampled records across 21 cantons carry
+        # `original_url`, so this closes a latent path rather than discarding law
+        # we can actually reach.
+        original_url = (dta or {}).get("original_url")
+        if not original_url:
+            logger.warning(
+                "lexfind refused tol_id=%s (%s): no original_url, so capturing it would "
+                "record the mirror as the document's own source",
+                tol_id,
+                record.get("systematic_number") or pdf_url,
+            )
+            skipped.append(
+                {
+                    "tol_id": tol_id,
+                    "url": pdf_url,
+                    "reason": "original_url_missing",
+                    "detail": (
+                        "LexFind published no original_url for this record; capturing it "
+                        "would record the mirror as the document's source"
+                    ),
+                }
+            )
+            return None
+
         pdf = await client.get(pdf_url)
         pdf.raise_for_status()
         body = pdf.content
@@ -869,10 +1386,8 @@ class LexFindApiProvider:
         }
         # `original_url` lives on the download entry, not the record root, and is
         # what keeps the canonical citation pointing at the canton rather than at
-        # the mirror.
-        original_url = (dta or {}).get("original_url")
-        if original_url:
-            metadata["original_url"] = original_url
+        # the mirror. Its absence was refused above, so it is present here.
+        metadata["original_url"] = original_url
         if record.get("systematic_number"):
             metadata["systematic_number"] = record["systematic_number"]
         entity = record.get("entity") or {}
@@ -924,7 +1439,7 @@ class LexFindApiProvider:
         title = (version or {}).get("title") or record.get("title")
 
         return ProviderResource(
-            source_url=original_url or f"{_BASE_URL}{pdf_url}",
+            source_url=original_url,
             final_url=f"{_BASE_URL}{pdf_url}",
             content_type="application/pdf",
             body_bytes=body,
@@ -933,3 +1448,113 @@ class LexFindApiProvider:
             discovery_depth=0,
             metadata=metadata,
         )
+
+    async def _spot_check_mirror_fidelity(
+        self,
+        resources: list[ProviderResource],
+        *,
+        run: Run,
+        sample_size: int,
+        delay_seconds: float,
+        timeout_seconds: float,
+    ) -> dict[str, Any] | None:
+        """Re-prove the mirror against the issuing source, for a small sample.
+
+        Returns ``None`` when the check is switched off or there is nothing to
+        check, so the run's response payload gains a key only when a check was
+        actually performed — an absent key must never read as "verified".
+
+        The sample is drawn with the run id as seed: reproducible for a given run,
+        and different across runs, so repeated acquisition of a corpus walks
+        different documents instead of re-proving the same one forever.
+        """
+        if sample_size <= 0 or not resources:
+            return None
+
+        candidates = [r for r in resources if r.metadata.get("original_url") and r.body_bytes]
+        if not candidates:
+            return None
+
+        rng = random.Random(str(run.run_id))  # noqa: S311 — sampling, not secrets
+        sampled = rng.sample(candidates, k=min(sample_size, len(candidates)))
+
+        # #797's posture, applied to the host it protects. This used to sleep
+        # between sampled DOCUMENTS, which meant that at the shipped default of
+        # one document the delay never ran at all, while `_resolve_source_document`
+        # made up to three back-to-back requests. The pacer is now handed to the
+        # resolver and awaited before EVERY request to the canton.
+        pacer_state = {"first": True}
+
+        async def pace() -> None:
+            if pacer_state["first"]:
+                pacer_state["first"] = False
+                return
+            if delay_seconds > 0:
+                await asyncio.sleep(delay_seconds)
+
+        checks: list[MirrorFidelityResult] = []
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(timeout_seconds, connect=min(10.0, timeout_seconds)),
+            headers={"User-Agent": _MIRROR_CHECK_USER_AGENT},
+            follow_redirects=True,
+        ) as source_client:
+            for resource in sampled:
+                checks.append(
+                    await verify_mirror_fidelity(
+                        source_client,
+                        original_url=str(resource.metadata["original_url"]),
+                        mirrored_body=resource.body_bytes or b"",
+                        tol_id=resource.metadata.get("tol_id"),
+                        pace=pace,
+                    )
+                )
+
+        diverged = [check for check in checks if check.diverged]
+        for check in diverged:
+            # Loud, and in the logs as well as the payload: a mirror that has
+            # stopped equalling its source is not a data-quality nit, it is the
+            # premise of using the mirror at all.
+            logger.error(
+                "lexfind mirror diverged from the issuing source: tol_id=%s source=%s %s",
+                check.tol_id,
+                check.source_url,
+                check.detail,
+            )
+
+        # An UNVERIFIED check is not a passed check, and a count buried in a job
+        # payload is the "marker nothing reads" this provider refuses elsewhere.
+        # Every one of them says so in the log.
+        unverified = [check for check in checks if check.status in _MIRROR_STATUSES_UNVERIFIED]
+        for check in unverified:
+            logger.warning(
+                "lexfind mirror NOT verified (%s): tol_id=%s source=%s %s",
+                check.status,
+                check.tol_id,
+                check.source_url,
+                check.detail,
+            )
+        if checks and not diverged and len(unverified) == len(checks):
+            # Nothing in this run proved anything. Distinct from "one of three
+            # was unreachable", and the state in which the mirror is running on
+            # an assertion again — which is the condition this check exists to
+            # end. Not a failure (the canton may simply be down, #716), but it
+            # must never pass silently.
+            logger.warning(
+                "lexfind mirror fidelity UNPROVEN for run %s: all %d sampled document(s) "
+                "were unverified. The mirror is being trusted on assertion, not measurement.",
+                run.run_id,
+                len(checks),
+            )
+
+        identical = sum(1 for c in checks if c.status == _MIRROR_STATUS_IDENTICAL)
+        return {
+            "sampled": len(sampled),
+            "candidates": len(candidates),
+            "identical": identical,
+            "diverged": len(diverged),
+            "unverified": len(unverified),
+            # One boolean an operator can read without interpreting three counts:
+            # did anything in this run actually prove the mirror equals the source?
+            "proven": identical > 0 and not diverged,
+            "checks": [check.as_record() for check in checks],
+        }

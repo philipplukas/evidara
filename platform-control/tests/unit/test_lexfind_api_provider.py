@@ -19,8 +19,11 @@ service.
 
 from __future__ import annotations
 
+import asyncio
 import copy
+import hashlib
 import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -32,7 +35,9 @@ from platform_control.services.lexfind_api_provider import (
     _current_version,
     _iso_date_or_none,
     is_in_force,
+    source_link_candidates,
     temporal_metadata,
+    verify_mirror_fidelity,
 )
 
 _FIXTURE = json.loads(
@@ -59,6 +64,11 @@ def _tol(systematic_number: str) -> dict:
 
 
 def _source_version(**spec):
+    # The mirror spot-check reaches the CANTON's host, not LexFind. Tests that
+    # are not about it switch it off explicitly, so no test can accidentally
+    # depend on a stub answering a request it never meant to make — and no test
+    # can ever reach `notes.zh.ch` for real.
+    spec.setdefault("mirror_spot_check_sample", 0)
     return SimpleNamespace(acquisition_spec=spec)
 
 
@@ -69,11 +79,15 @@ def _run(run_id="run_test"):
 class _ScriptedClient:
     """httpx.AsyncClient stand-in replaying the captured search response."""
 
-    def __init__(self, *args, pdf=_PDF, page=None, **kwargs):
+    def __init__(self, *args, pdf=_PDF, page=None, canton=None, **kwargs):
         del args, kwargs
         self._pdf = pdf
         self._page = page if page is not None else _FIXTURE
+        # Absolute URL -> (content, content_type). Absent means the canton's host
+        # does not answer, which is the #716 outage and NOT a divergence.
+        self._canton = canton or {}
         self.pdf_requests: list[str] = []
+        self.canton_requests: list[str] = []
 
     async def __aenter__(self):
         return self
@@ -89,6 +103,17 @@ class _ScriptedClient:
 
     async def get(self, url, *, params=None):
         del params
+        if url.startswith("http"):
+            self.canton_requests.append(url)
+            if url not in self._canton:
+                raise httpx.ConnectError(f"no route to {url}")
+            content, content_type = self._canton[url]
+            return httpx.Response(
+                200,
+                content=content,
+                headers={"content-type": content_type},
+                request=httpx.Request("GET", url),
+            )
         request = httpx.Request("GET", f"https://www.lexfind.ch{url}")
         if url.startswith("/tol/") or url.startswith("/tolv/"):
             self.pdf_requests.append(url)
@@ -726,3 +751,512 @@ async def test_missing_total_key_is_unstatable(provider, monkeypatch):
     coverage = result.response_payload["coverage"]
     assert coverage["entities"][0]["expected"] is None
     assert coverage["complete"] is False
+
+
+# --------------------------------------------------------------------------
+# Provenance may not degrade to the mirror (#731)
+# --------------------------------------------------------------------------
+
+_ZH_ERLASS_URL = (
+    "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung/"
+    "zhlex-ls/erlass-554_5-2008_04_14-2010_01_01-129.html"
+)
+_ZH_FILE_URL = "https://www.notes.zh.ch/appl/zhlex_r.nsf/WebView/$File/554.5.pdf"
+
+# The JavaScript stub #716 found and 2026-09-03 re-measured: the reason the
+# erlass page looks empty to a deterministic fetch.
+_ZH_STUB = (
+    b"<html><head><script>window.location.href='"
+    + _ZH_FILE_URL.encode()
+    + b"';</script></head><body>Redirecting...</body></html>"
+)
+
+
+def _page_without_original_url(systematic_number: str) -> dict:
+    page = copy.deepcopy(_FIXTURE)
+    for tol in page["texts_of_law_with_matches"]:
+        if tol["systematic_number"] == systematic_number:
+            for entry in tol["dta_urls"]:
+                entry.pop("original_url", None)
+    return page
+
+
+@pytest.mark.asyncio
+async def test_a_record_without_original_url_is_refused_not_mirrored(provider, monkeypatch):
+    """The canton's page is what makes a mirrored capture admissible.
+
+    This used to be `if original_url:`, with `source_url=original_url or <the
+    LexFind URL>`: when LexFind omitted the field, the capture silently recorded
+    the MIRROR as the document's source. Refuse instead, and name the reason.
+    """
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(page=_page_without_original_url("554.5")),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(), _source_version(search_text="554", entity_ids=[26]), _run()
+    )
+
+    assert "Hundegesetz" not in [r.title for r in result.inline_resources]
+    assert [s["reason"] for s in result.response_payload["skipped"]] == ["original_url_missing"]
+
+
+@pytest.mark.asyncio
+async def test_no_captured_resource_ever_cites_the_mirror_as_its_source(provider, monkeypatch):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
+    )
+    result = await provider.start_run(
+        SimpleNamespace(), _source_version(search_text="554", entity_ids=[26]), _run()
+    )
+
+    assert result.inline_resources
+    for resource in result.inline_resources:
+        assert not resource.source_url.startswith("https://www.lexfind.ch")
+        assert resource.metadata["original_url"] == resource.source_url
+
+
+# --------------------------------------------------------------------------
+# Byte-identity is re-checked, not remembered (#731)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_identity_holds_when_the_canton_serves_the_same_bytes():
+    client = _ScriptedClient(canton={_ZH_ERLASS_URL: (_PDF, "application/pdf")})
+    result = await verify_mirror_fidelity(
+        client, original_url=_ZH_ERLASS_URL, mirrored_body=_PDF, tol_id=22871
+    )
+
+    assert result.status == "identical"
+    assert result.diverged is False
+    # Both hashes recorded even on agreement: "we checked and they matched" is
+    # the evidence; "nothing was reported" is not.
+    assert result.mirror_md5 == result.source_md5 == hashlib.md5(_PDF).hexdigest()
+
+
+@pytest.mark.asyncio
+async def test_the_resolver_follows_the_js_stub_to_the_canton_file():
+    """The measured ZH chain: erlass page -> a JS stub -> `WebView/$File/` -> PDF.
+
+    The middle hop is #716 exactly — a URL that looks like a download and answers
+    `200` with a few hundred bytes of JavaScript. Two hops is the ceiling.
+    """
+    attachment_url = "https://www.notes.zh.ch/appl/zhlex_r.nsf/OpenAttachment/$File/554.5.pdf"
+    client = _ScriptedClient(
+        canton={
+            _ZH_ERLASS_URL: (
+                b'<html><a href="' + attachment_url.encode() + b'">Erlasstext</a></html>',
+                "text/html",
+            ),
+            attachment_url: (_ZH_STUB, "text/html"),
+            _ZH_FILE_URL: (_PDF, "application/pdf"),
+        }
+    )
+    result = await verify_mirror_fidelity(client, original_url=_ZH_ERLASS_URL, mirrored_body=_PDF)
+
+    assert result.status == "identical"
+    assert result.source_document_url == _ZH_FILE_URL
+
+
+@pytest.mark.asyncio
+async def test_a_divergence_is_reported_with_both_hashes_not_swallowed():
+    client = _ScriptedClient(canton={_ZH_ERLASS_URL: (_PDF + b"amended\n", "application/pdf")})
+    result = await verify_mirror_fidelity(
+        client, original_url=_ZH_ERLASS_URL, mirrored_body=_PDF, tol_id=22871
+    )
+
+    assert result.status == "diverged"
+    assert result.diverged is True
+    assert result.mirror_md5 != result.source_md5
+    assert result.mirror_md5 in result.detail
+    assert result.source_md5 in result.detail
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_canton_is_not_a_divergence():
+    """#716 was seven weeks long. The mirror exists to survive exactly this.
+
+    Reporting an outage as a divergence would fail every run for as long as the
+    canton is down — handing the outage the power the mirror was chosen to deny
+    it.
+    """
+    client = _ScriptedClient(canton={})
+    result = await verify_mirror_fidelity(client, original_url=_ZH_ERLASS_URL, mirrored_body=_PDF)
+
+    assert result.status == "source_unreachable"
+    assert result.diverged is False
+
+
+@pytest.mark.asyncio
+async def test_a_page_leading_nowhere_is_unverified_not_verified():
+    client = _ScriptedClient(canton={_ZH_ERLASS_URL: (b"<html>no link here</html>", "text/html")})
+    result = await verify_mirror_fidelity(client, original_url=_ZH_ERLASS_URL, mirrored_body=_PDF)
+
+    assert result.status == "source_document_not_found"
+    assert result.source_md5 is None
+
+
+@pytest.mark.asyncio
+async def test_the_run_fails_loudly_when_the_mirror_has_diverged(provider, monkeypatch, caplog):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(canton={_ZH_ERLASS_URL: (_PDF + b"amended\n", "application/pdf")}),
+    )
+    with caplog.at_level(logging.ERROR):
+        result = await provider.start_run(
+            SimpleNamespace(),
+            _source_version(
+                search_text="554",
+                entity_ids=[26],
+                mirror_spot_check_sample=4,
+                mirror_spot_check_delay_seconds=0,
+            ),
+            _run(),
+        )
+
+    fidelity = result.response_payload["mirror_fidelity"]
+    assert fidelity["diverged"] >= 1
+    assert fidelity["proven"] is False
+    assert result.inline_failure_reason is not None
+    assert "mirror fidelity check FAILED" in result.inline_failure_reason
+    assert any("mirror diverged" in record.message for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_a_divergence_discards_the_batch_instead_of_publishing_it(provider, monkeypatch):
+    """Failing the run is NOT enough — `_dispatch_run` publishes first.
+
+    `run_service._dispatch_run` persists `inline_resources` and builds the bundle
+    events (`:1320-1345`) BEFORE it reads `inline_failure_reason` (`:1348-1353`),
+    and `_publish_pending_dispatch_events` (`:1765-1787`) publishes every
+    `raw_artifact.available` / `artifact_bundle.available` with no check on
+    `run.status`. Handing resources down beside a failure reason would therefore
+    put the divergent documents in the index — cited to the canton's own URL —
+    and mark the run red afterwards, making the check worse than no check.
+
+    The whole batch goes, not just the sampled document: a mirror that has
+    stopped being faithful is not trustworthy for the records we did not draw.
+    """
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(canton={_ZH_ERLASS_URL: (_PDF + b"amended\n", "application/pdf")}),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(
+            search_text="554",
+            entity_ids=[26],
+            mirror_spot_check_sample=4,
+            mirror_spot_check_delay_seconds=0,
+        ),
+        _run(),
+    )
+
+    assert result.inline_resources == []
+    assert result.response_payload["captured"] == 4  # what was fetched
+    assert result.response_payload["published"] == 0  # what was handed downstream
+    assert "DISCARDED unpublished" in result.inline_failure_reason
+
+
+@pytest.mark.asyncio
+async def test_a_clean_run_still_publishes_everything_it_captured(provider, monkeypatch):
+    """The negative control for the discard: it must not fire when nothing diverged."""
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(canton={_ZH_ERLASS_URL: (_PDF, "application/pdf")}),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(
+            search_text="554",
+            entity_ids=[26],
+            mirror_spot_check_sample=4,
+            mirror_spot_check_delay_seconds=0,
+        ),
+        _run(),
+    )
+
+    assert len(result.inline_resources) == 4
+    assert result.response_payload["published"] == 4
+    assert result.response_payload["mirror_fidelity"]["proven"] is True
+    assert result.inline_failure_reason is None
+
+
+# --------------------------------------------------------------------------
+# An unverified check is not a passed check (#731)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_an_unverified_check_says_so_in_the_log_not_only_in_a_count(
+    provider, monkeypatch, caplog
+):
+    """A count buried in a job payload is the marker nothing reads."""
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(canton={}),
+    )
+    with caplog.at_level(logging.WARNING):
+        result = await provider.start_run(
+            SimpleNamespace(),
+            _source_version(
+                search_text="554",
+                entity_ids=[26],
+                mirror_spot_check_sample=2,
+                mirror_spot_check_delay_seconds=0,
+            ),
+            _run(),
+        )
+
+    fidelity = result.response_payload["mirror_fidelity"]
+    assert fidelity["unverified"] == 2
+    assert fidelity["proven"] is False
+    assert any("mirror NOT verified" in record.message for record in caplog.records)
+    # And the stronger statement: this run proved nothing at all.
+    assert any("UNPROVEN" in record.message for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_a_bug_in_the_check_is_reported_as_ours_not_as_an_outage():
+    """A resolver regression must not hide as a canton that happens to be down.
+
+    Collapsing both into `source_unreachable` — which never fails and never logs
+    — would render the check permanently inert with zero signal.
+    """
+
+    def explode(_body):
+        raise AttributeError("regression in the resolver")
+
+    import platform_control.services.lexfind_api_provider as module
+
+    original = module.source_link_candidates
+    module.source_link_candidates = explode
+    try:
+        client = _ScriptedClient(canton={_ZH_ERLASS_URL: (b"<html>page</html>", "text/html")})
+        result = await verify_mirror_fidelity(
+            client, original_url=_ZH_ERLASS_URL, mirrored_body=_PDF
+        )
+    finally:
+        module.source_link_candidates = original
+
+    assert result.status == "check_error"
+    assert result.diverged is False
+    assert "AttributeError" in result.detail
+
+
+# --------------------------------------------------------------------------
+# The resolver is a verifier, not a crawler — and not a coin flip (#731)
+# --------------------------------------------------------------------------
+
+
+def test_a_document_link_outranks_an_unrelated_js_redirect():
+    """Ordering by TARGET, not by markup shape.
+
+    A `window.location.href = …` pattern searched over the whole page wins
+    globally, so a cookie banner or language switch on a modern cantonal page
+    would be followed instead of the document — and, with no alternatives, the
+    run recorded `source_document_not_found` and said nothing.
+    """
+    page = (
+        b"<html><head><script>function accept(){window.location.href='/cookies-ok';}"
+        b"</script></head><body><a href='" + _ZH_FILE_URL.encode() + b"'>Erlasstext</a>"
+        b"</body></html>"
+    )
+    candidates = source_link_candidates(page)
+
+    assert candidates[0] == _ZH_FILE_URL
+    assert "/cookies-ok" in candidates  # kept as a fallback, just not first
+
+
+def test_candidates_are_capped_so_the_verifier_cannot_become_a_crawler():
+    page = (
+        b"<html>"
+        + b"".join(f"<a href='/doc{i}.pdf'>x</a>".encode() for i in range(20))
+        + b"</html>"
+    )
+
+    assert len(source_link_candidates(page)) <= 3
+
+
+@pytest.mark.asyncio
+async def test_a_dead_end_candidate_costs_a_request_not_the_answer():
+    """No backtracking used to burn the whole budget on the first wrong guess."""
+    decoy = "https://www.zh.ch/decoy.pdf"
+    client = _ScriptedClient(
+        canton={
+            _ZH_ERLASS_URL: (
+                b"<html><a href='" + decoy.encode() + b"'>a</a>"
+                b"<a href='" + _ZH_FILE_URL.encode() + b"'>b</a></html>",
+                "text/html",
+            ),
+            decoy: (b"<html>not a document</html>", "text/html"),
+            _ZH_FILE_URL: (_PDF, "application/pdf"),
+        }
+    )
+    result = await verify_mirror_fidelity(client, original_url=_ZH_ERLASS_URL, mirrored_body=_PDF)
+
+    assert result.status == "identical"
+    assert result.source_document_url == _ZH_FILE_URL
+
+
+# --------------------------------------------------------------------------
+# Politeness is not configurable away (#797)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_pace_is_applied_before_every_canton_request(provider, monkeypatch):
+    """It used to sleep between sampled DOCUMENTS.
+
+    At the shipped default of one document that meant the delay never ran at all,
+    while the resolver made up to three back-to-back requests at the canton.
+    """
+    slept: list[float] = []
+
+    async def fake_sleep(seconds):
+        slept.append(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    stub_url = "https://www.notes.zh.ch/appl/zhlex_r.nsf/OpenAttachment/$File/554.5.pdf"
+    # Every erlass page in the fixture leads down the same three-request chain,
+    # so the assertion does not depend on which document the seeded sample draws.
+    canton = {
+        stub_url: (_ZH_STUB, "text/html"),
+        _ZH_FILE_URL: (_PDF, "application/pdf"),
+    }
+    for tol in _FIXTURE["texts_of_law_with_matches"]:
+        for entry in tol["dta_urls"]:
+            canton[entry["original_url"]] = (
+                b"<html><a href='" + stub_url.encode() + b"'>x</a></html>",
+                "text/html",
+            )
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(canton=canton),
+    )
+    await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(
+            acquisition_spec={
+                "search_text": "554",
+                "entity_ids": [26],
+                "mirror_spot_check_delay_seconds": 2.5,
+            }
+        ),
+        _run(),
+    )
+
+    # Three requests to the canton at the default sample of one document: the
+    # first is free, the next two are paced.
+    assert slept == [2.5, 2.5]
+
+
+@pytest.mark.asyncio
+async def test_the_sample_size_cannot_be_configured_past_its_cap(provider, monkeypatch):
+    """`{"sample": 5000, "delay": 0}` is a plausible typo, not a licence."""
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(canton={_ZH_ERLASS_URL: (_PDF, "application/pdf")}),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(
+            search_text="554",
+            entity_ids=[26],
+            mirror_spot_check_sample=5000,
+            mirror_spot_check_delay_seconds=0,
+        ),
+        _run(),
+    )
+
+    # Capped at 5, then bounded again by the four documents actually captured.
+    assert result.response_payload["mirror_fidelity"]["sampled"] == 4
+
+
+@pytest.mark.asyncio
+async def test_a_malformed_knob_is_a_named_refusal_not_a_raw_valueerror(provider, monkeypatch):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26], mirror_spot_check_sample="lots"),
+        _run(),
+    )
+
+    assert result.inline_resources == []
+    assert "acquisition_spec" in result.inline_failure_reason
+    assert "'lots'" in result.inline_failure_reason
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_canton_does_not_fail_the_run(provider, monkeypatch):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(canton={}),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(
+            search_text="554",
+            entity_ids=[26],
+            mirror_spot_check_sample=2,
+            mirror_spot_check_delay_seconds=0,
+        ),
+        _run(),
+    )
+
+    fidelity = result.response_payload["mirror_fidelity"]
+    assert fidelity["diverged"] == 0
+    assert fidelity["unverified"] == 2
+    assert result.inline_failure_reason is None
+    assert len(result.inline_resources) == 4
+
+
+@pytest.mark.asyncio
+async def test_the_spot_check_is_a_sample_not_a_second_fetch_per_capture(provider, monkeypatch):
+    """Doubling every acquisition's request count is not an acceptable price."""
+    clients: list[_ScriptedClient] = []
+
+    def factory(*a, **k):
+        client = _ScriptedClient(*a, canton={_ZH_ERLASS_URL: (_PDF, "application/pdf")}, **k)
+        clients.append(client)
+        return client
+
+    monkeypatch.setattr("platform_control.services.lexfind_api_provider.httpx.AsyncClient", factory)
+    # Deliberately NOT `_source_version`: that helper switches the check off, and
+    # this test is about the shipped default sample of one.
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(
+            acquisition_spec={
+                "search_text": "554",
+                "entity_ids": [26],
+                "mirror_spot_check_delay_seconds": 0,
+            }
+        ),
+        _run(),
+    )
+
+    canton_requests = [url for client in clients for url in client.canton_requests]
+    assert len(result.inline_resources) == 4
+    assert result.response_payload["mirror_fidelity"]["sampled"] == 1  # the default
+    assert len(canton_requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_spot_check_can_be_switched_off_entirely(provider, monkeypatch):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26], mirror_spot_check_sample=0),
+        _run(),
+    )
+
+    # Absent, not `verified: false`: a key that appears only when a check ran
+    # cannot be misread as a check that passed.
+    assert "mirror_fidelity" not in result.response_payload
