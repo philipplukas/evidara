@@ -1,7 +1,35 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { searchResults } from "@/lib/mock-data";
+import { useWorkspace } from "@/lib/workspace-store";
 import { renderWithProviders } from "./helpers/render-with-providers";
+
+/**
+ * Renders the header beside a button that pivots the workspace, so a test can
+ * observe the header inside a result set that is not a search.
+ */
+function PivotHarness(props: Parameters<typeof AppHeader>[0]) {
+  const { state, dispatch } = useWorkspace();
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() =>
+          dispatch({
+            type: "PIVOT",
+            source: { type: "pivot", label: "Commentary", parentSource: state.resultSet.source },
+            results: [searchResults[1]],
+            scopeLabel: "Commentary for Art. 754 OR",
+          })
+        }
+      >
+        pivot-now
+      </button>
+      <AppHeader {...props} />
+    </div>
+  );
+}
 
 describe("AppHeader", () => {
   beforeEach(() => {
@@ -29,6 +57,45 @@ describe("AppHeader", () => {
     expect(url.searchParams.get("ls_scope")).toBe("Ergebnisse für „Art 754 OR“");
     expect(controlPlaneLink).not.toHaveAttribute("target");
     expect(controlPlaneLink).not.toHaveAttribute("rel");
+  });
+
+  // `q` has one parser and one default (`searchParamsParsers.q`), so `urlQuery`
+  // is never the empty string the two reads below used to lean on (#822).
+  it("hands the control plane the store's query, not the URL's", () => {
+    renderWithProviders(
+      <AppHeader controlPanelUrl="https://ops.example/admin" showControlPlaneEntry={true} />,
+      { searchParams: { q: "Stale URL query" }, initialQuery: "Art 754 OR" },
+    );
+
+    const href = screen.getByRole("link", { name: /Kontrollbereich/ }).getAttribute("href");
+    const url = new URL(href!);
+    // `ls_scope` is derived from the store, so `ls_query` must be too — the two
+    // halves of one handoff cannot describe different result sets.
+    expect(url.searchParams.get("ls_query")).toBe("Art 754 OR");
+    expect(url.searchParams.get("ls_scope")).toBe("Ergebnisse für „Art 754 OR“");
+  });
+
+  it("sends no query and runs no search while the result set is a pivot", () => {
+    const onSearch = vi.fn().mockResolvedValue(undefined);
+
+    renderWithProviders(
+      <PivotHarness
+        onSearch={onSearch}
+        controlPanelUrl="https://ops.example/admin"
+        showControlPlaneEntry={true}
+      />,
+      { searchParams: { q: "Art 754 OR" }, initialQuery: "Art 754 OR" },
+    );
+
+    onSearch.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "pivot-now" }));
+
+    // A pivot has no search query; `?q=` still holds the one it was reached
+    // from. Sending it would contradict `ls_scope`, and re-running it would
+    // throw the user straight back out of the pivot.
+    const href = screen.getByRole("link", { name: /Kontrollbereich/ }).getAttribute("href");
+    expect(new URL(href!).searchParams.get("ls_query")).toBeNull();
+    expect(onSearch).not.toHaveBeenCalled();
   });
 
   it("keeps the control-plane entry visibly disabled when no URL is available", () => {

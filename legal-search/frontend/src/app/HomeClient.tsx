@@ -1,11 +1,11 @@
 "use client";
 
-import { parseAsString, useQueryState } from "nuqs";
+import { useQueryState } from "nuqs";
 import { Suspense, useEffect, useState } from "react";
 import { getSearchContext, searchDocuments } from "@/lib/api/generated/client";
 import { mapSearchContext, mapSearchResponse } from "@/lib/api-adapters";
 import { SearchConstraintsProvider } from "@/lib/search-constraints-store";
-import { DEFAULT_SEARCH_QUERY } from "@/lib/search-params";
+import { searchParamsParsers } from "@/lib/search-params";
 import type { FilterViewModel, SearchContextViewModel, SearchResultViewModel } from "@/lib/types";
 import { WorkspaceProvider } from "@/lib/workspace-store";
 import WorkspaceClient from "./WorkspaceClient";
@@ -16,7 +16,7 @@ interface HomeClientProps {
 }
 
 export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: HomeClientProps) {
-  const [urlQuery] = useQueryState("q", parseAsString.withDefault(DEFAULT_SEARCH_QUERY));
+  const [urlQuery] = useQueryState("q", searchParamsParsers.q);
   const [bootState, setBootState] = useState<{
     searchContext: SearchContextViewModel;
     filters: FilterViewModel[];

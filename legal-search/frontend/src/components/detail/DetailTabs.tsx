@@ -1,8 +1,9 @@
 "use client";
 
-import { parseAsString, useQueryState } from "nuqs";
+import { useQueryState } from "nuqs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnalyticsEvent, track } from "@/lib/analytics";
+import { searchParamsParsers } from "@/lib/search-params";
 import type { TabViewModel } from "@/lib/types";
 
 interface DetailTabsProps {
@@ -10,7 +11,7 @@ interface DetailTabsProps {
 }
 
 export function DetailTabs({ tabs }: DetailTabsProps) {
-  const [activeTab, setActiveTab] = useQueryState("tab", parseAsString.withDefault("details"));
+  const [activeTab, setActiveTab] = useQueryState("tab", searchParamsParsers.tab);
 
   return (
     <div className="border-b border-border/60 px-3 py-2">
@@ -58,6 +59,6 @@ export function DetailTabs({ tabs }: DetailTabsProps) {
 }
 
 export function useActiveTab(): string {
-  const [tab] = useQueryState("tab", parseAsString.withDefault("details"));
+  const [tab] = useQueryState("tab", searchParamsParsers.tab);
   return tab;
 }

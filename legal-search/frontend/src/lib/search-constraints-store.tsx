@@ -1,6 +1,6 @@
 "use client";
 
-import { parseAsArrayOf, parseAsBoolean, parseAsString, useQueryStates } from "nuqs";
+import { useQueryStates } from "nuqs";
 import {
   createContext,
   type Dispatch,
@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { searchParamsParsers } from "./search-params";
 import type { ContextConstraints, SearchConstraintsState, SearchRefinement } from "./types";
 
 export type SearchConstraintsAction =
@@ -190,12 +191,16 @@ interface SearchConstraintsProviderProps {
 }
 
 export function SearchConstraintsProvider({ children }: SearchConstraintsProviderProps) {
+  // Parsers come from `search-params.ts` — the `CH` / `de` defaults used to be
+  // declared here as well as there, and the two copies disagreed: this file
+  // defaulted to `["CH"]` / `["de"]` while `searchParamsParsers` gave both no
+  // default at all (#822).
   const [urlState, setUrlState] = useQueryStates({
-    jurisdictions: parseAsArrayOf(parseAsString).withDefault(["CH"]),
-    languages: parseAsArrayOf(parseAsString).withDefault(["de"]),
-    sourceType: parseAsString,
-    officialOnly: parseAsBoolean.withDefault(false),
-    refinements: parseAsString,
+    jurisdictions: searchParamsParsers.jurisdictions,
+    languages: searchParamsParsers.languages,
+    sourceType: searchParamsParsers.sourceType,
+    officialOnly: searchParamsParsers.officialOnly,
+    refinements: searchParamsParsers.refinements,
   });
 
   const refinements = useMemo(() => parseRefinements(urlState.refinements), [urlState.refinements]);
