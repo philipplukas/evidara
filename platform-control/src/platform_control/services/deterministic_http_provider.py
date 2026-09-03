@@ -176,11 +176,24 @@ class DeterministicHttpProvider:
         inline_failure_reason = None
         if not resources:
             if skipped:
+                # Two causes reach this branch and they have opposite remedies, so the
+                # message names both rather than asserting the portal is broken. The
+                # common one in practice is the second: measured 2026-09-03, three
+                # `enabled: true` templates seed a portal HOME PAGE rather than a
+                # document — `deterministic_http_bundesrecht` -> gesetze-im-internet.de/,
+                # `deterministic_http_fedlex_legislation` -> fedlex.admin.ch/,
+                # `deterministic_http_normattiva_legislation` -> normattiva.it/ — and all
+                # three score 0 markers. Their sibling `_codes` template, which seeds
+                # actual documents, scores 92-763 and passes.
                 inline_failure_reason = (
-                    f"deterministic_http fetched {len(skipped)} document(s) but all failed "
-                    "the legal-text density gate: they carry no Art./§/Abs. markers, which "
-                    "is a navigation or JavaScript shell rather than law. Refusing rather "
-                    "than capturing chrome as acceptance evidence (#631)."
+                    f"deterministic_http fetched {len(skipped)} document(s) and refused "
+                    "every one: none carries the Art./§/Abs. markers a statute page does. "
+                    "Either the portal served a navigation or JavaScript shell in place "
+                    "of the text (#631 — capturing that as legislation is the failure "
+                    "this gate exists to prevent), or the template's seed URL points at "
+                    "a portal landing page rather than at a document, in which case the "
+                    "remedy is the seed, not the portal. `skipped_documents` carries the "
+                    "URL and marker count for each."
                 )
             else:
                 inline_failure_reason = "Deterministic HTTP provider did not capture any resources."

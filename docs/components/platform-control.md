@@ -165,13 +165,38 @@ pinned across both components by
 `document-intelligence/tests/test_quarantine.py::MarkerVocabularyDriftTests`.
 
 **Which provider calls which is a decision, not a default.** A gate configured for the
-wrong modality or the wrong language is worse than none, because it refuses honest
-captures while looking like protection — `eur_lex_sparql` defaults to English and
-`legifrance` is French, both outside `content_gate`'s DE/IT marker vocabulary, so both
-are deliberately ungated. The matrix, including those reasons, lives in
+wrong modality, the wrong language or the wrong *unit of publication* is worse than none,
+because it refuses honest captures while looking like protection. Three providers are
+deliberately outside the density gate, each on a stated reason:
+
+- `eur_lex_sparql` defaults to English and `legifrance` is French, both outside
+  `content_gate`'s DE/IT marker vocabulary. (Measured: GDPR and the DSM Directive come
+  back as `application/xhtml+xml` — which *is* assessable, so the gate would not abstain
+  — and both score **0 markers**.)
+- `ris_ogd` publishes **one document per §/Artikel/Anlage**, and BGBl. III Kundmachungen
+  are prose, so the floor's "whole act" premise does not hold. Measured 2026-09-03, a
+  floor of 3 refused **15 of 40 genuine documents — 38% of `ris_ogd_bundesrecht`'s
+  yield**. It keeps `check_capture`, which refused 0 of 60 live documents.
+
+The matrix, including those reasons, lives in
 `platform-control/tests/unit/test_capture_guard_coverage.py` and is **asserted**: a
 provider registered without a recorded decision, or whose capture path stops matching
-the one it has, fails that test. Read it before adding a provider.
+the one it has, fails that test. Note what it does *not* assert — it matches call names
+in the AST, so it proves a gate is **wired**, not that its verdict is **enforced**. A new
+gated provider needs a behavioural refusal test alongside its matrix row.
+
+### Three enabled `deterministic_http` templates now capture nothing
+
+Disclosed because the red is the gate working, not a regression. `deterministic_http_bundesrecht`
+(`gesetze-im-internet.de/`), `deterministic_http_fedlex_legislation` (`fedlex.admin.ch/`)
+and `deterministic_http_normattiva_legislation` (`normattiva.it/`) each seed a portal
+**home page** rather than a document. All three return HTML with **0 legal-text markers**
+and are now refused, so those templates go from "captures 1" to "captures 0" with an
+`inline_failure_reason`. Capturing the Fedlex SPA shell as "legislation" is #631 verbatim
+— the thing the gate exists to stop. **The remedy is the seed URL, not the gate**; the
+sibling `deterministic_http_bundesrecht_codes` template seeds real documents, scores
+92–763 markers, and passes. The refusal message names both possible causes for exactly
+this reason.
 
 ## Drift risks
 

@@ -14,7 +14,6 @@ from typing import Any
 import httpx
 
 from acquisition_core.artifact_guard import check_capture
-from acquisition_core.content_gate import assess_legal_text_density
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
@@ -398,7 +397,41 @@ async def _fetch_single_document(
     request_timeout_seconds: float,
     run: Run,
 ) -> ProviderResource | dict[str, str]:
-    """Fetch a single document. Returns ProviderResource on success, failure dict otherwise."""
+    """Fetch a single document. Returns ProviderResource on success, failure dict otherwise.
+
+    **`check_capture` runs here; `assess_legal_text_density` deliberately does not.**
+
+    The marker floor's unit of analysis is a *whole act* — it was calibrated on Fedlex
+    and LexFind, where one document is one statute and clears three markers in its first
+    screenful. RIS's unit of publication is not an act: it publishes **one document per
+    §/Artikel/Anlage**, and BGBl. III Kundmachungen are prose. Measured against the five
+    `enabled: true` AT templates on 2026-09-03, the shared floor of 3 refused **15 of 40
+    genuine documents on `ris_ogd_bundesrecht` — 38% of its yield**:
+
+    - `BGBLA_2026_III_119.xml` (published a week earlier): "Kundmachung: Geltungsbereich
+      des Zusatzprotokolls zum Übereinkommen über den Beförderungsvertrag im
+      internationalen Straßengüterverkehr (CMR)" — **0 markers**.
+    - `NOR40148597`, a bilateral visa agreement with Switzerland (BGBl. III 62/2013) — 0.
+    - `NOR30001719`, which reads "§ 2 Abs. 5 Z 5" — exactly **2**, one short of the floor.
+
+    Note what that third example rules out. Restricting the gate to `BrKons` and
+    abstaining on `BgblAuth` does not work: `NOR30001719` *is* `BrKons`. And no non-zero
+    floor admits a 0-marker Kundmachung, so a per-source `min_legal_markers` could only
+    reach it at 0 — which is not a gate, just a knob that reads like one. The heuristic
+    does not fit this source, and lowering the shared threshold to make it fit would
+    weaken every provider the threshold was calibrated for.
+
+    Withholding real law is not the safe direction of this trade. A refused document was
+    reported with `content_gate`'s prose — "This looks like a navigation or JavaScript
+    shell, not legal text" — which is a **false diagnosis** for a CMR Kundmachung, and it
+    sent an operator to the portal rather than to the threshold. Worse, because
+    `inline_failure_reason` fires only when `resources` is empty, a run that dropped 15
+    documents still reported success.
+
+    `check_capture` stays: it measured 0 refusals across 60 live documents, and it is the
+    only thing standing between an `Rtf`/`Pdf` download arriving where `Xml` was promised
+    and this function decoding it as UTF-8 text.
+    """
     meta = _extract_metadata(ref)
     ris_id = meta.get("ris_id") or "unknown"
 
@@ -441,13 +474,8 @@ async def _fetch_single_document(
     actual_ct = response.headers.get("content-type", content_type)
     normalized_ct = actual_ct.split(";")[0].strip().lower()
 
-    # Legal-text density (#631). RIS Bundesrecht is German and cites `§` and `Abs.`
-    # throughout, so the shared DE/IT vocabulary fits this source directly. The gate
-    # abstains on any content type it cannot read, so a format outside HTML/XML
-    # passes through untouched rather than being guessed at.
-    assessment = assess_legal_text_density(body, content_type=normalized_ct)
-    if not assessment.is_legal_text:
-        return {"url": url, "error": f"no_legal_text_markers: {assessment.reason}"}
+    # NO legal-text density gate here, deliberately — see `_fetch_single_document`'s
+    # note below and the matrix row in tests/unit/test_capture_guard_coverage.py.
 
     resource_metadata: dict[str, Any] = {
         "provider": "ris_ogd",
@@ -475,7 +503,6 @@ async def _fetch_single_document(
     if meta.get("gesetzesnummer"):
         resource_metadata["gesetzesnummer"] = meta["gesetzesnummer"]
     resource_metadata["capture_guard"] = "passed"
-    resource_metadata["legal_text_evidence"] = assessment.as_evidence()
 
     return ProviderResource(
         source_url=meta.get("document_url") or url,

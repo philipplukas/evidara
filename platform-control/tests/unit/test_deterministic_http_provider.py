@@ -234,7 +234,11 @@ async def test_navigation_shell_is_refused_rather_than_captured_as_law(
     assert result.inline_resources == []
     assert result.response_payload["skipped"] == 1
     assert result.response_payload["skipped_documents"][0]["reason"] == "no_legal_text_markers"
-    assert "legal-text density gate" in result.inline_failure_reason
+    # Both remedies are named. Three enabled templates seed a portal home page rather
+    # than a document, so "the portal is broken" on its own is the wrong diagnosis more
+    # often than it is the right one.
+    assert "navigation or JavaScript shell" in result.inline_failure_reason
+    assert "seed URL points at" in result.inline_failure_reason
 
 
 @pytest.mark.asyncio

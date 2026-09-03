@@ -93,11 +93,18 @@ floor, which is a supported escape hatch, not a bug.
 **Scope, stated plainly: the text-level invariant now holds for PDF and for most HTML.**
 The legal-text floors skip HTML/XML on the theory that `content_gate` judged them at
 capture. That theory used to cover three of thirteen providers — only the ones inheriting
-`PortalHttpProviderBase` (Canton/Bundesland/Regione). It now covers **nine**: those three,
+`PortalHttpProviderBase` (Canton/Bundesland/Regione). It now covers **eight**: those three,
 plus `lexfind_api` (whose call is the deliberate `application/pdf` abstention),
-`gemeinde_http`, `fedlex_sparql`, `ris_ogd`, `ch_court_decisions` and `deterministic_http`.
+`gemeinde_http`, `fedlex_sparql`, `ch_court_decisions` and `deterministic_http`.
 
-Four remain outside it, and three of those are decisions rather than omissions:
+Five remain outside it, and four of those are decisions rather than omissions:
+
+- `ris_ogd` — the marker floor assumes one document is one **act**. RIS publishes one
+  document per §/Artikel/Anlage, and BGBl. III Kundmachungen are prose. Measured
+  2026-09-03, a floor of 3 refused 15 of 40 genuine documents (38% of
+  `ris_ogd_bundesrecht`'s yield), including a 0-marker CMR Kundmachung and a `BrKons`
+  norm carrying exactly 2. **RIS HTML/XML therefore reaches DI marker-checked by
+  neither gate** — the largest remaining case for the HTML exemption below.
 
 - `eur_lex_sparql` — `_preferred_languages` defaults to `["en"]`, and `content_gate`'s
   marker vocabulary is DE/IT. EU English writes "Article 5", which carries no `art.`,

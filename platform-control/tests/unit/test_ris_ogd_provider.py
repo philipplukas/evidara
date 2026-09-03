@@ -221,16 +221,22 @@ def test_extract_metadata_survives_a_missing_application_block() -> None:
 
 
 # ---------------------------------------------------------------------------
-# The capture guard (#631/#716)
+# The capture guard (#716) — and the density gate that deliberately is NOT here
 #
 # RIS promises a format out of band: the listing's `DataType` says Html/Xml/Pdf
 # *before* the download URL is fetched, so `check_capture` is what holds the OGD
 # endpoint to that promise. It is load-bearing here beyond the stub case, because
 # `_fetch_single_document` decodes every body as text — a binary arriving where
-# `Xml` was promised would be UTF-8-mangled and captured as a document.
+# `Xml` was promised would be UTF-8-mangled and captured as a document. Measured
+# against 60 live documents it refused none, so it costs nothing honest.
 #
-# Mutation check: delete either guard block in `_fetch_single_document` and the two
-# refusal tests below fail with `captured == 1`.
+# `assess_legal_text_density` is deliberately absent; see `_fetch_single_document`'s
+# docstring for the 38%-of-yield measurement. The two tests at the bottom of this
+# section are the regression guard for that decision — they hold real RIS documents
+# that a floor of 3 refuses, and they must keep passing.
+#
+# Mutation check: delete the `check_capture` block in `_fetch_single_document` and
+# `test_a_pdf_where_the_listing_promised_html_is_refused` fails with `captured == 1`.
 # ---------------------------------------------------------------------------
 
 _REAL_NORM_HTML = (
@@ -287,14 +293,12 @@ async def _run_ris(monkeypatch: pytest.MonkeyPatch, client_cls: type[_RisClient]
 
 
 @pytest.mark.asyncio
-async def test_a_genuine_norm_passes_both_guards(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The honest capture must survive: Austrian federal law cites `§` and `Abs.`."""
+async def test_a_genuine_norm_passes_the_capture_guard(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The honest capture must survive."""
     result = await _run_ris(monkeypatch, _RisClient)
 
     assert result.response_payload["captured"] == 1
-    metadata = result.inline_resources[0].metadata
-    assert metadata["capture_guard"] == "passed"
-    assert metadata["legal_text_evidence"]["legal_marker_count"] >= 3
+    assert result.inline_resources[0].metadata["capture_guard"] == "passed"
 
 
 @pytest.mark.asyncio
@@ -317,19 +321,61 @@ async def test_a_pdf_where_the_listing_promised_html_is_refused(
     assert "content_type_mismatch" in result.response_payload["failures"][0]["error"]
 
 
+# ── Regression guard for the density-gate exclusion ─────────────
+#
+# Both bodies below are real RIS documents, quoted from the live API. Both score
+# BELOW `content_gate.DEFAULT_MIN_LEGAL_MARKERS = 3`, and both are genuine Austrian
+# law. Wiring the shared density gate into this provider refused 15 of 40 documents
+# on the enabled `ris_ogd_bundesrecht` template — 38% of its yield — and reported
+# them to the operator as "a navigation or JavaScript shell", which is false.
+#
+# If someone re-adds `assess_legal_text_density` here, these two fail. That is the
+# point: read `_fetch_single_document`'s docstring before making them pass.
+
+
 @pytest.mark.asyncio
-async def test_a_navigation_shell_is_refused_rather_than_captured_as_a_norm(
+async def test_a_zero_marker_bgbl_kundmachung_is_captured_not_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """`BGBLA_2026_III_119` — prose, 0 legal-text markers, and unambiguously law."""
+
     class _Client(_RisClient):
         document_response = (
             200,
-            b"<html><head><script>var x=1;</script></head><body>"
-            b"<nav>Startseite Suche Kontakt</nav></body></html>",
+            "BUNDESGESETZBLATT FÜR DIE REPUBLIK ÖSTERREICH Teil III 119. Kundmachung: "
+            "Geltungsbereich des Zusatzprotokolls zum Übereinkommen über den "
+            "Beförderungsvertrag im internationalen Straßengüterverkehr (CMR)".encode(),
             {"content-type": "text/html; charset=utf-8"},
         )
 
     result = await _run_ris(monkeypatch, _Client)
 
-    assert result.response_payload["captured"] == 0
-    assert "no_legal_text_markers" in result.response_payload["failures"][0]["error"]
+    assert result.response_payload["captured"] == 1, (
+        "a BGBl. III Kundmachung carries no Art./§/Abs. markers because it is prose, "
+        "not because it is chrome. Refusing it withholds real law and misreports why."
+    )
+    assert result.response_payload["failed"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_two_marker_single_paragraph_norm_is_captured_not_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`NOR30001719` — one paragraph, exactly two markers, one short of the shared floor.
+
+    This is also what rules out the narrower fix of gating only `BrKons` and abstaining
+    on `BgblAuth`: this document *is* `BrKons`. RIS's unit of publication is one
+    §/Artikel/Anlage, not an act, so the floor's premise does not hold for this source.
+    """
+
+    class _Client(_RisClient):
+        document_response = (
+            200,
+            b"<html><body><p>&#167; 2 Abs. 5 Z 5 Die Behoerde hat ...</p></body></html>",
+            {"content-type": "text/html; charset=utf-8"},
+        )
+
+    result = await _run_ris(monkeypatch, _Client)
+
+    assert result.response_payload["captured"] == 1
+    assert result.response_payload["failed"] == 0

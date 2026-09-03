@@ -20,6 +20,19 @@ captures while looking like protection.
 
 Adding a provider to ``build_provider_registry`` without deciding fails here. That is
 the point: the decision is cheap to make and expensive to notice you never made.
+
+**This file asserts WIRING, not ENFORCEMENT, and the difference matters.** It matches
+call *names* in the AST, so it is blind to "keep the call, discard the verdict" — a
+provider that computes a verdict and then never branches on it passes every assertion
+here. That was verified rather than assumed: mutating ``fedlex_sparql_provider.py``'s
+refusal branch to ``if False:`` leaves this file green, and is caught instead by
+``test_filestore_shell_is_refused_rather_than_captured_as_the_act``.
+
+So **a new `True` row requires a behavioural refusal test alongside it** — one that
+asserts a stub or shell response is refused, and fails when the branch is removed. This
+file proves the gate is called; only that test proves the call is load-bearing. Every
+`True` row today has such a test, named in the mutation-check comment above it in the
+provider's own test module.
 """
 
 from __future__ import annotations
@@ -83,12 +96,22 @@ _MATRIX: dict[str, GuardExpectation] = {
         module="ris_ogd_provider.py",
         inherits_from=None,
         check_capture=True,
-        legal_text_density=True,
+        legal_text_density=False,
         reason=(
-            "The RIS listing promises Xml/Html/Pdf before the download is fetched, and "
-            "this provider decodes every body as text — a binary arriving where Xml was "
-            "promised would be UTF-8-mangled and captured. Austrian federal law is "
-            "German and cites § and Abs. throughout."
+            "check_capture only. The RIS listing promises Xml/Html/Pdf before the "
+            "download is fetched and this provider decodes every body as text, so a "
+            "binary arriving where Xml was promised would be UTF-8-mangled and captured "
+            "— 0 refusals across 60 live documents, so it costs nothing honest. The "
+            "DENSITY GATE IS DELIBERATELY OFF, on measurement: the marker floor's unit "
+            "of analysis is a whole act, and RIS publishes one document per "
+            "§/Artikel/Anlage with BGBl. III Kundmachungen as prose. Measured "
+            "2026-09-03 against the five enabled AT templates, a floor of 3 refused 15 "
+            "of 40 genuine documents on ris_ogd_bundesrecht — 38% of its yield — "
+            "including BGBLA_2026_III_119 (a CMR Kundmachung, 0 markers) and "
+            "NOR30001719 ('§ 2 Abs. 5 Z 5', 2 markers). Restricting to BrKons does not "
+            "help: NOR30001719 is BrKons. No non-zero floor admits a 0-marker "
+            "Kundmachung. Withholding real law is the worse failure direction, and "
+            "lowering the shared threshold would weaken every provider calibrated on it."
         ),
     ),
     "fedlex_sparql": GuardExpectation(
@@ -263,15 +286,24 @@ def test_the_matrix_matches_what_the_providers_actually_call() -> None:
     )
 
 
-def test_every_ungated_provider_states_why() -> None:
-    """The `False, False` rows are the load-bearing ones; they must justify themselves."""
+def test_every_deliberately_omitted_gate_states_why() -> None:
+    """Any gate turned OFF by judgement — rather than by inheritance — must justify itself.
+
+    Originally this only covered the `False, False` rows. `ris_ogd` showed why that was
+    too narrow: it keeps `check_capture` and drops the density gate, on a 38%-of-yield
+    measurement that is the most load-bearing reason in the file, and the old condition
+    skipped it entirely.
+    """
     for name, expectation in _MATRIX.items():
-        if expectation.check_capture or expectation.legal_text_density:
+        if expectation.inherits_from is not None:
+            continue
+        if expectation.check_capture and expectation.legal_text_density:
             continue
         assert len(expectation.reason) > 120, (
-            f"{name} is wired to neither capture gate with a one-line reason. An "
-            "ungated capture path is a claim that neither failure mode is reachable "
-            "there; say why in enough detail that a reviewer can disagree with it."
+            f"{name} omits a capture gate with a one-line reason. Omitting one is a "
+            "claim that its failure mode is unreachable there, or that the gate would "
+            "refuse honest captures; say which, in enough detail that a reviewer can "
+            "disagree with it."
         )
 
 
