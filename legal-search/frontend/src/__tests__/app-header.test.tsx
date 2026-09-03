@@ -1,7 +1,9 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import type { UrlUpdateEvent } from "nuqs/adapters/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { searchResults } from "@/lib/mock-data";
+import { DEFAULT_SEARCH_QUERY } from "@/lib/search-params";
 import { useWorkspace } from "@/lib/workspace-store";
 import { renderWithProviders } from "./helpers/render-with-providers";
 
@@ -96,6 +98,33 @@ describe("AppHeader", () => {
     const href = screen.getByRole("link", { name: /Kontrollbereich/ }).getAttribute("href");
     expect(new URL(href!).searchParams.get("ls_query")).toBeNull();
     expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it("keeps a searched query in the URL when it happens to equal the default", async () => {
+    // nuqs deletes a param whose written value equals the parser default
+    // (`clearOnDefault`, on by default). Giving `q` an honest default armed
+    // that: without `clearOnDefault: false` the user searches
+    // `DEFAULT_SEARCH_QUERY`, watches it vanish from the address bar, and the
+    // link they copy resolves to whatever that constant is when it is opened
+    // rather than to the query they ran (#822).
+    const updates: UrlUpdateEvent[] = [];
+    const onSearch = vi.fn().mockResolvedValue(undefined);
+
+    renderWithProviders(
+      <AppHeader onSearch={onSearch} controlPanelUrl={undefined} showControlPlaneEntry={true} />,
+      {
+        searchParams: { q: "foo" },
+        initialQuery: "foo",
+        onUrlUpdate: (event) => updates.push(event),
+      },
+    );
+
+    const input = screen.getByPlaceholderText("Nach Artikel, Urteil, Kommentar oder Zitat suchen…");
+    fireEvent.change(input, { target: { value: DEFAULT_SEARCH_QUERY } });
+    fireEvent.click(screen.getByRole("button", { name: "Suchen" }));
+
+    await waitFor(() => expect(updates.length).toBeGreaterThan(0));
+    expect(updates.at(-1)?.searchParams.get("q")).toBe(DEFAULT_SEARCH_QUERY);
   });
 
   it("keeps the control-plane entry visibly disabled when no URL is available", () => {

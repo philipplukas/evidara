@@ -26,7 +26,7 @@ import { usePreferences } from "@/hooks/use-preferences";
 import { runSearch } from "@/hooks/use-search";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
-import { searchParamsParsers } from "@/lib/search-params";
+import { DEFAULT_JURISDICTIONS, DEFAULT_LANGUAGES, searchParamsParsers } from "@/lib/search-params";
 import type { FilterViewModel, SearchContextViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 
@@ -326,13 +326,19 @@ export default function WorkspaceClient({
 
   const pinnedIds = new Set(state.pinned.map((p) => p.id));
 
+  // NOTE: no `resultSet.source.type === "search"` guard here, unlike the
+  // equivalent effect in `AppHeader`. Changing a constraint inside a pivot
+  // therefore re-runs the stale `?q=` and throws the user out of the pivot —
+  // pre-existing on `main` and tracked as #842, deliberately not fixed in the
+  // #822 parser change because the right behaviour is to re-run the *pivot*
+  // with the new constraints, which is more than a guard.
   useEffect(() => {
     if (!urlQuery) return;
     if (!hasAppliedInitialConstraintsRef.current) {
       hasAppliedInitialConstraintsRef.current = true;
       const hasNonDefaultConstraints =
-        constraints.context.jurisdictions.join(",") !== "ch" ||
-        constraints.context.languages.join(",") !== "de" ||
+        constraints.context.jurisdictions.join(",") !== DEFAULT_JURISDICTIONS.join(",") ||
+        constraints.context.languages.join(",") !== DEFAULT_LANGUAGES.join(",") ||
         constraints.context.sourceType !== null ||
         constraints.context.officialOnly ||
         constraints.refinements.length > 0;

@@ -157,8 +157,10 @@ export function AppHeader({
     }
   }, []);
 
-  // On mount or when the URL ?q= param changes (e.g. browser back/forward),
-  // resync the store search state if needed.
+  // On mount, and whenever the URL's ?q= stops matching the store, resync by
+  // re-running it. (Not "browser back/forward", as this comment used to say:
+  // nuqs writes with `history: "replace"` by default and the app never asks for
+  // "push", so a search creates no history entry to go back to.)
   //
   // Only while the result set *is* a search. A pivot ("cited by", "citing")
   // leaves `storeQuery` empty while `?q=` keeps the query the pivot was reached

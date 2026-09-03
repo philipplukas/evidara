@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type RenderOptions, render } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { NuqsTestingAdapter } from "nuqs/adapters/testing";
+import { NuqsTestingAdapter, type OnUrlUpdateFunction } from "nuqs/adapters/testing";
 import type { ReactElement, ReactNode } from "react";
 import { MESSAGES } from "@/i18n/messages";
 import { searchResults } from "@/lib/mock-data";
@@ -16,6 +16,8 @@ interface ProviderOptions {
   initialTotalResults?: number;
   /** URL search params to initialize nuqs with, e.g. { item: "law-1", tab: "related" } */
   searchParams?: Record<string, string>;
+  /** Observe URL writes — nuqs hands back the resulting query string. */
+  onUrlUpdate?: OnUrlUpdateFunction;
 }
 
 /**
@@ -34,6 +36,7 @@ export function renderWithProviders(
     initialResults = searchResults,
     initialTotalResults,
     searchParams = {},
+    onUrlUpdate,
     ...renderOptions
   } = options ?? {};
 
@@ -43,7 +46,7 @@ export function renderWithProviders(
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <NuqsTestingAdapter searchParams={searchParams}>
+      <NuqsTestingAdapter searchParams={searchParams} onUrlUpdate={onUrlUpdate}>
         <QueryClientProvider client={queryClient}>
           <NextIntlClientProvider locale="de" messages={MESSAGES.de}>
             <SearchConstraintsProvider>

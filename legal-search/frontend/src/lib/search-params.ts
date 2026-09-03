@@ -8,11 +8,8 @@ import {
 /**
  * Central definition of all URL search params.
  *
- * Single source of truth — used by both client hooks (useQueryState /
- * useQueryStates) and server components (searchParamsCache).
- *
  * URL structure:
- *   /?q=...&item=...&tab=...&jurisdictions=CH,AT&languages=de&sourceType=...
+ *   /?q=...&item=...&tab=...&jurisdictions=ch,at&languages=de&sourceType=...
  *    &officialOnly=true&refinements=...
  *
  * **`searchParamsParsers` is the only place a parser for these params may be
@@ -26,8 +23,13 @@ import {
  * (#762). #763 shared the *constant* rather than the parser, so `AppHeader`
  * kept its own `""` default and the divergence survived the fix (#822).
  *
- * `search-params-single-source.test.ts` enforces this: it fails on any call
- * site outside this module that constructs a parser for a param defined here.
+ * `search-params-single-source.test.ts` enforces this for every `useQueryState`
+ * and `useQueryStates` call site in `src/`. See its docstring for the two
+ * evasions it deliberately does not chase.
+ *
+ * Consumed by the client hooks in `AppHeader`, `HomeClient`, `WorkspaceClient`,
+ * `DetailTabs` and `search-constraints-store`. `searchParamsCache` below has no
+ * consumer yet — see its own note.
  */
 
 /**
@@ -39,15 +41,34 @@ export const DEFAULT_SEARCH_QUERY = "Art. 754 OR Verantwortlichkeit";
 /** The tab the detail panel opens on when the URL does not name one. */
 export const DEFAULT_DETAIL_TAB = "details";
 
-/** Jurisdictions the search is constrained to before the user narrows it. */
-export const DEFAULT_JURISDICTIONS = ["CH"];
+/**
+ * Jurisdictions the search is constrained to before the user narrows it.
+ *
+ * Lower-case, because that is the form the app actually holds: every value
+ * entering `SearchConstraintsState` goes through `normalizeJurisdictions`,
+ * which lower-cases it. An upper-case `["CH"]` here would parse to a value the
+ * store never reports, and — the day a Server Component uses
+ * `searchParamsCache` — would render `CH` on the server and hydrate `ch` on the
+ * client.
+ */
+export const DEFAULT_JURISDICTIONS = ["ch"];
 
 /** Languages the search is constrained to before the user narrows it. */
 export const DEFAULT_LANGUAGES = ["de"];
 
 export const searchParamsParsers = {
-  /** Search query */
-  q: parseAsString.withDefault(DEFAULT_SEARCH_QUERY),
+  /**
+   * Search query.
+   *
+   * `clearOnDefault: false` because `q` is the one param the user authors and
+   * shares. nuqs otherwise deletes a param whose written value equals the
+   * parser default, so searching for `DEFAULT_SEARCH_QUERY` itself would strip
+   * `?q=` from the address bar — and the link the user then copies would resolve
+   * to whatever `DEFAULT_SEARCH_QUERY` happens to be when it is opened, not to
+   * the query they ran. On `main` this could not happen: the only component
+   * that writes `q` defaulted it to `""`, which nothing equals (#822).
+   */
+  q: parseAsString.withDefault(DEFAULT_SEARCH_QUERY).withOptions({ clearOnDefault: false }),
   /** Selected item ID (drives detail panel) — no selection is a real state. */
   item: parseAsString,
   /** Active detail tab */
@@ -65,10 +86,16 @@ export const searchParamsParsers = {
 };
 
 /**
- * Server-side search params cache.
- * Use in Server Components to read URL state without client-side JS.
+ * Server-side search params cache, for reading URL state in a Server Component
+ * without client-side JS:
  *
- * Usage in page.tsx:
  *   const { q, item } = await searchParamsCache.parse(searchParams);
+ *
+ * **Nothing consumes this yet.** It is kept because it derives from
+ * `searchParamsParsers` above, so a Server Component that adopts it inherits
+ * the same defaults the client hooks use rather than inventing its own — which
+ * is the whole point of this module. This module's docstring used to claim the
+ * cache *was* used by server components while it had no consumer at all; that
+ * claim is what let five call sites drift unnoticed (#822).
  */
 export const searchParamsCache = createSearchParamsCache(searchParamsParsers);
