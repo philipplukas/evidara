@@ -218,6 +218,20 @@ def test_the_inactive_since_date_is_the_first_day_out_of_force():
     the inclusive first day in force. So the last day in force is the day
     before. Guessing the other way would report a repealed norm as good law for
     one more day, which is the #661 failure at one-day resolution.
+
+    **This is inference, not measurement**, and it is asserted here so that it
+    is at least stated rather than assumed: the reading rests on the field name
+    and on symmetry with `version_active_since`, and every
+    `version_inactive_since` in the captured fixture is `null`, so nothing in
+    this repo has yet observed a real one. A live probe against a superseded
+    version would settle it.
+
+    **#843** tracks the contradiction this sits next to: `temporal_metadata`
+    (three tests up) ships that same date onward as `in_force_until`, which
+    `legal-search/api/src/core/norm-hierarchy/in-force.ts:24-27,60` defines as
+    INCLUSIVE — so the exclusive reading asserted here is silently widened by one
+    day downstream. LexFind is the outlier; `ris_ogd` already emits inclusive.
+    Do not "fix" one end of that without reading #843.
     """
     version = dict(_current_version(_tol("554.5")))
     version.update(version_inactive_since="30.06.2026")

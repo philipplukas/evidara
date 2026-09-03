@@ -23,13 +23,18 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     registry.register(DeterministicHttpProvider())
     registry.register(FedlexSparqlProvider())
     registry.register(RisOgdProvider())
-    # Sub-federal and supranational providers. `live_ready: bool` is gone —
-    # readiness is the three-valued `AcquisitionReadiness` (#743) and is declared
-    # per provider on the class, not by this grouping: eur_lex_sparql,
-    # bundesland_http and regione_http are `live`; legifrance is `scaffold`
-    # until PISTE credentials exist. Either way the code key is only one of the
-    # two: blueprint templates referencing them stay `enabled: false` until an
-    # operator captures acceptance-run evidence for each jurisdiction (ADR-0030).
+    # Sub-federal and supranational providers. `live_ready: bool` is DEPRECATED,
+    # not gone — `resolve_readiness` still honours it as a fallback for providers
+    # declaring no `readiness` (acquisition_core/providers.py:162,175),
+    # `ProviderRegistry.live_ready_names` (:231) keeps the name, and
+    # `source_service` still publishes `live_ready` on blueprint responses (:79).
+    # What replaced it as the source of truth is the three-valued
+    # `AcquisitionReadiness` (#743), declared per provider on the class and not by
+    # this grouping: eur_lex_sparql, bundesland_http and regione_http are `live`;
+    # legifrance is `scaffold` until PISTE credentials exist. Either way the code
+    # key is only one of the two: blueprint templates referencing them stay
+    # `enabled: false` until an operator captures acceptance-run evidence for each
+    # jurisdiction (ADR-0030).
     registry.register(EurLexSparqlProvider())
     registry.register(
         LegifranceProvider(
