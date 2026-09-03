@@ -11,8 +11,11 @@
 //
 //   dead-declaration    A field, config knob or export that is DECLARED with no producer, or no
 //                       consumer. Three instances surfaced in one session: `delegates_to` declared
-//                       in the index mapping with no writer anywhere; `di_overrides.quarantine_min_*`
-//                       read by document-intelligence and emitted by nobody; a `searchParamsCache`
+//                       in the index mapping with no writer anywhere; `di_overrides.quarantine_min_*`,
+//                       declared in contracts/schemas/artifact-bundle-manifest.schema.json:171 and
+//                       read by DI at normalize/quarantine.py:198-199, with NO producer anywhere in
+//                       platform-control/src (still true after #841, which landed the consumer and
+//                       not a writer — re-grep before citing it); a `searchParamsCache`
 //                       documented as the single source of truth with zero consumers in src/.
 //                       A declared-and-empty field is worse than an absent one: OpenSearch returns
 //                       an empty bucket rather than an error, so it reads as "none exists".

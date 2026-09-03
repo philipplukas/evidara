@@ -187,7 +187,7 @@ Four lenses, selected with `args.lenses`:
 
 | Lens | Grounded in |
 |---|---|
-| `dead-declaration` | `delegates_to` mapped with no writer anywhere; `di_overrides.quarantine_min_*` read by DI and emitted by nobody; a `searchParamsCache` documented as the single source of truth with zero consumers in `src/`. A declared-and-empty field reads as *"none exists"*, because OpenSearch returns an empty bucket rather than an error. |
+| `dead-declaration` | `delegates_to` mapped with no writer anywhere; `di_overrides.quarantine_min_*`, declared at `contracts/schemas/artifact-bundle-manifest.schema.json:171` and read at `normalize/quarantine.py:198-199` with no producer anywhere in `platform-control/src` (re-verified after #841, which landed the consumer, not a writer); a `searchParamsCache` documented as the single source of truth with zero consumers in `src/`. A declared-and-empty field reads as *"none exists"*, because OpenSearch returns an empty bucket rather than an error. |
 | `silent-degradation` | #631, #675, #713, #728, plus a `logger.debug` swallow that would have silently reverted every production read to a crashing path, and a provenance fallback that substituted the mirror's URL for the source's. |
 | `request-path-cost` | a blocking region lookup measured at **4,114 ms** newly on a per-document read path — ~8 s per document fetch — latent only because one env var happened to be set. |
 | `frontend-contract` | hardcoded colours where `AGENTS.md` requires `var(--token)`, missing locale keys, props no test renders, exports nothing imports. |
