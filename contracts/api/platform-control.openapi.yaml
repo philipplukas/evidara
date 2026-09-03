@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.21.0
+  version: 0.22.0
 paths:
   /health:
     get:
@@ -5997,6 +5997,7 @@ components:
       - failed
       - withdrawn
       - skipped_duplicate
+      - quarantined
       title: ProcessingStatus
     ProcessingStatusUpdateListResponse:
       properties:

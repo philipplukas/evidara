@@ -78,7 +78,12 @@ API_TITLE = "Platform Control API"
 # model must carry both: rendering `artifacts_count` alone would claim a delivery
 # that did not happen, and rendering `0` would hide the capture. Touches the locked
 # `/v1/runs` and `/v1/runs/{run_id}` paths, but only by adding response fields.
-API_VERSION = "0.21.0"
+# 0.22.0: additive — `quarantined` joins the document processing-status enum on
+# `/v1/runs/{run_id}/processing-status`. ADR-0047 gives DI a verdict between
+# processed and failed for a manifestation whose text is not law; without the
+# value the endpoint rejected the very status it must record, and the run read
+# as still-in-flight forever (#731). Additive: an existing writer never sends it.
+API_VERSION = "0.22.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

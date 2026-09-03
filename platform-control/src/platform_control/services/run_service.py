@@ -1222,6 +1222,17 @@ class RunService:
         if latest_processing.status.value == "failed":
             status = "failed"
             detail = latest_processing.error_summary or "Document-intelligence processing failed."
+        elif latest_processing.status.value == "quarantined":
+            # A refusal, not a success and not a failure (ADR-0047, #731). It must
+            # not fall through to the `ok` branch below: a document the corpus
+            # deliberately does not hold, reported as fine, is the false green this
+            # repo keeps getting caught by. `blocked` is the honest word — the run
+            # stopped here and no replay will move it.
+            status = "blocked"
+            detail = (
+                latest_processing.error_summary
+                or "Document-intelligence quarantined this manifestation: its text is not law."
+            )
         elif latest_processing.status.value in {"accepted", "processing"}:
             status = "in_progress"
             detail = f"Latest processing status is {latest_processing.status.value}."
@@ -1262,6 +1273,19 @@ class RunService:
                 stage="projection",
                 status="blocked",
                 detail="Projection blocked because DI reported a failed status.",
+                updated_at=latest_processing.occurred_at,
+            )
+        if latest_processing.status.value == "quarantined":
+            # Quarantine publishes nothing, so no lifecycle event is ever coming
+            # (#841). Reporting `in_progress` here would leave the operator
+            # watching a stage that has already finished refusing.
+            return RunPipelineHealthStage(
+                stage="projection",
+                status="blocked",
+                detail=(
+                    "Projection blocked because DI quarantined this manifestation; "
+                    "nothing was published."
+                ),
                 updated_at=latest_processing.occurred_at,
             )
         return RunPipelineHealthStage(

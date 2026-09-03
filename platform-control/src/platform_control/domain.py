@@ -123,6 +123,22 @@ class ProcessingStatus(StrEnum):
     FAILED = "failed"
     WITHDRAWN = "withdrawn"
     SKIPPED_DUPLICATE = "skipped_duplicate"
+    #: Terminal refusal (ADR-0047, #731). The bundle was structurally valid and
+    #: processing did not fail — document-intelligence looked at the extracted
+    #: text and could not support the claim that it is law: a scan with no text
+    #: layer, a cover sheet, an empty text layer.
+    #:
+    #: Distinct from FAILED on purpose. A failure's remedy is replay; a
+    #: quarantine's is implementing the missing document class, and replaying it
+    #: changes nothing. Distinct from SKIPPED_DUPLICATE because nothing was
+    #: published and there is no prior document to point at.
+    QUARANTINED = "quarantined"
+
+
+#: Statuses that must carry `error_code` and `error_summary`, and that no other
+#: status may carry. Both are refusals the operator has to be able to act on, and
+#: a refusal without a stated reason is the silence ADR-0047 exists to end.
+STATUSES_REQUIRING_A_REASON = frozenset({ProcessingStatus.FAILED, ProcessingStatus.QUARANTINED})
 
 
 class NormLevel(StrEnum):
