@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -15,6 +16,7 @@ from platform_control.models.review_task import ReviewTask
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
+from platform_control.models.wizard_run import WizardRun
 from platform_control.schemas.wizard import (
     CreateReviewTaskRequest,
     CreateWizardProjectRequest,
@@ -423,3 +425,124 @@ async def test_run_shard_crawl_skips_without_source_ref(session_maker) -> None:
     )
     result = await shard_acts.run_shard_crawl(wizard_run_id, "default", None)
     assert result["status"] == "skipped_no_source_ref"
+
+
+# ---------------------------------------------------------------------------
+# #561: the shard crawl is idempotent, and progress writes do not lose updates
+# ---------------------------------------------------------------------------
+
+
+class _CountingProvider(_FakeInlineProvider):
+    """Fake provider that records how many times it was actually dispatched."""
+
+    def __init__(self) -> None:
+        self.dispatches = 0
+
+    async def start_run(self, source, source_version, run):
+        self.dispatches += 1
+        return await super().start_run(source, source_version, run)
+
+
+async def _wizard_run_with_source(session_maker, name: str) -> str:
+    """Seed a wizard run whose discovery plan points at a real source version."""
+    async with session_maker() as session:
+        source_id, sv_id = await _seed_source_fixtures(session)
+        await session.commit()
+
+    async with session_maker() as session:
+        service = WizardService(session, InMemoryOrchestrator())
+        project = await service.create_project(CreateWizardProjectRequest(name=name))
+        await service.update_scope(project.wizard_project_id, {"domains": ["example.com"]})
+        await service.update_discovery_plan(
+            project.wizard_project_id,
+            {"source_id": source_id, "source_version_id": sv_id},
+        )
+        wizard_run = await service._get_latest_run_for_project(project.wizard_project_id)
+        await session.commit()
+        return wizard_run.wizard_run_id
+
+
+@pytest.mark.asyncio
+async def test_retrying_the_shard_crawl_does_not_re_scrape_the_portal(session_maker) -> None:
+    """#561: `ScopeShardWorkflow` retries `run_shard_crawl` up to five times.
+
+    Every attempt used to create a fresh `Run` row and dispatch the provider
+    again, so one transient error meant up to five duplicate rows and five full
+    re-scrapes of the same shard of a government legal portal. The dedupe key on
+    `runs.idempotency_key` is what stops that: the second attempt finds the first
+    attempt's run and reports it instead of crawling again.
+    """
+    wizard_run_id = await _wizard_run_with_source(session_maker, "idempotency")
+    provider = _CountingProvider()
+    registry = ProviderRegistry()
+    registry.register(provider)
+
+    shard_acts = ScopeShardActivities(
+        session_factory=session_maker,
+        provider_registry_factory=lambda: registry,
+    )
+
+    first = await shard_acts.run_shard_crawl(wizard_run_id, "ch/zurich", None)
+    second = await shard_acts.run_shard_crawl(wizard_run_id, "ch/zurich", None)
+    third = await shard_acts.run_shard_crawl(wizard_run_id, "ch/zurich", None)
+
+    assert provider.dispatches == 1, "a retried shard crawl re-scraped the portal"
+    assert second["run_id"] == first["run_id"]
+    assert third["run_id"] == first["run_id"]
+    assert second["deduplicated"] is True
+
+    async with session_maker() as session:
+        runs = (await session.scalars(select(Run))).all()
+        assert len(runs) == 1
+        assert runs[0].idempotency_key == f"wizard:{wizard_run_id}:shard:ch/zurich"
+
+
+@pytest.mark.asyncio
+async def test_a_different_shard_of_the_same_run_still_gets_its_own_run(session_maker) -> None:
+    """The key is per shard: deduping must not collapse the fan-out into one crawl."""
+    wizard_run_id = await _wizard_run_with_source(session_maker, "per-shard")
+    provider = _CountingProvider()
+    registry = ProviderRegistry()
+    registry.register(provider)
+    shard_acts = ScopeShardActivities(
+        session_factory=session_maker,
+        provider_registry_factory=lambda: registry,
+    )
+
+    zurich = await shard_acts.run_shard_crawl(wizard_run_id, "ch/zurich", None)
+    bern = await shard_acts.run_shard_crawl(wizard_run_id, "ch/bern", None)
+
+    assert provider.dispatches == 2
+    assert zurich["run_id"] != bern["run_id"]
+
+
+@pytest.mark.asyncio
+async def test_shard_progress_reports_survive_each_other_and_their_own_retries(
+    session_maker,
+) -> None:
+    """#561: concurrent shard completions must both land, and a retry must not double-count.
+
+    The deterministic proof of the compare-and-set lives in
+    `test_wizard_progress_store.py`; this is the activity-level end-to-end.
+    """
+    wizard_run_id = await _wizard_run_with_source(session_maker, "progress")
+    shard_acts = ScopeShardActivities(session_factory=session_maker)
+
+    stats = {"nodes_discovered": 4, "records_accepted": 3, "records_sent_to_review": 1}
+    await asyncio.gather(
+        *[
+            shard_acts.report_shard_progress(wizard_run_id, key, stats)
+            for key in ("ch/zurich", "ch/bern", "ch/aargau")
+        ]
+    )
+    # Temporal retries this activity up to three times; the same report arriving
+    # twice must not inflate the aggregate.
+    await shard_acts.report_shard_progress(wizard_run_id, "ch/zurich", stats)
+
+    async with session_maker() as session:
+        run = await session.get(WizardRun, wizard_run_id)
+        assert run is not None
+        assert set(run.progress["shards"]) == {"ch/zurich", "ch/bern", "ch/aargau"}
+        assert run.progress["total_nodes"] == 12
+        assert run.progress["accepted_records"] == 9
+        assert run.progress["routed_to_review"] == 3
