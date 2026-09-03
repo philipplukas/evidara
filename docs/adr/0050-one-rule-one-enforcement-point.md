@@ -48,9 +48,10 @@ friction and there is no mechanism that makes the stronger one binding.
   `--copy-evidence` path"*. Caught in review.
 - **An ADR against code, in this very series.** ADR-0030 §5 says
   `scripts/ch-fedlex-fast-loop.sh` **and** `scripts/ch-fedlex-compose-e2e.sh` take
-  `--url-pattern` and `--corpus-slug`. Only the fast loop does; the compose script says so
-  at the line above. Nobody wrote that carelessly — the ADR was true when written and the
-  script grew a comment denying it.
+  `--url-pattern` and `--corpus-slug`. Only the fast loop does
+  (`scripts/ch-fedlex-fast-loop.sh:73,79`); the compose script's own comment denies both
+  (`scripts/ch-fedlex-compose-e2e.sh:64-65`). Nobody wrote that carelessly — the ADR was
+  true when written, and the script later grew a comment contradicting it.
 
 ### Why the pattern survives review
 
