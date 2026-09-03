@@ -45,7 +45,7 @@ Run the narrowest gate for the surface you touched before pushing:
 |---|---|
 | `platform-control/` | `bash scripts/check-platform-control.sh` — ruff check + ruff format --check + pytest **and** the OpenAPI contract-drift gate **and** the full admin gate. A bare `uv run pytest` is narrower than CI. |
 | `platform-control/admin/` | `cd platform-control/admin && npm run check && npm run build` |
-| `document-intelligence/` | `cd document-intelligence && uv run --extra dev --extra service --extra test --extra llm pytest && uv run ruff check . && uv run ruff format --check .` |
+| `document-intelligence/` | `cd document-intelligence && CI=true uv run --extra dev --extra service --extra test --extra llm pytest && uv run ruff check . && uv run ruff format --check .` — `CI=true` is not optional, see below |
 | `legal-search/api/` | `cd legal-search/api && npm run check` |
 | `legal-search/frontend/` | `cd legal-search/frontend && npm run check && npm run build` — build is a separate CI step; it catches SSR issues `tsc` misses |
 | `legal-search/` (both surfaces) | `bash scripts/check-legal-search.sh` |
@@ -55,6 +55,7 @@ Run the narrowest gate for the surface you touched before pushing:
 | `eval/` | see `.github/workflows/eval-ris.yml` — two `-k`-filtered pytest selections |
 | `scripts/` | `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` — see note below; without pyyaml only 144 of 201 tests run |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `for c in AT CH DE FR IT EU; do python scripts/check_country_overlay_files.py --country $c; done` — `--country` is required; the bare command exits 2 on argparse |
+| `contracts/api/` or `contracts/events/` | `python3 scripts/check_contract_version_bump.py --base origin/main` — the manifest version bump. **Not** covered by `check-platform-control.sh`, which only checks that the generated spec still matches the app. |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
 
 Rows here must not be narrower than what CI runs: a clean local run against a
@@ -66,6 +67,23 @@ point — the gate must not depend on ambient state. Without it eleven test modu
 import and the runner reports `Ran 144 tests ... FAILED (errors=11)` — which reads as eleven
 broken tests and is really **fifty-seven that never ran**. `uv` is already required by this
 repo, so the command above needs no venv and no system package.
+
+The `contracts/` row above is the same trap in a second place: `check_contract_version_bump.py`
+compares the manifest's **top-level `version`** (`:47`, `:62`) — not `apis.<name>.version` — and fires on
+any change under `contracts/api/` or `contracts/events/` (`:14`). Two PRs from one lane hit it in a
+single day (2026-09-03) because the `platform-control/` row reads as exhaustive and is not. Note both
+numbers still move together: `check_contract_manifest.py` separately requires
+`apis.platform_control.version` to equal `platform_control.openapi.API_VERSION`.
+
+**`CI=true` is not optional either, on any suite that registers the CI-skip guard** —
+`document-intelligence/tests/conftest.py`, `platform-control/tests/conftest.py` and
+`eval/conftest.py` all do. The guard (#690, `scripts/ci_skip_guard.py`) fails the run when a test
+skips in CI for a reason that is not in that suite's `ALLOWED_SKIPS`. Its trigger is
+`running_in_ci()`, which is `bool(os.environ.get("CI"))` (`scripts/ci_skip_guard.py:61-63`) — so a
+workstation shell **can never fire it**, and a whole class of CI failure is invisible locally no
+matter which extras you pass. Neither `scripts/check-platform-control.sh` nor
+`scripts/check-document-intelligence.sh` sets `CI`, so prefix it yourself. Adding a test that skips
+without an allowlist entry is green locally and red in CI (observed on #840, 2026-09-03).
 
 For `document-intelligence/`, the extras are not optional: a bare `uv run pytest` cannot collect
 `test_instructor_extractor` or `test_eval_docling_extractor` and reports green over a smaller suite
