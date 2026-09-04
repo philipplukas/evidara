@@ -122,6 +122,7 @@ nav:
       - Document Intelligence: components/document-intelligence.md
       - Legal Search: components/legal-search.md
       - Contracts: components/contracts.md
+      - Workflow Command Envelope: components/workflow-command-envelope.md
       - Infrastructure: components/infra.md
       - First Vertical Slice: components/first-vertical-slice.md
   - Testing:

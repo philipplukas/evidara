@@ -2,6 +2,12 @@
 
 Constructs the standard JSON envelope returned by every evidara-cli workflow command as
 defined by contracts/schemas/workflow-command-envelope.schema.json and ADR-0022.
+
+This module is deliberately free of domain content and of imports beyond the standard
+library, so that it can be reasoned about — and if wanted, lifted — on its own. That
+boundary is enforced by tests/test_envelope.py, and the vocabulary (in particular what
+``side_effect_level`` classifies) is documented in
+docs/components/workflow-command-envelope.md.
 """
 
 from __future__ import annotations
