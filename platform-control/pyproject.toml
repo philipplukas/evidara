@@ -17,6 +17,10 @@ dependencies = [
   "httpx>=0.28.0,<1",
   "nats-py>=2.9.0,<3",
   "prometheus-client>=0.21.0,<1",
+  # RFC 9309 robots.txt parsing. BSD-3-Clause, no runtime dependencies, Scrapy's
+  # own parser. Replaces urllib.robotparser, which has no wildcard support and
+  # is first-match rather than longest-match — see services/robots.py.
+  "protego>=0.5.0,<1",
   "pydantic-settings>=2.10.0,<3",
   "pydantic>=2.11.0,<3",
   "pyyaml>=6.0.2,<7",

@@ -29,11 +29,14 @@ deliberately not wired to this limiter — double-budgeting would be misleading.
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from collections import defaultdict
 from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -296,24 +299,58 @@ current_rate_limiter: ContextVar[HostRateLimiter | None] = ContextVar(
 provider's outbound GET. Propagates across ``await`` points automatically."""
 
 
-def _parse_retry_after(header_value: str | None) -> float | None:
-    """Parse a ``Retry-After`` header as seconds. Returns ``None`` when absent
-    or when the value is an HTTP-date we can't trivially convert.
+def _parse_retry_after(header_value: str | None, *, now: datetime | None = None) -> float | None:
+    """Parse a ``Retry-After`` header as seconds. ``None`` when absent or unparseable.
 
-    Seconds parsing is what real operators observe; HTTP-date is rare in
-    scraping scenarios and we fail-open by returning ``None`` so the caller's
-    AIMD halving still applies but no explicit pause is scheduled.
+    RFC 9110 §10.2.3 defines **two** forms — ``delay-seconds`` and ``HTTP-date``
+    — and a server is free to choose either. This used to handle only the first
+    and returned ``None`` for the second, documented at the time as "rare in
+    scraping scenarios". That was a fail-open on the one signal a host sends to
+    say *exactly* how long to stay away: the AIMD halving still applied, but the
+    explicit pause the host asked for was dropped on the floor. The date form is
+    what a server emits when the window is a wall-clock moment rather than a
+    duration (a maintenance window, a daily quota reset), which is precisely the
+    public-sector portal case.
+
+    ``email.utils.parsedate_to_datetime`` is the stdlib's RFC 5322/9110 date
+    parser and covers all three date formats the spec permits, so nothing is
+    hand-rolled here and there is no second reading to drift.
+
+    ``now`` is injectable so the conversion is testable without freezing the
+    clock; it defaults to the current UTC instant.
     """
     if header_value is None:
         return None
     stripped = header_value.strip()
     if not stripped:
         return None
+
     try:
         seconds = float(stripped)
     except ValueError:
+        pass
+    else:
+        # `float()` happily accepts "inf" and "nan". An infinite deadline would
+        # pause this host forever with no way back short of a restart, so a
+        # non-finite delay is treated as no delay at all.
+        return max(0.0, seconds) if math.isfinite(seconds) else None
+
+    try:
+        deadline = parsedate_to_datetime(stripped)
+    except (TypeError, ValueError):
         return None
-    return max(0.0, seconds)
+    if deadline is None:  # pragma: no cover — defensive, older stdlib returned None
+        return None
+    # An HTTP-date is always GMT; a value that arrives naive is read as UTC
+    # rather than as local time, which would shift the pause by the offset.
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=UTC)
+    reference = now if now is not None else datetime.now(UTC)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=UTC)
+    # A date already in the past means "you may retry now", not "retry in the
+    # negative"; clamping keeps that from becoming an immediate-resume bug.
+    return max(0.0, (deadline - reference).total_seconds())
 
 
 async def limited_get(
