@@ -62,10 +62,23 @@ _HTML_MARKERS: tuple[bytes, ...] = (
     b"<meta http-equiv",
 )
 
-# How far in to look for a signature. Some servers emit a UTF-8 BOM or stray
-# whitespace before the payload; a magic number further in than this is not a
-# leading signature and should not be treated as one.
+# A UTF-8 BOM. `bytes.lstrip()` does **not** remove it — it strips ASCII whitespace
+# only — so skipping it takes an explicit step. Without one, a BOM-prefixed PDF is
+# refused as `format_signature_missing`, which sends an operator hunting for a stub
+# that is not there. The comment below claimed this tolerance for months before the
+# code provided it.
+_UTF8_BOM = b"\xef\xbb\xbf"
+
+# How far in to look for a signature. A leading BOM or stray whitespace is skipped;
+# past that the magic number must be the very next bytes, because a signature deeper
+# inside a payload is not a *leading* signature. So the window caps how much leading
+# padding is tolerated — it is not a region the signature may be found anywhere in.
 _SNIFF_WINDOW = 1024
+
+
+def _strip_leading_padding(head: bytes) -> bytes:
+    """Drop leading whitespace and a UTF-8 BOM, in either order."""
+    return head.lstrip().removeprefix(_UTF8_BOM).lstrip()
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +114,7 @@ def has_format_magic(body: bytes, content_type: str) -> bool:
     magics = _MAGIC_BY_FORMAT.get(content_type)
     if not magics:
         return True
-    head = body[:_SNIFF_WINDOW].lstrip()
+    head = _strip_leading_padding(body[:_SNIFF_WINDOW])
     return any(head.startswith(magic) for magic in magics)
 
 
@@ -149,7 +162,8 @@ def check_capture(
             return GuardResult(
                 False,
                 "format_signature_missing",
-                f"no {expected_content_type} signature in the first {_SNIFF_WINDOW} bytes",
+                f"payload does not open with a {expected_content_type} signature "
+                f"(a BOM or whitespace within the first {_SNIFF_WINDOW} bytes is skipped)",
             )
 
     if min_bytes and len(body) < min_bytes:

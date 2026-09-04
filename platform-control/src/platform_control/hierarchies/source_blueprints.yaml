@@ -697,8 +697,9 @@ overlays:
         enabled: false
   eu:
     # EUR-Lex SPARQL provider resolves ELI URIs via the Cellar SPARQL endpoint
-    # and fetches HTML manifestations. Provider is live_ready=True; templates
-    # are enabled for acceptance-run evidence capture.
+    # and fetches HTML manifestations. Provider readiness is LIVE
+    # (`AcquisitionReadiness.LIVE`, not the retired `live_ready=True` bool);
+    # templates are enabled for acceptance-run evidence capture.
     provider_templates:
       eur_lex_sparql_regulation_en:
         provider: eur_lex_sparql

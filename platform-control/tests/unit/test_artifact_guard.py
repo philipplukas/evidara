@@ -50,6 +50,51 @@ def test_format_without_a_signature_is_not_contradicted():
     assert has_format_magic(b"<html>anything</html>", "text/html")
 
 
+# A UTF-8 BOM is real: servers and CMSes prepend one when they concatenate a
+# response, and `bytes.lstrip()` does not strip it. Before this was handled, a
+# BOM-prefixed statute PDF was refused as `format_signature_missing` — a refusal
+# that names a stub the capture does not contain.
+_BOM = b"\xef\xbb\xbf"
+
+
+def test_leading_bom_does_not_hide_pdf_magic():
+    assert has_format_magic(_BOM + _PDF, "application/pdf")
+
+
+def test_bom_and_whitespace_together_do_not_hide_pdf_magic():
+    assert has_format_magic(b"\n  " + _BOM + _PDF, "application/pdf")
+    assert has_format_magic(_BOM + b"\n  " + _PDF, "application/pdf")
+
+
+def test_bom_prefixed_pdf_is_captured():
+    verdict = check_capture(
+        body=_BOM + _PDF,
+        expected_content_type="application/pdf",
+        declared_content_type="application/pdf",
+        min_bytes=500,
+    )
+    assert verdict.ok, verdict.detail
+
+
+def test_bom_does_not_smuggle_a_716_stub_past_the_guard():
+    """Skipping a BOM must not weaken the #716 defence.
+
+    `looks_like_html` runs *before* the magic-number check and matches by
+    substring, so it never depended on the payload's first byte. A BOM-prefixed
+    stub is still refused, and still refused for the right reason.
+    """
+    verdict = check_capture(
+        body=_BOM + _REDIRECT_STUB,
+        expected_content_type="application/pdf",
+    )
+    assert not verdict
+    assert verdict.reason == "html_where_binary_expected"
+
+
+def test_bom_alone_is_not_a_pdf():
+    assert not has_format_magic(_BOM + b"just some text", "application/pdf")
+
+
 def test_716_redirect_stub_is_refused_as_pdf():
     """The named regression: 142 bytes of HTML must never be captured as a statute."""
     result = check_capture(

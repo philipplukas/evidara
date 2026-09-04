@@ -11,13 +11,15 @@ This is DISTINCT from the Fedlex cantonal-concordat discovery path
 scrapes each canton's *own* legislation portal, which surfaces the bulk
 of cantonal/"state" legislation not mirrored on Fedlex.
 
-The provider ships DISABLED (`live_ready=False`), so its blueprint
-templates parse but the two-key lock rejects live runs until an operator
-captures acceptance-run evidence per canton. The portal hosts below are
-placeholder-but-plausible and MUST be verified against the real cantonal
-portals at live-enablement.
+The provider ships DISABLED — `readiness = AcquisitionReadiness.SCAFFOLD`
+on the class below, not the retired `live_ready=False` bool this docstring
+used to name (#743). Its blueprint templates parse but the two-key lock
+rejects runs of *every* mode until the portal problem below is solved; a
+SCAFFOLD needs engineering, not an acceptance run. The portal hosts below
+are placeholder-but-plausible and MUST be verified against the real
+cantonal portals at live-enablement.
 
-`live_ready` stays False for a second, concrete reason (#631): several
+Readiness stays SCAFFOLD for a second, concrete reason (#631): several
 cantonal collections — ZH-Lex among them — are JavaScript SPA portals.
 Deterministic HTTP fetches only their navigation shell, not the statute,
 so acquiring cantonal law from them needs SPA rendering or an underlying

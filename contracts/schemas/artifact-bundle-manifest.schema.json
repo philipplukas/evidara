@@ -195,7 +195,7 @@
         "quarantine_min_legal_markers": {
           "type": "integer",
           "minimum": 0,
-          "description": "Per-source floor for ADR-0047's legal-marker check (Art./§/Abs./comma/cpv.), overriding DI_QUARANTINE_MIN_LEGAL_MARKERS. Shares the marker vocabulary and default (3) with acquisition_core.content_gate."
+          "description": "Per-source floor for ADR-0047's legal-marker check (Art./§/Abs./comma/cpv./alinéa), overriding DI_QUARANTINE_MIN_LEGAL_MARKERS. The default is 1, not acquisition_core.content_gate's 3, and the marker vocabulary is a documented superset of it rather than the same list — the DI gate judges the extracted text of a single PDF manifestation, where the shortest real law in the corpus measures 2 markers, while content_gate judges a whole HTML portal page. See document_intelligence.normalize.quarantine.DEFAULT_MIN_LEGAL_MARKERS for the measurement."
         }
       },
       "additionalProperties": false

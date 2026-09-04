@@ -179,7 +179,7 @@ class CorrectionService:
 
         The actual workflow execution (and writing back
         `resulting_run_id` / `rescore_outcome`) lives in the activity
-        (`platform_control.temporal.activities.rescore_from_correction`).
+        (`platform_control.temporal.activities.RescoreFromCorrectionActivities.run_targeted_rescore`).
         """
 
         row = await self.get(correction_id)
@@ -244,8 +244,9 @@ class CorrectionService:
     ) -> Correction:
         """Persist the rescore worker's outcome on the correction's payload.
 
-        Called by `platform_control.temporal.activities.rescore_from_correction`
-        once the DI re-extraction returns. Outcome is one of `changed` /
+        Called by `RescoreFromCorrectionActivities.run_targeted_rescore` in
+        `platform_control.temporal.activities` once the DI re-extraction
+        returns. Outcome is one of `changed` /
         `unchanged` / `failed`; the correction-metrics widget (#432)
         reads `payload.rescore_outcome` to populate the rescore counters.
         """
