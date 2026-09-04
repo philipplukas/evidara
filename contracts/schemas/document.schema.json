@@ -164,6 +164,10 @@
           "type": "string",
           "description": "Canonical official publication citation when one can be derived reliably."
         },
+        "regeste": {
+          "type": "string",
+          "description": "The official headnote the source itself published for a decision, verbatim — the Swiss `Regeste`, the Austrian `Rechtssatz`/`Leitsatz`/`Stammrechtssatz`. Promoted by the pipeline from an explicit normalizer field or from `extracted_metadata.headnote`; never synthesised from the body and never taken from a generated summary, because a fabricated headnote is indistinguishable from an official one once indexed. Absent when the source published none — which is the normal case for statutes and ordinances."
+        },
         "original_language": {
           "type": "string",
           "pattern": "^[a-z]{2}$",

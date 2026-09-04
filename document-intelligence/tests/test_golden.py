@@ -74,6 +74,16 @@ class GoldenBundleTests(unittest.TestCase):
                         full_text = result.document.full_text or ""
                         for fragment in expected["key_content_contains"]:
                             self.assertIn(fragment, full_text, f"Missing content: {fragment}")
+                    if "metadata_regeste_contains" in expected:
+                        # #836: the headnote must survive the whole pipeline onto the
+                        # canonical document, because `metadata.regeste` is what the
+                        # search projection reads. Asserting only that the XML normalizer
+                        # extracted it would have passed for months while the value never
+                        # left the IR.
+                        self.assertIn(
+                            expected["metadata_regeste_contains"],
+                            result.document.metadata.get("regeste") or "",
+                        )
                     if "html_parse_used_fallback" in expected:
                         self.assertEqual(
                             result.document.metadata.get("html_parse_used_fallback"),

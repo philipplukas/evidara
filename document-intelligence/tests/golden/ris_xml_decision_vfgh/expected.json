@@ -1,5 +1,6 @@
 {
   "expected_source_family": "decision",
+  "metadata_regeste_contains": "Aufhebung eines Flächenwidmungsplans",
   "section_count_min": 1,
   "key_content_contains": ["Verfassungsgerichtshof", "Flächenwidmungsplan", "Grundlagenforschung"],
   "source_flavor": "ris_like",

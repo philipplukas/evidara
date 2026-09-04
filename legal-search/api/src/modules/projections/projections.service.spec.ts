@@ -183,6 +183,69 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('indexes the official headnote as `regeste` when the canonical row carries one', async () => {
+    // #836. `regeste` is mapped and boosted (`regeste^2`) in the documents index and
+    // rendered on the detail page (#830/#760), but until DI promoted
+    // `metadata.regeste` the only writers were the seed scripts — so an acquired
+    // decision had no headnote at any layer.
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const headnote = 'Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder.';
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Bundesgerichtsurteil 9C_100/2025',
+      body_text: 'Sachverhalt ...',
+      metadata: { regeste: headnote },
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({ regeste: headnote }),
+    );
+  });
+
+  it('reads the RIS headnote from extracted_metadata for a row published before the promotion', async () => {
+    // A document already in canonical Delta carries `extracted_metadata.headnote`
+    // (normalize/xml.py maps RIS `leitsatz`/`rechtssatz`/`strs` to it) but no promoted
+    // `metadata.regeste`. Reading the fallback is what lets a reindex pick the headnote
+    // up without reprocessing the corpus.
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const headnote = 'Die Asylgewährung an Wehrdienstverweigerer erfordert ...';
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'VwGH Ra 2024/19/0104',
+      body_text: 'Begründung ...',
+      metadata: { extracted_metadata: { headnote } },
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({ regeste: headnote }),
+    );
+  });
+
+  it('leaves `regeste` unset when the source published no headnote', async () => {
+    // The normal case: statutes and ordinances have none, and an empty string would
+    // render as a blank headnote the reader takes as authoritative.
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Bundesverfassung',
+      body_text: 'Art. 1 ...',
+      metadata: { regeste: '   ' },
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const projection = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as Record<string, unknown>;
+    expect(projection.regeste).toBeUndefined();
+  });
+
   it('indexes the document body as `content` so the highlighter can build a snippet', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();

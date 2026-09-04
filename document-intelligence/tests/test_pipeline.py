@@ -12,7 +12,12 @@ from document_intelligence.extractors.metadata import (
 )
 from document_intelligence.ingest.docling_adapter import _is_placeholder_title as is_docling_placeholder_title
 from document_intelligence.persist.sinks import InMemoryCanonicalSink
-from document_intelligence.pipeline import ProcessingPipeline, ProcessingResult, _resolve_official_citation
+from document_intelligence.pipeline import (
+    ProcessingPipeline,
+    ProcessingResult,
+    _resolve_official_citation,
+    _resolve_regeste,
+)
 from document_intelligence.validate.schema_validation import (
     validate_instance_against_contract,
 )
@@ -132,6 +137,42 @@ class ProcessingPipelineTests(unittest.TestCase):
         self.assertIsNone(_resolve_official_citation({}, {}, {"official_citation_hint": "  "}))
         self.assertIsNone(_resolve_official_citation({}, {}, {}))
         self.assertIsNone(_resolve_official_citation({}, {}, None))
+
+    def test_regeste_comes_from_the_ris_headnote(self) -> None:
+        """RIS `ct="leitsatz"|"rechtssatz"|"strs"` is already extracted as `headnote`.
+
+        `normalize/xml.py` has mapped those to `extracted_metadata["headnote"]` since
+        the RIS work landed; nothing ever read it. That is the one official headnote
+        the pipeline can see today, and it is exactly the Regeste field the index
+        boosts.
+        """
+        self.assertEqual(
+            _resolve_regeste({}, {"headnote": "Die Asylgewährung an Wehrdienstverweigerer erfordert ..."}),
+            "Die Asylgewährung an Wehrdienstverweigerer erfordert ...",
+        )
+
+    def test_regeste_prefers_an_explicit_normalizer_field(self) -> None:
+        """The documented slot for a normalizer that can find the headnote structurally.
+
+        A Swiss decision publishes its Regeste as a titled block; a normalizer that
+        identifies it sets `regeste` on the IR and wins over the generic RIS key.
+        """
+        self.assertEqual(
+            _resolve_regeste({"regeste": "Art. 754 OR; Verantwortlichkeit."}, {"headnote": "less specific"}),
+            "Art. 754 OR; Verantwortlichkeit.",
+        )
+
+    def test_regeste_is_absent_rather_than_invented(self) -> None:
+        """No headnote must stay no headnote.
+
+        A Regeste is an official text written by the court. A blank string renders as
+        an empty headnote the reader takes as authoritative, and a `headnote_reference`
+        (RIS `hinweisstrs`) is a pointer to *another* decision's headnote — neither is
+        a Regeste, and neither may end up in the field.
+        """
+        self.assertIsNone(_resolve_regeste({}, {}))
+        self.assertIsNone(_resolve_regeste({"regeste": "   "}, {"headnote": ""}))
+        self.assertIsNone(_resolve_regeste({}, {"headnote_reference": "GRS wie Ra 2023/18/0108 E 4. Juli 2023 RS 4"}))
 
     def test_processes_local_html_bundle_into_contract_valid_outputs(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:

@@ -1,5 +1,6 @@
 {
   "expected_source_family": "decision",
+  "metadata_regeste_contains": "Die Asylgewährung an Wehrdienstverweigerer erfordert",
   "section_count_min": 1,
   "source_flavor": "ris_like",
   "status_flow": ["accepted", "processing", "canonical_ready"],

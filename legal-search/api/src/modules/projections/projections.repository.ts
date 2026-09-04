@@ -76,6 +76,14 @@ export type SearchProjectionDocument = {
    * is the head of the document and identical for every query.
    */
   content?: string;
+  /**
+   * The official headnote of a decision, verbatim — the Swiss `Regeste`, the
+   * Austrian `Rechtssatz`/`Leitsatz`. Copied from the canonical document's
+   * `metadata.regeste`, which document-intelligence promotes only from a headnote
+   * the source itself published (#836). Absent for statutes and ordinances, which
+   * legitimately have none.
+   */
+  regeste?: string;
   /** Derived: the head of `content`, for display without loading the body. */
   content_preview?: string;
   /** Normalized document type from canonical DI row (law, decision, …). */
