@@ -19,6 +19,10 @@ on:
       - "legal-search/frontend/**"
       - "document-intelligence/**"
       - "contracts/**"
+      - "marketing/**"
+      # The shared design tokens and @evidara/shell are compiled into the
+      # marketing bundle (ADR-0027), so a change there changes that image.
+      - "styles/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -43,6 +47,7 @@ jobs:
       legal_search_api: ${{ steps.filter.outputs.legal_search_api }}
       legal_search_frontend: ${{ steps.filter.outputs.legal_search_frontend }}
       document_intelligence_consumer: ${{ steps.filter.outputs.document_intelligence_consumer }}
+      marketing: ${{ steps.filter.outputs.marketing }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,6 +82,10 @@ jobs:
               - '.github/workflows/runtime-images.yml'
             document_intelligence_consumer:
               - 'document-intelligence/**'
+              - '.github/workflows/runtime-images.yml'
+            marketing:
+              - 'marketing/**'
+              - 'styles/**'
               - '.github/workflows/runtime-images.yml'
 
   platform-control:
@@ -552,6 +561,61 @@ jobs:
   #
   # This job always reports, and fails only when a needed job genuinely failed.
   # `skipped` is an accepted result; `failure` and `cancelled` are not.
+  # The public marketing surface (ADR-0039). Its `Marketing` workflow already
+  # proves the static export builds; this job is what makes the export
+  # *deployable* — before it existed, `infra/hetzner/marketing/` referenced a
+  # `marketing` Service whose image nothing published, so the surface could be
+  # reviewed and merged and still never reach a cluster.
+  marketing:
+    name: Build marketing image
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.marketing == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          config: .github/buildkitd.toml
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (marketing)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository_owner }}/evidara-marketing
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and optionally push
+        uses: docker/build-push-action@v6
+        with:
+          # Repo root, not marketing/: the Dockerfile copies styles/tokens and
+          # styles/shell, which live outside the package (ADR-0028).
+          context: .
+          file: ./marketing/Dockerfile
+          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   gate:
     name: Runtime Images gate
     needs:
@@ -563,6 +627,7 @@ jobs:
       - platform-control-worker
       - document-intelligence-consumer
       - document-intelligence-document-service
+      - marketing
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

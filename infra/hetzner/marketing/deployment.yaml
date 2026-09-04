@@ -1,0 +1,78 @@
+# The marketing surface's workload (ADR-0039). Deliberately the smallest thing in
+# the namespace: a static export served by nginx, no Node runtime, no database,
+# no secret, no NATS subscription. It shares nothing with the product but the
+# design tokens compiled into its bundle (ADR-0027), which is what lets it stay
+# up when the product is down — the property ADR-0039 D2 asks for.
+#
+# Not part of infra/hetzner/apps/. That kustomization's `images:` pin moves as a
+# single unit tied to the platform's alembic revisions and MinIO accounts; this
+# surface has neither and must not be coupled to a rollout it cannot fail.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marketing
+  namespace: evidara
+  labels:
+    app: marketing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marketing
+  template:
+    metadata:
+      labels:
+        app: marketing
+    spec:
+      containers:
+        - name: marketing
+          # Pinned by SHA like every other Evidara image — never `latest`, which
+          # moves under the cluster on every merge. See the reasoning in
+          # apps/kustomization.yaml. No transformer reaches this file, so the tag
+          # is maintained by hand; the SHA must be one whose `Build marketing
+          # image` job in runtime-images.yml is green.
+          image: PIN_ME
+          ports:
+            - name: http
+              containerPort: 8080
+          # nginx-unprivileged already runs as uid 101; state it rather than
+          # inherit it, so a base-image change cannot silently restore root.
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /index.html
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /index.html
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: marketing
+  namespace: evidara
+  labels:
+    app: marketing
+spec:
+  selector:
+    app: marketing
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
