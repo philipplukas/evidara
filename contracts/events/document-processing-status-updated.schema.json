@@ -60,7 +60,8 @@
                 "canonical_ready",
                 "failed",
                 "withdrawn",
-                "skipped_duplicate"
+                "skipped_duplicate",
+                "quarantined"
               ]
             },
             "error_code": {

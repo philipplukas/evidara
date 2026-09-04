@@ -56,6 +56,35 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 
 Replay/checkpoint constraint: checkpoints are JSON metadata on `runs`, not a separate table. Provider-specific keys may appear under `replay_checkpoint`; treat unknown keys as opaque operational hints until normalized in a later schema pass.
 
+### Processing statuses, and `quarantined` (ADR-0047, #731)
+
+`document.processing_status.updated` carries one of `accepted`, `processing`,
+`canonical_ready`, `failed`, `withdrawn`, `skipped_duplicate`, `quarantined`. The last is
+document-intelligence refusing a structurally valid manifestation whose extracted text
+cannot support the claim that it is law — a scan with no text layer, a cover sheet, an
+empty text layer.
+
+Three things follow, and each is load-bearing:
+
+- **`quarantined` is not `failed`.** A failure's remedy is replay. A quarantine's remedy is
+  implementing the missing document class; replaying it changes nothing. They are separate
+  labels so the operator can tell "retry this" from "we cannot process this kind of thing
+  yet".
+- **It must carry a reason.** `error_code` + `error_summary` are required on `quarantined`
+  exactly as on `failed` (`schemas/processing_status.py`), from ADR-0047 §3's closed
+  taxonomy. A refusal that does not say why is the silence the ADR exists to end.
+- **It renders as `blocked`, never `ok`.** `RunService._resolve_di_stage` and
+  `_resolve_projection_stage` classify by status name, and a quarantine reaching the
+  catch-all branch would report a document the corpus deliberately does not hold as a
+  healthy pipeline. Quarantine also publishes nothing, so no lifecycle event is ever coming
+  and the projection stage must stop waiting for one.
+
+`processing_status_updates.status` is a **native Postgres enum**, so a new member needs an
+`ALTER TYPE … ADD VALUE` migration (`20260903_0026`). The model declares
+`native_enum=False` and every test builds the schema from the model, so a missing migration
+here is invisible to the entire suite and fails only in production — see that migration's
+docstring and AGENTS.md on #675/#713.
+
 ## Minimal v1 Outcome
 
 A user can:

@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from platform_control.domain import ProcessingStatus
+from platform_control.domain import STATUSES_REQUIRING_A_REASON, ProcessingStatus
 
 
 class ProcessingStatusProvenance(BaseModel):
@@ -37,11 +37,23 @@ class ProcessingStatusPayload(BaseModel):
 
     @model_validator(mode="after")
     def validate_failure_fields(self) -> ProcessingStatusPayload:
-        if self.status is ProcessingStatus.FAILED:
+        """Every refusal states its reason; nothing else may carry one.
+
+        `quarantined` joined `failed` here (#731). Without it the endpoint would
+        have rejected the very field ADR-0047 requires a quarantine to carry —
+        "error_code and error_summary must be null unless status is failed" — and
+        accepted a quarantine that explains nothing.
+        """
+        if self.status in STATUSES_REQUIRING_A_REASON:
             if not self.error_code or not self.error_summary:
-                raise ValueError("failed status requires non-empty error_code and error_summary")
+                raise ValueError(
+                    f"{self.status.value} status requires non-empty error_code and error_summary"
+                )
         elif self.error_code is not None or self.error_summary is not None:
-            raise ValueError("error_code and error_summary must be null unless status is failed")
+            raise ValueError(
+                "error_code and error_summary must be null unless the status is one of: "
+                + ", ".join(sorted(s.value for s in STATUSES_REQUIRING_A_REASON))
+            )
         return self
 
     model_config = ConfigDict(extra="forbid")

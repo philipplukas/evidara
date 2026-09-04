@@ -1324,6 +1324,55 @@ async def test_get_pipeline_health_summarizes_run_processing_and_search_stage(se
 
 
 @pytest.mark.asyncio
+async def test_get_pipeline_health_reports_a_quarantine_as_blocked_not_ok(session) -> None:
+    """A quarantined manifestation must not render as a healthy pipeline (#731).
+
+    `_resolve_di_stage` classifies by name, and `quarantined` would otherwise fall
+    through to the catch-all `ok` branch — reporting a document the corpus
+    deliberately does not hold as fine, which is the false green this repo keeps
+    getting caught by. Quarantine also publishes nothing, so no lifecycle event is
+    ever coming and the projection stage must stop waiting for one.
+    """
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    run.status = RunStatus.COMPLETED
+    run.completed_at = run.created_at
+    session.add(
+        ProcessingStatusUpdate(
+            event_id="evt_ps_quarantine",
+            run_id=run.run_id,
+            processing_manifest_id="pm_q",
+            processing_version="2026.09",
+            status=ProcessingStatus.QUARANTINED,
+            occurred_at=run.created_at,
+            source_snapshot_id="snap_q",
+            bundle_manifest_id="abm_q",
+            document_id=None,
+            document_revision=None,
+            error_code="no_text_layer",
+            error_summary="PDF has no text layer; 0 characters extracted.",
+        )
+    )
+    await session.commit()
+
+    pipeline = await run_service.get_pipeline_health(run.run_id)
+    by_stage = {stage.stage: stage for stage in pipeline.stages}
+
+    assert by_stage["document_intelligence"].status == "blocked"
+    assert "no text layer" in by_stage["document_intelligence"].detail
+    assert by_stage["projection"].status == "blocked"
+    assert pipeline.overall_status != "ok"
+
+
+@pytest.mark.asyncio
 async def test_dispatch_pending_runs_does_not_publish_before_commit(session) -> None:
     source, version, source_service = await _seed_source_version(session)
     await source_service.approve_source_version(version.source_version_id)

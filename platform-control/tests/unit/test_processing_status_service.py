@@ -218,3 +218,87 @@ async def test_record_document_lifecycle_events_is_idempotent(session) -> None:
     events = await service.list_run_document_lifecycle(RUN_ID)
     assert len(events) == 1
     assert events[0].event_id == "evt_processed_dedup"
+
+
+# ---------------------------------------------------------------------------
+# #731 / ADR-0047: `quarantined` — the refusal document-intelligence emits
+# ---------------------------------------------------------------------------
+
+
+def _build_quarantine_event(
+    event_id: str,
+    *,
+    error_code: str | None = "no_text_layer",
+    error_summary: str | None = "PDF has no text layer; 0 characters extracted.",
+) -> DocumentProcessingStatusUpdatedEvent:
+    """A quarantine as #841 emits it: no document published, and a stated reason."""
+    return DocumentProcessingStatusUpdatedEvent(
+        event_type="document.processing_status.updated",
+        event_version=1,
+        event_id=event_id,
+        occurred_at=datetime(2026, 4, 2, 12, 4, tzinfo=UTC),
+        producer="document-intelligence",
+        correlation_id=RUN_ID,
+        payload={
+            "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+            # Quarantine publishes nothing, so there is no document to point at.
+            "document_id": None,
+            "document_revision": None,
+            "provenance": {
+                "tenant_id": "tenant_public",
+                "corpus_id": "corpus_public_ch_federal_law",
+                "scope_type": "global_public",
+                "source_id": SOURCE_ID,
+                "source_version_id": SOURCE_VERSION_ID,
+                "run_id": RUN_ID,
+                "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+                "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+            },
+            "processing_version": "di_2026_03_29",
+            "status": ProcessingStatus.QUARANTINED,
+            "error_code": error_code,
+            "error_summary": error_summary,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_quarantine_event_is_accepted_and_recorded(session) -> None:
+    """Without `ProcessingStatus.QUARANTINED` this event could not be stored at all.
+
+    #841 emits it when a structurally valid manifestation's text cannot support the
+    claim that it is law. Until this landed, platform-control's run view showed
+    `accepted → processing` and then stopped — a refusal that looked like a hang.
+    """
+    await _seed_run(session)
+    service = ProcessingStatusService(session)
+
+    await service.record_document_processing_status(_build_quarantine_event("evt_quarantine_1"))
+
+    updates = await service.list_run_processing_status(RUN_ID)
+    assert len(updates) == 1
+    assert updates[0].status is ProcessingStatus.QUARANTINED
+    assert updates[0].error_code == "no_text_layer"
+    assert updates[0].document_id is None
+
+
+def test_a_quarantine_without_a_reason_is_rejected() -> None:
+    """ADR-0047's refusal is a *stated* one. A quarantine that explains nothing is the
+    silence the ADR exists to end, so the payload validator treats it like `failed`."""
+    with pytest.raises(ValueError, match="requires non-empty error_code and error_summary"):
+        _build_quarantine_event("evt_quarantine_2", error_code=None, error_summary=None)
+
+
+def test_a_non_refusal_status_still_may_not_carry_a_reason() -> None:
+    """Widening the reason rule to `quarantined` must not widen it to everything."""
+    event = _build_status_event("evt_ready_1", ProcessingStatus.CANONICAL_READY)
+    payload = event.payload.model_dump()
+    payload.update(
+        status=ProcessingStatus.CANONICAL_READY,
+        error_code="no_text_layer",
+        error_summary="should not be here",
+    )
+    with pytest.raises(ValueError, match="must be null unless the status is one of"):
+        DocumentProcessingStatusUpdatedEvent(
+            **{**event.model_dump(exclude={"payload"}), "payload": payload}
+        )

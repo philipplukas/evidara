@@ -5,7 +5,7 @@
 # regardless of which licence the project eventually adopts. `name:
 # Proprietary` is kept and is conformant on its own. No API shape changed, so
 # no `apis.*.version` moved.
-version: "2.32.0"
+version: "2.33.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -33,7 +33,10 @@ apis:
     # responses on the locked `/v1/runs` and `/v1/runs/{run_id}` paths (#853).
     # Additive: both fields have defaults and a reader that ignores them sees exactly
     # what it saw before.
-    version: "0.21.0"
+    # 0.22.0: adds `quarantined` to the processing-status enum on the locked
+    # `/v1/runs/{run_id}/processing-status` path (#731, ADR-0047). Additive: a
+    # reader that does not know the value only sees a status it never sent.
+    version: "0.22.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
@@ -85,6 +88,10 @@ events:
       - "document-intelligence"
   - name: "document.processing_status.updated"
     schema: "contracts/events/document-processing-status-updated.schema.json"
+    # Stays 1.0.0: this must mirror the schema's `event_version` const, which is
+    # the *wire* major (check_contract_manifest.py). `quarantined` was added to
+    # the status enum for ADR-0047 (#731) — additive, so the top-level manifest
+    # version took the minor bump per compatibility_policy below.
     event_version: "1.0.0"
     producer: "document-intelligence"
     consumers:

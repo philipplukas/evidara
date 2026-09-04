@@ -2881,7 +2881,7 @@ export interface components {
          * ProcessingStatus
          * @enum {string}
          */
-        ProcessingStatus: "accepted" | "processing" | "canonical_ready" | "failed" | "withdrawn" | "skipped_duplicate";
+        ProcessingStatus: "accepted" | "processing" | "canonical_ready" | "failed" | "withdrawn" | "skipped_duplicate" | "quarantined";
         /** ProcessingStatusUpdateListResponse */
         ProcessingStatusUpdateListResponse: {
             /** Data */
