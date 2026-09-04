@@ -780,7 +780,16 @@ class IcebergCanonicalSink(CanonicalSink):
                 # Conform to the table's committed schema so appends stay valid as
                 # canonical shapes evolve; fall back to inference when a new column
                 # is present (the catalog rejects it loudly rather than silently).
-                arrow_schema = table.schema().as_arrow()
+                #
+                # That stated policy — loudly, never silently — only ever held for
+                # *top-level* columns (#871). `pa.Table.from_pylist(rows, schema=...)` also
+                # applies the target type to nested ones, and it drops a struct field
+                # the target struct does not declare without raising. So a new key
+                # inside `metadata` (or any optional `provenance` field) took the
+                # silent path the comment above rules out. Widen first, exactly as the
+                # Delta sink does: the batch then reaches the catalog with its true
+                # shape, and the catalog decides — loudly — whether to evolve.
+                arrow_schema = _widen_for_new_nested_fields(table.schema().as_arrow(), ready)
                 incoming = {key for row in ready for key in row}
                 schema = arrow_schema if incoming.issubset(set(arrow_schema.names)) else None
             else:
@@ -963,7 +972,7 @@ def _projection_keys_for_rows(
 
 
 def _widen_for_new_nested_fields(schema: pa.Schema, rows: list[dict[str, object]]) -> pa.Schema:
-    """Add struct fields the batch carries but the existing Delta schema does not (#836).
+    """Add struct fields the batch carries but the existing table's schema does not (#836).
 
     Append reads the table's own Arrow schema and casts the batch to it, which is what keeps
     a narrowed batch compatible with a legacy surface. But that cast is applied to *nested*
@@ -973,6 +982,13 @@ def _widen_for_new_nested_fields(schema: pa.Schema, rows: list[dict[str, object]
     written on a fresh table and dropped on every append to an existing one. The value is
     then absent from Delta, absent from the lean document, and absent from the projection,
     while every test — which starts from an empty directory — passes.
+
+    ``metadata`` is only the loudest case. The loss is a property of **every struct column**
+    on every canonical surface: `provenance` is one too, and ``Provenance.to_dict`` omits its
+    optional fields when they are ``None``, so the struct a table is created with is whatever
+    the *first* row happened to carry — an optional field absent from that row is then dropped
+    from every row after it. Which also means the exposure is not "keys added after the table
+    was created"; it is "keys absent from the batch that created the table".
 
     ``schema_mode="merge"`` cannot rescue it: by the time ``write_deltalake`` sees the batch,
     the field is already gone. So unify the existing schema with the one inferred from the
@@ -991,9 +1007,12 @@ def _widen_for_new_nested_fields(schema: pa.Schema, rows: list[dict[str, object]
         logger.debug("delta_schema_unify_skipped", exc_info=True)
         return schema
     if set(unified.names) != set(schema.names):
-        # Unification introduced a *top-level* column. The caller already established that
-        # the batch's keys are a subset of the table's, so this cannot come from the data;
-        # rather than evolve the surface by accident, keep the table's schema.
+        # Unification introduced a *top-level* column. Returning the table's own schema keeps
+        # both callers on the path they already had for that case: the Delta sink has already
+        # established the batch's keys are a subset of the table's, so it cannot come from the
+        # data; the Iceberg sink checks afterwards and drops to inference, which is how a new
+        # column reaches its catalog loudly. Either way, do not evolve the surface by accident
+        # from inside a widening helper.
         return schema
     return unified
 

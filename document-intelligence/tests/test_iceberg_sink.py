@@ -6,10 +6,13 @@ interaction (namespace/table creation, append) and the opt-in env contract —
 not any particular storage layout.
 """
 
+import dataclasses
 import os
 import sys
 import unittest
 from unittest.mock import MagicMock
+
+import pyarrow as pa
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -19,7 +22,7 @@ from document_intelligence.persist.sinks import (
     IcebergCanonicalSink,
     IcebergSinkConfig,
 )
-from test_adapters import build_commentary_insight
+from test_adapters import build_commentary_insight, build_processing_result
 
 
 def _make_catalog(*, table_exists: bool = False) -> MagicMock:
@@ -28,6 +31,55 @@ def _make_catalog(*, table_exists: bool = False) -> MagicMock:
     catalog.create_table.return_value = MagicMock(name="CreatedTable")
     catalog.load_table.return_value = MagicMock(name="LoadedTable")
     return catalog
+
+
+class _RecordingTable:
+    """A catalog table that advertises the schema it was created with, and keeps appends."""
+
+    def __init__(self, schema: pa.Schema, appended: list[pa.Table]) -> None:
+        self._schema = schema
+        self._appended = appended
+
+    def schema(self) -> object:
+        arrow_schema = self._schema
+
+        class _IcebergSchema:
+            def as_arrow(self) -> pa.Schema:
+                return arrow_schema
+
+        return _IcebergSchema()
+
+    def append(self, table: pa.Table) -> None:
+        self._appended.append(table)
+
+
+class _RecordingCatalog:
+    """A minimal catalog that behaves like a real one across two writes.
+
+    The point is the *second* write: a table that already exists advertises the schema of
+    the batch that created it, and the sink conforms the next batch to that schema. A
+    `MagicMock` cannot say that — `_make_catalog` hands back `names=[]`, which sends every
+    append down the inference path and never exercises the conformance step at all.
+    """
+
+    def __init__(self) -> None:
+        self.tables: dict[str, _RecordingTable] = {}
+        self.appended: dict[str, list[pa.Table]] = {}
+
+    def create_namespace_if_not_exists(self, namespace: str) -> None:
+        return None
+
+    def table_exists(self, identifier: str) -> bool:
+        return identifier in self.tables
+
+    def load_table(self, identifier: str) -> _RecordingTable:
+        return self.tables[identifier]
+
+    def create_table(self, identifier: str, schema: pa.Schema) -> _RecordingTable:
+        appended = self.appended.setdefault(identifier, [])
+        table = _RecordingTable(schema, appended)
+        self.tables[identifier] = table
+        return table
 
 
 class IcebergSinkConfigTests(unittest.TestCase):
@@ -121,6 +173,46 @@ class IcebergCanonicalSinkTests(unittest.TestCase):
         sink.record_document_processed_event({"b": 2})
         self.assertEqual(sink.status_events, [{"a": 1}])
         self.assertEqual(sink.document_processed_events, [{"b": 2}])
+
+    def test_a_new_metadata_key_survives_append_to_an_existing_table(self) -> None:
+        """The Iceberg sink carries the same silent nested-field loss as Delta (#871).
+
+        `_write_rows` conforms the batch to the table's committed schema with
+        `pa.Table.from_pylist(rows, schema=...)`, and that applies the target type to
+        *nested* fields as well — PyArrow drops a struct field the target struct does not
+        declare, without raising. The comment at the call site promises the opposite for a
+        new column ("the catalog rejects it loudly rather than silently"); that promise only
+        ever held for top-level columns.
+
+        `_RecordingCatalog` exists because `MagicMock` cannot state the one fact that
+        matters: an existing table advertises the schema of the batch that *created* it.
+        `_make_catalog`'s stand-in returns `names=[]`, so every append in the other tests
+        falls straight through to inference and never meets the conformance step at all.
+
+        No pyiceberg here, and none is needed: the field is gone before the catalog is
+        reached, so the loss is provable at the Arrow layer where it happens.
+        """
+        catalog = _RecordingCatalog()
+        sink = IcebergCanonicalSink(IcebergSinkConfig(namespace="evidara"), catalog=catalog)
+
+        result = build_processing_result()
+        without = dataclasses.replace(
+            result.document,
+            metadata={k: v for k, v in result.document.metadata.items() if k != "regeste"},
+        )
+        sink.persist(without, [], result.manifest)
+
+        headnote = "Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder."
+        sink.persist(
+            dataclasses.replace(without, metadata={**without.metadata, "regeste": headnote}),
+            [],
+            result.manifest,
+        )
+
+        appended = catalog.appended["evidara.published_documents"]
+        self.assertEqual(len(appended), 2)
+        self.assertNotIn("regeste", appended[0].to_pylist()[0]["metadata"])
+        self.assertEqual(appended[1].to_pylist()[0]["metadata"]["regeste"], headnote)
 
 
 if __name__ == "__main__":
