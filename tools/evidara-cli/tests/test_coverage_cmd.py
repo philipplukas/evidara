@@ -809,8 +809,13 @@ def test_enable_refuses_a_bundle_whose_gate_could_not_run(
     Everything else about this run is good — completed, `mode=acceptance`, live
     execution mode, the right provider. Only the ledger disqualifies it, and the
     refusal has to name which gate.
+
+    This is the one guard that did NOT move server-side in #854, and it is not an
+    oversight: the ledger lives in a local harness `summary.json` and platform-control
+    stores no gate record, so the server has nothing to re-derive it from. Deleting the
+    client-side check would make this test go red, which is the point (#744).
     """
-    req_mock.side_effect = [_LIVE_NEVER_TURNED, _ACCEPTANCE_RUN, _VERSIONS_LIVE]
+    req_mock.side_effect = [_LIVE_NEVER_TURNED]
 
     with pytest.raises(typer.Exit) as exc:
         _enable(
@@ -822,12 +827,12 @@ def test_enable_refuses_a_bundle_whose_gate_could_not_run(
 
     assert exc.value.exit_code == 1
     payload = _payload(emit_mock)
-    assert _codes(payload) == ["evidence_run_is_not_acceptance_evidence"]
-    verdict = payload["artifacts"]["acceptance_verdict"]
-    assert [r["code"] for r in verdict["refusals"]] == ["gate_not_evaluated"]
-    assert "indexed_title_ok" in verdict["refusals"][0]["detail"]
-    # Three reads, no write.
-    assert req_mock.call_count == 3
+    assert _codes(payload) == ["gate_not_evaluated"]
+    coverage = payload["artifacts"]["gate_coverage"]
+    assert [e["gate"] for e in coverage["not_evaluated"]] == ["indexed_title_ok"]
+    assert "indexed_title_ok" in payload["artifacts"]["refusals"][0]["detail"]
+    # It refuses before the PUT is ever built: one read, no write.
+    assert req_mock.call_count == 1
 
 
 @patch("evidara_cli.coverage_cmd._emit")
@@ -841,13 +846,7 @@ def test_enable_accepts_a_bundle_whose_gates_were_only_excluded(
     Without this, the escalation would be indistinguishable from refusing every run
     that ever skipped a gate — which is the old behaviour with extra steps.
     """
-    req_mock.side_effect = [
-        _LIVE_NEVER_TURNED,
-        _ACCEPTANCE_RUN,
-        _VERSIONS_LIVE,
-        {"enabled": True, "source": "override"},
-        _LIVE_FLIPPED,
-    ]
+    req_mock.side_effect = [_LIVE_NEVER_TURNED, _ACCEPTANCE_RUN, _PUT_OK, _LIVE_FLIPPED]
 
     _enable(
         evidence_run_id="run_ok",
@@ -858,7 +857,8 @@ def test_enable_accepts_a_bundle_whose_gates_were_only_excluded(
     )
 
     payload = _payload(emit_mock)
-    assert payload["artifacts"]["acceptance_verdict"]["refusals"] == []
+    assert payload["artifacts"]["gate_coverage"]["refusals"] == []
+    assert payload["artifacts"]["gate_coverage"]["excluded"][0]["gate"] == "title_ok"
     assert payload["artifacts"]["verification"]["applied"] is True
 
 

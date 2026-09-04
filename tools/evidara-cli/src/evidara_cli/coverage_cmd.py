@@ -53,7 +53,7 @@ from evidara_cli.coverage import (
     summarise_templates,
 )
 from evidara_cli.envelope import build_envelope, evidence_assertion, evidence_count, evidence_http
-from evidara_cli.gate_coverage import load_evidence_bundle
+from evidara_cli.gate_coverage import gate_coverage_verdict, load_evidence_bundle
 
 coverage_app = typer.Typer(
     no_args_is_help=True,
@@ -933,6 +933,31 @@ def coverage_enable(
                     inputs=inputs,
                     artifacts=artifacts,
                     refusals=local_refusals,
+                ),
+                human=human,
+            )
+            raise typer.Exit(code=1)
+
+        # The second refusal that must stay client-side, for a structural reason rather
+        # than a historical one: gate coverage. #854 moved the rest of the guard into
+        # platform-control, but a gate ledger is not something the server can see — the
+        # harness bundle is a local `summary.json` and platform-control stores no gate
+        # record to re-derive it from. Sending the bundle would only move the trust, not
+        # the check. So the one guard #744 added stays here, in front of the PUT.
+        #
+        # `gate_coverage_verdict(None)` refuses nothing, so this is inert unless the
+        # operator actually cited `--evidence-bundle`; without one the flip is decided on
+        # the run-level rules alone, exactly as before.
+        gate_coverage = gate_coverage_verdict(bundle)
+        artifacts["gate_coverage"] = gate_coverage
+        if enabled and gate_coverage["refusals"]:
+            artifacts["refusals"] = gate_coverage["refusals"]
+            _emit(
+                _refusal_envelope(
+                    step=step,
+                    inputs=inputs,
+                    artifacts=artifacts,
+                    refusals=gate_coverage["refusals"],
                 ),
                 human=human,
             )

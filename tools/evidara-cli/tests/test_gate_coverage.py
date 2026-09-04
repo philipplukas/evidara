@@ -3,6 +3,14 @@
 `skipped_gates` collapsed two opposite claims into one list: a gate nobody asked for
 (still evidence) and a gate that was asked for and could not run (a hole). These assert
 the split, the escalation, and the conservative reading of the legacy shape.
+
+The *flip path* used to be asserted here too, through `flip_refusals`. #854 moved the
+enablement guard into platform-control and that function with it — but this one rule
+could not follow, because the ledger is a local harness `summary.json` and
+platform-control stores no gate record to re-derive it from. It is now a client-side
+pre-flight in `coverage_cmd.enable`, and the assertion that it refuses the flip lives in
+`test_coverage_cmd.py::test_enable_refuses_a_bundle_whose_gate_could_not_run`. Delete the
+pre-flight and that test goes red.
 """
 
 from __future__ import annotations
@@ -11,7 +19,7 @@ import json
 
 import pytest
 
-from evidara_cli.coverage import acceptance_evidence_verdict, flip_refusals
+from evidara_cli.coverage import acceptance_evidence_verdict
 from evidara_cli.gate_coverage import (
     EVIDENCE_GATE_COVERAGE_UNKNOWN,
     EVIDENCE_GATE_NOT_EVALUATED,
@@ -223,59 +231,3 @@ def test_an_excluded_gate_does_not_disturb_an_otherwise_good_run() -> None:
 
     assert verdict["is_acceptance_evidence"] is True
     assert verdict["refusals"] == []
-
-
-def test_the_flip_guard_inherits_the_rule_without_re_deriving_it() -> None:
-    # The rule lives in `gate_coverage_verdict` alone. `flip_refusals` never reads a
-    # gate list; it refuses because the acceptance verdict already did.
-    template = {
-        "provider": "lexfind",
-        "code_key": "live",
-        "config_key": "never_turned",
-        "agrees_with_server": True,
-    }
-    verdict = acceptance_evidence_verdict(
-        run=_GOOD_RUN,
-        execution_mode="live",
-        evidence_bundle=bundle(
-            gate_coverage=[{"gate": "indexed_title_ok", "outcome": "not_evaluated", "reason": "r"}]
-        ),
-    )
-
-    codes = [
-        r["code"]
-        for r in flip_refusals(
-            template=template,
-            desired_enabled=True,
-            evidence_verdict=verdict,
-            evidence_provider="lexfind",
-        )
-    ]
-
-    assert "evidence_run_is_not_acceptance_evidence" in codes
-
-
-def test_the_same_run_with_only_excluded_gates_is_flippable() -> None:
-    template = {
-        "provider": "lexfind",
-        "code_key": "live",
-        "config_key": "never_turned",
-        "agrees_with_server": True,
-    }
-    verdict = acceptance_evidence_verdict(
-        run=_GOOD_RUN,
-        execution_mode="live",
-        evidence_bundle=bundle(
-            gate_coverage=[{"gate": "title_ok", "outcome": "excluded", "reason": "r"}]
-        ),
-    )
-
-    assert (
-        flip_refusals(
-            template=template,
-            desired_enabled=True,
-            evidence_verdict=verdict,
-            evidence_provider="lexfind",
-        )
-        == []
-    )
