@@ -110,6 +110,78 @@ there is a whole `norm-hierarchy` module with `structural_path` already carrying
 the lexical ranking. Cross-reference-aware retrieval is a scoring change over data
 acquisition is already extracting — not a new subsystem.
 
+### Evidence from Swiss legal text, not from an English benchmark
+
+Everything above is general IR, and the section on contaminated benchmarks is a warning
+against importing its numbers. One study is not general: ZHAW published (2026-06) an
+evaluation built from **165,556 Swiss Federal Supreme Court decisions** (2000–2025), split
+into roughly 2.4 million passages, with 26 legal questions each translated into German,
+French, Italian and English — 104 query instances against ground-truth considerations.
+Twelve multilingual embedding models were tested, alongside reranking, hybrid search,
+language deconfounding and LLM query paraphrasing.
+
+The headline is the reason this ADR exists:
+
+> **73%** of queries found the correct passage in the top ten, against **19%** for keyword
+> search.
+
+That is close to a fourfold gap, measured on Swiss legal text in the languages this
+platform serves, rather than on English common-law data. It is the strongest available
+evidence that the lexical ceiling described above is real and not a modelling artefact.
+
+The same study supplies the caveat, and it lands on this ADR's own stated risk: German and
+English queries outperformed French and Italian, with data skew toward German
+acknowledged, and the authors conclude that *"multilingual does not yet mean equally good
+in every language."* Multilingual parity is therefore no longer an unmeasured risk in this
+document — it is a **measured and confirmed** one, which is why D6 requires per-language
+reporting rather than an average.
+
+The study does not appear to release its dataset or code, so it justifies the direction
+without supplying a harness. D6 still has to be built.
+
+### What is already installed, and switched off
+
+The decisive fact for the build order is not in the literature. It is in the cluster.
+
+OpenSearch 3.7.0 is running with, among others: `opensearch-neural-search`,
+`opensearch-knn`, `opensearch-ml`, `opensearch-ltr`, `opensearch-search-relevance`,
+`opensearch-ubi` and `query-insights`. The hybrid query executor thread pool is live
+(`_plugin_neural_search_hybrid_query_executor`, size 16), and the cluster settings read:
+
+```
+plugins.search_relevance.workbench_enabled          = true
+plugins.search_relevance.scheduled_experiments_enabled = true
+```
+
+**Search Relevance Workbench is enabled on the running cluster and nothing uses it.** It
+provides query sets, judgment lists, search-quality evaluation experiments, and a hybrid
+search optimization experiment that sweeps 82 variants per query — `l2`, `min_max` and
+`z_score` normalisation, arithmetic/harmonic/geometric combination, lexical-vs-neural
+weights in 0.1 increments, and RRF across `rank_constant` values. UBI supplies the schema
+from which SRW can derive *implicit* judgments out of real interaction data.
+
+This changes what D2 and D6 are. They were specified as things to build; most of both is a
+thing to **enable and configure**. An earlier draft of this ADR proposed constructing a
+config-sweep harness next to a cluster that already had one, idle — which is the same
+defect ADR-0052 names, seen from the other side: a capability that exists, is declared in
+the plugin list, and is treated by everyone as absent.
+
+#### And a hardware constraint that decides where embedding runs
+
+```
+name                        node.role  heap.max  ram.max
+opensearch-cluster-master-0 dimr       512mb     2gb
+```
+
+One node, roles data/ingest/cluster-manager/remote-client — **no `ml` role** — while
+`plugins.ml_commons.only_run_on_ml_node = true`. In-cluster model hosting will refuse to
+allocate, and a 512MB heap on a 2GB node could not host a modern encoder in any case.
+
+This is not an obstacle to route around; it settles a design question. Embedding belongs in
+`document-intelligence` (D7), and the query path must stay cheap — which is exactly the
+shape neural sparse **doc-only** mode has, where the model runs at ingest and query time
+needs only a tokenizer and a weight lookup table.
+
 ### The failure mode semantic search introduces
 
 This is the part that must not be discovered in production.
@@ -175,9 +247,16 @@ them invents a comparison the numbers do not support.
 `BGE 145 IV 137` must resolve exactly, and citations are what dense retrieval is worst at.
 The existing `official_citation^3` and `docket_number^2` weights stay load-bearing.
 
-### D2 — Optimizable: one config object, versioned, and an offline replay path
+### D2 — Optimizable: the cluster's own optimizer, plus one versioned config
 
-Every tunable lives in one module beside the existing weights —
+Parameter search is **not hand-rolled**. Search Relevance Workbench is enabled on the
+cluster today, and its hybrid search optimization experiment sweeps a space — 82 variants
+per query across three normalisation techniques, three combination techniques, the
+lexical/neural weight, and RRF `rank_constant` — that nobody would sweep by hand and
+nobody should reimplement. Fusion weights are *found*, against a judgment list, not chosen.
+
+What remains ours is attribution. Every tunable lives in one module beside the existing
+weights —
 `search-relevance.config.ts` already establishes this pattern and its own docstring says
 the parameters are centralised "so they can be adjusted in one place once the corpus is
 large enough for meaningful evaluation". That moment is what this ADR is preparing for.
@@ -192,9 +271,13 @@ Without it, a relevance number cannot be attributed to a configuration, and A/B 
 become folklore. With it, "which config produced this ranking" is answerable from a log
 line.
 
-Tuning happens **offline against captured candidate sets**, not against the live cluster:
-stage 1 output is replayable, so fusion weights, rerank depth and the D4 thresholds can be
-swept without re-running retrieval or paying for reranking on every trial.
+The knobs SRW does not own — D4's abstention floor and margin, rerank depth, the D5
+expansion budget — are tuned **offline against captured candidate sets** rather than
+against the live cluster: stage 1 output is replayable, so a sweep costs no retrieval and
+no reranking.
+
+The division is deliberate: SRW optimises what it has a judgment list for, and anything it
+cannot score stays in the versioned config with its own regression case.
 
 ### D3 — Observable: per-stage telemetry, and the query itself as data
 
@@ -246,24 +329,39 @@ for this repo than the conventional one.
 
 ### D6 — Testable, part two: retrieval metrics, on our own held-out data
 
-`eval/` gains a retrieval layer beside its answer layer: recall@k and NDCG@k over a
-labelled candidate set, reported per `task_type` so a `citation_chain` regression cannot
-hide behind a `section_classification` improvement.
+Retrieval quality is measured with **Search Relevance Workbench**, using its query sets,
+judgment lists and search-quality evaluation experiments, rather than with a parallel
+harness built beside it. `eval/` keeps its answer-quality role; SRW owns recall@k and
+NDCG@k over the candidate set. Judgments come from three sources SRW already supports:
+human labels, imported lists, and implicit judgments derived from UBI interaction data.
 
-Given MLEB's leakage finding, **published leaderboard scores are treated as marketing, not
-evidence.** The only number that governs a decision here is one measured on Evidara's own
-held-out Swiss queries. Two rules follow:
+Three rules constrain it, and none of them is optional:
 
-- The Swiss golden set is built from real queries (D3's Query Insights capture) and from
-  the ADR-0033 dog question family, labelled by a human, and **never** sent to a model
-  vendor for training or fine-tuning.
-- A held-out slice is never used for tuning, only for the final read.
+- **Reported per language.** German, French and Italian are scored and read separately,
+  never as one average. The ZHAW result is that the gap between them is real; an average
+  is precisely the statistic that would hide it.
+- **Reported per `task_type`**, so a `citation_chain` regression cannot hide behind a
+  `section_extraction` improvement — the same axis `eval/queries.csv` already carries.
+- **Our own data decides.** Given MLEB's leakage finding, published leaderboard scores are
+  treated as marketing, not evidence. The Swiss golden set is built from real captured
+  queries and the ADR-0033 dog-question family, labelled by a human, and **never** sent to
+  a model vendor for training or fine-tuning. A held-out slice is never used for tuning,
+  only for the final read.
+
+The one thing SRW does not do is measure the D4 refusal, because a judgment list scores
+rankings and a refusal is the absence of one. That case stays in `eval/` as the named test
+D4 requires.
 
 ### D7 — Chunking: late chunking, decided now because it is expensive later
 
 Embeddings are produced in `document-intelligence` as a pipeline stage, using **late
 chunking**: the document goes through a long-context model once and section-level vectors
 are pooled from its token embeddings, rather than each section being embedded standalone.
+
+That `document-intelligence` is the host is now forced rather than preferred. The
+OpenSearch node has no `ml` role, `plugins.ml_commons.only_run_on_ml_node` is `true`, and
+its heap is 512MB on a 2GB node — in-cluster model hosting cannot allocate and should not
+be made to. Embedding is ingest-time work in a Python pipeline that already exists.
 
 This is decided before implementation because it is a data-shape commitment. Re-embedding
 a large corpus to change chunking strategy is exactly the cost the platform exists to
@@ -288,6 +386,43 @@ entry in `mapping-drift.integration.spec.ts` land in the same change. The mappin
 source of truth is not weakened for this: index creation is first-writer-wins, so a second
 creation path does not merely disagree — it silently wins.
 
+### D10 — What may be a candidate representation, and what may not
+
+The model is still not chosen — D6 says what evidence would choose it. But the field of
+candidates is narrowed now, on two criteria that no amount of measurement will change.
+
+**Licence first.** `jina-embeddings-v3` is strong, supports late chunking natively, and is
+released **CC-BY-NC**: non-commercial. It is out, and it is named here so nobody
+rediscovers it, benchmarks it, and then finds out. Commercially usable candidates:
+**BGE-M3** (MIT), `multilingual-e5-large` (MIT), GTE-multilingual, and the OpenSearch
+neural sparse models.
+
+**Then coverage of the languages Swiss law is actually in.** OpenSearch's own
+`multilingual-v1` neural sparse model is benchmarked on 16 languages including French —
+and **not German, and not Italian**. That is not disqualifying, but it means the model
+OpenSearch ships for this purpose is untested on the majority language of this corpus, and
+D6's per-language reporting is how that gets settled rather than assumed.
+
+Two candidates get named because they are structurally interesting, not because they win:
+
+- **BGE-M3** produces dense, learned-sparse and ColBERT-style multi-vector representations
+  from a single model, over 100 languages at 8192 tokens. For the D1 cascade that means
+  *one* ingest pass in `document-intelligence` feeds all three retrieval arms, instead of
+  three pipelines to keep consistent. If it measures acceptably on German, it is the
+  cheapest possible shape for this design.
+- **Neural sparse in doc-only mode** is the option that fits the hardware. It searches on
+  Lucene's inverted index rather than a vector store, its `(token, weight)` output is
+  inspectable in a way a dense vector is not — which matters for a legal product that must
+  explain itself — and the query path needs no model.
+
+**SwissBERT / SentenceSwissBERT** (ZurichNLP) has language adapters for German, French,
+Italian and Romansh and is the only model built for Switzerland's actual language
+situation. It is trained on news rather than law and is small, so it is a candidate to
+measure, never a default.
+
+Nothing here is a decision to adopt. It is a decision about what enters the comparison,
+and it exists so that the comparison in D6 is short enough to actually run.
+
 ### D9 — The build order, gated on corpus size
 
 Semantic retrieval is not enabled by a date. Each step's exit condition is the evidence
@@ -295,15 +430,17 @@ that makes the next one measurable:
 
 | Step | Gate to start |
 |---|---|
-| 1. Retrieval metrics in `eval/` (D6) | none — do this now, it measures the *current* BM25 baseline |
-| 2. Cross-reference expansion (D5) | step 1 green, so the change can be shown to help |
-| 3. Swiss golden set from real queries (D6) | a corpus with enough documents for a query to have a wrong answer available |
-| 4. Late-chunked embeddings + mapping (D7, D8) | step 3 exists, so model choice is decidable |
-| 5. Fusion + gating (D1, D4) | step 4 |
-| 6. Reranking (stage 3) | steps 1–5, and a measured cost curve — the 200× finding says this may not pay |
+| 1. Turn on UBI + Query Insights capture, build the first query set (D3, D6) | none — configuration on a cluster that already runs both |
+| 2. SRW search-quality experiment against today's BM25 (D6) | step 1 — this is the baseline, and it is *configuration*, not construction |
+| 3. Cross-reference expansion (D5) | step 2 green, so the change can be shown to help |
+| 4. Swiss golden set from real queries, per language (D6) | a corpus large enough for a query to have a wrong answer available |
+| 5. Late-chunked embeddings + mapping (D7, D8, D10) | step 4 exists, so model choice is decidable |
+| 6. SRW hybrid optimizer over fusion; then gating (D1, D2, D4) | step 5 |
+| 7. Reranking (stage 3) | steps 1–6, and a measured cost curve — the 200× finding says this may not pay |
 
-Step 1 is available immediately and is worth doing on its own terms: it gives the lexical
-baseline a number, and without a baseline no later improvement can be claimed.
+Steps 1 and 2 are available immediately, need no corpus growth, and are mostly
+configuration of plugins the cluster already runs. They give the lexical baseline a number
+for the first time — and without a baseline, no later improvement can be claimed.
 
 ## Consequences
 
@@ -332,14 +469,16 @@ baseline a number, and without a baseline no later improvement can be claimed.
 
 ### Not covered
 
-- **Model selection.** Deliberately undecided; D6 says what evidence would decide it, and
-  the corpus does not yet support producing that evidence.
+- **Model selection.** Still deliberately undecided; D6 says what evidence would decide it
+  and D10 narrows the field, but the corpus does not yet support producing that evidence.
 - **Whether reranking pays at all.** Step 6 is gated on a cost curve, not assumed.
 - **Generative answering.** This ADR ends at a ranked, gated result set. What consumes it
   is ADR-0033's business.
-- **Multilingual parity.** Swiss federal law is the same norm in German, French and
-  Italian, and no benchmark surveyed evaluates that. It is a known unmeasured risk, named
-  here rather than assumed away.
+- **Multilingual parity.** No longer an unmeasured risk — ZHAW measured it on Swiss court
+  decisions and found German and English ahead of French and Italian. What is *not*
+  settled is what to do about it: whether a per-language model, per-language thresholds, or
+  query translation is the answer. D6's per-language reporting is what makes that
+  decidable; this ADR does not decide it.
 - **The MCP server.** Still not first (ADR-0033 §4).
 
 ## References
@@ -357,3 +496,8 @@ baseline a number, and without a baseline no later improvement can be claimed.
 - Rank1 (arXiv:2502.18418), *Rerank Before You Reason* (arXiv:2601.14224) — reasoning rerankers
 - CRAwLeR (arXiv:2606.21676) — cross-reference aware legal retrieval; D5
 - MLEB / Legal RAG Bench — benchmark contamination; retrieval sets the ceiling
+- ZHAW, *Can AI bridge Switzerland's legal language gap?* (2026-06) — 165,556 CH Federal
+  Supreme Court decisions; 73% top-10 vs 19% for keyword search; the DE/EN vs FR/IT gap
+- OpenSearch Search Relevance Workbench, and its hybrid search optimization experiment
+- OpenSearch v3 neural sparse models and `multilingual-v1` — D10's coverage caveat
+- BGE-M3 (BAAI), SwissBERT / SentenceSwissBERT (ZurichNLP) — D10 candidates
