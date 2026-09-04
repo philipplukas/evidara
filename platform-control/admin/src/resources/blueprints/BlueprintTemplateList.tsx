@@ -43,6 +43,7 @@ type TemplateRecord = SourceBlueprintTemplate & { id: string };
 const CLASS_PRESET_LABEL: Record<TemplateLockClass, string> = {
   "operator-actionable": "Ready to enable — you can fix",
   "awaiting-acceptance": "Awaiting acceptance run — you can fix",
+  "operator-disabled": "Turned off by an operator",
   "engineer-blocked": "Needs provider work",
   live: "Live",
 };

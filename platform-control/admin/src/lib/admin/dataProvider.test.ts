@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { controlPlaneActions, controlPlaneDataProvider } from "./dataProvider";
+import {
+  blueprintEnablementRefusals,
+  controlPlaneActions,
+  controlPlaneDataProvider,
+} from "./dataProvider";
 
 const originalFetch = global.fetch;
 
@@ -1621,5 +1625,106 @@ describe("reference-data list pagination (#616)", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.data).toHaveLength(2169);
+  });
+});
+
+describe("setBlueprintTemplateEnablement", () => {
+  /**
+   * #854: the panel used to PUT `{enabled, note}` and nothing else, which is exactly
+   * why it was the soft path around ADR-0030. The guard is server-side now, so the
+   * only way it can bite is if the client actually sends its inputs.
+   */
+  it("sends the evidence run and both ADR-0030 acknowledgements", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          overlay_id: "ch",
+          provider_template_id: "lexfind_api_be_hunde",
+          enabled: true,
+          default_enabled: false,
+          source: "override",
+          note: "bundle",
+          updated_by: "op_1",
+          updated_at: "2026-09-03T00:00:00Z",
+          applied: true,
+          needs_human: false,
+          needs_human_reasons: [],
+          evidence_run_id: "run_be",
+          evidence_binding: "template",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await controlPlaneActions.setBlueprintTemplateEnablement(
+      "ch",
+      "lexfind_api_be_hunde",
+      {
+        enabled: true,
+        note: "bundle",
+        evidence_run_id: "run_be",
+        reopen_operator_kill_switch: true,
+        acknowledge_provider_below_live: true,
+      },
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body).toEqual({
+      enabled: true,
+      note: "bundle",
+      evidence_run_id: "run_be",
+      reopen_operator_kill_switch: true,
+      acknowledge_provider_below_live: true,
+    });
+    expect(result.applied).toBe(true);
+    expect(result.evidence_binding).toBe("template");
+  });
+});
+
+describe("blueprintEnablementRefusals", () => {
+  const refused = async (body: unknown) => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(body), {
+        status: 409,
+        headers: { "content-type": "application/json" },
+      }),
+    ) as unknown as typeof fetch;
+    try {
+      await controlPlaneActions.setBlueprintTemplateEnablement("ch", "t", { enabled: true });
+      throw new Error("expected the 409 to reject");
+    } catch (error) {
+      return blueprintEnablementRefusals(error);
+    }
+  };
+
+  it("reads the ADR-0030 refusal codes off the 409 body", async () => {
+    // The codes are what the operator acts on; a generic "could not change the config
+    // key" throws away the only part of the answer that says what to do next.
+    expect(
+      await refused({
+        detail: "Ask them first.",
+        refusals: [
+          { code: "operator_kill_switch_not_acknowledged", detail: "Ask them first." },
+          { code: "provider_not_live_not_acknowledged", detail: "Move the code key." },
+        ],
+      }),
+    ).toEqual([
+      { code: "operator_kill_switch_not_acknowledged", detail: "Ask them first." },
+      { code: "provider_not_live_not_acknowledged", detail: "Move the code key." },
+    ]);
+  });
+
+  it("never renders a refusal as nothing-was-wrong", async () => {
+    // A 409 this cannot parse is still a refusal. Returning [] would fall through to
+    // the success path in the dialog.
+    const codes = await refused({ detail: "no codes here" });
+    expect(codes).toHaveLength(1);
+    expect(codes[0].code).toBe("refused_by_server");
+    expect(await refused({ refusals: [{ detail: "no code" }] })).toHaveLength(1);
+  });
+
+  it("returns nothing for an error that is not an enablement refusal", () => {
+    expect(blueprintEnablementRefusals(new Error("network down"))).toEqual([]);
   });
 });

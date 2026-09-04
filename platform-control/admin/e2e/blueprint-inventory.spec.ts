@@ -111,6 +111,12 @@ async function mockBlueprintApi(page: Page) {
           note: (body as { note: string | null }).note,
           updated_by: "op_00000000000000000000000001",
           updated_at: "2026-07-19T10:00:00Z",
+          // The dialog reports on `applied` — the server's read-back — not on the
+          // status code, so the mock has to carry it (#631, #713, #854).
+          applied: true,
+          needs_human: false,
+          needs_human_reasons: [],
+          evidence_binding: "template",
         }),
       });
     },
@@ -195,7 +201,7 @@ test.describe("Blueprint coverage inventory", () => {
     await expect(page.getByText("fedlex-default")).toHaveCount(0);
   });
 
-  test("an operator can flip the config key with an evidence note", async ({ page }) => {
+  test("an operator can flip the config key, and only with a cited run", async ({ page }) => {
     const mocks = await mockBlueprintApi(page);
     await page.goto("/#/blueprint-templates");
 
@@ -205,12 +211,17 @@ test.describe("Blueprint coverage inventory", () => {
     const dialog = page.getByTestId("blueprint-enablement-dialog");
     await expect(dialog).toBeVisible();
 
-    // The flip is gated on evidence: the submit stays disabled until a note is
-    // typed. A key turned for no recorded reason is a key turned by guessing.
     const submit = dialog.getByRole("button", { name: "Enable template" });
     await expect(submit).toBeDisabled();
 
+    // A note ALONE used to arm the key here, which is precisely what made this
+    // panel the soft path around ADR-0030 (#854): an operator refused by the CLI
+    // could type one character into this box and get the same state. It must not
+    // be enough on its own.
     await dialog.getByLabel("Evidence note").fill("acceptance run r_01J: 42/42 acts parsed");
+    await expect(submit).toBeDisabled();
+
+    await dialog.getByLabel("Acceptance run id").fill("run_01J");
     await expect(submit).toBeEnabled();
     await submit.click();
 
@@ -219,9 +230,14 @@ test.describe("Blueprint coverage inventory", () => {
     const calls = mocks.getEnablementCalls();
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toContain("/blueprint-templates/ch/canton_http_zh/enablement");
+    // The guard is server-side now, so what matters is that the panel actually
+    // sends its inputs — a PUT of `{enabled, note}` alone cannot be guarded.
     expect(calls[0].body).toEqual({
       enabled: true,
       note: "acceptance run r_01J: 42/42 acts parsed",
+      evidence_run_id: "run_01J",
+      reopen_operator_kill_switch: false,
+      acknowledge_provider_below_live: false,
     });
   });
 

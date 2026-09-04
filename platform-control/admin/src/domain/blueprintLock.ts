@@ -37,7 +37,16 @@ import type { PillLevel } from "../ui/primitives";
  *
  * - `live` — both keys turned; runs launch.
  * - `operator-actionable` — the provider is live and only the config key is
- *   shut. This is the pure-paperwork group: evidence, then flip.
+ *   shut, and *nobody ever turned it*. This is the pure-paperwork group:
+ *   evidence, then flip.
+ * - `operator-disabled` — somebody turned the config key off on purpose. This
+ *   is a different state with a different first step (ask them), and it used to
+ *   be collapsed into `operator-actionable` because the class was derived from
+ *   `enabled` alone. Both read `enabled: false`; only `source` separates them,
+ *   and the difference is load-bearing everywhere else in the platform —
+ *   ADR-0030's acceptance waiver dispatches at a never-turned key and refuses
+ *   at a kill switch (#768), and the flip guard refuses to reopen one without
+ *   an explicit acknowledgement (#854).
  * - `awaiting-acceptance` — the provider is built but unproven. The operator's
  *   first step is dispatching an acceptance run, not filing a ticket.
  * - `engineer-blocked` — the provider is a scaffold. Flipping the config key
@@ -46,6 +55,7 @@ import type { PillLevel } from "../ui/primitives";
 export type TemplateLockClass =
   | "live"
   | "operator-actionable"
+  | "operator-disabled"
   | "awaiting-acceptance"
   | "engineer-blocked";
 
@@ -69,9 +79,18 @@ const LOCK_CLASSES: Record<TemplateLockClass, LockClassDescriptor> = {
     id: "operator-actionable",
     label: "Ready to enable",
     detail:
-      "Provider is live; only the config key is shut. Capture acceptance-run " +
-      "evidence, then enable it here — no engineer, no deploy.",
+      "Provider is live; only the config key is shut, and nobody has turned it. " +
+      "Capture acceptance-run evidence, then enable it here — no engineer, no deploy.",
     level: "degraded",
+  },
+  "operator-disabled": {
+    id: "operator-disabled",
+    label: "Turned off by an operator",
+    detail:
+      "Somebody deliberately shut the config key — a kill switch, not a key that was " +
+      "never earned. Acceptance mode does not waive it, and reopening it needs an " +
+      "explicit acknowledgement. Read the note, and ask them first.",
+    level: "critical",
   },
   "awaiting-acceptance": {
     id: "awaiting-acceptance",
@@ -95,7 +114,20 @@ const LOCK_CLASSES: Record<TemplateLockClass, LockClassDescriptor> = {
 };
 
 type LockLike = Pick<SourceBlueprintTemplate, "enabled" | "live_ready"> &
-  Partial<Pick<SourceBlueprintTemplate, "acquisition_readiness">>;
+  Partial<Pick<SourceBlueprintTemplate, "acquisition_readiness" | "source">>;
+
+/**
+ * Whether the config key's current value is an operator's deliberate act.
+ *
+ * `source` is the provenance the API has published since #632: `"override"` means a
+ * row in `blueprint_template_overrides`, `"default"` means the shipped
+ * `source_blueprints.yaml` value nobody has touched. A payload that predates the field
+ * is read as `default` — the safe direction, because inventing a kill switch nobody
+ * installed would tell an operator to go ask a colleague who does not exist.
+ */
+function isOperatorOverride(template: LockLike): boolean {
+  return template.source === "override";
+}
 
 /**
  * Resolve the code key, tolerating a payload that predates `acquisition_readiness`.
@@ -108,10 +140,21 @@ function readinessOf(template: LockLike): AcquisitionReadiness {
   return template.acquisition_readiness ?? (template.live_ready ? "live" : "scaffold");
 }
 
+/**
+ * The priority order mirrors `evidara_cli.coverage.classify_template`'s blocker
+ * ordering — scaffold, then an operator's kill switch, then awaiting evidence — so the
+ * panel and the CLI never disagree about what the first step is. The kill switch is
+ * *also* surfaced unconditionally by {@link describeConfigKey}, because at a scaffold
+ * provider this class reports "needs provider work" and the closed key would otherwise
+ * stay invisible behind it (#854).
+ */
 export function classifyTemplate(template: LockLike): LockClassDescriptor {
   const readiness = readinessOf(template);
   if (readiness === "scaffold") {
     return LOCK_CLASSES["engineer-blocked"];
+  }
+  if (!template.enabled && isOperatorOverride(template)) {
+    return LOCK_CLASSES["operator-disabled"];
   }
   if (readiness === "awaiting_evidence") {
     return LOCK_CLASSES["awaiting-acceptance"];
@@ -181,6 +224,7 @@ export function describeEnablementAction(template: LockLike): EnablementAction {
 export const LOCK_CLASS_ORDER: TemplateLockClass[] = [
   "operator-actionable",
   "awaiting-acceptance",
+  "operator-disabled",
   "engineer-blocked",
   "live",
 ];
@@ -191,6 +235,7 @@ export function summarizeInventory(templates: LockLike[]): InventorySummary {
   const summary: InventorySummary = {
     live: 0,
     "operator-actionable": 0,
+    "operator-disabled": 0,
     "awaiting-acceptance": 0,
     "engineer-blocked": 0,
     total: templates.length,
@@ -215,11 +260,31 @@ export type KeyDescriptor = {
 };
 
 export function describeConfigKey(template: LockLike): KeyDescriptor {
+  if (template.enabled) {
+    return {
+      label: "Config key",
+      state: "open",
+      ownerHint: "on — an operator can turn this off",
+      level: "healthy",
+    };
+  }
+  // Said unconditionally, because this is the state the dialog is about to overwrite
+  // and it must be legible before the operator opens it. `classifyTemplate` reports
+  // "needs provider work" for a kill switch on a scaffold provider, so the class
+  // column alone cannot be where a kill switch becomes visible (#854).
+  if (isOperatorOverride(template)) {
+    return {
+      label: "Config key",
+      state: "shut",
+      ownerHint: "off — an operator shut this deliberately; ask before reopening",
+      level: "critical",
+    };
+  }
   return {
     label: "Config key",
-    state: template.enabled ? "open" : "shut",
-    ownerHint: template.enabled ? "on — an operator can turn this off" : "off — yours to turn",
-    level: template.enabled ? "healthy" : "degraded",
+    state: "shut",
+    ownerHint: "off — never turned; yours to turn",
+    level: "degraded",
   };
 }
 

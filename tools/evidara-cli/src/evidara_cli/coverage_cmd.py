@@ -41,22 +41,19 @@ from evidara_cli.client import (
     request_status,
 )
 from evidara_cli.coverage import (
+    FLIP_CLASSIFICATION_DISAGREES,
+    FLIP_CLASSIFICATION_DISAGREES_DETAIL,
     MODE_ACCEPTANCE,
     TERMINAL_RUN_STATUSES,
     acceptance_evidence_verdict,
     classify_template,
     diagnose_stall,
-    evidence_binding_strength,
-    find_source_version,
-    flip_refusals,
     is_already_in_desired_state,
+    server_refusals,
     summarise_templates,
-    verify_flip,
-    version_execution_mode,
-    version_provider,
 )
 from evidara_cli.envelope import build_envelope, evidence_assertion, evidence_count, evidence_http
-from evidara_cli.gate_coverage import load_evidence_bundle
+from evidara_cli.gate_coverage import gate_coverage_verdict, load_evidence_bundle
 
 coverage_app = typer.Typer(
     no_args_is_help=True,
@@ -679,43 +676,68 @@ def _find_template(
     )
 
 
-def _acceptance_context(
-    run_id: str, *, correlation_id: str | None, evidence_bundle: dict[str, Any] | None = None
-) -> tuple[dict[str, Any], dict[str, Any], str | None]:
-    """Fetch the cited run and derive its acceptance verdict and provider.
+def _refusal_envelope(
+    *,
+    step: str,
+    inputs: dict[str, Any],
+    artifacts: dict[str, Any],
+    refusals: list[dict[str, str]],
+    write_attempted: bool = False,
+) -> dict[str, Any]:
+    """One envelope shape for every refusal, wherever it was derived.
 
-    Returns ``(run, verdict, provider)``. The provider comes from the source version's
-    acquisition spec because the version read model exposes no template binding — see
-    ``coverage.version_provider``.
-
-    ``evidence_bundle`` is the harness `summary.json`, when the operator cited one. It
-    is what makes a gate that could not run refuse the flip rather than pass unnoticed
-    (:mod:`evidara_cli.gate_coverage`).
+    `write_attempted` is the honest distinction the side-effect level turns on: a
+    pre-write refusal changed nothing, while a refusal raised *after* the override row
+    was written leaves the key in whatever state the read-back reports.
     """
-    pc_base = platform_control_base_url()
-    pc_headers = platform_control_headers(correlation_id=correlation_id)
-    run_payload = request_json("GET", join_url(pc_base, f"/v1/runs/{run_id}"), headers=pc_headers)
-    run = run_payload if isinstance(run_payload, dict) else {}
-
-    version: dict[str, Any] | None = None
-    source_id = run.get("source_id")
-    if source_id:
-        try:
-            versions_payload = request_json(
-                "GET",
-                join_url(pc_base, f"/v1/sources/{source_id}/versions"),
-                headers=pc_headers,
+    return build_envelope(
+        ok=False,
+        workflow=_WORKFLOW,
+        step=step,
+        status="needs_human",
+        side_effect_level="reversible" if write_attempted else "none",
+        inputs=inputs,
+        artifacts=artifacts,
+        evidence=[
+            evidence_assertion(
+                "adr-0030:flip-justified",
+                value=[item["code"] for item in refusals],
+                passed=False,
+                note="; ".join(item["detail"] for item in refusals),
             )
-            version = find_source_version(versions_payload, run.get("source_version_id"))
-        except HttpJsonError:
-            version = None
-
-    verdict = acceptance_evidence_verdict(
-        run=run,
-        execution_mode=version_execution_mode(version),
-        evidence_bundle=evidence_bundle,
+        ],
+        decision={
+            "recommended_action": "needs-human",
+            "reason": (
+                (
+                    "Refused to flip the config key. The write was attempted and the "
+                    "read-back did not confirm it. "
+                    if write_attempted
+                    else "Refused to flip the config key. Nothing was written. "
+                )
+                + refusals[0]["detail"]
+            ),
+        },
+        next_actions=["inspect"],
+        compensation={"available": False},
     )
-    return run, verdict, version_provider(version)
+
+
+def _evidence_run(run_id: str, *, correlation_id: str | None) -> dict[str, Any]:
+    """Fetch the cited run for the envelope's artifacts.
+
+    Read-only and best-effort: the *verdict* over this run is derived by the server
+    (#854), so a failure here costs the envelope some context, never a check.
+    """
+    try:
+        payload = request_json(
+            "GET",
+            join_url(platform_control_base_url(), f"/v1/runs/{run_id}"),
+            headers=platform_control_headers(correlation_id=correlation_id),
+        )
+    except HttpJsonError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 @coverage_app.command("enable")
@@ -775,12 +797,17 @@ def coverage_enable(
 
     This is the loop's last step and the one worth getting wrong quietly. Enabling
     requires an `--evidence-run-id` whose run survives the ADR-0030 acceptance verdict
-    *and* ran this template's provider; it refuses outright otherwise, including for a
-    key an operator deliberately shut and for a provider whose code key is still below
-    `live`. After the `PUT` it re-reads `/v1/sources/blueprint-templates` and asserts
-    both the effective key **and** that the read model attributes it to an operator
-    override — a 200 alone cannot tell a flip from a write that silently did nothing
-    (#631, #713).
+    *and* binds to this template; it refuses outright otherwise, including for a key an
+    operator deliberately shut and for a provider whose code key is still below `live`.
+
+    **The guard lives in platform-control, not here (#854).** This command used to
+    derive the refusals itself, and the admin panel — hitting the same endpoint —
+    required only a non-empty note, so the easier path was the weaker one and this
+    command's guard was advisory. The `PUT` now carries the evidence run and both
+    acknowledgements, and the server refuses with 409 and the same named codes, which
+    are reproduced verbatim in the envelope. It also does the read-back, so a 200 here
+    already means the key was re-read and confirmed (#631, #713); this command still
+    re-reads the template afterwards to report the resulting lock state.
 
     The desired state is a *pair*, value and provenance: `--disable` on a key that is
     merely `never_turned` still writes, because ADR-0030's acceptance waiver dispatches
@@ -887,64 +914,68 @@ def coverage_enable(
             )
             return
 
-        verdict: dict[str, Any] | None = None
-        evidence_provider: str | None = None
-        if enabled and evidence_run_id:
-            run, verdict, evidence_provider = _acceptance_context(
-                evidence_run_id, correlation_id=correlation_id, evidence_bundle=bundle
-            )
-            artifacts["evidence_run"] = run
-            artifacts["acceptance_verdict"] = verdict
-            artifacts["evidence_binding"] = evidence_binding_strength(
-                evidence_provider=evidence_provider, template=before
-            )
-
-        refusals = flip_refusals(
-            template=before,
-            desired_enabled=enabled,
-            evidence_verdict=verdict,
-            evidence_provider=evidence_provider,
-            reopen_acknowledged=reopen_operator_kill_switch,
-            below_live_acknowledged=acknowledge_provider_below_live,
-        )
-        if refusals:
-            artifacts["refusals"] = refusals
+        # The only refusal still derived here, and it is checked before anything else
+        # is read: it compares *this* module's lock derivation against the server's
+        # `launchable`, which the server cannot check against itself — and `enable` is
+        # the one coverage command whose client-side derivation gates a write, so a
+        # disagreement is disqualifying.
+        if before.get("agrees_with_server") is False:
+            local_refusals = [
+                {
+                    "code": FLIP_CLASSIFICATION_DISAGREES,
+                    "detail": FLIP_CLASSIFICATION_DISAGREES_DETAIL,
+                }
+            ]
+            artifacts["refusals"] = local_refusals
             _emit(
-                build_envelope(
-                    ok=False,
-                    workflow=_WORKFLOW,
+                _refusal_envelope(
                     step=step,
-                    status="needs_human",
-                    side_effect_level="none",
                     inputs=inputs,
                     artifacts=artifacts,
-                    evidence=[
-                        evidence_assertion(
-                            "adr-0030:flip-justified",
-                            value=[item["code"] for item in refusals],
-                            passed=False,
-                            note="; ".join(item["detail"] for item in refusals),
-                        )
-                    ],
-                    decision={
-                        "recommended_action": "needs-human",
-                        "reason": (
-                            "Refused to flip the config key. Nothing was written. "
-                            + refusals[0]["detail"]
-                        ),
-                    },
-                    next_actions=["inspect"],
-                    compensation={"available": False},
+                    refusals=local_refusals,
                 ),
                 human=human,
             )
             raise typer.Exit(code=1)
 
+        # The second refusal that must stay client-side, for a structural reason rather
+        # than a historical one: gate coverage. #854 moved the rest of the guard into
+        # platform-control, but a gate ledger is not something the server can see — the
+        # harness bundle is a local `summary.json` and platform-control stores no gate
+        # record to re-derive it from. Sending the bundle would only move the trust, not
+        # the check. So the one guard #744 added stays here, in front of the PUT.
+        #
+        # `gate_coverage_verdict(None)` refuses nothing, so this is inert unless the
+        # operator actually cited `--evidence-bundle`; without one the flip is decided on
+        # the run-level rules alone, exactly as before.
+        gate_coverage = gate_coverage_verdict(bundle)
+        artifacts["gate_coverage"] = gate_coverage
+        if enabled and gate_coverage["refusals"]:
+            artifacts["refusals"] = gate_coverage["refusals"]
+            _emit(
+                _refusal_envelope(
+                    step=step,
+                    inputs=inputs,
+                    artifacts=artifacts,
+                    refusals=gate_coverage["refusals"],
+                ),
+                human=human,
+            )
+            raise typer.Exit(code=1)
+
+        if enabled and evidence_run_id:
+            artifacts["evidence_run"] = _evidence_run(
+                evidence_run_id, correlation_id=correlation_id
+            )
+
         audit_note = (note or "").strip()
-        if enabled:
+        if enabled and evidence_run_id:
             citation = f"ADR-0030 acceptance evidence: run {evidence_run_id}."
             audit_note = f"{citation} {audit_note}".strip()
 
+        # Everything else is the server's call (#854). A 409 is a refusal that wrote
+        # nothing; its `refusals[].code` is the same vocabulary this command used to
+        # derive locally, so the envelope reproduces it verbatim.
         try:
             put_response = request_json(
                 "PUT",
@@ -953,24 +984,66 @@ def coverage_enable(
                     f"/v1/sources/blueprint-templates/{overlay}/{template}/enablement",
                 ),
                 headers={**pc_headers, "Content-Type": "application/json"},
-                json_body={"enabled": enabled, "note": audit_note},
+                json_body={
+                    "enabled": enabled,
+                    "note": audit_note,
+                    "evidence_run_id": evidence_run_id if enabled else None,
+                    "reopen_operator_kill_switch": reopen_operator_kill_switch,
+                    "acknowledge_provider_below_live": acknowledge_provider_below_live,
+                },
             )
         except typer.Exit:
             raise
+        except HttpJsonError as exc:
+            if exc.status_code != 409:
+                # The write may or may not have landed, so the envelope must not claim
+                # "none" for its side-effect level.
+                _fail(exc, step=step, inputs=inputs, human=human, side_effect_level="reversible")
+            try:
+                body = json.loads(exc.body)
+            except (ValueError, TypeError):
+                body = None
+            refusals = server_refusals(body)
+            artifacts["refusals"] = refusals
+            artifacts["refusal_response"] = body
+            wrote = bool(isinstance(body, dict) and body.get("write_attempted"))
+            _emit(
+                _refusal_envelope(
+                    step=step,
+                    inputs=inputs,
+                    artifacts=artifacts,
+                    refusals=refusals,
+                    write_attempted=wrote,
+                ),
+                human=human,
+            )
+            raise typer.Exit(code=1) from exc
         except Exception as exc:
-            # The write may or may not have landed, so the envelope must not claim
-            # "none" for its side-effect level.
             _fail(exc, step=step, inputs=inputs, human=human, side_effect_level="reversible")
         artifacts["enablement_response"] = put_response
 
-        # The 200 is not the proof. Re-read the operator read model and check both the
-        # effective key and its provenance.
+        response = put_response if isinstance(put_response, dict) else {}
+        artifacts["acceptance_verdict"] = response.get("acceptance_verdict")
+        artifacts["evidence_binding"] = response.get("evidence_binding")
+
+        # A 200 already means the server re-read the write and confirmed it. Re-read
+        # the inventory anyway: it is what reports the resulting lock state, and an
+        # `applied: true` that this cannot corroborate is worth refusing over.
         after_raw = _fetch_templates(correlation_id=correlation_id)
         after_match = _find_template(after_raw, overlay=overlay, template=template) or {}
-        verification = verify_flip(after_template=after_match, desired_enabled=enabled)
         after = classify_template(after_match) if after_match else None
         artifacts["template_after"] = after
-        artifacts["verification"] = verification
+        server_applied = bool(response.get("applied", True))
+        client_agrees = bool(after_match) and (
+            bool(after_match.get("enabled")) is bool(enabled)
+            and str(after_match.get("source") or "default").lower() == "override"
+        )
+        artifacts["verification"] = {
+            "applied": server_applied and client_agrees,
+            "server_applied": server_applied,
+            "effective_enabled": after_match.get("enabled"),
+            "provenance": after_match.get("source"),
+        }
 
         ev: list[dict[str, Any]] = [
             evidence_http(
@@ -981,56 +1054,42 @@ def coverage_enable(
             ),
             evidence_assertion(
                 "coverage:config-key-read-back",
-                value=verification["effective_enabled"],
-                passed=verification["applied"],
+                value=after_match.get("enabled"),
+                passed=server_applied and client_agrees,
                 note=(
-                    "Re-read the blueprint-template read model: the key is "
-                    f"{verification['effective_enabled']} with provenance "
-                    f"'{verification['provenance']}'."
-                    if verification["applied"]
-                    else "; ".join(item["detail"] for item in verification["problems"])
+                    "The server re-read the write and this command re-read the template "
+                    f"listing: the key is {after_match.get('enabled')} with provenance "
+                    f"'{after_match.get('source')}'."
                 ),
             ),
         ]
-        # The binding is provider-level at best, and for `lexfind` that is 26 cantons
-        # plus Bund behind one name. Surfaced as a check that did NOT pass, so a human
-        # confirms the run is for this template rather than reading a quiet field (#846).
-        weak_binding = enabled and verdict is not None
-        if weak_binding:
+        binding = response.get("evidence_binding")
+        if enabled and binding is not None:
+            # `template` is exact — the cited run's version records this overlay and
+            # provider template. Anything weaker is reported as a check that did not
+            # pass so a human confirms it, rather than a quiet field (#846).
             ev.append(
                 evidence_assertion(
                     "adr-0030:acceptance-evidence",
                     value=evidence_run_id,
-                    passed=False,
-                    note=(
-                        f"Run {evidence_run_id} passed the acceptance verdict, but binding "
-                        f"to this template is only '{artifacts.get('evidence_binding')}'-"
-                        "level: the version read model exposes no overlay/template, so a "
-                        "same-provider run of a DIFFERENT template satisfies this check "
-                        "too — for `lexfind` that is every canton plus Bund. Confirm by "
-                        "hand that the cited run is this template's (#846)."
-                    ),
+                    passed=binding == "template",
+                    note=(f"Run {evidence_run_id} binds to this template at '{binding}' strength."),
                 )
             )
-        # Only meaningful when arming the key; shutting one is safe at any code key.
-        if enabled and after and after["code_key"] != "live":
+        for reason in response.get("needs_human_reasons") or []:
             ev.append(
                 evidence_assertion(
-                    "adr-0030:code-key",
-                    value=after["code_key"],
+                    "adr-0030:operator-judgement",
+                    value=str(reason),
                     passed=False,
-                    note=(
-                        "The config key is armed ahead of the code key, which is still "
-                        f"'{after['code_key']}'. ADR-0030 §2 wants LIVE first; the lock "
-                        f"admits {after['dispatchable_modes'] or 'no mode'} meanwhile, so "
-                        "harm is deferred, not absent. Moving the code key is a "
-                        "platform-control code change."
-                    ),
+                    note=str(reason),
                 )
             )
 
-        ok = verification["applied"]
-        needs_human = ok and any(item.get("passed") is False for item in ev)
+        ok = server_applied and client_agrees
+        needs_human = ok and (
+            bool(response.get("needs_human")) or any(item.get("passed") is False for item in ev)
+        )
         compensate_cmd = (
             "evidara workflow coverage enable --disable "
             f"--overlay {overlay} --template {template} --note '<why>'"

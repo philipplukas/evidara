@@ -219,7 +219,7 @@ EXPECTED_ERROR_RESPONSES = {
     "retryRun": {"400", "404", "409"},
     "saveWizardDiscoveryPlan": {"404", "409"},
     "saveWizardScope": {"404", "409"},
-    "setBlueprintTemplateEnablement": {"404"},
+    "setBlueprintTemplateEnablement": {"404", "409"},
     "slackInteraction": {"400"},
     "startWizardPilotRun": {"400", "404", "409"},
     "triggerRescoreFromCorrection": {"404", "409"},
@@ -232,9 +232,21 @@ EXPECTED_ERROR_RESPONSES = {
     "updateSourceVersion": {"404", "409"},
 }
 
-#: `GET /ready` answers 503 with the readiness *report* (`status: degraded`), not
-#: an error body — it is a health verdict, not a raised exception.
-NON_ERROR_BODY_RESPONSES = {("getReadiness", "503")}
+#: Responses whose body is a *verdict the handler returns*, not the payload
+#: `main._error_payload` builds from a raised exception. Both are strict supersets of
+#: `ErrorResponse` in the fields that matter, so a client that only knows the uniform
+#: error body still reads them:
+#:
+#: - `GET /ready` answers 503 with the readiness report (`status: degraded`) — a health
+#:   verdict, not a raised exception.
+#: - `PUT .../enablement` answers 409 with the ADR-0030 guard's refusal codes (#854).
+#:   `{detail: str}` alone cannot carry them, and the whole point of moving the guard
+#:   server-side is that both clients branch on codes rather than on prose. It keeps
+#:   `detail` and `correlation_id` so nothing that reads only those regresses.
+NON_ERROR_BODY_RESPONSES = {
+    ("getReadiness", "503"),
+    ("setBlueprintTemplateEnablement", "409"),
+}
 
 _DOMAIN_ERROR_CODES = {"400", "401", "403", "404", "409", "500", "503"}
 

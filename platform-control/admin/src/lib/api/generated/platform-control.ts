@@ -221,12 +221,21 @@ export interface paths {
         get?: never;
         /**
          * Set Blueprint Template Enablement
-         * @description Flip the operator-reachable ADR-0030 config key for one template (#632).
+         * @description Flip the operator-reachable ADR-0030 config key for one template (#632, #854).
          *
          *     This is the key an operator turns after capturing acceptance-run evidence —
          *     reachable over the API, with an audit trail (who/when/why), no repo edit and
          *     no deploy. The code key (`live_ready`) is unaffected: a run at a scaffold
          *     provider still refuses even once this is enabled.
+         *
+         *     **The guard is here, not in the clients.** Enabling requires a cited
+         *     `evidence_run_id` whose run survives the ADR-0030 acceptance verdict and binds to
+         *     *this* template — not merely to its provider, which for `lexfind` would be 26
+         *     cantons plus Bund off one canton's run (#846). Reopening a key an operator
+         *     deliberately shut, and arming the config key ahead of the code key, each need their
+         *     own acknowledgement. Refusals come back as **409** with machine-readable codes and
+         *     nothing written; a 200 additionally asserts `applied`, which is a genuine read-back
+         *     rather than the status code (#631, #713).
          */
         put: operations["setBlueprintTemplateEnablement"];
         post?: never;
@@ -1415,17 +1424,115 @@ export interface components {
             seed_urls?: string[] | null;
         };
         /**
+         * BlueprintTemplateAcceptanceVerdict
+         * @description Whether the cited run may be cited as ADR-0030 acceptance evidence.
+         */
+        BlueprintTemplateAcceptanceVerdict: {
+            /** Is Acceptance Evidence */
+            is_acceptance_evidence: boolean;
+            /** Refusals */
+            refusals?: components["schemas"]["BlueprintTemplateEnablementRefusal"][];
+            /** Run Id */
+            run_id?: string | null;
+            /** Mode */
+            mode?: string | null;
+            /** Execution Mode */
+            execution_mode?: string | null;
+            /** Captured Resources Count */
+            captured_resources_count?: number | null;
+        };
+        /**
+         * BlueprintTemplateEnablementRefusal
+         * @description One machine-readable reason the flip did not happen.
+         */
+        BlueprintTemplateEnablementRefusal: {
+            /**
+             * Code
+             * @description Stable refusal code. The same vocabulary `evidara workflow coverage enable` reports, so an agent branches on the code and never on prose.
+             * @example operator_kill_switch_not_acknowledged
+             */
+            code: string;
+            /**
+             * Detail
+             * @description Operator-facing explanation of the refusal.
+             */
+            detail: string;
+        };
+        /**
+         * BlueprintTemplateEnablementRefusedResponse
+         * @description The 409 body when the ADR-0030 guard refuses to move the config key (#854).
+         *
+         *     Carries `detail` so a client that only knows the uniform error envelope still gets
+         *     a usable message, and `refusals` so one that does not can render the codes.
+         */
+        BlueprintTemplateEnablementRefusedResponse: {
+            /**
+             * Detail
+             * @description Human-readable summary — the first refusal's detail.
+             */
+            detail: string;
+            /** Correlation Id */
+            correlation_id?: string | null;
+            /** Overlay Id */
+            overlay_id: string;
+            /** Provider Template Id */
+            provider_template_id: string;
+            /** Refusals */
+            refusals: components["schemas"]["BlueprintTemplateEnablementRefusal"][];
+            /**
+             * Needs Human
+             * @default true
+             */
+            needs_human: boolean;
+            /**
+             * Write Attempted
+             * @description False for a pre-write refusal: nothing was written and the key is unchanged. True only when the override row was written and the read-back then failed to confirm it — the key's state is then whatever the read-back reports, not what was requested.
+             */
+            write_attempted: boolean;
+            /** Evidence Run Id */
+            evidence_run_id?: string | null;
+            /**
+             * Evidence Binding
+             * @description How tightly the cited run is bound to *this* template. 'template' is exact — the run's source version records this overlay and provider template. 'acquisition_spec' is near-exact — the version has no blueprint provenance but its resolved spec equals this template's, so `needs_human` is set. 'provider' and 'none' are too weak to enable on and are refused: all 26 cantons and Bund sit behind the single `lexfind` provider (#846).
+             */
+            evidence_binding?: string | null;
+            acceptance_verdict?: components["schemas"]["BlueprintTemplateAcceptanceVerdict"] | null;
+        };
+        /**
          * BlueprintTemplateEnablementRequest
-         * @description Operator flip of the ADR-0030 config key (#632).
+         * @description Operator flip of the ADR-0030 config key (#632), with its evidence (#854).
+         *
+         *     Until #854 this carried `enabled` and a free-text `note`, and the note being
+         *     non-empty was the entire precondition for arming a template. The CLI meanwhile
+         *     required a cited acceptance run and refused with eight named codes, so the two
+         *     paths to the same state differed sharply in rigour and **the easier one was the
+         *     weaker one**. The guard now lives on the server and these are the inputs it needs.
          */
         BlueprintTemplateEnablementRequest: {
             /** Enabled */
             enabled: boolean;
             /**
              * Note
-             * @description Why the key was flipped — e.g. a link to captured acceptance-run evidence.
+             * @description Why the key was flipped. Required in both directions: it is the only durable record of why this template was trusted, or why a portal was shut off.
              */
             note?: string | null;
+            /**
+             * Evidence Run Id
+             * @description Run whose acceptance evidence earns the flip (ADR-0030 §5). Required to enable; ignored when disabling. The server re-derives the acceptance verdict from this run and binds it to this template — a run of a different template on the same provider is refused (#846).
+             */
+            evidence_run_id?: string | null;
+            /**
+             * Reopen Operator Kill Switch
+             * @description Acknowledge reopening a key an operator deliberately shut. Acceptance evidence does not waive a kill switch (ADR-0030 §2, #768).
+             * @default false
+             */
+            reopen_operator_kill_switch: boolean;
+            /**
+             * Acknowledge Provider Below Live
+             * @description Acknowledge arming the config key before the provider's code key reaches `live`. ADR-0030 §2 wants LIVE first.
+             * @default false
+             */
+            acknowledge_provider_below_live: boolean;
         };
         /** BlueprintTemplateEnablementResponse */
         BlueprintTemplateEnablementResponse: {
@@ -1454,6 +1561,28 @@ export interface components {
             updated_by?: string | null;
             /** Updated At */
             updated_at?: string | null;
+            /**
+             * Applied
+             * @description The flip was confirmed by re-reading the template: the effective key is what was asked for AND the read model attributes it to an operator override. A 200 alone cannot tell a flip from a write that silently did nothing (#631, #713), so never report a flip on the status code.
+             * @default true
+             */
+            applied: boolean;
+            /**
+             * Needs Human
+             * @description The flip happened but at least one thing was not decided for you — read `needs_human_reasons`. Set when the evidence bound to the template only by acquisition-spec equality, when the code key is still below `live`, or when an operator's kill switch was reopened.
+             * @default false
+             */
+            needs_human: boolean;
+            /** Needs Human Reasons */
+            needs_human_reasons?: string[];
+            /** Evidence Run Id */
+            evidence_run_id?: string | null;
+            /**
+             * Evidence Binding
+             * @description How tightly the cited run is bound to *this* template. 'template' is exact — the run's source version records this overlay and provider template. 'acquisition_spec' is near-exact — the version has no blueprint provenance but its resolved spec equals this template's, so `needs_human` is set. 'provider' and 'none' are too weak to enable on and are refused: all 26 cantons and Bund sit behind the single `lexfind` provider (#846).
+             */
+            evidence_binding?: string | null;
+            acceptance_verdict?: components["schemas"]["BlueprintTemplateAcceptanceVerdict"] | null;
         };
         /** BundeslandHttpAcquisitionSpec */
         BundeslandHttpAcquisitionSpec: {
@@ -4714,6 +4843,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The ADR-0030 guard refused to move the config key. `refusals[].code` names why, in the same vocabulary `evidara workflow coverage enable` reports. `write_attempted: false` means nothing was written. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlueprintTemplateEnablementRefusedResponse"];
                 };
             };
             /** @description Validation Error */

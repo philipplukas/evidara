@@ -266,52 +266,77 @@ uv run evidara workflow coverage enable \
 
 Pass `--evidence-bundle`. Without it the command cannot tell a gate the operator
 excluded from a gate that could not run, and the flip is decided on the run-level rules
-alone (#744).
+alone (#744). This is the one part of the guard that stays client-side after #854: the
+bundle is a local harness file and platform-control stores no gate ledger, so the server
+cannot derive it however much of the rest moves there.
 
-Use this rather than a hand-rolled `PUT`: the command re-derives the acceptance verdict
-for the cited run and refuses when it does not earn the flip, and — the part that matters
-— it **re-reads the template afterwards** and requires both the effective key *and* an
-`override` provenance before reporting success. A `200` alone cannot tell a flip from a
-write that silently did nothing (#631, #713). If `verification.applied` is false, the key
-is **not** flipped; say so and stop.
+**Everything else is server-side, so a hand-rolled `PUT` meets the same rules (#854).**
+The guard used to live only in the CLI while the admin panel required just a non-empty
+note, which made this command's guard advisory — an operator refused here could type one
+character into the panel and get the same state. Now
+`PUT /v1/sources/blueprint-templates/{overlay}/{template}/enablement` re-derives the
+acceptance verdict, binds the run to the template, checks both ADR-0030 ordering rules
+and reads the write back. Still prefer the command: it applies the gate-coverage refusal
+the server cannot see, carries the citation into the audit note, corroborates the
+server's read-back against the template listing, and returns the whole thing as an
+envelope. If `verification.applied` is false, the key is **not** flipped; say so and
+stop.
 
-Its refusals write nothing:
+Refusals come back as HTTP **409** and write nothing:
 
 | refusal | what to do |
 |---|---|
 | `no_evidence_run_cited` | Go capture evidence (§3–§5). The key is turned after evidence, not on confidence. |
+| `evidence_run_not_found` | The run id does not exist. Do not retype it from memory; list runs. |
 | `evidence_run_is_not_acceptance_evidence` | Read `acceptance_verdict.refusals` — usually `execution_mode_shadow`, or `gate_not_evaluated` when a cited bundle reports a gate that could not run. Re-run live, or run the missing gate. |
 | `evidence_run_provider_unresolved` | Nothing ties the run to this template. Do not "assume it's fine"; find the right run. |
 | `evidence_run_provider_mismatch` | You cited a run from another corpus. |
+| `evidence_run_template_mismatch` | You cited a run from a **different template on the same provider** — the LexFind trap. Cite this template's own run. |
+| `evidence_run_template_unbindable` | The run's version has no blueprint provenance and its spec is not this template's. Nothing binds them; find the right run. |
 | `evidence_run_capture_count_unknown` | The run reports no capture count, so that check did not run. A check that cannot run is not a pass. |
-| `classification_disagrees_with_server` | The CLI's lock mirror has drifted from the server's `launchable`. Do not write against a derivation you cannot trust — report it. |
+| `no_audit_note_recorded` | Say why, in both directions. A flip with no reason is indistinguishable from one made by guessing. |
+| `classification_disagrees_with_server` | The CLI's lock mirror has drifted from the server's `launchable`. Do not write against a derivation you cannot trust — report it. (The only refusal still derived client-side; the server cannot check itself against its own `launchable`.) |
 | `provider_not_live_not_acknowledged` | **Move the code key first.** ADR-0030 §2 wants LIVE before `enabled: true`; the invariant test that enforces it covers only `source_blueprints.yaml`, never the override table this writes. `--acknowledge-provider-below-live` arms it anyway. |
 | `operator_kill_switch_not_acknowledged` | **Ask the operator first.** `--reopen-operator-kill-switch` exists so reopening is a deliberate act, not an accident. |
 
-Two things the command deliberately will **not** decide for you, so a successful flip
-comes back `needs_human` rather than `passed` whenever either applies — read every
-evidence item marked `passed: false` before calling it done:
+The one refusal that is *not* "nothing happened" is a read-back failure after the write:
+it comes back `write_attempted: true`. The key's state is then whatever the read-back
+reports, not what you asked for. Go look.
 
-- **The binding to the template is provider-level only** (`artifacts.evidence_binding`).
-  The version read model exposes no overlay/template, and all 26 cantons plus Bund sit
-  behind the single `lexfind` provider — so one canton's run satisfies the check for
-  every LexFind template. Confirm by hand that the cited run is this template's (#846).
-- **Arming the config key ahead of the code key** is reported, not waved through.
+**Evidence now binds to the template, not to its provider (#846).** The run's source
+version records the blueprint template it was created from, and the server reads it
+directly, so one canton's LexFind run no longer satisfies the check for the other 26.
+`artifacts.evidence_binding` reports the strength:
 
-A `200` is not a flip. Read `verification.problems`:
+- `template` — exact. Nothing left to confirm.
+- `acquisition_spec` — the version has no blueprint provenance but its spec equals this
+  template's. Allowed, and reported `needs_human`: confirm by hand.
+- `provider` / `none` — refused.
+
+A `200` is not a flip. The server reads its own write back and reports the outcome; read
+`verification.problems`:
 
 | code | what it means |
 |---|---|
 | `read_back_disagrees` | The `PUT` returned 200 and the read model still reports the old effective key. **The key was not flipped.** |
 | `no_override_recorded` | The effective key is what you asked for, but the read model still attributes it to the shipped default. `set_enabled` always writes an override row, so the write did not land and the value merely happens to agree. |
 
-Turning the key **off** takes no evidence, but it does take `--note`, and it is a real
-write even when the key merely reads `false` today: a `never_turned` key is waived by
-acceptance mode, an operator's `false` is not (#768). Do not read "it's already off" as
-"the portal is shut".
+Two things the command still will **not** decide for you, so a successful flip comes back
+`needs_human` rather than `passed` whenever either applies — read every evidence item
+marked `passed: false` before calling it done:
 
-The admin panel's Blueprints inventory does the same flip through the UI; see the
-`run-admin-panel` skill. It does not do the read-back check.
+- **A binding weaker than `template`.**
+- **Arming the config key ahead of the code key**, and reopening somebody's kill switch.
+
+Turning the key **off** takes no evidence, but it does take a note — now required by the
+server, in both directions — and it is a real write even when the key merely reads `false`
+today: a `never_turned` key is waived by acceptance mode, an operator's `false` is not
+(#768). Do not read "it's already off" as "the portal is shut".
+
+The admin panel's Blueprints inventory does the same flip through the UI and meets the
+same guard: it sends the evidence run id and the acknowledgements, renders the returned
+refusal codes, and reports on the server's `applied` read-back rather than the status
+code. See the `run-admin-panel` skill.
 
 **Code key** — moving a provider from `awaiting_evidence` to `live` is a **code change**
 in platform-control. Attach the evidence to that request; do not flip it on confidence.

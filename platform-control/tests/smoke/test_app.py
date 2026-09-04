@@ -7,8 +7,10 @@ import pytest
 from conftest import dispatchable_compliance_policy
 
 from platform_control.database import get_session
+from platform_control.domain import RunMode, RunStatus
 from platform_control.main import create_app
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.run import Run
 from platform_control.routers.runs import get_firecrawl_provider
 from platform_control.services.firecrawl_provider import ProviderStartResult
 
@@ -512,12 +514,51 @@ async def test_operator_can_flip_the_config_key_over_the_api(session_maker) -> N
         refused_rows = [row for row in failed_runs.json()["data"] if row["status"] == "failed"]
         assert len(refused_rows) == 1
 
-        flip = await client.put(
+        # #854: a note alone no longer arms the key. The panel used to flip it on
+        # exactly this payload while the CLI demanded cited evidence, so the easier
+        # path was the weaker one. Both now meet the same guard.
+        note_only = await client.put(
             "/v1/sources/blueprint-templates/de/bundesland_http_bayern/enablement",
             json={"enabled": True, "note": "acceptance run 2026-07-18: 42/42 acts parsed"},
         )
+        assert note_only.status_code == 409
+        assert [item["code"] for item in note_only.json()["refusals"]] == ["no_evidence_run_cited"]
+        assert note_only.json()["write_attempted"] is False
+        still_shut = await client.get("/v1/sources/blueprint-templates")
+        assert not next(
+            row
+            for row in still_shut.json()["data"]
+            if (row["overlay_id"], row["provider_template_id"]) == ("de", "bundesland_http_bayern")
+        )["enabled"]
+
+        async with session_maker() as evidence_session:
+            evidence_session.add(
+                Run(
+                    run_id="run_smoke_acceptance_bayern",
+                    source_id=source_id,
+                    source_version_id=source_version_id,
+                    mode=RunMode.ACCEPTANCE,
+                    status=RunStatus.COMPLETED,
+                    captured_resources_count=42,
+                )
+            )
+            await evidence_session.commit()
+
+        flip = await client.put(
+            "/v1/sources/blueprint-templates/de/bundesland_http_bayern/enablement",
+            json={
+                "enabled": True,
+                "note": "acceptance run 2026-07-18: 42/42 acts parsed",
+                "evidence_run_id": "run_smoke_acceptance_bayern",
+            },
+        )
         assert flip.status_code == 200
         flipped = flip.json()
+        # The binding is exact: the cited run's version records this overlay and
+        # template, not merely this provider (#846).
+        assert flipped["evidence_binding"] == "template"
+        assert flipped["applied"] is True
+        assert flipped["needs_human"] is False
         assert flipped["enabled"] is True
         assert flipped["default_enabled"] is False
         assert flipped["source"] == "override"

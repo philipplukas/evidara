@@ -142,6 +142,12 @@ export type BlueprintTwoKeyLock = {
   notes: string[];
 };
 
+/** One machine-readable reason platform-control refused to move the config key (#854). */
+export type BlueprintEnablementRefusal = {
+  code: string;
+  detail: string;
+};
+
 /** Result of flipping the config key (#632) — carries the audit trail. */
 export type BlueprintTemplateEnablement = {
   overlay_id: string;
@@ -152,7 +158,62 @@ export type BlueprintTemplateEnablement = {
   note: string | null;
   updated_by: string | null;
   updated_at: string | null;
+  /**
+   * The server re-read the write and confirmed it — the effective key AND an
+   * `override` provenance. A 200 alone cannot tell a flip from a write that silently
+   * did nothing (#631, #713), so the dialog reports on this, not on the status code.
+   */
+  applied: boolean;
+  /** The flip happened, but something was not decided for you. */
+  needs_human: boolean;
+  needs_human_reasons: string[];
+  evidence_run_id: string | null;
+  /** `"template"` is exact; anything weaker wants a human to confirm it (#846). */
+  evidence_binding: string | null;
 };
+
+/** What the operator has to supply to arm the ADR-0030 config key (#854). */
+export type BlueprintTemplateEnablementInput = {
+  enabled: boolean;
+  note?: string | null;
+  evidence_run_id?: string | null;
+  reopen_operator_kill_switch?: boolean;
+  acknowledge_provider_below_live?: boolean;
+};
+
+/**
+ * Read the ADR-0030 refusal codes off a rejected enablement `PUT`.
+ *
+ * The refusals arrive as a 409 body, which `requestJson` attaches to the thrown
+ * `HttpError`. Returning `[]` for a body this cannot parse would render a refusal as
+ * "nothing was wrong", so an unparseable 409 still yields one refusal.
+ */
+export function blueprintEnablementRefusals(error: unknown): BlueprintEnablementRefusal[] {
+  const body = error instanceof HttpError ? (error.body as unknown) : undefined;
+  const raw =
+    typeof body === "object" && body !== null && "refusals" in body
+      ? (body as { refusals?: unknown }).refusals
+      : undefined;
+  const refusals = Array.isArray(raw)
+    ? raw.flatMap((item): BlueprintEnablementRefusal[] => {
+        if (typeof item !== "object" || item === null) return [];
+        const { code, detail } = item as { code?: unknown; detail?: unknown };
+        if (typeof code !== "string" || code.length === 0) return [];
+        return [{ code, detail: typeof detail === "string" ? detail : "" }];
+      })
+    : [];
+  if (refusals.length > 0) return refusals;
+  if (error instanceof HttpError && error.status === 409) {
+    return [
+      {
+        code: "refused_by_server",
+        detail:
+          error.message || "platform-control refused the flip and did not say which rule it broke.",
+      },
+    ];
+  }
+  return [];
+}
 
 export type SourceBlueprintPreview = SourceBlueprintPreviewInput & {
   acquisition_spec: AcquisitionSpec;
@@ -1081,7 +1142,7 @@ export const controlPlaneActions = {
   async setBlueprintTemplateEnablement(
     overlayId: string,
     providerTemplateId: string,
-    input: { enabled: boolean; note?: string | null },
+    input: BlueprintTemplateEnablementInput,
   ): Promise<BlueprintTemplateEnablement> {
     return requestJson<BlueprintTemplateEnablement>(
       `/v1/sources/blueprint-templates/${encodeURIComponent(overlayId)}/${encodeURIComponent(

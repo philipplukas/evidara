@@ -7,7 +7,8 @@
 # no `apis.*.version` moved.
 # 2.34.0: platform-control 0.23.0 — the wizard human gate expires into a terminal
 # state (#560). Additive; no locked path changed shape.
-version: "2.34.0"
+# 2.35.0: platform-control 0.24.0 — the enablement guard moves server-side (#854).
+version: "2.35.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -41,7 +42,12 @@ apis:
     # 0.23.0: adds the wizard human gate's terminal states, so an expired gate
     # resolves instead of hanging forever (#560). Additive: existing gate
     # outcomes are unchanged.
-    version: "0.23.0"
+    # 0.24.0: the ADR-0030 config-key flip guard moves server-side (#854). The
+    # enablement PUT now takes `evidence_run_id` and the two acknowledgements,
+    # answers 409 with machine-readable `refusals[].code`, and reports `applied` /
+    # `needs_human` / `evidence_binding`. Additive on the wire — but `{enabled, note}`
+    # alone can no longer arm a key, which is the point.
+    version: "0.24.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

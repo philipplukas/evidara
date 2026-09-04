@@ -183,21 +183,39 @@ uv run evidara workflow coverage enable \
 ```
 
 The loop's last step, and the one worth getting wrong quietly. Enabling **requires** an
-`--evidence-run-id`; the command re-derives the ADR-0030 acceptance verdict for that run
-and refuses when it does not earn the flip. Refusal codes:
+`--evidence-run-id`.
+
+**The guard lives in platform-control, not in this command (#854).** It used to derive
+the refusals here, while the admin panel — hitting the same endpoint — required only a
+non-empty free-text note. Two clients, two rules, and the easier path was the weaker one,
+so this command's guard was advisory. `PUT /v1/sources/blueprint-templates/{overlay}/
+{template}/enablement` now re-derives the acceptance verdict, binds the cited run to the
+template, checks both ADR-0030 ordering rules and reads the write back; it answers **409**
+with the codes below, and this command reproduces them verbatim in
+`artifacts.refusals`. The codes are unchanged in spelling and meaning — they are a public
+interface — and are the same ones the admin panel now renders.
 
 | code | meaning |
 |---|---|
 | `no_evidence_run_cited` | ADR-0030 §5: the key is turned after evidence, not on confidence. |
+| `evidence_run_not_found` | No run exists with the cited id, so nothing was re-derived. |
 | `evidence_run_is_not_acceptance_evidence` | The run failed the verdict — read `acceptance_verdict.refusals`. |
 | `evidence_run_provider_unresolved` | The run's provider could not be resolved, so nothing ties it to this template. Refused rather than skipped-and-passed (#744). |
 | `evidence_run_provider_mismatch` | The run used a different acquisition provider. |
+| `evidence_run_template_mismatch` | The run's source version was created from a **different** blueprint template. Same provider is not the same template — for `lexfind` that would be 26 cantons plus Bund off one canton's run (#846). |
+| `evidence_run_template_unbindable` | The run's version records no blueprint provenance and its acquisition spec is not this template's, so it cannot be bound to this template at all (#846). |
 | `evidence_run_capture_count_unknown` | The run reports no `captured_resources_count`, so that check did not run. |
-| `classification_disagrees_with_server` | The client-side lock mirror disagrees with the server's `launchable`. This is the one command where that derivation gates a write, so a disagreement is disqualifying. |
+| `no_audit_note_recorded` | A flip in either direction has to say why. Shutting a portal off with no recorded reason is as unauditable as arming one. |
+| `classification_disagrees_with_server` | The client-side lock mirror disagrees with the server's `launchable`. **The one refusal still derived here** — the server producing `launchable` cannot check itself against it — and this is the one command where that derivation gates a write. |
 | `provider_not_live_not_acknowledged` | ADR-0030 §2 admits `enabled: true` only for a LIVE provider. `test_blueprint_provider_parity.py` asserts that over `source_blueprints.yaml` but **not** over the override table this writes, so the ordering is enforced here. `--acknowledge-provider-below-live` arms it anyway. |
-| `operator_kill_switch_not_acknowledged` | The key was shut by an operator. Pass `--reopen-operator-kill-switch` only after asking them. Keyed off `config_key`, never off `blocker` — `blocker` is single and priority-ordered, so a `provider_scaffold` (the server's fail-closed default for an unresolvable provider) hides the kill switch. |
+| `operator_kill_switch_not_acknowledged` | The key was shut by an operator. Pass `--reopen-operator-kill-switch` only after asking them. Keyed off the config key's *provenance*, never off `blocker` — `blocker` is single and priority-ordered, so a `provider_scaffold` (the fail-closed default for an unresolvable provider) hides the kill switch. |
 
-A refusal writes nothing (`side_effect_level: none`). What the three `side_effect_level` values mean, and what a consumer is expected to do differently for each, is written up in [docs/components/workflow-command-envelope.md](../../docs/components/workflow-command-envelope.md).
+A refusal writes nothing (`side_effect_level: none`). The one exception is a refusal the
+server raises *after* writing the override row, when its own read-back does not confirm
+the flip: that comes back `write_attempted: true` and `side_effect_level: reversible`,
+because claiming nothing happened would be false.
+
+What the three `side_effect_level` values mean, and what a consumer is expected to do differently for each, is written up in [docs/components/workflow-command-envelope.md](../../docs/components/workflow-command-envelope.md).
 
 **"Already in the desired state" is a pair, not a boolean** — the requested value *and*
 an `override` provenance. `--disable` on a key that merely reads `false` today still
@@ -207,28 +225,33 @@ never installed while live traffic kept flowing. The mirror case writes too — 
 only by shipped default has no evidence citation recorded against it.
 
 A flip that lands still comes back `needs_human` rather than `passed` when a check did
-not pass: the provider-level evidence binding always, and arming the key ahead of the
-code key. `ok` tracks the write; `status` tracks whether a human still has something to
-confirm.
+not pass: an evidence binding weaker than template-exact, arming the key ahead of the code
+key, and reopening somebody's kill switch. `ok` tracks the write; `status` tracks whether
+a human still has something to confirm.
 
-**The `200` is not the proof.** After the `PUT` the command re-reads
-`/v1/sources/blueprint-templates` and requires *both* that the effective key is what was
-asked for **and** that the read model attributes it to an operator `override`. Either
-alone is also satisfied by a write that silently did nothing — the failure mode behind
-#631 and #713 — so a mismatch exits nonzero with `verification.problems`
-(`read_back_disagrees`, `no_override_recorded`).
+**The `200` is not the proof.** The server re-reads the template after writing and
+requires *both* that the effective key is what was asked for **and** that the read model
+attributes it to an operator `override` — either alone is also satisfied by a write that
+silently did nothing (#631, #713) — and reports that as `applied`. This command re-reads
+`/v1/sources/blueprint-templates` as well and exits nonzero if the two disagree.
 
 Flipping the config key does not open the code key: when the provider is short of `live`
 the envelope says which modes the lock still admits. Turning the key **off** is a kill
 switch — it needs no evidence but does need `--note`.
 
-The binding between the cited run and the template is **provider-level**, reported as
-`artifacts.evidence_binding`. `SourceVersionResponse` exposes no `overlay_id` /
-`provider_template_id`, so a same-provider run of a different template also satisfies the
-check — and for `lexfind` that is all 26 cantons plus Bund behind one name, so one run
-covers every LexFind template. The envelope marks that check `passed: false` so it is
-confirmed by a human rather than read as proven; #846 tracks binding it near-exactly by
-comparing the version's acquisition spec against `POST /v1/sources/blueprint-preview`.
+**The binding between the cited run and the template is exact** where the run's source
+version records a blueprint template, which is every version created from one. Reported as
+`artifacts.evidence_binding`:
+
+| strength | meaning |
+|---|---|
+| `template` | The version records this overlay and provider template. Exact; nothing left to confirm. |
+| `acquisition_spec` | The version has no blueprint provenance, but its spec equals this template's resolved spec. Near-exact — allowed, and reported `needs_human`. |
+| `provider` / `none` | Too weak to enable on. Refused, not reported. |
+
+This is what #846 fixed. Provider-level agreement used to be enough, and all 26 cantons
+plus Bund sit behind the single `lexfind` provider, so one canton's run satisfied the
+check for every LexFind template.
 
 **Agent skill:** `.claude/skills/coverage-acceptance-loop/SKILL.md` routes the whole loop,
 including the compose env vars whose defaults silently break it.
