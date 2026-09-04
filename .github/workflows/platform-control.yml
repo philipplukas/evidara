@@ -15,6 +15,9 @@ on:
       - "contracts/api/platform-control.openapi.yaml"
       - "scripts/check-platform-control.sh"
       - "scripts/generate_platform_control_contract.py"
+      - "scripts/check-e2e-spec-coverage.sh"
+      - "scripts/e2e/**"
+      - "styles/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -51,6 +54,9 @@ jobs:
               - 'contracts/api/platform-control.openapi.yaml'
               - 'scripts/check-platform-control.sh'
               - 'scripts/generate_platform_control_contract.py'
+              - 'scripts/check-e2e-spec-coverage.sh'
+              - 'scripts/e2e/**'
+              - 'styles/**'
               - '.github/workflows/platform-control.yml'
 
   check:
@@ -103,6 +109,85 @@ jobs:
       - name: Check (backend + admin)
         run: bash scripts/check-platform-control.sh
 
+  # ─── Admin Playwright suite ───
+  #
+  # The admin's e2e specs ran in NO workflow. `npm run check` for that surface is
+  # typecheck + lint + vitest + openapi; nothing invoked `npm run e2e`, so six
+  # spec files were committed, linted, typechecked and executed by nothing. That
+  # is not a coverage nicety — it is why a clipped ACTIONS column, an attention
+  # chip contradicting the dashboard, a UA-beveled sort header and a completely
+  # absent dark mode all survived review. Vitest cannot see any of them: jsdom
+  # has no layout engine and applies no stylesheet.
+  #
+  # Split from `check` rather than folded into it because this job needs a
+  # browser download and a built dev server; keeping it separate means a browser
+  # cache miss cannot slow the fast lint/test gate. Both feed `gate`.
+  #
+  # Every spec mocks platform-control via `page.route`, so no backend, database
+  # or API key is required — only the Next dev server Playwright's `webServer`
+  # starts itself.
+  admin-e2e:
+    name: Admin e2e (Playwright)
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: platform-control/admin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          # Read the pin from `.nvmrc` so CI and local cannot drift.
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: platform-control/admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('platform-control/admin/package-lock.json') }}
+
+      - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npm run e2e:browsers
+
+      - name: Install Playwright system deps
+        if: runner.environment == 'github-hosted'
+        run: npx playwright install-deps chromium
+
+      - name: Run admin e2e suite
+        run: npm run e2e
+
+      # Asserts every spec under platform-control/admin/e2e/ is selected by some
+      # command this workflow invokes — the guard that keeps the job above from
+      # silently drifting back to running nothing (#686). Runs here because this
+      # job already has node_modules, and the check needs no browser
+      # (`playwright test --list` does not start the webServer).
+      - name: Check e2e spec coverage
+        working-directory: .
+        run: bash scripts/check-e2e-spec-coverage.sh
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-playwright-report
+          path: platform-control/admin/playwright-report/
+          retention-days: 7
+
   # The single required status check for this workflow. Individual jobs are
   # path-filtered and GitHub reports no conclusion for a job skipped by `if:`,
   # so requiring one directly would leave unrelated PRs pending forever.
@@ -112,6 +197,7 @@ jobs:
     needs:
       - changes
       - check
+      - admin-e2e
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

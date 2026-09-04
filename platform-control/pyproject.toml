@@ -27,6 +27,12 @@ dependencies = [
 
 [project.scripts]
 platform-control-seed-reference-data = "platform_control.seed_reference_data:main"
+# LOCAL DEVELOPMENT ONLY. Writes one run per lifecycle state so the admin's run
+# queue has pending / running / failed / cancelled rows to render — every run a
+# local stack acquires naturally is `completed`, which left the triage UI
+# unreviewable. Refuses outside PLATFORM_CONTROL_ENVIRONMENT=development and
+# without an explicit flag.
+platform-control-seed-demo-runs = "platform_control.seed_demo_runs:main"
 platform-control-connector-worker = "platform_control.connector_worker:main"
 platform-control-temporal-worker = "platform_control.temporal_worker:main"
 # Legal-retention hard delete. Scheduled by the retention-sweep CronJob (ADR-0031),
