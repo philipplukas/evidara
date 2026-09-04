@@ -7,6 +7,7 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from acquisition_core.content_gate import assess_legal_text_density
 from platform_control.errors import ProviderConfigurationError
 from platform_control.models.run import Run
 from platform_control.models.source import Source
@@ -76,6 +77,10 @@ class DeterministicHttpProvider:
 
         resources: list[ProviderResource] = []
         failures: list[dict[str, str]] = []
+        # Fetched, and refused by the legal-text density gate: a 200 carrying a
+        # navigation or JavaScript shell rather than law. Recorded with the reason,
+        # never counted as captured (#631).
+        skipped: list[dict[str, object]] = []
 
         headers = {"User-Agent": user_agent}
         async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=False) as client:
@@ -114,6 +119,30 @@ class DeterministicHttpProvider:
                     normalized_content_type = content_type.split(";")[0].strip().lower()
                     if normalized_content_type == "application/text":
                         normalized_content_type = "text/plain"
+
+                    # Legal-text density (#631). Every blueprint template pointing
+                    # here targets a DE/CH/IT collection — `gesetze-im-internet.de`,
+                    # the Fedlex filestore and `normattiva.it`
+                    # (hierarchies/source_blueprints.yaml:114,129,176,672) — which is
+                    # the vocabulary `content_gate` was built for. The gate abstains
+                    # on any content type it cannot read (`text/plain`, binaries), so
+                    # a non-HTML manifestation passes through untouched rather than
+                    # being judged on a vocabulary that does not apply to it.
+                    assessment = assess_legal_text_density(
+                        body, content_type=normalized_content_type
+                    )
+                    if not assessment.is_legal_text:
+                        skipped.append(
+                            {
+                                "url": resolved_url,
+                                "requested_url": url,
+                                "reason": "no_legal_text_markers",
+                                "detail": assessment.reason,
+                                **assessment.as_evidence(),
+                            }
+                        )
+                        continue
+
                     resources.append(
                         ProviderResource(
                             source_url=url,
@@ -127,6 +156,8 @@ class DeterministicHttpProvider:
                                 "provider": self.provider_name,
                                 "requested_url": url,
                                 "fetched_at": datetime.now(UTC).isoformat(),
+                                "legal_text_assessment": "passed",
+                                "legal_text_evidence": assessment.as_evidence(),
                             },
                         )
                     )
@@ -138,11 +169,21 @@ class DeterministicHttpProvider:
             "requested": len(seed_urls),
             "captured": len(resources),
             "failed": len(failures),
+            "skipped": len(skipped),
             "failures": failures,
+            "skipped_documents": skipped,
         }
         inline_failure_reason = None
         if not resources:
-            inline_failure_reason = "Deterministic HTTP provider did not capture any resources."
+            if skipped:
+                inline_failure_reason = (
+                    f"deterministic_http fetched {len(skipped)} document(s) but all failed "
+                    "the legal-text density gate: they carry no Art./§/Abs. markers, which "
+                    "is a navigation or JavaScript shell rather than law. Refusing rather "
+                    "than capturing chrome as acceptance evidence (#631)."
+                )
+            else:
+                inline_failure_reason = "Deterministic HTTP provider did not capture any resources."
 
         return ProviderStartResult(
             provider=self.provider_name,

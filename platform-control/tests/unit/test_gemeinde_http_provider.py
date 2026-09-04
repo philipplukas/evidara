@@ -92,9 +92,34 @@ def _landing_page(*, title: str, rows: list[str]) -> str:
     )
 
 
-# A minimal well-formed PDF. Content does not matter here — that the *bytes* survive
-# acquisition unmodified does.
-_PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"
+# A well-formed PDF standing in for a real ordinance. Content does not matter here —
+# that the *bytes* survive acquisition unmodified does — but the SIZE now does: the
+# capture guard's byte floor (`_DEFAULT_MIN_BINARY_BYTES`) refuses a stub, and a
+# 70-byte "PDF" is a stub by any honest reading. Padded with a comment stream so the
+# fixture is a plausible one-page ordinance rather than something only a test accepts.
+_PDF_BYTES = (
+    b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"
+    + b"% Vollzugsvorschriften zum Hundegesetz, Art. 1 Abs. 1\n" * 24
+    + b"trailer\n<< /Root 1 0 R >>\n%%EOF\n"
+)
+# An HTML ordinance as a commune that publishes law as HTML would serve it. The
+# previous fixture ("Art. 1 Der Stadtrat ...") carried one legal-text marker and so
+# scored below `content_gate`'s floor of three: it was indistinguishable from a
+# navigation shell, which is the point of the gate. Real law clears the floor in its
+# first two articles.
+_HTML_ORDINANCE = (
+    "<html><body><h1>Hundereglement</h1>"
+    "<p>Art. 1 Abs. 1 Der Stadtrat regelt das Halten von Hunden.</p>"
+    "<p>Art. 2 Abs. 2 Ziff. 3 Hunde sind an der Leine zu führen.</p>"
+    "</body></html>"
+)
+# A 142-byte JavaScript redirect stub served with a 200 where a PDF was promised —
+# the #716 payload, reproduced as bytes so the guard meets the real failure shape.
+_REDIRECT_STUB_BYTES = (
+    b'<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;'
+    b'url=/login"><script>window.location="/login";</script></head>'
+    b"<body></body></html>"
+)
 
 
 class _FakeClient:
@@ -256,7 +281,7 @@ async def test_html_manifestation_would_be_acquired_normally(
             ),
             "https://www.stadt-zuerich.ch/recht/hunde.html": (
                 200,
-                "<html><body>Art. 1 Der Stadtrat ...</body></html>",
+                _HTML_ORDINANCE,
                 {"content-type": "text/html; charset=utf-8"},
             ),
         },
@@ -276,6 +301,178 @@ async def test_html_manifestation_would_be_acquired_normally(
     assert resource.metadata["jurisdiction_id"] == "jur_ch_gemeinde_261"
     assert resource.metadata["parent_jurisdiction_id"] == "jur_ch_zh"
     assert resource.metadata["bfs_number"] == 261
+
+
+# ─── The capture guard (#631/#716 at the municipal rung) ────────
+#
+# Mutation check for all four: delete the `check_capture(...)`/
+# `assess_legal_text_density(...)` block in `gemeinde_http_provider.start_run` and the
+# three refusal tests fail — the stub is captured, `captured` reads 1 and
+# `inline_failure_reason` is None. The pass tests fail only if the guard is wired with
+# the wrong expectation (a byte floor on HTML, a marker floor on PDF), which is the
+# other way this goes wrong.
+
+
+@pytest.mark.asyncio
+async def test_javascript_stub_served_where_a_pdf_was_promised_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#716's payload, one rung down: a `200` carrying a redirect stub, not a statute.
+
+    The landing page's `rechtstexte` link ends in `.pdf`, so the provider's
+    `content_type` is derived from the SUFFIX — a promise made by the page, not by
+    the server. Nothing but the capture guard makes the server keep it. Before it was
+    wired, these 142 bytes were counted in `captured` and shipped downstream as the
+    Vollzugsvorschriften.
+    """
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                _fixture_html(),
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+            "https://www.stadt-zuerich.ch/dam/": (
+                200,
+                _REDIRECT_STUB_BYTES,
+                # The server declares PDF; only the bytes give it away.
+                {"content-type": "application/pdf"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL}),
+        SimpleNamespace(run_id="run_zh_261_stub"),
+    )
+
+    assert result.response_payload["captured"] == 0
+    assert result.inline_resources == []
+    skipped = result.response_payload["skipped_manifestations"]
+    assert len(skipped) == 1
+    # The most specific defect, not a downstream symptom: it is HTML, not a short PDF.
+    assert skipped[0]["reason"] == "html_where_binary_expected"
+    # The operator is sent to the portal, not to a capability gap.
+    assert "capture guard refused" in result.inline_failure_reason
+    assert "html_where_binary_expected" in result.inline_failure_reason
+
+
+@pytest.mark.asyncio
+async def test_pdf_declared_as_html_is_refused_before_the_bytes_are_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A `.pdf` link answered with `text/html` is a login wall or an error page."""
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                _fixture_html(),
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+            "https://www.stadt-zuerich.ch/dam/": (
+                200,
+                _PDF_BYTES,
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL}),
+        SimpleNamespace(run_id="run_zh_261_ct"),
+    )
+
+    assert result.response_payload["captured"] == 0
+    assert result.response_payload["skipped_manifestations"][0]["reason"] == (
+        "content_type_mismatch"
+    )
+
+
+@pytest.mark.asyncio
+async def test_html_navigation_shell_is_refused_at_the_municipal_rung(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#631 for communes that publish HTML: a well-formed page with no law in it.
+
+    `check_capture` cannot see this — a nav shell is honest HTML with visible text —
+    which is why both gates are wired, not one.
+    """
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                _landing_page(
+                    title="Hundereglement",
+                    rows=[
+                        _row("ASZ", "554.510"),
+                        _row("rechtstexte", _link("/recht/hunde.html")),
+                    ],
+                ),
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+            "https://www.stadt-zuerich.ch/recht/hunde.html": (
+                200,
+                "<html><head><script>var nav=1;</script></head>"
+                "<body><nav>Startseite Kontakt Impressum</nav></body></html>",
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL}),
+        SimpleNamespace(run_id="run_zh_261_shell"),
+    )
+
+    assert result.response_payload["captured"] == 0
+    skipped = result.response_payload["skipped_manifestations"][0]
+    assert skipped["reason"] == "no_legal_text_markers"
+    assert skipped["legal_marker_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_genuine_pdf_capture_records_the_guard_verdict_as_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other half: an honest capture passes, and says so in its metadata.
+
+    The density gate abstains on `application/pdf` and is called anyway, so the
+    abstention is recorded rather than implied by its absence — the same convention
+    `lexfind_api` follows. Judging a PDF's text belongs to DI (ADR-0047), and this
+    provider must not grow a second opinion about it.
+    """
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                _fixture_html(),
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+            "https://www.stadt-zuerich.ch/dam/": (
+                200,
+                _PDF_BYTES,
+                {"content-type": "application/pdf"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL}),
+        SimpleNamespace(run_id="run_zh_261_ok"),
+    )
+
+    assert result.response_payload["captured"] == 1
+    metadata = result.inline_resources[0].metadata
+    assert metadata["capture_guard"] == "passed"
+    assert metadata["legal_text_assessment"] == "abstained_binary_manifestation"
 
 
 # ─── Config validation / safety ─────────────────────────────────
