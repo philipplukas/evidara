@@ -411,7 +411,7 @@ export function RunLaunchButton({
             <div className="flex flex-col gap-3">
               <p className="text-sm font-semibold text-[var(--foreground)] m-0">Launch summary</p>
               <div className="flex flex-wrap gap-2">
-                <Pill level={runModeToLevel(formState.mode)}>
+                <Pill variant="tag" level={runModeToLevel(formState.mode)}>
                   {`${formatModeLabel(formState.mode)} mode`}
                 </Pill>
                 <Pill variant="meta">{`Source ${selectedSource?.name ?? "not selected"}`}</Pill>

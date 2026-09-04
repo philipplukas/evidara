@@ -28,14 +28,18 @@ import {
   type PillLevel,
 } from "../../ui/primitives";
 import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
-import { CancelRunButton } from "./RunActions";
+import { CancelRunButton, RetryRunButton } from "./RunActions";
 import { RunLaunchButton } from "./RunLaunchDialog";
 import {
   describeQueueScope,
+  describeRunAge,
   describeRunState,
   formatQueueCount,
   getRunQueueKeyboardShortcutAction,
   resolveQueueCountScope,
+  runLooksStalled,
+  runStateNeedsExplanation,
+  selectAttentionRun,
   summarizeRunFilters,
 } from "./RunList";
 
@@ -81,7 +85,7 @@ function PresetButton({ isActive, onClick, children, tone = "accent" }: PresetBu
       className={`inline-flex items-center rounded-full border px-3 h-8 text-[12px] font-semibold transition-colors ${
         isActive
           ? toneActive
-          : "bg-white/60 border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-strong)]"
+          : "bg-[var(--surface-panel)]/60 border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-strong)]"
       }`}
     >
       {children}
@@ -102,16 +106,15 @@ export default function RunListV2() {
   const filterValues = controller.filterValues as RunQueueFilterValues;
 
   const runs = useMemo(() => records ?? [], [records]);
-  // Inlined from the v1 `selectAttentionRun` helper to preserve the richer
-  // `RunListRecord` typing (v1 casts to `RunRecord` and loses `source_name`).
-  const attentionRun = useMemo<RunListRecord | null>(() => {
-    const actionable: RunStatus[] = ["failed", "running", "pending"];
-    for (const status of actionable) {
-      const match = runs.find((r) => r.status === status);
-      if (match) return match;
-    }
-    return runs[0] ?? null;
-  }, [runs]);
+  /*
+   * The shared helper, not a second copy of it. The copy that used to live here
+   * (justified by `RunListRecord`'s extra fields, which the helper is now
+   * generic over) is how this page came to disagree with the dashboard about
+   * the same queue: it ended in a `runs[0]` fallback, so on an all-completed
+   * queue it nominated the newest completed run as the "attention run" while
+   * the dashboard correctly reported nothing needing attention.
+   */
+  const attentionRun = useMemo(() => selectAttentionRun(runs), [runs]);
   const filterSummary = useMemo(() => summarizeRunFilters(filterValues), [filterValues]);
   const hasActiveFilters = filterSummary.length > 0;
 
@@ -180,7 +183,9 @@ export default function RunListV2() {
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[12px] text-[var(--foreground)]">{record.run_id}</span>
           <div>
-            <Pill level={runModeToLevel(record.mode)}>{record.mode}</Pill>
+            <Pill variant="tag" level={runModeToLevel(record.mode)}>
+              {record.mode}
+            </Pill>
           </div>
         </div>
       ),
@@ -201,22 +206,73 @@ export default function RunListV2() {
       key: "state",
       header: "State",
       sortField: "status",
-      render: (record) => (
-        <div className="flex flex-col gap-1 max-w-[32ch]">
-          <Pill level={runRecordStatusToLevel(record.status)}>{record.status}</Pill>
-          <span className="text-[12px] text-[var(--foreground-subtle)]">
-            {describeRunState(record)}
-          </span>
-          {record.status === "failed" && record.failure_reason ? (
-            <span
-              className="text-[12px] text-[var(--status-critical)] truncate"
-              title={record.failure_reason}
-            >
-              Failure: {record.failure_reason}
-            </span>
-          ) : null}
-        </div>
-      ),
+      render: (record) => {
+        const age = describeRunAge(record);
+        const stalled = runLooksStalled(record);
+        return (
+          // `items-start`: a flex column stretches its children by default, so
+          // the status pill grew to the width of the sentence beside it and read
+          // as a bordered banner rather than a badge. It only became visible once
+          // the column got wider, but the stretch was always there.
+          <div className="flex flex-col items-start gap-1 max-w-[32ch]">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Pill level={runRecordStatusToLevel(record.status)}>{record.status}</Pill>
+              {/*
+               * The staleness signal. A run queued 30 seconds ago and one stuck
+               * for three days used to render identically, and CREATED — the only
+               * column that would let you tell them apart — is one of the two
+               * clipped off the right edge at 1440px. Sitting beside the badge,
+               * this survives any horizontal scroll position.
+               */}
+              {age ? (
+                <span
+                  data-testid="run-age"
+                  className={
+                    stalled
+                      ? "text-[11px] font-semibold text-[var(--status-degraded)]"
+                      : "text-[11px] text-[var(--foreground-subtle)]"
+                  }
+                  title={
+                    stalled
+                      ? "This run has been in this state for over two hours — check whether it is stuck."
+                      : undefined
+                  }
+                >
+                  {age}
+                  {stalled ? " · check it" : ""}
+                </span>
+              ) : null}
+            </div>
+            {/*
+             * Prose only where the badge is not the whole message. Eight
+             * identical three-line repetitions of "Finished successfully…" were
+             * costing the vertical space that pushed ACTIONS off the fold.
+             */}
+            {runStateNeedsExplanation(record) ? (
+              <span className="text-[12px] text-[var(--foreground-subtle)]">
+                {describeRunState(record)}
+              </span>
+            ) : null}
+            {record.status === "failed" && record.failure_reason ? (
+              /*
+               * `line-clamp-3`, not `truncate`. A single-line clip cut the
+               * failure reason at "provider returned HT…" — precisely where it
+               * starts being useful — which forced a click into the detail page
+               * on every failed row just to read the sentence. Three lines is
+               * enough for the substance; the `title` still carries the whole
+               * thing.
+               */
+              <span
+                data-testid="run-failure-reason"
+                className="text-[12px] text-[var(--status-critical)] line-clamp-3"
+                title={record.failure_reason}
+              >
+                Failure: {record.failure_reason}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       key: "captured",
@@ -257,14 +313,34 @@ export default function RunListV2() {
     {
       key: "actions",
       header: "Actions",
-      headerClassName: "sr-only",
+      /*
+       * Pinned to the right edge, and its header made visible.
+       *
+       * Measured on the running app at 1440px: `scrollWidth 1160 >
+       * clientWidth 1054`, so UPDATED and ACTIONS sat past the right edge of a
+       * scroll container that showed no cue at all. Cancel and retry are the
+       * only levers an operator has on a live run, and they were off-screen on
+       * a standard laptop — at 390px the table lost everything but RUN and a
+       * sliver of SOURCE. Pinning means the levers survive any horizontal
+       * scroll position and any viewport width.
+       *
+       * The header was `sr-only`, which is `position: absolute` and cannot also
+       * be `position: sticky`. Showing it is the better trade anyway: a pinned
+       * column that never says what it is reads as a rendering artefact.
+       */
+      stickyRight: true,
       className: "text-right",
-      // Renders only for pending/running runs; the ConfirmButton inside
-      // CancelRunButton stops click propagation so the row-click navigation
-      // does not fire when the operator opens the cancel confirmation.
+      /*
+       * Cancel renders for pending/running, Retry for failed/cancelled — so
+       * every non-terminal-and-fine state now offers its one lever from the
+       * list, and no state offers both. The ConfirmButton inside each stops
+       * click propagation, so the row-click navigation does not fire when the
+       * operator opens a confirmation.
+       */
       render: (record) => (
         <RecordContextProvider value={record}>
           <CancelRunButton />
+          <RetryRunButton />
         </RecordContextProvider>
       ),
     },
@@ -285,10 +361,13 @@ export default function RunListV2() {
               Triage active, failed, and completed acquisition runs. Use presets to narrow the
               operator queue without leaving the list.
             </p>
-            <p className="text-[12px] text-[var(--foreground-subtle)]">
-              Press <kbd className="font-mono">/</kbd> to focus the attention run. Press{" "}
-              <kbd className="font-mono">O</kbd> to open it.
-            </p>
+            {/* Only advertised while there is an attention run to focus. */}
+            {attentionRun ? (
+              <p className="text-[12px] text-[var(--foreground-subtle)]">
+                Press <kbd className="font-mono">/</kbd> to focus the attention run. Press{" "}
+                <kbd className="font-mono">O</kbd> to open it.
+              </p>
+            ) : null}
           </div>
           <div className="shrink-0">
             <RunLaunchButton label="Create Run" defaultMode="production" />
@@ -331,7 +410,28 @@ export default function RunListV2() {
               >
                 Open attention run · {attentionRun.source_name}
               </button>
-            ) : null}
+            ) : countScope === "unknown" ? null : (
+              /*
+               * Says the quiet case out loud instead of leaving a gap where the
+               * amber chip was — the absence of a warning is itself information.
+               *
+               * The wording is scoped to what this page actually knows.
+               * `complete` means every run the server reports is in hand, so the
+               * dashboard's sentence is true here too. `partial` means we are
+               * looking at one page, and claiming anything about the queue would
+               * be the same class of error as the chip this replaces. When the
+               * counts are unknown (a failed list query) nothing is said at all;
+               * the error alert below is the honest surface for that.
+               */
+              <span
+                data-testid="run-queue-no-attention"
+                className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-input)] px-3 h-9 text-[12px] font-semibold text-[var(--foreground-subtle)]"
+              >
+                {countScope === "complete"
+                  ? "No run is failing, pending, or running"
+                  : "No failing, pending, or running run on this page"}
+              </span>
+            )}
           </div>
           <p
             className={

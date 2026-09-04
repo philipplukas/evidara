@@ -91,3 +91,22 @@ export const FONT_WEIGHT_BOLD = 700;
 // ─── Radii (base matches shadcn `--radius`; multipliers derived in CSS) ───
 export const RADIUS_BASE = "0.625rem";
 export const RADIUS_PILL = "9999px";
+
+// ─── Dark-mode mirrors ───
+//
+// `tokens.css` has carried a complete `.dark` block since it was written; these
+// are the handful of values a *JavaScript* consumer needs, because MUI's
+// `palette.<slot>.main` takes a hex/rgb string and cannot read a CSS variable
+// (the same constraint that made the light values above literals). They mirror
+// the `.dark` block in `tokens.css` — edit both together, exactly as the
+// `:root` mirror above requires.
+//
+// Only the slots `platform-control/admin`'s MUI bridge maps are listed. Adding
+// more is fine; inventing values that are not in the `.dark` block is not.
+export const ACCENT_CORE_DARK = "#9484f5";
+export const STATUS_DEGRADED_DARK = "#fbbf24";
+export const STATUS_CRITICAL_DARK = "#f87171";
+export const STATUS_INFO_DARK = "#60a5fa";
+export const SURFACE_PAGE_DARK = "#0f1419";
+export const SURFACE_PANEL_DARK = "#1a2028";
+export const BRAND_STRONG_DARK = "#c7dff0";

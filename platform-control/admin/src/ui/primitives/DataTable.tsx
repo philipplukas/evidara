@@ -16,7 +16,15 @@
 
 import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "./cn";
+import {
+  NO_TABLE_OVERFLOW,
+  resolveTableOverflow,
+  sameTableOverflow,
+  type TableOverflow,
+  tableOverflowState,
+} from "./tableOverflow";
 
 export type SortOrder = "ASC" | "DESC";
 
@@ -30,6 +38,16 @@ export interface DataTableColumn<T> {
   className?: string;
   /** Extra classes for the <th>. */
   headerClassName?: string;
+  /**
+   * Pin this column to the right edge so horizontal scroll cannot take it away.
+   *
+   * Reserved for columns carrying the row's *actions*. On the run queue the
+   * ACTIONS column holds cancel and retry — the only levers an operator has on
+   * a live run — and at 1440px it sat entirely past the right edge of the
+   * scroll container. A column an operator must be able to reach under pressure
+   * does not get to be the one that scrolls away.
+   */
+  stickyRight?: boolean;
 }
 
 export interface DataTableProps<T> {
@@ -83,11 +101,89 @@ export function DataTable<T>({
   const hasRows = !!records && records.length > 0;
   const totalPages = total && perPage ? Math.max(1, Math.ceil(total / perPage)) : undefined;
 
+  /*
+   * Horizontal-overflow state. `overflow-x: auto` made the table *scrollable*;
+   * it never made it *look* scrollable, so columns past the right edge were
+   * indistinguishable from columns that did not exist (#M16). This drives the
+   * edge fades, the caption hint, and the `data-overflow` attribute.
+   */
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [overflow, setOverflow] = useState<TableOverflow>(NO_TABLE_OVERFLOW);
+
+  const measure = useCallback(() => {
+    const element = scrollerRef.current;
+    if (!element) {
+      return;
+    }
+    const next = resolveTableOverflow({
+      scrollLeft: element.scrollLeft,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    });
+    // Identity-stable when nothing changed, so the render-time measurement
+    // below settles instead of looping.
+    setOverflow((prev) => (sameTableOverflow(prev, next) ? prev : next));
+  }, []);
+
+  useEffect(() => {
+    const element = scrollerRef.current;
+    if (!element) {
+      return;
+    }
+    measure();
+    element.addEventListener("scroll", measure, { passive: true });
+    // A column set can change width without the container resizing (a longer
+    // failure reason, a wider id), so observe the table too — a window-resize
+    // listener alone would miss it.
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => measure());
+    observer?.observe(element);
+    const table = element.firstElementChild;
+    if (table) {
+      observer?.observe(table);
+    }
+    return () => {
+      element.removeEventListener("scroll", measure);
+      observer?.disconnect();
+    };
+  }, [measure]);
+
+  /*
+   * Deliberately dependency-free: re-measure after *every* render.
+   *
+   * A render that changes column widths without resizing the container (a page
+   * of runs with longer ids, a filter that drops the widest failure reason) does
+   * not fire `scroll`, and `ResizeObserver` on the table catches most but not
+   * all of it. Measuring on render is cheap — three reads and a `setState` that
+   * no-ops when the value is unchanged — and it cannot go stale.
+   */
+  useEffect(measure);
+
+  const hasStickyColumn = columns.some((col) => col.stickyRight);
+  const showCaptionBand = caption != null || overflow.overflowing;
+
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-panel)] shadow-[var(--shadow-card)]">
-      {caption ? (
-        <div className="border-b border-[var(--border)] px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--text-meta)]">
-          {caption}
+      {showCaptionBand ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--text-meta)]">
+          <span>{caption}</span>
+          {overflow.overflowing ? (
+            /*
+             * Said in words, not only in a gradient: a fade at the edge is a
+             * hint a hurried operator can miss and a screen-reader user cannot
+             * see at all. `hasStickyColumn` changes what is true, so it changes
+             * what this claims.
+             */
+            <span
+              className="font-normal normal-case tracking-normal text-[var(--foreground-subtle)]"
+              data-testid="datatable-overflow-hint"
+            >
+              <span className="font-semibold">Scrolls horizontally</span>
+              {hasStickyColumn
+                ? " — more columns to the side; Actions stays pinned."
+                : " — more columns to the side."}
+            </span>
+          ) : null}
         </div>
       ) : null}
 
@@ -101,165 +197,224 @@ export function DataTable<T>({
        * scrolls; it does not squeeze columns to fit and clip the rightmost
        * one.
        */}
-      <div className="overflow-x-auto">
-        {/*
-         * `aria-busy` rides on the persistent <table> rather than the loading
-         * cell: a live region has to exist before its content changes to be
-         * announced reliably, and the cell mounts and unmounts with the state
-         * it would describe. Toggling an attribute on an element that never
-         * leaves the DOM is the signal assistive tech can actually observe.
-         *
-         * `min-w-full` (not `w-full`): fill the container when the columns are
-         * narrow, but grow past it when they are not — the parent scrolls
-         * instead of cramming every column into 100% width and clipping.
-         */}
-        <table
-          aria-busy={!!isLoading}
-          className="min-w-full border-collapse text-sm text-[var(--foreground)]"
+      {/*
+       * `relative` anchors the edge fades below. The fades are decoration only
+       * (`aria-hidden`, `pointer-events-none`); the caption band above carries
+       * the same fact in text.
+       */}
+      <div className="relative">
+        <div
+          ref={scrollerRef}
+          className="overflow-x-auto"
+          data-overflow={tableOverflowState(overflow)}
         >
-          <thead>
-            <tr className="bg-[var(--surface-input)]">
-              {columns.map((col) => {
-                const isSorted = sort && col.sortField && sort.field === col.sortField;
-                const canSort = !!col.sortField && !!onSort;
-                const SortIcon = !isSorted
-                  ? ChevronsUpDown
-                  : sort.order === "ASC"
-                    ? ChevronUp
-                    : ChevronDown;
-                return (
-                  <th
-                    key={col.key}
-                    scope="col"
-                    className={cn(
-                      "text-left px-4 py-3 border-b border-[var(--border)]",
-                      "text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-meta)]",
-                      col.headerClassName,
-                    )}
-                    aria-sort={
-                      isSorted ? (sort!.order === "ASC" ? "ascending" : "descending") : "none"
-                    }
+          {/*
+           * `aria-busy` rides on the persistent <table> rather than the loading
+           * cell: a live region has to exist before its content changes to be
+           * announced reliably, and the cell mounts and unmounts with the state
+           * it would describe. Toggling an attribute on an element that never
+           * leaves the DOM is the signal assistive tech can actually observe.
+           *
+           * `min-w-full` (not `w-full`): fill the container when the columns are
+           * narrow, but grow past it when they are not — the parent scrolls
+           * instead of cramming every column into 100% width and clipping.
+           */}
+          <table
+            aria-busy={!!isLoading}
+            className="min-w-full border-collapse text-sm text-[var(--foreground)]"
+          >
+            <thead>
+              <tr className="bg-[var(--surface-input)]">
+                {columns.map((col) => {
+                  const isSorted = sort && col.sortField && sort.field === col.sortField;
+                  const canSort = !!col.sortField && !!onSort;
+                  const SortIcon = !isSorted
+                    ? ChevronsUpDown
+                    : sort.order === "ASC"
+                      ? ChevronUp
+                      : ChevronDown;
+                  return (
+                    <th
+                      key={col.key}
+                      scope="col"
+                      className={cn(
+                        "text-left px-4 py-3 border-b border-[var(--border)]",
+                        "text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-meta)]",
+                        // A pinned header needs its own opaque ground, or the
+                        // columns it floats over show straight through it.
+                        col.stickyRight &&
+                          "sticky right-0 z-10 bg-[var(--surface-input)] border-l border-[var(--border)]",
+                        col.headerClassName,
+                      )}
+                      aria-sort={
+                        isSorted ? (sort!.order === "ASC" ? "ascending" : "descending") : "none"
+                      }
+                    >
+                      {/*
+                       * A sortable header is a real <button>, not an onClick on
+                       * the <th> — the bare handler was mouse-only for the same
+                       * reason the rows were (#624).
+                       */}
+                      {canSort ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextOrder: SortOrder =
+                              isSorted && sort?.order === "ASC" ? "DESC" : "ASC";
+                            onSort!(col.sortField!, nextOrder);
+                          }}
+                          className={cn(
+                            /*
+                             * `border-0 bg-transparent p-0` is load-bearing, not
+                             * tidiness. `globals.css` deliberately imports only
+                             * Tailwind's theme + utilities layers and skips
+                             * preflight (the residual MUI pages need their base
+                             * styles), so a bare <button> keeps the UA default:
+                             * `border: 2px outset rgb(0,0,0)` on a grey
+                             * ButtonFace ground. Every sortable header on every
+                             * list rendered with that bevel, which reads as a
+                             * stuck focus ring. The admin-wide reset in
+                             * globals.css covers this class of bug generally;
+                             * these utilities keep the primitive correct on its
+                             * own terms.
+                             */
+                            "border-0 bg-transparent p-0 font-bold text-inherit cursor-pointer",
+                            "inline-flex items-center gap-1 select-none uppercase tracking-[0.08em]",
+                            "hover:text-[var(--accent-core)]",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] rounded-sm",
+                          )}
+                        >
+                          {col.header}
+                          <SortIcon
+                            size={12}
+                            strokeWidth={2.5}
+                            className={cn(
+                              "transition-opacity",
+                              isSorted ? "opacity-100" : "opacity-40",
+                            )}
+                            aria-hidden
+                          />
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">{col.header}</span>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && !hasRows ? (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-4 py-10 text-center text-[var(--text-meta)]"
                   >
-                    {/*
-                     * A sortable header is a real <button>, not an onClick on
-                     * the <th> — the bare handler was mouse-only for the same
-                     * reason the rows were (#624).
-                     */}
-                    {canSort ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextOrder: SortOrder =
-                            isSorted && sort?.order === "ASC" ? "DESC" : "ASC";
-                          onSort!(col.sortField!, nextOrder);
-                        }}
+                    Loading…
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-4 py-10 text-center text-[var(--status-critical)]"
+                  >
+                    {/* `alert` announces on insertion, which is exactly how this
+                      node arrives — no persistent region needed. */}
+                    <span role="alert">Failed to load records.</span>
+                  </td>
+                </tr>
+              ) : !hasRows ? (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-4 py-10 text-center text-[var(--text-meta)]"
+                  >
+                    {empty ?? "No records."}
+                  </td>
+                </tr>
+              ) : (
+                records!.map((record) => (
+                  /*
+                   * An activatable row is a real tab stop: `tabIndex={0}` plus an
+                   * Enter/Space handler, because `onClick` on a <tr> never fires
+                   * from the keyboard (#624). Space is `preventDefault`ed so it
+                   * activates the row instead of scrolling the page.
+                   *
+                   * The `<tr>` deliberately keeps its implicit `row` role rather
+                   * than taking `role="button"` — overriding it would strip the
+                   * row/cell relationship from every cell inside and make the
+                   * table harder to navigate than it is today. The stronger fix,
+                   * a real <a> in the first cell (which also buys middle-click
+                   * and open-in-new-tab), needs an href at each call site.
+                   */
+                  <tr
+                    key={getRowId(record)}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    aria-label={onRowClick && getRowLabel ? getRowLabel(record) : undefined}
+                    onClick={onRowClick ? () => onRowClick(record) : undefined}
+                    onKeyDown={
+                      onRowClick
+                        ? (event) => {
+                            if (event.key !== "Enter" && event.key !== " ") {
+                              return;
+                            }
+                            // Let controls inside a cell keep their own keys.
+                            if (event.target !== event.currentTarget) {
+                              return;
+                            }
+                            event.preventDefault();
+                            onRowClick(record);
+                          }
+                        : undefined
+                    }
+                    className={cn(
+                      "border-b border-[var(--border)] last:border-b-0 align-top",
+                      onRowClick && "cursor-pointer hover:bg-[var(--interactive-accent-subtle)]",
+                      onRowClick &&
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]",
+                    )}
+                  >
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
                         className={cn(
-                          "inline-flex items-center gap-1 select-none uppercase tracking-[0.08em]",
-                          "hover:text-[var(--accent-core)]",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] rounded-sm",
+                          "px-4 py-3.5",
+                          col.stickyRight &&
+                            "sticky right-0 z-10 bg-[var(--surface-panel)] border-l border-[var(--border)]",
+                          col.className,
                         )}
                       >
-                        {col.header}
-                        <SortIcon
-                          size={12}
-                          strokeWidth={2.5}
-                          className={cn(
-                            "transition-opacity",
-                            isSorted ? "opacity-100" : "opacity-40",
-                          )}
-                          aria-hidden
-                        />
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-1">{col.header}</span>
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && !hasRows ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-4 py-10 text-center text-[var(--text-meta)]"
-                >
-                  Loading…
-                </td>
-              </tr>
-            ) : error ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-4 py-10 text-center text-[var(--status-critical)]"
-                >
-                  {/* `alert` announces on insertion, which is exactly how this
-                      node arrives — no persistent region needed. */}
-                  <span role="alert">Failed to load records.</span>
-                </td>
-              </tr>
-            ) : !hasRows ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-4 py-10 text-center text-[var(--text-meta)]"
-                >
-                  {empty ?? "No records."}
-                </td>
-              </tr>
-            ) : (
-              records!.map((record) => (
-                /*
-                 * An activatable row is a real tab stop: `tabIndex={0}` plus an
-                 * Enter/Space handler, because `onClick` on a <tr> never fires
-                 * from the keyboard (#624). Space is `preventDefault`ed so it
-                 * activates the row instead of scrolling the page.
-                 *
-                 * The `<tr>` deliberately keeps its implicit `row` role rather
-                 * than taking `role="button"` — overriding it would strip the
-                 * row/cell relationship from every cell inside and make the
-                 * table harder to navigate than it is today. The stronger fix,
-                 * a real <a> in the first cell (which also buys middle-click
-                 * and open-in-new-tab), needs an href at each call site.
-                 */
-                <tr
-                  key={getRowId(record)}
-                  tabIndex={onRowClick ? 0 : undefined}
-                  aria-label={onRowClick && getRowLabel ? getRowLabel(record) : undefined}
-                  onClick={onRowClick ? () => onRowClick(record) : undefined}
-                  onKeyDown={
-                    onRowClick
-                      ? (event) => {
-                          if (event.key !== "Enter" && event.key !== " ") {
-                            return;
-                          }
-                          // Let controls inside a cell keep their own keys.
-                          if (event.target !== event.currentTarget) {
-                            return;
-                          }
-                          event.preventDefault();
-                          onRowClick(record);
-                        }
-                      : undefined
-                  }
-                  className={cn(
-                    "border-b border-[var(--border)] last:border-b-0 align-top",
-                    onRowClick && "cursor-pointer hover:bg-[var(--interactive-accent-subtle)]",
-                    onRowClick &&
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]",
-                  )}
-                >
-                  {columns.map((col) => (
-                    <td key={col.key} className={cn("px-4 py-3.5", col.className)}>
-                      {col.render(record)}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                        {col.render(record)}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/*
+         * Edge fades. Decoration only — the caption band states the same fact in
+         * words, because a gradient is invisible to a screen reader and easy to
+         * miss under pressure. They sit outside the scroller so they stay put
+         * while the content moves under them.
+         */}
+        {overflow.canScrollLeft ? (
+          <div
+            aria-hidden
+            data-testid="datatable-fade-left"
+            className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[var(--surface-panel)] to-transparent"
+          />
+        ) : null}
+        {overflow.canScrollRight ? (
+          <div
+            aria-hidden
+            data-testid="datatable-fade-right"
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[var(--surface-panel)] to-transparent"
+          />
+        ) : null}
       </div>
 
       {totalPages && totalPages > 1 && onPageChange && page !== undefined ? (

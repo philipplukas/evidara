@@ -105,7 +105,7 @@ export function SourceVersionDiffPanel({
   const changedCount = entries.filter((e) => e.kind !== "unchanged").length;
 
   return (
-    <div className="rounded-[12px] border border-[var(--border)] bg-white/80 backdrop-blur-[8px] overflow-hidden">
+    <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-panel)]/80 backdrop-blur-[8px] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}

@@ -15,12 +15,13 @@
 import { BrandMark } from "@evidara/shell";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
   resolveLegalSearchHandoff,
 } from "../../lib/admin/navigationContext";
+import { ThemeToggle } from "./ThemeToggle";
 
 const LEGAL_SEARCH_URL =
   process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
@@ -141,8 +142,21 @@ export function AppBar() {
        * where the column is wide enough to breathe.
        */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 lg:gap-4 w-full px-3 sm:px-6 py-2 lg:py-3 min-w-0">
-        {/* Brand mark + product */}
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/*
+         * Brand mark + product, and the way back to the dashboard.
+         *
+         * Every one of the thirteen sidebar links targets a resource or a
+         * create form; none targets `/`. The logo was not a link either, so once
+         * an operator left the dashboard the only route back was editing the
+         * URL. A clickable wordmark is the convention operators already expect;
+         * the sidebar also carries an explicit "Overview" entry, because a
+         * convention is not a discoverable affordance.
+         */}
+        <Link
+          to="/"
+          aria-label="Evidara control plane — dashboard"
+          className="flex items-center gap-3 min-w-0 flex-1 no-underline rounded-lg transition-colors hover:bg-[var(--admin-on-brand-wash)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 -mx-1 px-1 py-1"
+        >
           {/*
            * The shared `BrandMark` draws its lattice in `currentColor`. Admin's
            * header is a dark navy gradient, so it inherits the near-white
@@ -162,7 +176,7 @@ export function AppBar() {
               Control plane
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Title block (route-aware) */}
         <div className="flex flex-col items-start lg:items-center text-left lg:text-center min-w-0 flex-1 gap-[2px]">
@@ -206,8 +220,9 @@ export function AppBar() {
           ) : null}
         </div>
 
-        {/* Back-to-legal-search CTA */}
-        <div className="flex lg:items-center self-stretch lg:self-auto">
+        {/* Theme toggle + back-to-legal-search CTA */}
+        <div className="flex items-stretch lg:items-center gap-2 self-stretch lg:self-auto">
+          <ThemeToggle />
           <a
             href={handoff.returnToUrl}
             className="inline-flex items-center justify-center gap-2 rounded-full font-semibold no-underline transition-[background-color,border-color,transform,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 px-4 min-h-11 sm:h-10 text-sm bg-[var(--admin-on-brand-wash)] border border-[var(--admin-on-brand-border)] text-[var(--admin-on-brand)] hover:bg-[var(--admin-on-brand-wash-hover)] hover:border-[var(--admin-on-brand-border-hover)] whitespace-nowrap self-stretch lg:self-auto w-full lg:w-auto"

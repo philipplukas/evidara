@@ -96,12 +96,106 @@ export const describeRunState = (record: Pick<RunRecord, "status">): string => {
     return "Active now. Watch the pipeline sections for the next operator cue.";
   }
   if (record.status === "failed") {
-    return "Blocked. Review the failure reason in the detail page.";
+    // Was "Review the failure reason in the detail page." — which stopped being
+    // true twice over: the reason is now legible in the row above this sentence
+    // (it used to clip at one line), and Retry is now on the row. Sending an
+    // operator to another page for something in front of them is the kind of
+    // stale instruction that trains people to ignore the copy.
+    return "Blocked. Fix the cause, then retry.";
   }
   if (record.status === "completed") {
     return "Finished successfully. Use the detail view for audit evidence.";
   }
   return "Stopped by an operator. Review the detail page if this was unexpected.";
+};
+
+/**
+ * Whether the queue row needs to spell out its state in prose.
+ *
+ * It did so on every row, including eight identical repetitions of "Finished
+ * successfully. Use the detail view for audit evidence." — three lines each,
+ * under a badge that already said `completed`. Thirteen rows came to 2,230px of
+ * page, and every one of those lines was bought at the cost of vertical space
+ * while CREATED, UPDATED and ACTIONS stayed off the right edge.
+ *
+ * A terminal state that went the way it was supposed to needs no sentence: its
+ * badge is the whole message. The states that are *not* self-explanatory — the
+ * ones where the operator has to decide something — keep theirs.
+ */
+export const runStateNeedsExplanation = (record: Pick<RunRecord, "status">): boolean =>
+  record.status !== "completed";
+
+/**
+ * How long the run has been in its current, still-moving state.
+ *
+ * The gap this fills: a run queued thirty seconds ago and one stuck for three
+ * days rendered *pixel-identically* — same badge, same "Queued. Review readiness
+ * or open the run when it becomes active", no age, no dispatch attempt. The one
+ * column that would let an operator infer staleness, CREATED, is also one of the
+ * two clipped off the right edge at 1440px. So the queue had no staleness signal
+ * at all.
+ *
+ * Only emitted for `pending` and `running`: on a terminal run "age" is not a
+ * thing that is still accruing, and the CREATED/UPDATED columns are the right
+ * place to read one.
+ *
+ * `now` is injected so the formatting is testable without freezing the clock.
+ */
+export const describeRunAge = (
+  record: Pick<RunRecord, "status" | "created_at" | "started_at">,
+  now: Date = new Date(),
+): string | null => {
+  if (record.status !== "pending" && record.status !== "running") {
+    return null;
+  }
+  const since = record.status === "running" ? record.started_at : record.created_at;
+  if (!since) {
+    return null;
+  }
+  const elapsedMs = now.getTime() - new Date(since).getTime();
+  // A negative elapsed time is clock skew between writers, not a duration we
+  // know — the same reason the dashboard refuses to print one (#674). Say
+  // nothing rather than "-3m".
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
+    return null;
+  }
+  const verb = record.status === "running" ? "running" : "queued";
+  const minutes = Math.floor(elapsedMs / 60_000);
+  if (minutes < 1) {
+    return `${verb} <1 min`;
+  }
+  if (minutes < 60) {
+    return `${verb} ${minutes} min`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${verb} ${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  return `${verb} ${days}d`;
+};
+
+/**
+ * Past which age a still-moving run should be called out rather than merely
+ * timed. Two hours is long enough that a healthy local or CI dispatch has
+ * finished, and short enough that a genuinely stuck run is flagged the same
+ * working session it stalls in.
+ */
+export const RUN_STALE_AFTER_MS = 2 * 60 * 60 * 1000;
+
+export const runLooksStalled = (
+  record: Pick<RunRecord, "status" | "created_at" | "started_at">,
+  now: Date = new Date(),
+): boolean => {
+  if (record.status !== "pending" && record.status !== "running") {
+    return false;
+  }
+  const since = record.status === "running" ? record.started_at : record.created_at;
+  if (!since) {
+    return false;
+  }
+  const elapsedMs = now.getTime() - new Date(since).getTime();
+  return Number.isFinite(elapsedMs) && elapsedMs >= RUN_STALE_AFTER_MS;
 };
 
 export const summarizeRunFilters = (filterValues: RunQueueFilterValues): string => {
@@ -113,7 +207,24 @@ export const summarizeRunFilters = (filterValues: RunQueueFilterValues): string 
   return segments.join(" · ");
 };
 
-export const selectAttentionRun = (runs: RunRecord[]): RunRecord | null => {
+/**
+ * The run an operator should open first, or `null` when there is not one.
+ *
+ * `null` is the load-bearing return value. This used to end
+ * `return runs[0] ?? null` — so on a queue where every run had finished it
+ * picked the newest *completed* run and the list rendered an amber
+ * "Open attention run · <source>" chip pointing at it. On the same dataset the
+ * dashboard said "No run is failing, pending, or running… nothing needing
+ * attention" and disabled its button. Two screens, one queue, opposite claims,
+ * and the list was the one that was wrong: nothing about a completed run needs
+ * attention. An operator who learns that the amber chip means nothing stops
+ * reading it on the day it means something.
+ *
+ * Generic over the record shape so `RunListV2` can pass its richer
+ * `RunListRecord` (which carries `source_name`) and get it back — the inlined
+ * copy that existed for exactly that reason is what let the two drift.
+ */
+export const selectAttentionRun = <T extends Pick<RunRecord, "status">>(runs: T[]): T | null => {
   for (const status of ACTIONABLE_STATUSES) {
     const candidate = runs.find((run) => run.status === status);
     if (candidate) {
@@ -121,7 +232,7 @@ export const selectAttentionRun = (runs: RunRecord[]): RunRecord | null => {
     }
   }
 
-  return runs[0] ?? null;
+  return null;
 };
 
 export const isKeyboardShortcutInputTarget = (target: EventTarget | null): boolean => {

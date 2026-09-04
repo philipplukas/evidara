@@ -217,7 +217,7 @@ function PipelineHealthBanner({
               return (
                 <div
                   key={stage.stage}
-                  className="rounded-[12px] border border-[var(--border-faint)] bg-white/70 p-3"
+                  className="rounded-[12px] border border-[var(--border-faint)] bg-[var(--surface-panel)]/70 p-3"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -245,7 +245,7 @@ function PipelineHealthBanner({
                         <button
                           type="button"
                           onClick={() => onJumpToSection(action.href)}
-                          className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
+                          className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-[var(--surface-panel)]/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-[var(--surface-panel)]"
                         >
                           {action.label}
                         </button>
@@ -254,7 +254,7 @@ function PipelineHealthBanner({
                           href={action.href}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
+                          className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-[var(--surface-panel)]/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-[var(--surface-panel)]"
                         >
                           {action.label}
                         </a>
@@ -273,7 +273,7 @@ function PipelineHealthBanner({
 
 function DecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-0.5 rounded-[10px] border border-[var(--border-faint)] bg-white/80 p-3">
+    <div className="space-y-0.5 rounded-[10px] border border-[var(--border-faint)] bg-[var(--surface-panel)]/80 p-3">
       <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] leading-[1.2] text-[var(--foreground-subtle)]">
         {label}
       </span>
@@ -289,7 +289,7 @@ function DecisionCell({ label, value }: { label: string; value: string }) {
  */
 function PrimaryDecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1 rounded-[12px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-card-hover)]">
+    <div className="space-y-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface-panel)] p-4 shadow-[var(--shadow-card-hover)]">
       <span className="block text-[15px] font-semibold uppercase tracking-[0.08em] leading-[1.2] text-[var(--foreground-muted)]">
         {label}
       </span>

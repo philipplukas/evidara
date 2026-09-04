@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { buildRunRecord } from "../../lib/admin/__fixtures__/runs";
 import {
   describeQueueScope,
+  describeRunAge,
   describeRunState,
   formatQueueCount,
   getRunQueueKeyboardShortcutAction,
   isKeyboardShortcutInputTarget,
   resolveQueueCountScope,
+  runLooksStalled,
+  runStateNeedsExplanation,
   selectAttentionRun,
   summarizeRunFilters,
 } from "./RunList";
@@ -62,10 +65,17 @@ describe("RunList helpers", () => {
     expect(selectAttentionRun([completedRun, pendingRun])).toBe(pendingRun);
   });
 
+  it("reports no attention run when nothing is actionable", () => {
+    // The defect this replaces: the selector fell back to `runs[0]`, so a queue
+    // of five completed runs produced an amber "Open attention run" chip
+    // pointing at a completed run — on the same data where the dashboard
+    // correctly reported nothing needing attention.
+    expect(selectAttentionRun([completedRun])).toBeNull();
+    expect(selectAttentionRun([])).toBeNull();
+  });
+
   it("describes the queue state in operator language", () => {
-    expect(describeRunState(failedRun)).toBe(
-      "Blocked. Review the failure reason in the detail page.",
-    );
+    expect(describeRunState(failedRun)).toBe("Blocked. Fix the cause, then retry.");
     expect(describeRunState(completedRun)).toContain("Finished successfully");
   });
 
@@ -193,5 +203,72 @@ describe("queue count honesty during an outage", () => {
         total: undefined,
       }),
     ).toBe("unknown");
+  });
+});
+
+/**
+ * A pending run and a stalled run rendered pixel-identically: same badge, same
+ * "Queued. Review readiness…" sentence, no age. The `CREATED` column that would
+ * let an operator infer staleness is one of the two clipped off the right edge
+ * at 1440px, so the queue carried no staleness signal at all.
+ */
+describe("run age and staleness", () => {
+  const now = new Date("2026-04-15T10:00:00Z");
+
+  it("ages a pending run from when it was created", () => {
+    const queued = { ...pendingRun, created_at: "2026-04-15T09:26:00Z" };
+    expect(describeRunAge(queued, now)).toBe("queued 34 min");
+  });
+
+  it("ages a running run from when it started, not when it was created", () => {
+    // A run that sat in the queue for an hour and has been running for five
+    // minutes is a five-minute-old *run*, not an hour-old one.
+    const running = {
+      ...runningRun,
+      created_at: "2026-04-15T09:00:00Z",
+      started_at: "2026-04-15T09:55:00Z",
+    };
+    expect(describeRunAge(running, now)).toBe("running 5 min");
+  });
+
+  it("scales to hours and days", () => {
+    expect(describeRunAge({ ...pendingRun, created_at: "2026-04-15T07:00:00Z" }, now)).toBe(
+      "queued 3h",
+    );
+    expect(describeRunAge({ ...pendingRun, created_at: "2026-04-12T10:00:00Z" }, now)).toBe(
+      "queued 3d",
+    );
+  });
+
+  it("says nothing for a terminal run — its age is not still accruing", () => {
+    expect(describeRunAge(completedRun, now)).toBeNull();
+    expect(describeRunAge(failedRun, now)).toBeNull();
+  });
+
+  it("refuses to print a negative duration from clock skew", () => {
+    // Same rule as the dashboard's `formatDuration` (#674): an impossible
+    // number is worse than no number.
+    expect(describeRunAge({ ...pendingRun, created_at: "2026-04-15T11:00:00Z" }, now)).toBeNull();
+  });
+
+  it("flags a run that has sat in a moving state for over two hours", () => {
+    expect(runLooksStalled({ ...pendingRun, created_at: "2026-04-15T09:30:00Z" }, now)).toBe(false);
+    expect(runLooksStalled({ ...pendingRun, created_at: "2026-04-15T07:00:00Z" }, now)).toBe(true);
+    // A completed run is not stalled, however old.
+    expect(runLooksStalled({ ...completedRun, created_at: "2026-01-01T00:00:00Z" }, now)).toBe(
+      false,
+    );
+  });
+});
+
+describe("runStateNeedsExplanation", () => {
+  it("drops the sentence only where the badge already says everything", () => {
+    // Eight identical three-line repetitions of "Finished successfully. Use the
+    // detail view for audit evidence." made the 13-row list 2,230px tall — space
+    // paid for while ACTIONS stayed clipped off the right edge.
+    expect(runStateNeedsExplanation(completedRun)).toBe(false);
+    for (const run of [pendingRun, runningRun, failedRun]) {
+      expect(runStateNeedsExplanation(run)).toBe(true);
+    }
   });
 });

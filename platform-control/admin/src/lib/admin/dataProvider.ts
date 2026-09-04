@@ -387,9 +387,21 @@ const isRunDetailResource = (resource: string): resource is RunDetailResourceNam
 /** One server page of a reference-data list. */
 const fetchSimpleListPage = async <TResource extends SimpleListResourceName>(
   resource: TResource,
-  { limit, offset }: { limit: number; offset: number },
+  { limit, offset, q }: { limit: number; offset: number; q?: string },
 ): Promise<PaginatedListResponse<ResourceRecordMap[TResource]>> => {
   const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  /*
+   * `/v1/reference-data/{jurisdictions,authorities}` have taken a `q` name
+   * filter since they were paginated (`reference_data.py`), and the admin never
+   * sent it. So the jurisdictions list — 2,169 rows, 44 pages, alphabetical —
+   * had no way to find a row at all, while the create-source wizard's picker
+   * over the same registry searched fine (client-side, over the fully paged-out
+   * list). Filtering server-side means the pager and the caption keep reporting
+   * the real total for the search, rather than for the page in hand.
+   */
+  if (q) {
+    query.set("q", q);
+  }
   return requestJson<PaginatedListResponse<ResourceRecordMap[TResource]>>(
     `${SIMPLE_LIST_PATHS[resource]}?${query}`,
   );
@@ -919,7 +931,13 @@ const getSimpleListResult = async <TResource extends SimpleListResourceName>(
   }
 
   const { limit, offset } = toLimitOffset(params);
-  const response = await fetchSimpleListPage(resource, { limit, offset });
+  // `q` is the only filter these endpoints accept; anything else in
+  // `params.filter` is not silently dropped into the query string, because a
+  // filter the server ignores is a filter the operator believes is applied.
+  const rawQuery = params.filter?.q;
+  const q =
+    typeof rawQuery === "string" && rawQuery.trim().length > 0 ? rawQuery.trim() : undefined;
+  const response = await fetchSimpleListPage(resource, { limit, offset, q });
   const records = response.data.map((item) => toRecord(item, idField));
   return toServerPagedResult(records, response.total, params);
 };
@@ -982,6 +1000,24 @@ const getRunDetailList = async <TResource extends RunDetailResourceName>(
 export const controlPlaneActions = {
   async cancelRun(runId: string): Promise<RunRecord> {
     const response = await requestJson<RunResponse>(`/v1/runs/${runId}/cancel`, {
+      method: "POST",
+    });
+    return toRecord(response, "run_id");
+  },
+
+  /**
+   * `POST /v1/runs/{id}/retry` — the one recovery action for the one state that
+   * needs recovering.
+   *
+   * The endpoint has existed since runs did (`routers/runs.py:203`); nothing in
+   * the admin called it. A failed run's detail page offered "Jump to…" anchors
+   * and nothing else, so the only lever on the only state that needs a lever was
+   * an operator's own `curl`. The server resets the run to PENDING, drops its
+   * provider jobs, and re-dispatches — so this is a real dispatch, not a
+   * bookkeeping flip, and the caller must confirm it.
+   */
+  async retryRun(runId: string): Promise<RunRecord> {
+    const response = await requestJson<RunResponse>(`/v1/runs/${runId}/retry`, {
       method: "POST",
     });
     return toRecord(response, "run_id");

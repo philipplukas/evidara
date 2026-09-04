@@ -21,7 +21,9 @@ export function PageContextBar({ children }: PageContextBarProps) {
         py: 1.75,
         px: { xs: 0, sm: 0.25 },
         mx: { xs: -0.5, sm: 0 },
-        backgroundColor: "rgba(255, 253, 248, 0.96)",
+        // Token, not a cream literal: this bar is sticky over the page body, so
+        // a hardcoded near-white stayed white when the app went dark.
+        backgroundColor: "color-mix(in oklab, var(--surface-panel) 96%, transparent)",
         backdropFilter: "blur(10px)",
         borderBottom: "1px solid",
         borderColor: "var(--border)",

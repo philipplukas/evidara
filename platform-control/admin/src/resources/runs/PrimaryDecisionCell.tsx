@@ -10,7 +10,7 @@
  */
 export function PrimaryDecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[12px] border border-[var(--border)] bg-white p-4 space-y-1 shadow-[var(--shadow-card-hover)]">
+    <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-panel)] p-4 space-y-1 shadow-[var(--shadow-card-hover)]">
       <span className="block text-[15px] font-semibold uppercase tracking-[0.08em] text-[var(--foreground-muted)] leading-[1.2]">
         {label}
       </span>

@@ -25,7 +25,7 @@ import { Admin, Resource } from "react-admin";
 import { Navigate, Route, useParams } from "react-router-dom";
 import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
-import { adminMuiTheme } from "../lib/admin/muiTheme";
+import { adminMuiDarkTheme, adminMuiTheme } from "../lib/admin/muiTheme";
 import BlueprintTemplateList from "../resources/blueprints/BlueprintTemplateList";
 import { CommentaryInsightList } from "../resources/corrections/CommentaryInsightList";
 import { CommentaryInsightShow } from "../resources/corrections/CommentaryInsightShow";
@@ -97,6 +97,16 @@ export default function AdminApp() {
       layout={AdminLayout}
       notification={NoNotification}
       theme={adminMuiTheme}
+      /*
+       * Supplying `darkTheme` is what turns dark mode on at all. React-admin's
+       * `useTheme()` only consults `prefers-color-scheme` when a dark theme
+       * exists and otherwise pins the mode to 'light'; without this prop the
+       * admin rendered a full-brightness white panel on a dark OS, and light and
+       * dark screenshots of it were byte-identical. `ThemeSync` (in AppShell)
+       * mirrors the resolved mode onto <html> so the Tailwind token palette
+       * follows the same single value.
+       */
+      darkTheme={adminMuiDarkTheme}
     >
       <Resource
         name={ResourceName.Jurisdictions}

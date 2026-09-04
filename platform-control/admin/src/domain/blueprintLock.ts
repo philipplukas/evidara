@@ -119,6 +119,65 @@ export function classifyTemplate(template: LockLike): LockClassDescriptor {
   return template.enabled ? LOCK_CLASSES.live : LOCK_CLASSES["operator-actionable"];
 }
 
+/**
+ * How prominent the row's enable/disable control is allowed to be, and what it
+ * must admit about itself.
+ *
+ * The inventory rendered a filled violet `Enable` — the page's strongest visual
+ * commitment — on every unenabled row, including the rows whose own Status cell
+ * reads "Enabling the config key will not unlock it; this needs a provider
+ * change." The most prominent affordance on the row was the futile one.
+ *
+ * The truth this encodes is `SourceService`'s: `launchable = enabled and
+ * live_ready` (`services/source_service.py`). Where the code key is shut,
+ * turning the config key changes `enabled` and nothing an operator wants —
+ * runs still refuse. That is not a reason to *hide* the control (a template
+ * can be pre-enabled ahead of a provider landing, and the enablement dialog
+ * carries its own code-key warning), but it is a reason to stop presenting it
+ * as the obvious next step.
+ *
+ * Deliberately NOT modelled here: whether the flip is permitted at all. The
+ * enablement guard is #854's, and a second opinion about it living in the UI is
+ * how two guards drift apart.
+ */
+export type EnablementAction = {
+  label: "Enable" | "Disable";
+  /** Maps to the `Button` primitive's variant. */
+  variant: "primary" | "secondary" | "ghost";
+  /**
+   * One clause naming what the action will not achieve, or `null` when it will
+   * achieve exactly what its label says. Rendered beside the control.
+   */
+  futility: string | null;
+};
+
+export function describeEnablementAction(template: LockLike): EnablementAction {
+  if (template.enabled) {
+    // Turning a key off always does what it says, whatever the provider is
+    // doing — including on a scaffold, where it is the only way to undo a
+    // premature flip.
+    return { label: "Disable", variant: "secondary", futility: null };
+  }
+
+  switch (readinessOf(template)) {
+    case "live":
+      // The one case where enabling is the next step and finishes the job.
+      return { label: "Enable", variant: "primary", futility: null };
+    case "awaiting_evidence":
+      return {
+        label: "Enable",
+        variant: "ghost",
+        futility: "Will not launch runs yet — the code key is still shut.",
+      };
+    default:
+      return {
+        label: "Enable",
+        variant: "ghost",
+        futility: "Will not launch runs — the provider needs a change first.",
+      };
+  }
+}
+
 export const LOCK_CLASS_ORDER: TemplateLockClass[] = [
   "operator-actionable",
   "awaiting-acceptance",

@@ -107,7 +107,9 @@ export default function RunShowV2() {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill level={runRecordStatusToLevel(run.status)}>{STATUS_LABEL[run.status]}</Pill>
-          <Pill level={runModeToLevel(run.mode)}>{runModeLabel(run.mode)}</Pill>
+          <Pill variant="tag" level={runModeToLevel(run.mode)}>
+            {runModeLabel(run.mode)}
+          </Pill>
           <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
         </div>
         <RecordContextProvider value={run}>
@@ -211,7 +213,7 @@ export default function RunShowV2() {
 
 function DecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[10px] border border-[var(--border-faint)] bg-white/80 p-3 space-y-0.5">
+    <div className="rounded-[10px] border border-[var(--border-faint)] bg-[var(--surface-panel)]/80 p-3 space-y-0.5">
       <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--foreground-subtle)] leading-[1.2]">
         {label}
       </span>
