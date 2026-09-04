@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from document_intelligence.config.runtime import RuntimeSettings
-from document_intelligence.persist.sinks import delta_storage_options
+from document_intelligence.persist.sinks import delta_dataset_filesystem, delta_storage_options
 
 _DOC_ID_RE = re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
 _PM_ID_RE = re.compile(r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
@@ -110,6 +110,18 @@ class DeltaPublishedDocumentStore:
     def _delta_table_kwargs(self) -> dict[str, Any]:
         return {"storage_options": self._storage_options} if self._storage_options else {}
 
+    def _open_dataset(self, uri: str) -> Any:
+        """Open a published surface as a pyarrow dataset over a *native* filesystem.
+
+        Every Delta read in this store goes through here. The explicit ``filesystem`` is what
+        keeps the process from aborting at interpreter teardown (``terminate called without an
+        active exception``) once the read is done — see ``delta_dataset_filesystem`` and #825.
+        Passing ``None`` is the documented fallback: ``deltalake`` then builds its own handler.
+        """
+        deltalake = importlib.import_module("deltalake")
+        table = deltalake.DeltaTable(uri, **self._delta_table_kwargs())
+        return table.to_pyarrow_dataset(filesystem=delta_dataset_filesystem(uri, self._storage_options))
+
     def get_full(
         self,
         document_id: str,
@@ -123,7 +135,6 @@ class DeltaPublishedDocumentStore:
         if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
             return None
 
-        deltalake = importlib.import_module("deltalake")
         dataset_mod = importlib.import_module("pyarrow.dataset")
         filters = [dataset_mod.field("document_id") == document_id]
         if document_revision is not None:
@@ -131,12 +142,8 @@ class DeltaPublishedDocumentStore:
         if processing_manifest_id is not None:
             filters.append(dataset_mod.field("processing_manifest_id") == processing_manifest_id)
 
-        table = (
-            deltalake.DeltaTable(self._published_documents_uri, **self._delta_table_kwargs())
-            .to_pyarrow_dataset()
-            .to_table(
-                filter=_and_filters(filters),
-            )
+        table = self._open_dataset(self._published_documents_uri).to_table(
+            filter=_and_filters(filters),
         )
         rows = table.to_pylist()
         if not rows:
@@ -171,8 +178,7 @@ class DeltaPublishedDocumentStore:
         Ordering by ``document_id`` makes the walk resumable: a caller that crashes after
         document *N* passes ``after_document_id=N`` to continue without redoing prior work.
         """
-        deltalake = importlib.import_module("deltalake")
-        dataset = deltalake.DeltaTable(self._published_documents_uri, **self._delta_table_kwargs()).to_pyarrow_dataset()
+        dataset = self._open_dataset(self._published_documents_uri)
 
         available = set(dataset.schema.names)
         columns = [name for name in _BACKFILL_ROW_COLUMNS if name in available]
@@ -199,7 +205,6 @@ class DeltaPublishedDocumentStore:
         if not self._published_sections_uri:
             return []
 
-        deltalake = importlib.import_module("deltalake")
         dataset_mod = importlib.import_module("pyarrow.dataset")
         filters = [dataset_mod.field("document_id") == document_id]
         if document_revision is not None:
@@ -208,11 +213,7 @@ class DeltaPublishedDocumentStore:
             filters.append(dataset_mod.field("processing_manifest_id") == processing_manifest_id)
 
         try:
-            table = (
-                deltalake.DeltaTable(self._published_sections_uri, **self._delta_table_kwargs())
-                .to_pyarrow_dataset()
-                .to_table(filter=_and_filters(filters))
-            )
+            table = self._open_dataset(self._published_sections_uri).to_table(filter=_and_filters(filters))
         except Exception as exc:  # pragma: no cover - depends on Delta backend failure mode
             logger.warning(
                 "published_sections_unavailable",
