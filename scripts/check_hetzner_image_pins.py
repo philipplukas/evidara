@@ -32,6 +32,28 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 KUSTOMIZATION = Path("infra/hetzner/apps/kustomization.yaml")
 MIGRATE_JOB = Path("infra/hetzner/apps/migrate-job.yaml")
 
+# Every other Evidara image reference under infra/hetzner/ — today just the marketing
+# Deployment (ADR-0039), which is deliberately outside apps/kustomization.yaml so the
+# public surface is not coupled to a platform rollout it has no part in. Being outside
+# the kustomization also puts it outside the `images:` transformer, which is exactly the
+# condition that let the migrate Job drift 143 commits. These do NOT have to agree with
+# the app SHA — they roll on their own schedule — but they must still be pinned to a
+# commit, not to a tag that moves under the cluster.
+HETZNER_DIR = Path("infra/hetzner")
+EVIDARA_IMAGE_PREFIX = "ghcr.io/philipplukas/evidara-"
+
+# Helm values files are out of scope: they configure third-party charts and reach the
+# cluster through `helm upgrade`, not `kubectl apply`, so this guard could not tell a
+# drifted one from a current one anyway.
+#
+# `runners/values-heavy.yaml` is a REAL instance of the hazard below — the ARC heavy
+# pool runs `evidara-runner-heavy:latest` — and it is excluded knowingly, not by
+# oversight: that pool is CI capacity with no user-facing state, its own file already
+# carries a longer warning about Helm-revision drift (#534), and repinning it is a
+# change to how CI is provisioned rather than to how the product is served. If it is
+# ever brought under a pin, delete this exclusion in the same change.
+EXCLUDED_DIRS = ("runners", "values")
+
 PLATFORM_CONTROL_IMAGE = "ghcr.io/philipplukas/evidara-platform-control"
 
 # `image: <repo>:<tag>` in the Job's pod spec.
@@ -112,6 +134,28 @@ def main() -> int:
                     "must be bumped by hand in the same change.\n"
                     "    Left drifted, the Job completes successfully having applied nothing, "
                     "and the API rolls against a database missing its migrations."
+                )
+
+    # 3. No Evidara image anywhere under infra/hetzner/ is pinned to a moving tag.
+    #    `latest` here is not a smaller version of the same mistake as a drifted SHA —
+    #    it is a worse one: the drift happens on someone else's merge, at a time nobody
+    #    chose, and `kubectl describe` still reports the tag it was applied with.
+    covered = {kustomization_path.resolve(), migrate_path.resolve()}
+    for path in sorted((REPO_ROOT / HETZNER_DIR).rglob("*.yaml")):
+        if path.resolve() in covered:
+            continue
+        if path.relative_to(REPO_ROOT / HETZNER_DIR).parts[0] in EXCLUDED_DIRS:
+            continue
+        for match in _IMAGE_RE.finditer(path.read_text(encoding="utf-8")):
+            repo, tag = match.group("repo"), match.group("tag")
+            if not repo.startswith(EVIDARA_IMAGE_PREFIX):
+                continue
+            if not _SHA_RE.match(tag):
+                errors.append(
+                    f"{path.relative_to(REPO_ROOT)}: `{repo}` is pinned to `{tag}`, which is "
+                    "not a full 40-character commit SHA.\n"
+                    "    Nothing transforms this tag, so a moving one is rolled by whoever "
+                    "merges next, not by whoever deploys."
                 )
 
     if errors:

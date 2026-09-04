@@ -31,7 +31,7 @@ spec:
           # apps/kustomization.yaml. No transformer reaches this file, so the tag
           # is maintained by hand; the SHA must be one whose `Build marketing
           # image` job in runtime-images.yml is green.
-          image: PIN_ME
+          image: ghcr.io/philipplukas/evidara-marketing:32a13330873d67d57c3bdd0d1dd03a0f81e41b16
           ports:
             - name: http
               containerPort: 8080
