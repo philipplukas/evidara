@@ -94,6 +94,22 @@ of the CI job, not just `ruff check`. The full
 CI gate is `scripts/check-document-intelligence.sh`, but it installs into the ambient `python3`
 rather than a uv environment, so prefer the command above locally.
 
+**Which dependency set each gate runs, and why they differ (#848).** There are two, deliberately:
+
+| Runs | Dependency set | Python |
+|---|---|---|
+| The command above (`uv run`) | `uv.lock` | `document-intelligence/.python-version` (3.12) |
+| `document-intelligence-locked` CI job | `uv.lock` (`uv sync --frozen`) | 3.12 |
+| `document-intelligence/Dockerfile*` | `uv.lock` (`uv sync --frozen`) | 3.12 (base image) |
+| `document-intelligence-check` CI job + `scripts/check-document-intelligence.sh` | `pyproject.toml` **floors**, resolved against PyPI on the day | 3.12 |
+
+The locked row is what ships; the floating row is the early warning that a new
+`deltalake`/`pyarrow` broke us. Until #848 the image also floated and the local gate was the
+only locked runner, so the two silently disagreed — measured 2026-09-03, the image built
+`deltalake` 1.6.3 / `pyarrow` 25.0.1 while `uv run` gave 1.5.0 / 23.0.1 on Python **3.13**.
+Bumping a floor without re-locking now fails `uv sync --frozen` in CI and in the image build
+rather than shipping something no gate ran.
+
 ### ID contract (see #264)
 
 Canonical seeds: `platform-control/src/platform_control/seeds/reference/{authorities,jurisdictions,compliance_policies,extractor_profiles}.yaml`.

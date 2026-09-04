@@ -33,6 +33,15 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 
 ## Local setup
 
+> **Two dependency sets, on purpose (#848).** `uv.lock` is what the **images** install
+> (`uv sync --frozen` in all three Dockerfiles) and what `uv run` gives you locally, on the
+> Python in `.python-version` (3.12, matching the base image). The `pip install -e ".[...]"`
+> commands below resolve `pyproject.toml`'s **floors** against PyPI on the day you run them,
+> which is what CI's `document-intelligence-check` job does as an early warning. They are not
+> the same software: on 2026-09-03 the floors gave `deltalake` 1.6.3 / `pyarrow` 25.0.1 and the
+> lock gave 1.5.0 / 23.0.1. **To reproduce what production runs, use `uv run`.** Changing a
+> floor without re-locking now fails `uv sync --frozen`, in CI and in the image build.
+
 Minimal lint + editor tooling:
 
 ```bash

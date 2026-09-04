@@ -3,17 +3,23 @@
 
 FROM python:3.12-slim@sha256:804ddf3251a60bbf9c92e73b7566c40428d54d0e79d3428194edf40da6521286
 
+# Installs from `uv.lock`, not from `pyproject.toml`'s floors — see the note in
+# `document-intelligence/Dockerfile` and #848.
+COPY --from=ghcr.io/astral-sh/uv@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff /uv /usr/local/bin/uv
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DOCUMENT_SERVICE_CONTENT_DIR=/content \
-    PORT=8090
+    PORT=8090 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_LINK_MODE=copy \
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
 COPY document-intelligence/ /app/
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir ".[service]"
+RUN uv sync --frozen --no-dev --no-editable --extra service
 
 EXPOSE 8090
 
