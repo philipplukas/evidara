@@ -8,7 +8,7 @@
  */
 import type { RunRecord } from "../../lib/admin/dataProvider";
 
-type RunQueueFilterValues = Partial<Pick<RunRecord, "mode" | "status">>;
+type RunQueueFilterValues = Partial<Pick<RunRecord, "mode" | "status" | "refused">>;
 
 const ACTIONABLE_STATUSES: RunRecord["status"][] = ["failed", "running", "pending"];
 
@@ -67,7 +67,14 @@ export const describeQueueScope = ({
   filterSummary: string;
 }): string => {
   if (scope === "unknown") {
-    return "Run counts unavailable — the queue could not be loaded, so these are not zeros.";
+    // Two different reasons produce `unknown`, and telling an operator the queue
+    // "could not be loaded" while it is plainly on screen teaches them to ignore
+    // the line. A narrowing filter (status, or either refusal preset) means the
+    // page holds only that slice, so the other chips are unknowable — which is
+    // still not zero, and the sentence has to keep saying so.
+    return filterSummary.length > 0
+      ? `Filtering ${filterSummary} · per-status counts unavailable while the queue is narrowed — the chips show “—”, not zero.`
+      : "Run counts unavailable — the queue could not be loaded, so these are not zeros.";
   }
 
   const base =
@@ -88,7 +95,16 @@ export const describeQueueScope = ({
  * once the types were derived from it (#737) the mismatch became visible. The
  * fix is to ask for what is used, not to widen either record.
  */
-export const describeRunState = (record: Pick<RunRecord, "status">): string => {
+export const describeRunState = (
+  record: Pick<RunRecord, "status"> & Partial<Pick<RunRecord, "refused">>,
+): string => {
+  // A refusal outranks the status it wears. ADR-0035 persists a refused dispatch
+  // as terminal FAILED, so without this branch the queue tells an operator to go
+  // "review the failure reason" of a provider that was never called — sending
+  // them to debug acquisition when the remedy is a config or code key (#634).
+  if (record.refused === true) {
+    return "Refused before dispatch by the ADR-0030 two-key lock. Nothing was fetched — fix the key, not the provider.";
+  }
   if (record.status === "pending") {
     return "Queued. Review readiness or open the run when it becomes active.";
   }
@@ -202,6 +218,9 @@ export const summarizeRunFilters = (filterValues: RunQueueFilterValues): string 
   const segments = [
     filterValues.mode ? `mode: ${String(filterValues.mode)}` : null,
     filterValues.status ? `status: ${String(filterValues.status)}` : null,
+    // `false` is a real filter value here ("exclude refusals"), so this tests for
+    // the boolean rather than for truthiness.
+    typeof filterValues.refused === "boolean" ? `refused: ${filterValues.refused}` : null,
   ].filter((segment): segment is string => segment !== null);
 
   return segments.join(" · ");

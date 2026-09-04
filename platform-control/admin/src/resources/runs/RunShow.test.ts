@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildRunRecord } from "../../lib/admin/__fixtures__/runs";
+import type { RunRecord } from "../../lib/admin/dataProvider";
 import type { LegalSearchHandoff } from "../../lib/admin/navigationContext";
-import { buildRunHandoffGuidance } from "./RunShow";
+import { buildRunHandoffGuidance, describeRunReplay, describeRunScope } from "./RunShow";
 import { formatDuration } from "./RunShowV2";
 
 const baseRun = buildRunRecord({
@@ -61,5 +62,48 @@ describe("formatDuration", () => {
         completed_at: "2026-07-17T20:16:20.944165Z",
       }),
     ).toBe("\u2014");
+  });
+});
+
+describe("detail-only fields on a record that may be a list row", () => {
+  /**
+   * React-admin seeds `useShowController` from the list cache. That cache holds
+   * `RunListItemResponse` rows, which carry neither `scope` nor `replay`, so on a
+   * row click the detail page renders a record whose static `RunResponse` type is
+   * a lie for one frame. `run.scope.kind` threw there and the whole page fell
+   * behind react-admin's "Something went wrong" boundary — reachable only by
+   * clicking a row, never by loading the URL directly, which is why no fixture
+   * caught it.
+   */
+  it("does not throw on a list-shaped record and does not invent a scope", () => {
+    // Deliberately the shape react-admin actually hands over: a list row, with
+    // no `scope` key at all. The cast is the point — TypeScript believes this is
+    // a `RunResponse` at that moment and it is not.
+    const listShaped = { run_id: "run-123" } as Partial<RunRecord>;
+    expect(describeRunScope(listShaped)).toEqual({ value: "not loaded", known: false });
+  });
+
+  it("refuses to claim 'not a replay' before the detail response has landed", () => {
+    // `replay` is legitimately null on a non-replay run, so its own absence
+    // cannot distinguish "not a replay" from "not fetched yet". Saying the former
+    // is an assertion about the run we have no field to support.
+    expect(describeRunReplay({})).toEqual({ value: "not loaded", known: false });
+    expect(describeRunReplay({ scope: { kind: "full_source" }, replay: null })).toEqual({
+      value: "not a replay",
+      known: true,
+    });
+  });
+
+  it("names the replay mode and its parent once the detail response is in", () => {
+    expect(
+      describeRunReplay({
+        scope: { kind: "full_source" },
+        replay: { mode: "backfill", parent_run_id: "run_parent" },
+      }),
+    ).toEqual({ value: "backfill \u00b7 parent run_parent", known: true });
+    expect(describeRunScope({ scope: { kind: "time_window" } })).toEqual({
+      value: "time_window",
+      known: true,
+    });
   });
 });

@@ -19,6 +19,7 @@ import { DetailGrid, FieldCell, Pill } from "../../ui/primitives";
 import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
 import { RunActionStack } from "./RunActions";
 import RunDetailSectionsV2 from "./RunDetailSectionsV2";
+import { useRunPipelineHealth } from "./useRunPipelineHealth";
 
 const STATUS_LABEL: Record<RunRecord["status"], string> = {
   pending: "Pending",
@@ -35,6 +36,9 @@ export default function PreviewReviewShowV2() {
     id,
   });
   const run = controller.record;
+  // Same single-fetch contract as the runs detail: `RunDetailSectionsV2` no
+  // longer owns the pipeline-health request, so its host supplies it.
+  const pipelineHealth = useRunPipelineHealth(run?.run_id);
 
   if (controller.isPending) {
     return (
@@ -114,7 +118,11 @@ export default function PreviewReviewShowV2() {
       </DetailGrid>
 
       <RecordContextProvider value={run}>
-        <RunDetailSectionsV2 />
+        <RunDetailSectionsV2
+          health={pipelineHealth.health}
+          healthIsPending={pipelineHealth.isPending}
+          healthError={pipelineHealth.error}
+        />
       </RecordContextProvider>
     </div>
   );

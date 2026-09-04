@@ -98,6 +98,33 @@ Track these in the same dashboard for wizard-enabled discovery/extraction runs.
 
 When a panel degrades, use this sequence:
 
+0. **Ask the run detail first, before any of the below.** The admin panel's run page
+   (`/#/runs/{run_id}/show`) now answers, without a JSON payload:
+   - **Was it refused?** A banner leads the page when the ADR-0030 two-key lock blocked the
+     dispatch. Nothing was fetched; the remedy is a key on the blueprint template, not
+     provider debugging. The run queue has a **Refused only** preset
+     (`GET /v1/runs?refused=true`) for the same question across the queue.
+   - **Why did nothing happen?** A named stall cause from the same vocabulary
+     `evidara workflow coverage` prints — `no_dispatch_worker`, `publish_path_disabled`,
+     `di_consumer_silent`, `projection_stalled`, `search_projection_pending`,
+     `run_refused_by_lock`. `publish_path_disabled` is the one that hides behind a *green*
+     run.
+   - **What did it capture, publish and refuse?** A capture ledger with `captured` and
+     `published` as separate numbers, the per-resource refusal slugs grouped by reason, and
+     the mirror-fidelity spot check. Anything the provider did not record renders as `—`,
+     never as `0`.
+   - **Does it justify flipping the key?** The ADR-0030 acceptance verdict, with the
+     `execution_mode` joined from the source version. `skipped_gates` and `environment` are
+     shown as **unavailable**, because the harness writes them into a bundle under
+     `docs/runbooks/evidence/` that no runtime serves — treat them as unverified, never as
+     passed.
+
+   Two things the panel still cannot tell you: **quarantined documents** (ADR-0047 records
+   them on the DI-owned processing-manifest surface and emits no further status event, and
+   platform-control's `ProcessingStatus` has no `quarantined` member — so a clean DI
+   Processing Status list is *not* evidence that nothing was withheld), and **who** attempted
+   a refused dispatch (ADR-0035 records what and why, not who).
+
 1. Pick one affected `run_id`.
 2. Pull run details from platform-control API (`/v1/runs/{run_id}`).
 3. Trace correlated logs using `correlation_id=run_id` in Cloud Logging.

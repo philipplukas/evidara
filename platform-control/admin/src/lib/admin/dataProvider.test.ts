@@ -74,6 +74,59 @@ describe("controlPlaneDataProvider", () => {
   });
 
   /**
+   * ADR-0035 built the refusal record and #634 built `GET /v1/runs?refused=true`
+   * — explicitly so refusals could be audited "without them polluting failure
+   * triage". No client ever sent the parameter, so the filter existed and the
+   * refusal log did not. These two cases pin the wire.
+   */
+  it.each([
+    [true, "refused=true"],
+    // `false` is a real filter value ("exclude refusals"), not an absence, so it
+    // must reach the server rather than being dropped as falsy.
+    [false, "refused=false"],
+  ])("forwards the ADR-0030 refusal filter (%s)", async (refused, expected) => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [], total: 0, limit: 25, offset: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ) as typeof fetch;
+
+    await controlPlaneDataProvider.getList("runs", {
+      pagination: { page: 1, perPage: 25 },
+      sort: { field: "created_at", order: "DESC" },
+      filter: { refused },
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/platform-control/v1/runs?${expected}&limit=25&offset=0`,
+      expect.anything(),
+    );
+  });
+
+  it("omits the refusal filter entirely when it is not set", async () => {
+    // An absent filter means "both", not "false"; sending `refused=false` by
+    // default would hide every refusal from the default queue.
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [], total: 0, limit: 25, offset: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ) as typeof fetch;
+
+    await controlPlaneDataProvider.getList("runs", {
+      pagination: { page: 1, perPage: 25 },
+      sort: { field: "created_at", order: "DESC" },
+      filter: {},
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/runs?limit=25&offset=0",
+      expect.anything(),
+    );
+  });
+
+  /**
    * #616 — `/v1/runs` is server-paginated (`{data, limit, offset, total}`,
    * default `limit=100`). This test previously asserted the opposite premise
    * ("unbounded run lists") and so pinned the bug: the provider sent no

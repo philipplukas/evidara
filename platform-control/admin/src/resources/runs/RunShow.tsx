@@ -23,6 +23,46 @@ export type RunHandoffGuidance = {
   whatToCheckNext: string;
 };
 
+/**
+ * The two detail-only fields, described for a record that may not carry them yet.
+ *
+ * `RunResponse` declares `scope` (required) and `replay` (nullable); the run
+ * **list** row does not — `RunListItemResponse` carries neither. React-admin
+ * seeds `useShowController` from the list cache, so on a row click the detail
+ * page renders a `RunListItemResponse` for one frame before `getOne` lands, and
+ * the record's static type is a lie for exactly that frame. Reading
+ * `run.scope.kind` there threw `Cannot read properties of undefined` and put the
+ * whole page behind react-admin's "Something went wrong" boundary — a class of
+ * defect no unit test saw, because every fixture is a full `RunResponse`.
+ *
+ * The honest rendering of "the detail response has not arrived" is *not loaded*,
+ * not `full_source` and not "not a replay": the latter is a claim about the run,
+ * and we do not hold the field that would support it.
+ */
+export const describeRunScope = (
+  run: Partial<Pick<RunRecord, "scope">>,
+): { value: string; known: boolean } =>
+  run.scope ? { value: run.scope.kind, known: true } : { value: "not loaded", known: false };
+
+export const describeRunReplay = (
+  run: Partial<Pick<RunRecord, "scope" | "replay">>,
+): { value: string; known: boolean } => {
+  // `scope` is the presence probe: `replay` is legitimately `null` on a
+  // non-replay run, so its own absence cannot distinguish the two states.
+  if (!run.scope) {
+    return { value: "not loaded", known: false };
+  }
+  if (!run.replay) {
+    return { value: "not a replay", known: true };
+  }
+  return {
+    value: run.replay.parent_run_id
+      ? `${run.replay.mode} · parent ${run.replay.parent_run_id}`
+      : run.replay.mode,
+    known: true,
+  };
+};
+
 const describeRunNextStep = (run: RunRecord): string => {
   if (run.status === "failed") {
     return "Open the pipeline sections below and use the failure reason to pinpoint the blocked stage.";
