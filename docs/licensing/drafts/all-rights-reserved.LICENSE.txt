@@ -1,0 +1,13 @@
+Copyright (c) 2026 Philipp Guldimann. All rights reserved.
+
+This software and its accompanying documentation are proprietary and
+confidential. No licence, express or implied, is granted to any person to
+use, copy, modify, merge, publish, distribute, sublicense, or sell copies of
+this software, in whole or in part, except under a separate written agreement
+signed by the copyright holder.
+
+Unauthorised copying, distribution, or use of this software, via any medium,
+is prohibited.
+
+Third-party components distributed with this software remain subject to their
+own licences. See THIRD-PARTY-NOTICES.md.
