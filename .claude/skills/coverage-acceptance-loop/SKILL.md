@@ -58,6 +58,60 @@ Filters: `--overlay`, `--provider`, `--template`, `--readiness`, `--blocker`, `-
 > mirror has drifted and its verdicts are untrustworthy. `/v1/runs/readiness` is
 > authoritative.
 
+## 1b. When there is no template yet — the source-lifecycle half
+
+`coverage templates` inventories what `source_blueprints.yaml` already ships. For a
+source with **no** blueprint template, the entry point is `workflow source`, whose five
+steps map onto the same loop: `inspect` → `propose` → `apply` → `verify` →
+`compensate`.
+
+```bash
+uv run evidara workflow source inspect --human                 # reachability + discovery
+uv run evidara workflow source propose --seed-url <url> --human
+uv run evidara workflow source apply --display-name '<name>' --seed-url <url> \
+  --jurisdiction-id <id> --human
+uv run evidara workflow source verify --source-id <id> --human   # or --run-id
+uv run evidara workflow source compensate --source-id <id> --reason '<why>' --human
+```
+
+Every one of these returns the ADR-0022 envelope
+(`contracts/schemas/workflow-command-envelope.schema.json`), and two fields decide what
+you may do next:
+
+- **`side_effect_level`** — `none` for `inspect`/`propose`/`verify`, `reversible` for
+  `apply` and `compensate`. Only `apply` mutates, and it creates a **draft** source.
+- **`status`** — `passed`, `needs_human`, `failed_retriable`, `failed_terminal`, or
+  `compensated`. This is the field to branch on.
+- **`decision.recommended_action`** — advisory, and **not** the same as `status`.
+
+`propose`'s duplicate check is where that distinction bites. `proposal.py:68` defines the
+domain as `none` / `low` / `high`, and both backends grade it the same way — rule-based at
+`:102-108`, DSPy at `:187-194`. Then `workflow_cmd.py:261` marks the evidence item
+`passed = duplicate_risk != "high"`, and `:267` derives `status` from it. So:
+
+| `duplicate_risk` | `status` | exit | `recommended_action` |
+|---|---|---|---|
+| `none` | `passed` | 0 | `apply` |
+| `low` | `passed` | 0 | `needs-human` |
+| `high` | `needs_human` | 1 | `needs-human` |
+
+**Only `high` stops the command.** At `low` — the display name appears *inside* an
+existing source's name — the envelope is `passed` and exit 0, and the only signal is
+`recommended_action: needs-human` plus the evidence item's `value`. An agent branching on
+`status` alone will sail past it. Read `artifacts.proposal.duplicate_risk` before `apply`;
+do not create a second source for a corpus the platform already holds.
+
+`compensate` is a **real corrective action**, not an in-memory undo: it cancels the run
+(`POST /v1/runs/{id}/cancel`) and rejects the latest `pending_approval`/`draft` version
+(`POST /v1/versions/{id}/reject`). With nothing pending it records intent only and
+still reports `compensated` — read `artifacts` to see what it actually did.
+
+Adding a *provider* rather than a source is a code change, and two things about it are
+easy to get wrong in ways nothing catches:
+
+- whether the captured bytes are law → `validate-acquisition-provider` skill
+- what `in_force_until` means at your upstream → `provider-temporal-semantics` skill
+
 ## 2. Pre-flight — before creating anything
 
 ```bash
@@ -187,11 +241,15 @@ With the bundle, two more refusal codes can appear in `acceptance_verdict.refusa
 bundle reported no coverage at all). Both refuse the flip in §6. Without the bundle only
 the run-level rules above run, and a hole in the gates stays invisible.
 
-Persist the bundle under `docs/runbooks/evidence/`. **`ch-fedlex-compose-e2e.sh` — the
-driver §3 recommends — has no `--copy-evidence` flag** (its own comment says so at
-`:65`); pass `--out-dir` and copy the directory yourself. `--copy-evidence` exists on
-`scripts/ch-fedlex-fast-loop.sh` (`:185`) and its siblings, which run against a deployed
-environment rather than local compose.
+Persist the bundle under `docs/runbooks/evidence/`. **`ch-fedlex-compose-e2e.sh` has
+no `--copy-evidence` flag** — its own comment says so (`:64-65`); pass `--out-dir` and
+copy it yourself. `--copy-evidence` exists on `scripts/ch-fedlex-fast-loop.sh` (`:185`) and
+`scripts/ch-bger-fast-loop.sh` (`:149`), which run against a deployed environment rather
+than local compose. `--url-pattern` and `--corpus-slug` exist on **`ch-fedlex-fast-loop.sh`
+only** (`:113`, `:129`) — `ch-bger-fast-loop.sh` has 18 flags and neither is among them.
+
+Whether the captured bytes were law at all is a separate question this harness does not
+answer — see the `validate-acquisition-provider` skill before citing a run as coverage.
 
 ## 6. Flip the key
 
@@ -240,6 +298,13 @@ evidence item marked `passed: false` before calling it done:
   every LexFind template. Confirm by hand that the cited run is this template's (#846).
 - **Arming the config key ahead of the code key** is reported, not waved through.
 
+A `200` is not a flip. Read `verification.problems`:
+
+| code | what it means |
+|---|---|
+| `read_back_disagrees` | The `PUT` returned 200 and the read model still reports the old effective key. **The key was not flipped.** |
+| `no_override_recorded` | The effective key is what you asked for, but the read model still attributes it to the shipped default. `set_enabled` always writes an override row, so the write did not land and the value merely happens to agree. |
+
 Turning the key **off** takes no evidence, but it does take `--note`, and it is a real
 write even when the key merely reads `false` today: a `never_turned` key is waived by
 acceptance mode, an operator's `false` is not (#768). Do not read "it's already off" as
@@ -271,7 +336,11 @@ still admits when the provider is short of `live`.
 
 - [ADR-0030](../../../docs/adr/0030-acquisition-provider-enablement-lifecycle.md) — the lifecycle, the two-key lock (§2), the evidence workflow (§5), `RunMode.ACCEPTANCE` (§6)
 - [ADR-0033](../../../docs/adr/0033-agentic-legal-reasoning.md) §4 — the build order, and why not to build the MCP server
+- [ADR-0022](../../../docs/adr/adr-0022-agentic-cli-workflow-control-surface.md) — the envelope every `workflow` command returns
 - `tools/evidara-cli/src/evidara_cli/coverage.py` — the classification rules, with their platform-control counterparts cited
 - `tools/evidara-cli/src/evidara_cli/gate_coverage.py` — the excluded / not-evaluated split and the one implementation of the rule that escalates it
 - `scripts/ch-fedlex-compose-e2e.sh` — the driver
+- `.claude/skills/validate-acquisition-provider/SKILL.md` — whether the captures were law
+- `.claude/skills/provider-temporal-semantics/SKILL.md` — `in_force_from` / `in_force_until` for a new provider
+- `.claude/skills/opensearch-mapping-drift/SKILL.md` — why a document reaches the index and the query still returns nothing
 - `.claude/skills/run-admin-panel/SKILL.md` — driving the admin UI to flip the config key
