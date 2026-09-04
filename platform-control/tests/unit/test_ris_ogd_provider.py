@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from types import SimpleNamespace
 
 import httpx
@@ -137,8 +138,59 @@ def _brkons_ref(brkons: dict) -> dict:
     }
 
 
+def test_the_ris_end_date_is_the_inclusive_last_day_in_force() -> None:
+    """The boundary, measured — not the passthrough (#843).
+
+    The test below it asserts that `2018-12-31` in comes out as `2018-12-31`; the
+    input and the expectation are the same string, so it pins that the value
+    SURVIVES the mapping and says nothing about what it MEANS. That is how
+    `in_force_until` reached the index with no established reading at all.
+
+    What it means, measured live 2026-09-03 against B-VG (Gesetzesnummer
+    10000138) — the probe #843 named, a version's end date against its
+    successor's start date:
+
+        Art. 11  NOR40211942  1998-… 2020-01-01 -> 2024-04-30
+                 NOR40261486             2024-05-01 -> (open)
+        Art. 15  NOR40211946             2019-02-01 -> 2024-02-26
+                 NOR40260251             2024-02-27 -> 2024-07-18
+
+    Successor start is predecessor end **+ 1 day** in both pairs. An exclusive
+    end-date would make the two dates equal. Corroborated by RIS's own
+    point-in-time query: `Fassung.FassungVom=2024-04-30` returns NOR40211942, the
+    version whose `Ausserkrafttretensdatum` IS 2024-04-30.
+
+    So RIS agrees with our `in_force_until` and the provider correctly converts
+    nothing. The dates here are the measured B-VG Art. 11 pair, so this test is
+    tied to an observation rather than to a plausible-looking pair of strings.
+    """
+    superseded = _extract_metadata(
+        _brkons_ref({"Inkrafttretensdatum": "2020-01-01", "Ausserkrafttretensdatum": "2024-04-30"})
+    )
+    successor = _extract_metadata(_brkons_ref({"Inkrafttretensdatum": "2024-05-01"}))
+
+    assert superseded["in_force_until"] == "2024-04-30"
+    assert successor["in_force_from"] == "2024-05-01"
+    # The gap is the whole assertion: adjacent versions do not share a date.
+    assert superseded["in_force_until"] < successor["in_force_from"]
+
+    # And that is exactly what the consumer means by `in_force_until` —
+    # legal-search/api/src/core/norm-hierarchy/in-force.ts:24-28 repeals only on
+    # `asOf > until`, so the norm is in force on 2024-04-30 and repealed on
+    # 2024-05-01, which is the successor's first day. No day is claimed twice and
+    # no day falls between the two versions.
+    assert date.fromisoformat(successor["in_force_from"]) == date.fromisoformat(
+        superseded["in_force_until"]
+    ) + timedelta(days=1)
+
+
 def test_extract_metadata_reads_the_ris_validity_window() -> None:
-    """The window RIS publishes must survive acquisition in ISO form."""
+    """The window RIS publishes must survive acquisition in ISO form.
+
+    A passthrough assertion by construction — see the boundary test above for
+    what the value MEANS. Both are needed: this one catches a mapping that drops
+    or reformats the date, that one catches a mapping that shifts it.
+    """
     meta = _extract_metadata(
         _brkons_ref(
             {

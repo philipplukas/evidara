@@ -183,6 +183,23 @@ def test_parses_real_amtliche_sammlung_landing_page() -> None:
 
 
 def test_parser_reads_a_repeal_date_when_the_enactment_is_superseded() -> None:
+    """A PASSTHROUGH assertion, and knowingly so (#843).
+
+    Input `31.08.2017`, output `2017-08-31` — same date, so this pins that the
+    value survives the mapping, NOT what it means. The boundary reading for Stadt
+    Zürich's `ausserkrafttretendatum` is **not established**: this synthesised
+    date is the only non-empty one anywhere in the repo (the captured live page,
+    tests/fixtures/gemeinde_http/stadt_zuerich_as_554_510.html, has the field
+    empty because 554.510 is in force), and #843 found no repealed AS page to
+    compare a successor's `inkrafttretendatum` against.
+
+    Do not "align" it on the strength of the field name. The identical German
+    field name is INCLUSIVE at AT RIS and Fedlex and EXCLUSIVE at LexFind, all
+    measured 2026-09-03 — the name predicts nothing. Passing through unconverted
+    is the status quo and the only choice that does not move a real date on a
+    guess; see the comment at gemeinde_http_provider.py `parse_amtliche_sammlung_page`
+    for the probe that would settle it.
+    """
     # Superseded versions carry a non-empty Ausserkrafttreten. Synthesised from
     # the same field ids the live page uses.
     html = _landing_page(

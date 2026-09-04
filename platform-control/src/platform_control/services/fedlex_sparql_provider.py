@@ -51,6 +51,20 @@ _FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
 # force). The current/open consolidation may omit the end date. These are the only
 # two predicates the selection + temporal-metadata logic depends on; if Fedlex ever
 # renames them, correct them here and nowhere else.
+#
+# THE BOUNDARY (#843). "Last day in force" above was asserted, not measured, when
+# it was written. It is now measured, and it holds: `dateEndApplicability` is
+# **INCLUSIVE**, so it is passed to `in_force_until` unconverted — matching the
+# closed boundary contract (contracts/schemas/document.schema.json;
+# legal-search/api/src/core/norm-hierarchy/in-force.ts:24-28) — and matching
+# `_select_member`'s own `in_force_until >= as_of` reading below.
+#
+# Measured live 2026-09-03: one query pulled 3000 consolidation members across
+# 1193 works with both dates, and every consecutive pair within a work was
+# compared. **1800 of 1806 adjacent pairs have successor start = predecessor end
+# + 1 day. ZERO pairs are equal.** An exclusive end-date would produce a delta of
+# 0; a delta of 0 does not occur. The six outliers are deltas of 13-8767 days —
+# genuine gaps in a consolidation series, not a competing convention.
 _JOLUX_IN_FORCE_FROM_PREDICATE = "jolux:dateApplicability"
 _JOLUX_IN_FORCE_UNTIL_PREDICATE = "jolux:dateEndApplicability"
 

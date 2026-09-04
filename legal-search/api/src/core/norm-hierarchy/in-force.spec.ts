@@ -44,6 +44,24 @@ describe('resolveInForceState', () => {
   it('settles the question from the repeal date even without a start date', () => {
     expect(resolveInForceState({ in_force_until: '2018-12-31' }, '2019-06-01')).toBe('repealed');
   });
+
+  it('agrees with the producers on ONE boundary date, deliberately (#843)', () => {
+    // The consumer half of a two-sided pin. The producer half is
+    // `platform-control/tests/unit/test_lexfind_api_provider.py`
+    // ::test_the_exclusive_upstream_end_date_is_converted_to_the_inclusive_boundary,
+    // which starts from a real LexFind record — ZH 415.611, measured 2026-09-03,
+    // `version_inactive_since: "01.07.2026"` — and emits `in_force_until:
+    // 2026-06-30`. THIS test consumes that exact value.
+    //
+    // Read the two together: the act was repealed with effect from 1 July 2026,
+    // so 30 June is the last day it applied and 1 July is the first day it did
+    // not. If either side ever drifts by a day, one of these two tests fails and
+    // names the other. Before #843 they were the same date in two files on
+    // opposite sides of the boundary, agreeing by coincidence.
+    const zh415611 = { in_force_from: '2017-02-01', in_force_until: '2026-06-30' };
+    expect(resolveInForceState(zh415611, '2026-06-30')).toBe('in_force');
+    expect(resolveInForceState(zh415611, '2026-07-01')).toBe('repealed');
+  });
 });
 
 describe('inForceExclusionClauses', () => {
@@ -55,5 +73,18 @@ describe('inForceExclusionClauses', () => {
       { range: { in_force_until: { lt: '2019-06-01' } } },
       { range: { in_force_from: { gt: '2019-06-01' } } },
     ]);
+  });
+
+  it('uses `lt`, not `lte`, so the last day in force is not filtered out (#843)', () => {
+    // The index filter has to encode the SAME inclusive boundary as
+    // `resolveInForceState`, or a norm reads `in_force` on its last day in the
+    // detail view while the search that should surface it has already dropped it.
+    // `lt` keeps a document whose `in_force_until` equals the as-of date; `lte`
+    // would exclude it. Asserted on the date itself, not on the shape.
+    const [untilClause] = inForceExclusionClauses('2026-06-30') as [
+      { range: { in_force_until: Record<string, string> } },
+    ];
+    expect(untilClause.range.in_force_until).toEqual({ lt: '2026-06-30' });
+    expect(untilClause.range.in_force_until.lte).toBeUndefined();
   });
 });

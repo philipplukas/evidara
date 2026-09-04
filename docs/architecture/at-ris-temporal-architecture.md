@@ -20,6 +20,17 @@ on **540/540** norms sampled live (2026-07-19); `Ausserkrafttretensdatum` is
 **omitted while the norm is still in force**, which is a meaningful absence and
 is never filled in.
 
+`Ausserkrafttretensdatum` is **inclusive** — the last day the version was in
+force — and therefore matches `in_force_until` and is passed through unconverted.
+Measured live 2026-09-03 against B-VG (Gesetzesnummer 10000138): Art. 11 ends
+2024-04-30 and its successor begins 2024-05-01, Art. 15 ends 2024-02-26 and its
+successor begins 2024-02-27 — one day apart, where an exclusive end-date would
+make them equal. RIS's own point-in-time query agrees: `Fassung.FassungVom=2024-04-30`
+returns the version whose end date IS 2024-04-30, not its successor. Sources
+disagree with each other on this (LexFind's equivalent field is exclusive), so see
+[boundary-contracts.md](boundary-contracts.md) "The in-force boundary" for the
+convention and the per-provider table.
+
 The same two values also appear in the per-document RIS XML as
 `<absatz ct="ikra">` / `<absatz ct="akra">` — but there they are **DD.MM.YYYY**
 (`24.04.1998`). Acquisition is therefore the better source, and the XML

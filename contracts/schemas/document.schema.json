@@ -99,7 +99,7 @@
         "null"
       ],
       "format": "date",
-      "description": "Last date the norm WAS in force — inclusive. Repeal / end of validity. Without it, 'was this in force on 2019-06-01?' is unanswerable, so a `lifecycle_status` of `repealed` with no date here resolves to `unknown` rather than being guessed either way (ADR-0033)."
+      "description": "Last date the norm WAS in force — INCLUSIVE. Repeal / end of validity. Without it, 'was this in force on 2019-06-01?' is unanswerable, so a `lifecycle_status` of `repealed` with no date here resolves to `unknown` rather than being guessed either way (ADR-0033). PRODUCER OBLIGATION (#843): upstream sources publish BOTH conventions and the field name never tells you which — a producer whose source publishes the first day OUT of force must subtract one day before emitting this. Measured 2026-09-03: AT RIS `Ausserkrafttretensdatum` and Fedlex `jolux:dateEndApplicability` are inclusive (pass through); LexFind `version_inactive_since` is exclusive (converted in `lexfind_api_provider.temporal_metadata`). Getting this wrong by one day reports a repealed norm as good law on its repeal date, because the consumer repeals only on `asOf > in_force_until`."
     },
     "delegates_to": {
       "type": "array",

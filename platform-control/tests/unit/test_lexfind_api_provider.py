@@ -199,10 +199,17 @@ def test_active_law_maps_its_in_force_start():
 
 
 def test_repealed_law_carries_its_end_date():
+    """The end date survives — converted, because the two sides differ (#843).
+
+    `version_inactive_since` is EXCLUSIVE (the first day out of force) and
+    `in_force_until` is INCLUSIVE (the last day in force), so 30 June in is 29
+    June out. Before #843 this asserted `2020-06-30` and thereby pinned the
+    off-by-one: the norm read as good law on the very day it stopped applying.
+    """
     version = dict(_current_version(_tol("554.5")))
     version.update(version_inactive_since="30.06.2020", is_active=False)
     meta = temporal_metadata(version)
-    assert meta["in_force_until"] == "2020-06-30"
+    assert meta["in_force_until"] == "2020-06-29"
     assert meta["amendment_relation"] == "repealed_by"
 
 
@@ -237,32 +244,90 @@ def test_repealed_law_with_an_end_date_is_not_in_force_after_it():
 
 
 def test_the_inactive_since_date_is_the_first_day_out_of_force():
-    """The boundary, asserted deliberately: `version_inactive_since` is EXCLUSIVE.
+    """The boundary: `version_inactive_since` is EXCLUSIVE. **Now measured (#843).**
 
-    LexFind's field says the version has been *out of force since* that date —
-    the day its successor took over, mirroring `version_active_since`, which is
-    the inclusive first day in force. So the last day in force is the day
-    before. Guessing the other way would report a repealed norm as good law for
-    one more day, which is the #661 failure at one-day resolution.
+    This docstring used to say the reading was inference from the field name plus
+    symmetry with `version_active_since`, because every `version_inactive_since`
+    in the captured fixture is `null`. It was measured live on 2026-09-03 and the
+    inference held:
 
-    **This is inference, not measurement**, and it is asserted here so that it
-    is at least stated rather than assumed: the reading rests on the field name
-    and on symmetry with `version_active_since`, and every
-    `version_inactive_since` in the captured fixture is `null`, so nothing in
-    this repo has yet observed a real one. A live probe against a superseded
-    version would settle it.
+      * `GET /api/frontend/v1/de/texts-of-law/22871/with-version-groups` (the ZH
+        Hundegesetz) returns 7 versions and `version_inactive_since` is `null` on
+        ALL of them, six of which are `is_active: false`. So the field is not a
+        version-window end; it is the **repeal date of the act**, mirrored by
+        `info_badge: abrogated` + `info_badge_date`.
+      * `GET /api/frontend/v1/de/entities/{26,1}/recent-changes` (ZH and BE, five
+        pages each) returned 150 changes, 27 with a non-null
+        `version_inactive_since`. **26 of the 27 fall on the 1st of a month** and
+        not one is a month-end. Swiss repeals take effect at the start of a
+        month, so a "last day in force" field would cluster on 30/31. This one
+        holds the day the repeal took effect — the first day OUT of force.
 
-    **#843** tracks the contradiction this sits next to: `temporal_metadata`
-    (three tests up) ships that same date onward as `in_force_until`, which
-    `legal-search/api/src/core/norm-hierarchy/in-force.ts:24-27,60` defines as
-    INCLUSIVE — so the exclusive reading asserted here is silently widened by one
-    day downstream. LexFind is the outlier; `ris_ogd` already emits inclusive.
-    Do not "fix" one end of that without reading #843.
+    That prose also used to end "LexFind is the outlier; `ris_ogd` already emits
+    inclusive". The conclusion survives measurement but the reasoning did not:
+    `ris_ogd` did not *emit* inclusive, it passed its upstream value through
+    untouched, and nothing had established what that value meant. RIS is now
+    measured inclusive too (see `test_ris_ogd_provider.py`), so the passthrough is
+    correct — but it was correct by luck, and this file was asserting it as
+    though it were by design.
     """
     version = dict(_current_version(_tol("554.5")))
     version.update(version_inactive_since="30.06.2026")
     assert is_in_force(version, as_of="2026-06-29") is True
     assert is_in_force(version, as_of="2026-06-30") is False
+
+
+def test_the_exclusive_upstream_end_date_is_converted_to_the_inclusive_boundary():
+    """The producer half of a two-sided pin on ONE boundary date (#843).
+
+    The consumer half is `legal-search/api/src/core/norm-hierarchy/in-force.spec.ts`
+    "agrees with the producers on ONE boundary date, deliberately (#843)", which
+    consumes exactly the `2026-06-30` this emits.
+
+    The input is a real record, not an invented one: ZH 415.611, read from
+    `/entities/26/recent-changes` on 2026-09-03 — `version_active_since:
+    "01.02.2017"`, `version_inactive_since: "01.07.2026"`, `info_badge:
+    "abrogated"`. The act was repealed with effect from 1 July 2026, so 30 June is
+    the last day it applied.
+
+    Before #843, `temporal_metadata` shipped `2026-07-01` into an `in_force_until`
+    that `resolveInForceState` reads inclusively — so the repealed act read as
+    `in_force` on its own repeal date. The two files agreed on `is_in_force`
+    (exclusive) and disagreed on the metadata (inclusive) for the same record,
+    which is the defect #843 was filed for.
+    """
+    version = dict(_current_version(_tol("554.5")))
+    version.update(version_active_since="01.02.2017", version_inactive_since="01.07.2026")
+
+    meta = temporal_metadata(version)
+    assert meta["in_force_from"] == "2017-02-01"
+    assert meta["in_force_until"] == "2026-06-30"
+
+    # And the provider's own three-valued answer agrees with the metadata it
+    # emits, on the boundary date and on the day after. It did not before.
+    assert is_in_force(version, as_of="2026-06-30") is True
+    assert is_in_force(version, as_of="2026-07-01") is False
+
+
+def test_a_month_boundary_end_date_does_not_roll_back_into_the_wrong_month():
+    """Crossing a month/year edge is where a naive `-1 day` would break.
+
+    `01.01.2026` out is `2025-12-31` in — not `2026-01-00`, and not `2026-12-31`.
+    Cheap to assert, and the arithmetic is the whole of the fix.
+    """
+    version = dict(_current_version(_tol("554.5")))
+    version.update(version_inactive_since="01.01.2026")
+    assert temporal_metadata(version)["in_force_until"] == "2025-12-31"
+
+    version.update(version_inactive_since="01.03.2024")  # leap year
+    assert temporal_metadata(version)["in_force_until"] == "2024-02-29"
+
+
+def test_an_unparseable_end_date_is_dropped_rather_than_shifted():
+    """A mangled boundary is worse than an absent one: absence resolves `unknown`."""
+    version = dict(_current_version(_tol("554.5")))
+    version.update(version_inactive_since="irgendwann")
+    assert "in_force_until" not in temporal_metadata(version)
 
 
 def test_active_law_inside_its_window_is_in_force():
@@ -368,7 +433,11 @@ async def test_a_law_already_repealed_at_capture_is_observed_as_not_in_force(pro
         _run(),
     )
     hundegesetz = next(r for r in result.inline_resources if r.title == "Hundegesetz")
-    assert hundegesetz.metadata["in_force_until"] == "2020-06-30"
+    # `30.06.2020` upstream is EXCLUSIVE, so the last day in force is 29 June
+    # (#843). This is the end-to-end proof that the conversion in
+    # `temporal_metadata` reaches `ProviderResource.metadata`, which is the path
+    # the bundle hints and then the index read.
+    assert hundegesetz.metadata["in_force_until"] == "2020-06-29"
     assert hundegesetz.metadata["in_force_at_capture"] is False
 
 
