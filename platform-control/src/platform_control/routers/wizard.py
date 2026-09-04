@@ -39,6 +39,7 @@ def get_orchestrator() -> Orchestrator:
             namespace=settings.temporal_namespace,
             task_queue=settings.temporal_task_queue,
             target=settings.temporal_target,
+            human_gate_timeout_seconds=settings.wizard_human_gate_timeout_seconds,
         )
     return InMemoryOrchestrator()
 
@@ -194,4 +195,27 @@ async def reject_wizard_run(
 ) -> WizardRunStatusResponse:
     service = WizardService(session, orchestrator)
     run = await service.reject_run(run_id, reason=request.reason)
+    return _to_status_response(run)
+
+
+@router.post(
+    "/runs/{run_id}/restart",
+    response_model=WizardRunStatusResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(404, 409),
+)
+async def restart_wizard_run(
+    run_id: str,
+    session: SessionDep,
+    orchestrator: Annotated[Orchestrator, Depends(get_orchestrator)],
+) -> WizardRunStatusResponse:
+    """Start a fresh run for the project behind a run that ended terminally (#560).
+
+    `GateExpired` is terminal for the run. Without this it was terminal for the
+    whole project: every other mutating endpoint guards on a state an expired run
+    can never reach, so the operator's only recovery was re-entering the scope and
+    discovery plan in a brand-new project. Returns the **new** run.
+    """
+    service = WizardService(session, orchestrator)
+    run = await service.restart_run(run_id)
     return _to_status_response(run)

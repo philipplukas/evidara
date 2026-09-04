@@ -95,10 +95,16 @@ class TemporalOrchestrator:
         *,
         target: str = "localhost:7233",
         client: Client | None = None,
+        human_gate_timeout_seconds: int | None = None,
     ) -> None:
         self.namespace = namespace
         self.task_queue = task_queue
         self.target = target
+        #: Passed to `WizardRunWorkflow` at start so the gate has a deadline (#560).
+        #: The workflow cannot read `Settings` itself — reading config inside
+        #: workflow code is non-deterministic and the sandbox blocks it — so the
+        #: value has to travel as workflow input.
+        self.human_gate_timeout_seconds = human_gate_timeout_seconds
         self._injected_client = client
         self._connected_client: Client | None = None
 
@@ -130,7 +136,7 @@ class TemporalOrchestrator:
         try:
             await client.start_workflow(
                 WizardRunWorkflow.run,
-                wizard_run.wizard_run_id,
+                args=[wizard_run.wizard_run_id, self.human_gate_timeout_seconds],
                 id=workflow_id,
                 task_queue=self.task_queue,
             )

@@ -145,7 +145,14 @@ def create_app() -> FastAPI:
     app.include_router(firecrawl.router, dependencies=_service_auth)
     app.include_router(di_events.router, dependencies=_service_auth)
 
-    # Slack interactions — unauthenticated (Slack signature verification handled in-route)
+    # Slack interactions — unauthenticated, and NOT signature-verified. This comment
+    # used to claim "Slack signature verification handled in-route"; the route does no
+    # such check (compare `firecrawl.py`, which verifies an HMAC). The endpoint is inert
+    # today because it only signals when `wizard_orchestrator_backend == "temporal"`,
+    # which is nowhere (ADR-0031) — but it must not be reachable in a deployment that
+    # turns Temporal on. Verify the `X-Slack-Signature` header, or delete the route,
+    # before that happens. Found while fixing #560; not fixed there because removing a
+    # published endpoint is a contract change that deserves its own review.
     app.include_router(slack_interactions.router)
 
     @app.exception_handler(NotFoundError)

@@ -88,6 +88,7 @@ async def test_temporal_orchestrator_starts_workflow_and_signals(
         workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
         activities=[
             state_acts.persist_pilot_completed,
+            state_acts.persist_wizard_outcome,
             state_acts.fetch_scope_shards,
             shard_acts.run_shard_crawl,
             shard_acts.report_shard_progress,
@@ -143,6 +144,7 @@ async def test_temporal_orchestrator_starts_standalone_child_workflows(
         workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
         activities=[
             state_acts.persist_pilot_completed,
+            state_acts.persist_wizard_outcome,
             state_acts.fetch_scope_shards,
             shard_acts.run_shard_crawl,
             shard_acts.report_shard_progress,

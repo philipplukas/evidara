@@ -83,7 +83,11 @@ API_TITLE = "Platform Control API"
 # processed and failed for a manifestation whose text is not law; without the
 # value the endpoint rejected the very status it must record, and the run read
 # as still-in-flight forever (#731). Additive: an existing writer never sends it.
-API_VERSION = "0.22.0"
+# 0.23.0: additive — the wizard human gate's terminal states. An expired gate now
+# resolves to a recorded outcome instead of hanging with no timeout, no
+# notification and no way to end (#560), so the gate decision is readable as a
+# claim rather than inferred from a run that never moves.
+API_VERSION = "0.23.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

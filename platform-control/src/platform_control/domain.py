@@ -208,6 +208,18 @@ class WizardRunState(StrEnum):
     REVIEW_ROUTING = "ReviewRouting"
     FINALIZE_PUBLISH = "FinalizePublish"
     MONITOR_AND_DRIFT = "MonitorAndDrift"
+    #: Terminal. Nobody approved or rejected the human gate before it expired (#560).
+    #:
+    #: The gate used to be an unbounded `wait_condition`, so an un-actioned run sat
+    #: at `HumanGateApproval` forever — the workflow open, the DB frozen, and no
+    #: way to tell "waiting on an operator" from "abandoned in March". This is the
+    #: state that distinguishes them, and it is the *only* thing an expired gate
+    #: may become: the fallback is always to refuse to scale, never to auto-approve
+    #: a fan-out of crawls against live government portals.
+    #:
+    #: Terminal on purpose. Resuming means a new pilot, which is a new operator
+    #: decision, not a continuation of one nobody made.
+    GATE_EXPIRED = "GateExpired"
 
 
 class ReviewTaskStatus(StrEnum):

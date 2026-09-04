@@ -87,6 +87,7 @@ The wizard is implemented as a single long-running workflow (`WizardRunWorkflow`
 6. `ReviewRouting`
 7. `FinalizePublish`
 8. `MonitorAndDrift`
+9. `GateExpired` (terminal)
 
 ### Transition contract
 
@@ -97,6 +98,7 @@ The wizard is implemented as a single long-running workflow (`WizardRunWorkflow`
 | `PilotRun`          | `HumanGateApproval` | Pilot run completes                      | Minimum sample size reached, no fatal errors  |
 | `HumanGateApproval` | `ScaledRun`         | Explicit operator approval               | Pilot quality gates pass                      |
 | `HumanGateApproval` | `DiscoveryPlan`     | Operator rejects with notes              | Feedback captured and versioned               |
+| `HumanGateApproval` | `GateExpired`       | Gate deadline passes with no decision    | Terminal; never auto-approves (#560)          |
 | `ScaledRun`         | `ReviewRouting`     | Scaled extraction finishes               | Confidence distribution computed              |
 | `ReviewRouting`     | `FinalizePublish`   | Review queue drains under target backlog | Required review coverage achieved             |
 | `FinalizePublish`   | `MonitorAndDrift`   | Publish succeeds                         | Versioned artifact and index write complete   |
@@ -106,6 +108,30 @@ The wizard is implemented as a single long-running workflow (`WizardRunWorkflow`
 
 - Use deterministic workflow code and idempotent activities.
 - Store all approval decisions as workflow signals (`approve`, `reject`, `request_changes`).
+- **Bound every human gate and write its outcome (#560).** `WizardRunWorkflow` waits at the
+  gate for `PLATFORM_CONTROL_WIZARD_HUMAN_GATE_TIMEOUT_SECONDS` (default 72h) and then records
+  `GateExpired`. There is deliberately no auto-approve fallback: the only safe answer to
+  "nobody responded" is to refuse to scale a crawl of live government portals. The workflow
+  also persists its own outcome on rejection, on scaled completion (`ReviewRouting`), and on
+  failure (`failure_reason`), so the row can never silently disagree with the execution.
+  Changes to this part of the workflow are gated behind `workflow.patched`
+  (`wizard-gate-timeout-and-terminal-state`) so recorded histories keep replaying.
+- **The gate decision is a claim, on both sides.** The timer firing and an operator clicking
+  approve are concurrent: the API guards on a read, then round-trips to Temporal, then writes.
+  So `persist_wizard_outcome` takes `expected_states` and `WizardService._claim_gate_decision`
+  writes `… WHERE state = <what the guard saw>`. Exactly one side lands; the loser is told
+  (409) rather than overwriting or being overwritten. Without this the row could end at
+  `ScaledRun` with the workflow closed `gate_expired`, no shard ever starting, and nothing
+  surfacing it — `ScaledRun` is not terminal.
+- **A terminal run must not be a terminal project.** `GateExpired` ends the *run*;
+  `POST /v1/wizard/runs/{run_id}/restart` starts a fresh run at `DiscoveryPlan` on the same
+  project, reusing its scope and discovery plan. It is not a transition in the run state
+  machine — the expired run keeps its record — and a new run means a new workflow id, which
+  restarting in place could not have (it would collide with the closed execution and be
+  swallowed by the `WorkflowAlreadyStartedError` handler).
+- **A patched workflow needs two recorded histories.** The pre-patch one replays the legacy
+  branch; without a post-patch one the branch that actually runs is guarded by nothing. See
+  `PATCHED_WORKFLOWS` in `tests/unit/test_temporal_replay.py`.
 - Use child workflows for domain shards to reduce blast radius.
 - Add `continue_as_new` for long-lived monitor loops.
 - Record run history and decision metadata into `RunLedger`.
@@ -161,6 +187,7 @@ Use explicit event names so state transitions are inspectable and testable.
 | `PilotRun -> HumanGateApproval` | `pilot_completed` | `pilotSampleCount >= minPilotSample && fatalErrorCount == 0` |
 | `HumanGateApproval -> ScaledRun` | `gate_approved` | `pilotQualityScore >= minPilotQuality` |
 | `HumanGateApproval -> DiscoveryPlan` | `gate_rejected` | `rejectionReason != null` |
+| `HumanGateApproval -> GateExpired` | `gate_expired` | `gateDeadlinePassed && decision == null` |
 | `ScaledRun -> ReviewRouting` | `scaled_completed` | `allShardWorkflowsTerminal == true` |
 | `ReviewRouting -> FinalizePublish` | `review_backlog_within_target` | `mandatoryReviewOpen == 0 && reviewCoverage >= minCoverage` |
 | `FinalizePublish -> MonitorAndDrift` | `publish_succeeded` | `artifactVersionPinned && indexWriteSucceeded` |

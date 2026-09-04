@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.22.0
+  version: 0.23.0
 paths:
   /health:
     get:
@@ -1749,6 +1749,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/wizard/runs/{run_id}/restart:
+    post:
+      tags:
+      - wizard
+      summary: Restart Wizard Run
+      description: |-
+        Start a fresh run for the project behind a run that ended terminally (#560).
+
+        `GateExpired` is terminal for the run. Without this it was terminal for the
+        whole project: every other mutating endpoint guards on a state an expired run
+        can never reach, so the operator's only recovery was re-entering the scope and
+        discovery plan in a brand-new project. Returns the **new** run.
+      operationId: restartWizardRun
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WizardRunStatusResponse'
         '404':
           description: A referenced entity does not exist.
           content:
@@ -8220,6 +8267,7 @@ components:
       - ReviewRouting
       - FinalizePublish
       - MonitorAndDrift
+      - GateExpired
       title: WizardRunState
     WizardRunStatusResponse:
       properties:
