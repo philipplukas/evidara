@@ -61,14 +61,35 @@ def _migrate_job(sha: str) -> str:
     )
 
 
+def _marketing_deployment(sha: str) -> str:
+    return dedent(
+        f"""\
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: marketing
+        spec:
+          template:
+            spec:
+              containers:
+                - name: marketing
+                  image: ghcr.io/philipplukas/evidara-marketing:{sha}
+        """
+    )
+
+
 class CheckHetznerImagePinsTest(unittest.TestCase):
-    def _run(self, kustomization: str, migrate_job: str) -> int:
+    def _run(self, kustomization: str, migrate_job: str, extra: dict[str, str] | None = None) -> int:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             apps = root / "infra" / "hetzner" / "apps"
             apps.mkdir(parents=True)
             (apps / "kustomization.yaml").write_text(kustomization, encoding="utf-8")
             (apps / "migrate-job.yaml").write_text(migrate_job, encoding="utf-8")
+            for rel, body in (extra or {}).items():
+                target = root / "infra" / "hetzner" / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(body, encoding="utf-8")
 
             original = checker.REPO_ROOT
             checker.REPO_ROOT = root
@@ -97,6 +118,42 @@ class CheckHetznerImagePinsTest(unittest.TestCase):
             "ghcr.io/philipplukas/evidara-platform-control", "ghcr.io/philipplukas/busybox"
         )
         self.assertEqual(self._run(_kustomization(SHA_A), job), 1)
+
+    def test_an_unkustomized_workload_may_roll_on_its_own_sha(self) -> None:
+        """The marketing surface (ADR-0039) is deliberately outside apps/, so it is
+        NOT required to share the platform's SHA — only to have one."""
+        self.assertEqual(
+            self._run(
+                _kustomization(SHA_A),
+                _migrate_job(SHA_A),
+                extra={"marketing/deployment.yaml": _marketing_deployment(SHA_B)},
+            ),
+            0,
+        )
+
+    def test_fails_when_an_unkustomized_workload_uses_a_moving_tag(self) -> None:
+        """Nothing transforms that tag, so `latest` there is rolled by whoever merges
+        next rather than by whoever deploys."""
+        self.assertEqual(
+            self._run(
+                _kustomization(SHA_A),
+                _migrate_job(SHA_A),
+                extra={"marketing/deployment.yaml": _marketing_deployment("latest")},
+            ),
+            1,
+        )
+
+    def test_helm_values_are_out_of_scope(self) -> None:
+        """`runners/` and `values/` configure third-party charts applied by `helm
+        upgrade`; the ARC pool really does run `:latest` and is excluded knowingly."""
+        self.assertEqual(
+            self._run(
+                _kustomization(SHA_A),
+                _migrate_job(SHA_A),
+                extra={"runners/values-heavy.yaml": "        image: ghcr.io/philipplukas/evidara-runner-heavy:latest\n"},
+            ),
+            0,
+        )
 
     def test_real_repo_files_are_consistent(self) -> None:
         """Guards the checked-in pins, not just the checker."""

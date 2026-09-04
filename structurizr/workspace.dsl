@@ -54,6 +54,14 @@ workspace "Evidara" "Document intelligence platform for legal research" {
             # anything else in this model is the architectural point: the only
             # publicly reachable surface cannot reach the control plane, the
             # search API, or any data store.
+            #
+            # DEPLOYED 2026-09-04, but temporarily behind the shared BasicAuth
+            # middleware at the operator's request, so the `prospect -> marketing`
+            # edge below is an intention rather than the runtime until that
+            # annotation is removed from infra/hetzner/marketing/ingress-tls.yaml.
+            # The `Public` tag describes the container's design posture (no server
+            # runtime, no secret, no reachable neighbour), which is unchanged by
+            # the password.
             marketing = container "marketing" "Public waitlist and positioning page" "Kubernetes (k3s) / Next.js static export behind Traefik" {
                 tags "Public"
             }

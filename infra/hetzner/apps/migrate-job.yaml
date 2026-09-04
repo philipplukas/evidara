@@ -20,7 +20,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migrate
-          image: ghcr.io/philipplukas/evidara-platform-control:8759bec51fc55fa02a155f5b63ddf23adf942bcc
+          image: ghcr.io/philipplukas/evidara-platform-control:4dddce3c02e6966b4e37afcc2262658f990eae91
           command: ["sh", "-c", "alembic upgrade head && platform-control-seed-reference-data"]
           envFrom:
             - configMapRef:

@@ -33,80 +33,90 @@ resources:
 # at d695b990 while three newer complete sets existed). Confirm with
 # `gh run list --workflow=runtime-images.yml --commit <sha>`.
 #
-# 8759bec5 (#804) is the current `main` tip and all seven image jobs are green on
-# its push (run 30027046837).
+# 4dddce3c (#858) is the newest `main` commit that actually published images: all
+# seven image jobs are green on its push (run 33759401696), and all six tags below
+# were confirmed present in GHCR before this pin was written.
 #
-# This rollout is large. Production was pinned at da39660d (2026-07-16), 109
-# commits behind, and that gap is why the platform has no corpus: the deployed
-# image contained exactly two acquisition providers, `fedlex_sparql` and
-# `gemeinde_http`. Everything that makes a Swiss corpus possible was built after
-# it. What this pin adds:
-#   - the LexFind provider (#797): 26 cantons plus federal behind one
-#     unauthenticated JSON API. This is the cantonal rung, and it carries the
-#     ADR-0033 dog question — `tol/22871` is the ZH Hundegesetz, md5-identical to
-#     the canton's own PDF.
-#   - `blueprint_enablement` and the ADR-0030 two-key lock, so template
-#     enablement is an operator action against evidence rather than a repo edit.
-#   - `RunMode.ACCEPTANCE` (#743), without which no run can be recorded as
-#     acceptance evidence at all.
-#   - the legislative identifier reaches the index (#755 / #804), so a law is
-#     findable by its own citation. `official_citation` is `null` on every
-#     document in the live index today: the mapping defines the field and the
-#     query boosts it, but nothing populated it. Pinning below this SHA and then
-#     rebuilding the index would rebuild it still-null — which is why #804 was
-#     merged before this pin rather than after.
+# It is NOT `main`'s tip. The four commits after it (6d5dca3c, e4c38650, 4dd8d081,
+# 7cb76544) touch only `docs/`, `scripts/` and `.github/`, so `runtime-images.yml`
+# never started on their pushes and no image carries their SHA. Pinning the tip
+# would be unpullable — which is the trap the paragraph above describes, met for
+# real. When you bump this, pin the newest SHA with a green `push` run — which is
+# not always `main`'s tip.
 #
-# NOT zero alembic delta — unlike the previous two pins. THREE forward revisions
-# apply on rollout, and the migrate job must complete before the API rolls:
-#   20260714_0021_jurisdiction_norm_level      <- already overdue, see below
-#   20260717_0022_blueprint_template_overrides
-#   20260720_0023_run_mode_acceptance
+# What this pin adds over 8759bec5 (2026-07-23, 35 commits back). User-visible in
+# `search.evidara.veyo.dev`:
+#   - a deep-linked search reaches the right parser (#822 / #829). Each URL search
+#     param had its own ad-hoc parse at every call site, so the same query string
+#     resolved differently depending on which component read it first.
+#   - the regeste renders as a headnote on document detail (#760 / #830), which is
+#     the first thing a lawyer reads on a court decision.
+#   - the BFF owns metadata visibility outright (#787 / #821) rather than splitting
+#     the rule across BFF and frontend — the AGENTS.md "one rule, one enforcer"
+#     failure, where the weaker of the two clients silently became the policy.
+# In the acquisition platform (not user-visible, but this is where the corpus comes
+# from): the LexFind cantonal rung goes from one canton to a working enumeration —
+# BE acceptance evidence (#814), `lexfind_api` promoted to LIVE (#815), whole-canton
+# enumeration with the run proving its own denominator (#818), the coverage ledger
+# that stores what a jurisdiction should hold (#819), a locator-less artifact no
+# longer collapsing onto one `document_id` (#831), an idempotent shard crawl whose
+# progress writes cannot be lost (#834), a temporal boolean no longer frozen at
+# capture time — the #661 trap (#837), a mirror that keeps proving it equals the
+# source (#845), and a FAILED dispatch that no longer publishes what it captured
+# (#858). Plus DI quarantine for a manifestation whose text is not law (#841).
 #
-# Three, not two, because the migrate Job had drifted exactly the way the warning
-# in migrate-job.yaml predicts: it was pinned at 6e1816a7 (#574), 143 commits
-# back and older than the da39660d pin it was supposed to migrate for. So the
-# previous rollout shipped code containing 0021 and never ran it. Verified against
-# the live DB, not inferred: `alembic_version` reads 20260713_0020, and
-# `jurisdictions` has 2169 rows but no `level` column — while the deployed
-# da39660d image maps `level` on the Jurisdiction model. Every ORM read of a
-# jurisdiction in production currently raises UndefinedColumn, which is one
-# concrete reason ADR-0033's `norm_hierarchy` cannot answer anything there.
+# NOT zero alembic delta. TWO forward revisions apply on rollout, and the migrate
+# Job must complete before the API rolls:
+#   20260728_0024_coverage_reconciliations
+#   20260903_0025_wizard_shard_idempotency
 # migrate-job.yaml is bumped to this same SHA in this change; keep the two in
 # lockstep, since the `images:` transformer below deliberately does not reach it.
 #
-# Prior pin da39660d (#626) advanced the site past 5c5c13f5 (#617) with:
-#   - document body text reaches the screen at all (#621 / #613 / #609). The BFF
-#     suppressed `content` for EVERY document that had a body: the docling fetch
-#     was skipped whenever `content` was present, and the mapper emitted `content`
-#     only from `content_docling` — a field the index does not define. Every
-#     document detail served `content: null` while advertising an "Inhalt" tab.
-#   - the platform-control OpenAPI spec is now GENERATED from the FastAPI app and
-#     drift-gated (#618 / #626, ADR-0034). The hand-written spec described 4 of 11
-#     acquisition providers, omitted 14 of 61 paths, pointed at a `servers` host
-#     that exists nowhere in `infra/`, and documented `Bearer <JWT>` auth "from the
-#     identity provider" when the API requires `X-API-Key` — a client built from it
-#     could not authenticate at all. Runtime behaviour is unchanged; `/docs` now
-#     shows the real title/version, and 8 wizard `operationId`s change (fixing a
-#     genuine `get_run` collision). Paths are untouched, so path-based clients are
-#     unaffected.
-# Zero alembic delta from 5c5c13f5 (no new platform-control migrations across this
-# range), so the migrate job applies no forward revision on rollout.
+# ── PRECONDITION THIS PIN DOES NOT SATISFY ON ITS OWN ──
 #
-# (Prior pin 5c5c13f5 (#617) stopped the source-version editor corrupting
-# acquisition specs on save — it had been resetting `corpus_id`, emptying
-# `language_codes`, nulling `document_type_hint` and rewriting 7 of 11 providers to
-# firecrawl, HTTP 200 each time, with the damaged record rendering identically to a
-# healthy one. Zero alembic delta.)
+# `platform-control.yaml`, `document-intelligence.yaml` and
+# `retention-sweep-cronjob.yaml` now `envFrom` the per-workload MinIO Secrets
+# `evidara-s3-platform-control`, `evidara-s3-di-consumer` and
+# `evidara-s3-document-service` (#813). Those Secrets do not exist in a cluster that
+# has not been cut over, and a pod that starts without one fails at its first
+# artifact write rather than at startup. Run
+# `infra/hetzner/provision-minio-users.sh` (then `verify-minio-scoping.sh`) BEFORE
+# applying this kustomization; `deploy-stage4.sh` fails fast if they are absent.
+# Procedure: docs/runbooks/minio-least-privilege-cutover.md.
+#
+# ── prior pins, newest first ──
+#
+# 8759bec5 (#804, 2026-07-23) carried the LexFind provider (#797) — 26 cantons plus
+# federal behind one unauthenticated JSON API, the rung that holds ADR-0033's dog
+# question — `blueprint_enablement` and the ADR-0030 two-key lock,
+# `RunMode.ACCEPTANCE` (#743), and the legislative identifier reaching the index
+# (#755 / #804) so a law is findable by its own citation. Three alembic revisions
+# (0021..0023), one of them overdue because the migrate Job had drifted 143 commits
+# behind the pin it was meant to migrate for — the exact failure migrate-job.yaml
+# warns about.
+#
+# da39660d (#626, 2026-07-16) made document body text reach the screen at all
+# (#621 / #613 / #609 — the BFF served `content: null` for every document with a
+# body while advertising an "Inhalt" tab), and made the platform-control OpenAPI
+# spec generated from the FastAPI app and drift-gated (#618, ADR-0034); the
+# hand-written spec had described 4 of 11 providers and documented an auth scheme
+# the API does not accept. Zero alembic delta.
+#
+# 5c5c13f5 (#617) stopped the source-version editor corrupting acquisition specs on
+# save — resetting `corpus_id`, emptying `language_codes`, nulling
+# `document_type_hint` and rewriting 7 of 11 providers to firecrawl, HTTP 200 each
+# time, the damaged record rendering identically to a healthy one. Zero alembic
+# delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
+    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
+    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
+    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
+    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
+    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
+    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
