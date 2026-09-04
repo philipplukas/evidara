@@ -138,7 +138,8 @@ Each `ExternalSecret` should report `SecretSynced`; each Deployment should reach
 - [ ] **Object-store integration test** (recommended for the same reason): run the opt-in
       MinIO test — `cd document-intelligence && EVIDARA_MINIO_IT=1 uv run --extra it --extra test pytest tests/test_delta_s3_integration.py`.
       It is the only test that reads canonical Delta over `s3://` rather than a local path, so it is
-      what covers the MinIO branch of `delta_dataset_filesystem` (#825). CI does not run it.
+      what covers the MinIO branch of `delta_dataset_filesystem` (#825) and the credentials the
+      targeted-rescore store reads with (#847). CI does not run it.
 
 ## 8. Re-point CI smokes (optional)
 
