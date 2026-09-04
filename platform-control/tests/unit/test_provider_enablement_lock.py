@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pytest
+from conftest import dispatchable_compliance_policy
 from sqlalchemy import select
 
 from acquisition_core.providers import (
@@ -90,7 +91,16 @@ def _registry() -> tuple[ProviderRegistry, dict[str, RecordingProvider]]:
 
 async def _source_version_from_template(session, template: tuple[str, str]):
     overlay_id, provider_template_id = template
-    session.add(Jurisdiction(jurisdiction_id="jur_ch_federal", name="Switzerland", slug="ch"))
+    policy = dispatchable_compliance_policy()
+    session.add(policy)
+    session.add(
+        Jurisdiction(
+            jurisdiction_id="jur_ch_federal",
+            name="Switzerland",
+            slug="ch",
+            compliance_policy_id=policy.compliance_policy_id,
+        )
+    )
     session.add(
         Authority(
             authority_id="auth_fedlex",
@@ -377,7 +387,16 @@ async def test_seed_override_cannot_bypass_the_config_key(session) -> None:
     between this run and the live portal — with or without operator seeds.
     """
     overlay_id, provider_template_id = DISABLED_TEMPLATE
-    session.add(Jurisdiction(jurisdiction_id="jur_de_by", name="Bayern", slug="de-by"))
+    policy = dispatchable_compliance_policy()
+    session.add(policy)
+    session.add(
+        Jurisdiction(
+            jurisdiction_id="jur_de_by",
+            name="Bayern",
+            slug="de-by",
+            compliance_policy_id=policy.compliance_policy_id,
+        )
+    )
     session.add(
         Authority(
             authority_id="auth_de_by",

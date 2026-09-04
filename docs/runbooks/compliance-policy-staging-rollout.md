@@ -113,8 +113,18 @@ NULL;`) before downgrade in that case.
 Merged in #262. Populates `cp_ch_fedlex_open_data` and `cp_at_ris_ogd`, plus
 sets `jurisdictions.compliance_policy_id` for CH and AT.
 
-Other jurisdictions (DE/FR/IT/EU) stay unattached; absence means
-unconstrained by design.
+Other jurisdictions (DE/FR/IT/EU) stay unattached.
+
+> **Amended 2026-09-03.** This step used to read "absence means unconstrained by
+> design". That is no longer true, and it was never a decision anyone made — it
+> was the fallthrough. A source whose jurisdiction (and authority) resolves to no
+> policy is now **refused** at dispatch with the slug
+> `compliance_policy_missing`, and the attempt is recorded as a terminal FAILED
+> run with `refused: true`. There is deliberately no parent fallback: inheriting
+> would hand `jur_ch`'s open-data posture (`robots_mode: ignore`, 600 rpm) to
+> every canton and commune beneath it, none of which is in that programme. An
+> unattached jurisdiction is therefore inert, not unconstrained — declare a
+> policy before onboarding a source under it.
 
 ### Commands
 

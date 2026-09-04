@@ -12,10 +12,16 @@ back-to-back runs would each start with a full bucket and defeat the cap.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from platform_control.errors import InvalidStateTransitionError, NotFoundError
+from platform_control.errors import (
+    CompliancePolicyMissingError,
+    InvalidStateTransitionError,
+    NotFoundError,
+)
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.source import Source
@@ -193,16 +199,32 @@ async def resolve_rate_limiter_for_source(
 ) -> HostRateLimiter | None:
     """Return the limiter governing ``source``'s jurisdiction, if any.
 
-    Returns ``None`` when the source's jurisdiction has no policy attached —
-    callers must treat that as "no limiter" (unconstrained) and not silently
-    substitute a default, because the absence is the operator's signal that the
-    jurisdiction is either whitelisted (e.g. their own test domains) or that a
-    policy has yet to be written.
+    Returns ``None`` when the source's jurisdiction has no policy attached. This
+    is the *reporting* resolver — ``None`` means "there is no policy", and the
+    caller decides what to do about it.
+
+    It is no longer the dispatch path's resolver, and the docstring here used to
+    say something the code then contradicted: callers "must treat that as 'no
+    limiter' (unconstrained) and not silently substitute a default". The second
+    half held; the first half made the absence mean the most permissive thing
+    available, which is a default in everything but name. The dispatch path now
+    calls :func:`require_politeness_envelope`, which refuses.
     """
     policy = await _resolve_policy_for_source(session, source)
     if policy is None:
         return None
     return registry.get_or_create(policy)
+
+
+def _robots_context(policy: CompliancePolicy, checker: RobotsChecker) -> RobotsContext:
+    user_agent = _DEFAULT_USER_AGENT
+    if policy.contact_url:
+        user_agent = f"{_DEFAULT_USER_AGENT} (+{policy.contact_url})"
+    return RobotsContext(
+        checker=checker,
+        mode=policy.robots_mode,
+        user_agent=user_agent,
+    )
 
 
 async def resolve_robots_context_for_source(
@@ -216,15 +238,67 @@ async def resolve_robots_context_for_source(
     :func:`resolve_rate_limiter_for_source`. The ``user_agent`` falls back to a
     service default when the policy does not declare a ``contact_url`` so a
     robots-compliant UA is always used.
+
+    This is the *reporting* resolver, kept for ``cli plan``, which describes what
+    a run would do without performing any IO. The dispatch path uses
+    :func:`require_politeness_envelope` instead, which refuses rather than
+    returning ``None``.
     """
     policy = await _resolve_policy_for_source(session, source)
     if policy is None:
         return None
-    user_agent = _DEFAULT_USER_AGENT
-    if policy.contact_url:
-        user_agent = f"{_DEFAULT_USER_AGENT} (+{policy.contact_url})"
-    return RobotsContext(
-        checker=checker,
-        mode=policy.robots_mode,
-        user_agent=user_agent,
+    return _robots_context(policy, checker)
+
+
+COMPLIANCE_POLICY_MISSING = "compliance_policy_missing"
+"""Refusal slug written at the head of the run's ``failure_reason``.
+
+Snake-case, matching the capture-level refusal vocabulary (``original_url_missing``
+and friends), so an operator auditing ``?refused=true`` can group refusals by
+cause without parsing prose.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class PolitenessEnvelope:
+    """The limiter + robots pair a dispatched run must have before it fetches."""
+
+    policy: CompliancePolicy
+    limiter: HostRateLimiter
+    robots: RobotsContext
+
+
+async def require_politeness_envelope(
+    session: AsyncSession,
+    source: Source,
+    registry: RateLimiterRegistry,
+    checker: RobotsChecker,
+) -> PolitenessEnvelope:
+    """Resolve the politeness envelope for ``source``, or refuse the dispatch.
+
+    This is the resolver the run-launch path uses, and the difference from
+    :func:`resolve_rate_limiter_for_source` is the whole point: absence is an
+    error here, not a ``None`` the caller is free to read as "unconstrained".
+
+    See :class:`~platform_control.errors.CompliancePolicyMissingError` for why
+    the alternative — inheriting the parent jurisdiction's policy — is the wrong
+    answer in this tree.
+    """
+    policy = await _resolve_policy_for_source(session, source)
+    if policy is None:
+        authority_id = getattr(source, "authority_id", None)
+        raise CompliancePolicyMissingError(
+            f"{COMPLIANCE_POLICY_MISSING}: no compliance policy resolves for source "
+            f"{source.source_id!r} (jurisdiction={source.jurisdiction_id!r}, "
+            f"authority={authority_id!r}). A run may not reach a live host with no "
+            "rate policy, no robots mode and no attribution block. There is no parent "
+            "fallback on purpose — inheriting would apply a policy nobody wrote for "
+            "this host. Declare one in "
+            "`seeds/reference/compliance_policies.yaml` and bind it on the "
+            "jurisdiction (or on the authority, which wins)."
+        )
+    return PolitenessEnvelope(
+        policy=policy,
+        limiter=registry.get_or_create(policy),
+        robots=_robots_context(policy, checker),
     )

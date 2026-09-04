@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 
 import httpx
 import pytest
+from conftest import dispatchable_compliance_policy
 
 from platform_control.database import get_session
 from platform_control.main import create_app
@@ -65,7 +66,16 @@ async def client(_app):
 async def seed_reference_data(session_maker):
     """Seed minimum reference data for source creation."""
     async with session_maker() as session:
-        session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+        policy = dispatchable_compliance_policy()
+        session.add(policy)
+        session.add(
+            Jurisdiction(
+                jurisdiction_id="jur_ch",
+                name="Switzerland",
+                slug="ch",
+                compliance_policy_id=policy.compliance_policy_id,
+            )
+        )
         session.add(
             Authority(
                 authority_id="auth_bger",

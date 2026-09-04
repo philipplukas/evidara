@@ -12,6 +12,24 @@
 # Attribution text reflects the programme's terms verbatim. Contact URL
 # identifies evidara.ai in the user-agent for both rate logs and robots.txt
 # User-agent matching.
+#
+# A JURISDICTION WITH NO POLICY IS REFUSED, NOT DEFAULTED.
+# ------------------------------------------------------
+# There is no parent fallback and there will not be one. Inheriting down this
+# tree would hand `jur_ch`'s policy — `cp_ch_fedlex_open_data`,
+# `robots_mode: ignore`, 600 rpm, attributed to the Federal Chancellery's
+# open-data programme — to all 26 cantons and all 2,110 communes beneath it.
+# Not one of those hosts is in that programme. That is the largest unearned
+# permission the seed tree could grant, and it would be granted by a default
+# nobody typed.
+#
+# So the absence of a policy is a refusal, not a licence: `_dispatch_run`
+# raises `CompliancePolicyMissingError` (slug `compliance_policy_missing`)
+# before any outbound request, and the attempt is recorded as a terminal FAILED
+# run with `refused: true`, the same trace the ADR-0030 two-key lock leaves.
+# The remedy is one YAML block here plus one line in `jurisdictions.yaml` —
+# cheap, explicit and auditable. A wrong INHERITED policy is none of those,
+# because nothing about it is visible until the host complains.
 version: 1
 items:
   # CH / Fedlex is an explicit open-data programme operated by the Swiss
@@ -79,6 +97,85 @@ items:
     retention_days: 365
     attribution_required: true
     attribution_text: "Source: Swiss Federal Courts (Bundesgericht / Bundesverwaltungsgericht)."
+    contact_url: "https://evidara.ai/contact"
+
+  # CH cantonal law via LexFind (26 cantons + Bund behind one unauthenticated
+  # JSON API at www.lexfind.ch, operated for the Schweizerische
+  # Staatsschreiberkonferenz). Bound to all 26 cantonal jurisdictions.
+  #
+  # EVERY FIELD BELOW IS EITHER MEASURED OR AN EXPLICITLY-LABELLED JUDGEMENT.
+  #
+  # The measurement that shapes the whole policy is a NULL: **LexFind publishes
+  # no terms.** Read from its own i18n bundles on 2026-09-03 by the licensing
+  # lane (not re-fetched here — the standing constraint forbids fetching from a
+  # public-sector host): the complete `info_page` key set is
+  # `{about, contact, disclaimer}` in de/fr/it. `Nutzungsbedingungen`,
+  # `Impressum`, `Urheberrecht`, `Lizenz` and `Copyright` are absent in every
+  # language. The disclaimer is accuracy-only — it neither grants a right to
+  # reuse nor reserves one. `robots.txt` is a single comment line.
+  #
+  # A null is not a permission. Fedlex and RIS earn `robots_mode: ignore` from
+  # an explicit open-data programme; LexFind has published nothing to earn
+  # anything, so this policy is conservative BY CHOICE rather than permissive by
+  # default. Everything here is a floor we set on ourselves, not a limit
+  # somebody set for us — which is exactly why it must be written down.
+  #
+  # NOT YET SETTLED, and it is a human gate, not agent work: the operator has
+  # never contacted the Staatsschreiberkonferenz about terms or rate
+  # expectations (#797 shipped without it). Flipping `enabled: true` turns
+  # hand-dispatched runs into standing production traffic. Revisit these numbers
+  # when that conversation happens — do not treat them as agreed.
+  #
+  # KNOWN GAP, stated here so this policy is not read as more than it is: the
+  # `lexfind_api` provider does not route its requests through
+  # `politeness.limited_get` — it calls `client.get` directly
+  # (`lexfind_api_provider.py:1143,1256,1347`). Attaching this policy therefore
+  # does NOT yet pace the LexFind API itself. Five providers do honour it
+  # (fedlex_sparql, ris_ogd, deterministic_http, ch_court_decisions,
+  # gemeinde_http); lexfind_api is not among them. Its only live politeness is
+  # the hardcoded `asyncio.sleep(mirror_spot_check_delay_seconds)` in the mirror
+  # spot-check, which paces the CANTON's host, not lexfind.ch. Wiring the
+  # provider is a provider-lane change and is deliberately not done here.
+  - compliance_policy_id: cp_ch_lexfind
+    name: ch-lexfind
+    description: >-
+      Swiss cantonal legislation via lexfind.ch. LexFind publishes no terms of
+      use, no licence and no copyright notice in any of its three languages, and
+      its robots.txt carries no rules — so there is no grant that could justify
+      the open-data tier, and this sits at the most conservative
+      public-official setting instead. One request at a time, one every three
+      seconds, an identifying User-Agent, and no upward probing: the ceiling
+      equals the start rate so the AIMD controller cannot climb against a
+      service that has never told us what it can take.
+    # STRICT because there is nothing to supersede robots.txt. Today this costs
+    # nothing — LexFind's robots.txt is a single comment line, so it disallows
+    # nothing — and that is the point: if they publish rules tomorrow, or a
+    # `Crawl-delay`, this binds automatically instead of needing a seed change
+    # nobody would think to make.
+    robots_mode: strict
+    # MEASURED. 20 rpm is one request every 3.0 s, which is
+    # `_DEFAULT_MIRROR_SPOT_CHECK_DELAY_SECONDS = 3.0`
+    # (`lexfind_api_provider.py:182`) — the pace #797 already applies to the
+    # canton's own host, restated here as the policy it should always have been.
+    # `max == start` so `HostRateLimiter` cannot probe upward.
+    # JUDGEMENT: the 6 rpm floor (one request per 10 s) is the same floor the
+    # two other no-licence tiers use; nothing measured it.
+    min_requests_per_minute_per_host: 6
+    start_requests_per_minute_per_host: 20
+    max_requests_per_minute_per_host: 20
+    # MEASURED. "One request at a time" is #797's posture, recorded at
+    # `lexfind_api_provider.py:60-66`.
+    max_concurrent_per_host: 1
+    # JUDGEMENT, not a measurement: 365 days matches the two other tiers that
+    # hold bytes under no published licence (court, municipal). There is no
+    # LexFind retention term to derive it from, because there are no terms.
+    retention_days: 365
+    attribution_required: true
+    # Names BOTH the canton whose law it is and the mirror the bytes came
+    # through, and says plainly that no licence exists. Claiming a licence
+    # LexFind has not published would be the fabrication ADR-0033 exists to
+    # prevent; so would attributing cantonal law to the mirror alone.
+    attribution_text: "Source: the publishing Swiss canton's own legal collection, retrieved via lexfind.ch (Schweizerische Staatsschreiberkonferenz). No licence or terms of use are published by either party."
     contact_url: "https://evidara.ai/contact"
 
   # CH communal law (Gemeinden). Each of the ~2,110 communes publishes its own

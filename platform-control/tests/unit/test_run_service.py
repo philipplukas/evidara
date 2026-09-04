@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass, field
 
 import pytest
+from conftest import dispatchable_compliance_policy
 from sqlalchemy import select
 
 from platform_control.domain import ProcessingStatus, ProviderJobStatus, RunMode, RunStatus
@@ -231,7 +232,16 @@ class RecordingPublisher:
 
 
 async def _seed_source_version(session):
-    session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+    policy = dispatchable_compliance_policy()
+    session.add(policy)
+    session.add(
+        Jurisdiction(
+            jurisdiction_id="jur_ch",
+            name="Switzerland",
+            slug="ch",
+            compliance_policy_id=policy.compliance_policy_id,
+        )
+    )
     session.add(
         Authority(
             authority_id="auth_zh_admin",
@@ -402,7 +412,16 @@ async def test_get_run_readiness_rejects_lexfind_without_search_text(session) ->
 
 @pytest.mark.asyncio
 async def test_overlay_template_source_version_passes_readiness_checks(session) -> None:
-    session.add(Jurisdiction(jurisdiction_id="jur_at", name="Austria", slug="at"))
+    policy = dispatchable_compliance_policy()
+    session.add(policy)
+    session.add(
+        Jurisdiction(
+            jurisdiction_id="jur_at",
+            name="Austria",
+            slug="at",
+            compliance_policy_id=policy.compliance_policy_id,
+        )
+    )
     session.add(
         Authority(
             authority_id="auth_at_ris",

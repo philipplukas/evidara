@@ -10,6 +10,7 @@ so the panel and the operator see an inert template as inert.
 from __future__ import annotations
 
 import pytest
+from conftest import dispatchable_compliance_policy
 
 from acquisition_core.providers import AcquisitionReadiness, ProviderNotLiveReadyError
 from platform_control.domain import RunMode, RunStatus, SourceVersionStatus
@@ -46,7 +47,16 @@ LIVE_BUT_SHUT_TEMPLATE = ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
 
 
 async def _seed_reference(session) -> None:
-    session.add(Jurisdiction(jurisdiction_id="jur_ch_federal", name="Switzerland", slug="ch"))
+    policy = dispatchable_compliance_policy()
+    session.add(policy)
+    session.add(
+        Jurisdiction(
+            jurisdiction_id="jur_ch_federal",
+            name="Switzerland",
+            slug="ch",
+            compliance_policy_id=policy.compliance_policy_id,
+        )
+    )
     session.add(
         Authority(
             authority_id="auth_fedlex",

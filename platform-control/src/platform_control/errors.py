@@ -32,6 +32,40 @@ class BlueprintTemplateNotEnabledError(PlatformControlError):
     """
 
 
+class CompliancePolicyMissingError(PlatformControlError):
+    """Raised when a run would reach a live host with no CompliancePolicy resolved.
+
+    Refusal slug: ``compliance_policy_missing``.
+
+    The alternative was a parent fallback, and it is the wrong answer here. This
+    seed tree roots every Swiss canton and all 2,110 communes under ``jur_ch``,
+    whose policy is ``cp_ch_fedlex_open_data`` — ``robots_mode: ignore``, a
+    600 rpm ceiling, and an attribution line naming the Federal Chancellery's
+    open-data programme. Not one cantonal or communal host is in that
+    programme. Inheritance would therefore grant the single largest unearned
+    permission in the repo, silently, to 2,136 jurisdictions, on the strength of
+    a default nobody typed. "Ignore robots.txt at this host" is a claim; a
+    fallback would make it on the operator's behalf.
+
+    Treating the absence as "no limits" is the other wrong answer, and it is
+    what the code did until this existed: ``resolve_rate_limiter_for_source``
+    returns ``None``, ``_dispatch_run`` binds ``None`` into the contextvar, and
+    ``limited_get`` falls through to a bare ``client.get``. Its own docstring
+    already said callers "must not silently substitute a default" — but nothing
+    said what the absence *means*, and the fallthrough answered with the most
+    permissive reading available.
+
+    So: refuse. It is impossible to miss, it is recorded as a terminal FAILED
+    run with ``refused: true`` (the same trace the ADR-0030 two-key lock
+    leaves), and the remedy is one YAML block. A wrongly-inherited policy is
+    invisible until the host complains.
+
+    SHADOW versions are exempt, for the same reason ``_require_launchable``
+    exempts them: they replay cassettes and no request reaches the portal a
+    politeness policy protects.
+    """
+
+
 class SignatureVerificationError(PlatformControlError):
     """Raised when a webhook signature cannot be verified."""
 

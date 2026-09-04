@@ -29,6 +29,7 @@ from platform_control.domain import (
 )
 from platform_control.errors import (
     BlueprintTemplateNotEnabledError,
+    CompliancePolicyMissingError,
     DispatchPublishError,
     InvalidStateTransitionError,
     NotFoundError,
@@ -82,8 +83,7 @@ from platform_control.services.artifact_store import ArtifactStore
 from platform_control.services.blueprint_enablement import BlueprintEnablementService
 from platform_control.services.compliance_policy_service import (
     RateLimiterRegistry,
-    resolve_rate_limiter_for_source,
-    resolve_robots_context_for_source,
+    require_politeness_envelope,
 )
 from platform_control.services.coverage_reconciliation import parse_coverage_payload
 from platform_control.services.politeness import current_rate_limiter
@@ -393,11 +393,26 @@ class RunService:
         # A refusal is recorded as a terminal FAILED run before the 400 propagates,
         # so "what did we try to onboard and why did it refuse?" is answerable
         # (#634). It is terminal, not PENDING, so no worker ever picks it up.
+        # The politeness envelope is the third thing that must hold before a
+        # request leaves this process, and it refuses in the same shape: a
+        # jurisdiction with no CompliancePolicy cannot dispatch, and the attempt
+        # is recorded rather than discarded. Checked here as well as in
+        # `_dispatch_run` for the same reason the two-key lock is — the
+        # worker-backed path would otherwise accept the run and only refuse it
+        # out-of-band, stranding a PENDING run no worker can ever dispatch.
         provider = self._resolve_provider_for_source_version(source_version)
         if provider is not None:
             try:
                 await self._require_launchable(source_version, provider, request.mode)
-            except (BlueprintTemplateNotEnabledError, ProviderNotLiveReadyError) as exc:
+                if source_version.execution_mode is not ExecutionMode.SHADOW:
+                    await require_politeness_envelope(
+                        self.session, source, self.rate_limiter_registry, self.robots_checker
+                    )
+            except (
+                BlueprintTemplateNotEnabledError,
+                CompliancePolicyMissingError,
+                ProviderNotLiveReadyError,
+            ) as exc:
                 await self._record_refused_run(source, source_version, request, str(exc))
                 raise
 
@@ -1316,14 +1331,19 @@ class RunService:
         # Bind the jurisdiction's rate limiter + robots context into the async
         # context so every outbound GET performed by the provider honours them.
         # set/reset keeps concurrent runs on different policies isolated.
-        limiter = await resolve_rate_limiter_for_source(
-            self.session, source, self.rate_limiter_registry
-        )
-        robots_ctx = await resolve_robots_context_for_source(
-            self.session, source, self.robots_checker
-        )
-        limiter_token = current_rate_limiter.set(limiter)
-        robots_token = current_robots_context.set(robots_ctx)
+        #
+        # A missing policy REFUSES the dispatch (slug `compliance_policy_missing`)
+        # rather than resolving to None and letting `limited_get` fall through to
+        # an unpaced, robots-blind `client.get`. SHADOW is exempt for the same
+        # reason `_require_launchable` exempts it — cassettes, no portal.
+        if source_version.execution_mode is ExecutionMode.SHADOW:
+            envelope = None
+        else:
+            envelope = await require_politeness_envelope(
+                self.session, source, self.rate_limiter_registry, self.robots_checker
+            )
+        limiter_token = current_rate_limiter.set(envelope.limiter if envelope else None)
+        robots_token = current_robots_context.set(envelope.robots if envelope else None)
         try:
             provider_result = await provider.start_run(source, source_version, run)
         finally:

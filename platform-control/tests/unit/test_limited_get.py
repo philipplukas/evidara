@@ -233,3 +233,102 @@ async def test_limited_get_reports_exception_to_limiter() -> None:
         await limited_get(_FailingClient(), "https://example.com/a", limiter=limiter)
 
     assert limiter.current_requests_per_minute == 60.0
+
+
+class _DelayDeclaringChecker(RobotsChecker):
+    """Allows everything and declares a fixed pace, without touching the network."""
+
+    def __init__(self, interval: float | None) -> None:
+        super().__init__()
+        self._interval = interval
+        self.asked: list[tuple[str, str]] = []
+
+    async def is_allowed(self, url: str, user_agent: str) -> bool:  # noqa: ARG002
+        return True
+
+    async def min_interval_seconds(self, url: str, user_agent: str) -> float | None:
+        self.asked.append((url, user_agent))
+        return self._interval
+
+
+class _DelayRecordingLimiter(HostRateLimiter):
+    def __init__(self) -> None:
+        super().__init__(max_requests_per_minute=60, max_concurrent=2)
+        self.applied: list[tuple[str, float | None]] = []
+
+    def apply_robots_delay(self, host: str, min_interval_seconds: float | None) -> None:
+        self.applied.append((host, min_interval_seconds))
+        super().apply_robots_delay(host, min_interval_seconds)
+
+
+@pytest.mark.asyncio
+async def test_strict_mode_pushes_the_sites_declared_pace_into_the_limiter() -> None:
+    """This is the wiring that makes `robots_mode: strict` mean "obey robots.txt".
+
+    Before it, `Crawl-delay` and `Request-rate` were read nowhere in the repo, so
+    a host asking for ten seconds between requests was overridden by our own
+    number while the config said strict.
+    """
+    checker = _DelayDeclaringChecker(10.0)
+    limiter = _DelayRecordingLimiter()
+    client = _StubClient()
+
+    robots_token = current_robots_context.set(
+        RobotsContext(checker=checker, mode=RobotsMode.STRICT, user_agent="evidara-bot")
+    )
+    limiter_token = current_rate_limiter.set(limiter)
+    try:
+        await limited_get(client, "https://example.ch/a")
+    finally:
+        current_rate_limiter.reset(limiter_token)
+        current_robots_context.reset(robots_token)
+
+    assert limiter.applied == [("example.ch", 10.0)]
+    assert checker.asked == [("https://example.ch/a", "evidara-bot")]
+    assert client.calls == ["https://example.ch/a"]
+
+
+@pytest.mark.asyncio
+async def test_ignore_mode_does_not_read_the_sites_pace() -> None:
+    """IGNORE means an open-data grant supersedes robots.txt — including its pacing.
+
+    The file is not fetched at all in that mode, so asking for a delay would be
+    an extra request to a host we have explicit permission to crawl.
+    """
+    checker = _DelayDeclaringChecker(10.0)
+    limiter = _DelayRecordingLimiter()
+    client = _StubClient()
+
+    robots_token = current_robots_context.set(
+        RobotsContext(checker=checker, mode=RobotsMode.IGNORE, user_agent="evidara-bot")
+    )
+    limiter_token = current_rate_limiter.set(limiter)
+    try:
+        await limited_get(client, "https://fedlex.data.admin.ch/eli/x")
+    finally:
+        current_rate_limiter.reset(limiter_token)
+        current_robots_context.reset(robots_token)
+
+    assert checker.asked == []
+    assert limiter.applied == []
+
+
+@pytest.mark.asyncio
+async def test_a_disallowed_url_never_reaches_the_pace_lookup() -> None:
+    """Refusal short-circuits: no pace is applied for a URL we will not fetch."""
+    checker = _AlwaysDisallowChecker()
+    limiter = _DelayRecordingLimiter()
+    client = _StubClient()
+
+    robots_token = current_robots_context.set(
+        RobotsContext(checker=checker, mode=RobotsMode.STRICT, user_agent="evidara-bot")
+    )
+    limiter_token = current_rate_limiter.set(limiter)
+    try:
+        with pytest.raises(RobotsDisallowedError):
+            await limited_get(client, "https://example.ch/private")
+    finally:
+        current_rate_limiter.reset(limiter_token)
+        current_robots_context.reset(robots_token)
+
+    assert limiter.applied == []

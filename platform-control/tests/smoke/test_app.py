@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import httpx
 import pytest
+from conftest import dispatchable_compliance_policy
 
 from platform_control.database import get_session
 from platform_control.main import create_app
@@ -26,7 +27,16 @@ class StubProvider:
 @pytest.mark.asyncio
 async def test_create_source_approve_and_trigger_run(session_maker) -> None:
     async with session_maker() as seed_session:
-        seed_session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+        policy = dispatchable_compliance_policy()
+        seed_session.add(policy)
+        seed_session.add(
+            Jurisdiction(
+                jurisdiction_id="jur_ch",
+                name="Switzerland",
+                slug="ch",
+                compliance_policy_id=policy.compliance_policy_id,
+            )
+        )
         seed_session.add(
             Authority(
                 authority_id="auth_zh_admin",
@@ -329,7 +339,16 @@ async def test_two_key_lock_rejects_scaffold_and_disabled_template_with_400(sess
     request leaves the process, with a 400 the admin UI can render.
     """
     async with session_maker() as seed_session:
-        seed_session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+        policy = dispatchable_compliance_policy()
+        seed_session.add(policy)
+        seed_session.add(
+            Jurisdiction(
+                jurisdiction_id="jur_ch",
+                name="Switzerland",
+                slug="ch",
+                compliance_policy_id=policy.compliance_policy_id,
+            )
+        )
         seed_session.add(
             Authority(
                 authority_id="auth_zh",

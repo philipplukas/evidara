@@ -82,6 +82,14 @@ class AcquisitionProvider(StrEnum):
     CH_COURT_DECISIONS = "ch_court_decisions"
 
 
+# NOTE: this docstring is a GENERATED contract surface — it is copied verbatim
+# into `contracts/api/platform-control.openapi.yaml`, so editing it forces a
+# manifest version bump (ADR-0034). It is therefore deliberately left as-is while
+# three open PRs (#844, #851, #864) already claim that bump. What `STRICT`
+# enforces in full — `Disallow`/`Allow` AND the site's `Crawl-delay` /
+# `Request-rate` — is documented at the top of
+# `platform_control.services.robots`, which is the module that enforces it. The
+# text below under-claims rather than over-claims, which is the safe direction.
 class RobotsMode(StrEnum):
     """How aggressively a jurisdiction's scrapers honour robots.txt.
 

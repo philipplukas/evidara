@@ -14,7 +14,9 @@ from temporalio.testing import WorkflowEnvironment
 from platform_control import models as _models  # noqa: F401
 from platform_control.config import get_settings
 from platform_control.database import reset_database_caches
+from platform_control.domain import RobotsMode
 from platform_control.models.base import Base
+from platform_control.models.compliance_policy import CompliancePolicy
 
 # The "CI may not skip" guard is shared across platform-control, document-intelligence
 # and eval (#690). These are three separate Python projects with no common package, so
@@ -102,6 +104,38 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     for item in items:
         if "temporal" in item.keywords:
             item.add_marker(skip_marker)
+
+
+def dispatchable_compliance_policy(
+    *,
+    compliance_policy_id: str = "cp_test",
+    name: str = "test-politeness",
+) -> CompliancePolicy:
+    """A minimal policy so a seeded jurisdiction can actually dispatch a run.
+
+    A source whose jurisdiction resolves to no ``CompliancePolicy`` is refused at
+    dispatch (``compliance_policy_missing``) rather than running unpaced and
+    robots-blind. Before that refusal existed, **every** dispatch test in this
+    suite ran without a policy — which is the same hole the seed tree had, and
+    is why nobody noticed the production one.
+
+    So this is not boilerplate to satisfy a new check: a test that dispatches
+    without one is rehearsing a run that must not happen. Attach it with::
+
+        policy = dispatchable_compliance_policy()
+        session.add(policy)
+        session.add(Jurisdiction(..., compliance_policy_id=policy.compliance_policy_id))
+
+    ``robots_mode`` is STRICT here on purpose — the safe default a real policy
+    gets — so tests exercise the enforcing branch rather than the exempt one.
+    """
+    return CompliancePolicy(
+        compliance_policy_id=compliance_policy_id,
+        name=name,
+        robots_mode=RobotsMode.STRICT,
+        max_requests_per_minute_per_host=60,
+        max_concurrent_per_host=2,
+    )
 
 
 @pytest_asyncio.fixture

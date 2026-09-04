@@ -15,6 +15,13 @@ connection error). ``Retry-After`` headers pause acquisition exactly that long.
 When min/start are left as ``None`` the corridor collapses to ``max`` on all
 three points — equivalent to the original static cap.
 
+On top of that corridor sits the pace the HOST asked for. Under
+``robots_mode: strict``, a ``Crawl-delay`` or ``Request-rate`` in the site's
+robots.txt is pushed in per host via :meth:`HostRateLimiter.apply_robots_delay`
+and can only *lower* the effective rate. Our corridor is what we are willing to
+send; the robots directive is what they are willing to receive, and the smaller
+of the two wins.
+
 Firecrawl delegates politeness to the external service, so its provider is
 deliberately not wired to this limiter — double-budgeting would be misleading.
 """
@@ -39,11 +46,22 @@ _PRESSURE_STATUSES: frozenset[int] = frozenset({429, 503, 504, 522, 524})
 
 @dataclass(slots=True)
 class HostBudget:
-    """Per-host state: current token count + last-refill timestamp + semaphore."""
+    """Per-host state: current token count + last-refill timestamp + semaphore.
+
+    ``robots_min_interval_seconds`` is the gap the HOST asked for in its
+    robots.txt (``Crawl-delay`` / ``Request-rate``), or ``None`` when it asked
+    for nothing. It is per-host rather than per-policy because one policy can
+    govern several hosts and each publishes its own file.
+    """
 
     tokens: float
     last_refill_monotonic: float
     semaphore: asyncio.Semaphore
+    robots_min_interval_seconds: float | None = None
+    # When the last permit for this host was GRANTED. `last_refill_monotonic`
+    # cannot stand in for it: refills happen on every acquire attempt, including
+    # the ones that then went to sleep waiting.
+    last_granted_monotonic: float | None = None
 
 
 class HostRateLimiter:
@@ -118,6 +136,38 @@ class HostRateLimiter:
     def _refill_rate_per_second(self) -> float:
         return self._current_rpm / 60.0
 
+    def apply_robots_delay(self, host: str, min_interval_seconds: float | None) -> None:
+        """Record the minimum gap ``host``'s own robots.txt asked for between requests.
+
+        One-directional, and that is the whole contract: this may only make the
+        limiter slower. ``Crawl-delay: 1`` at a host whose policy paces at 6 rpm
+        does not license 60 rpm — robots.txt is a floor on politeness, not a
+        grant of one. It is enforced as a *gate* alongside the token bucket, not
+        as a second rate: whichever of the two is slower decides when the next
+        request goes out.
+
+        A gate rather than a rate because the two say different things. The
+        bucket bounds an average and tolerates a burst against it; ``Crawl-delay:
+        10`` is a statement about the gap between *consecutive* requests, which a
+        bucket holding ten tokens satisfies on average and violates immediately.
+
+        Called from :func:`limited_get` once the robots context is known.
+        ``None`` (the site asked for nothing) clears any previous gap rather than
+        pinning a stale one, since robots.txt can change within a process
+        lifetime and the checker's cache has a TTL. A non-positive value is not a
+        pace and is treated as ``None``.
+        """
+        if min_interval_seconds is not None and min_interval_seconds <= 0:
+            min_interval_seconds = None
+        self._get_budget(host).robots_min_interval_seconds = min_interval_seconds
+
+    def _robots_gate_wait(self, budget: HostBudget, now: float) -> float:
+        """Seconds still owed to the host's declared gap, or 0.0 when none is."""
+        interval = budget.robots_min_interval_seconds
+        if interval is None or budget.last_granted_monotonic is None:
+            return 0.0
+        return max(0.0, budget.last_granted_monotonic + interval - now)
+
     def _get_budget(self, host: str) -> HostBudget:
         budget = self._budgets.get(host)
         if budget is None:
@@ -153,18 +203,24 @@ class HostRateLimiter:
                 await asyncio.sleep(retry_wait)
             while True:
                 async with self._locks[host]:
-                    self._refill(budget)
-                    if budget.tokens >= 1.0:
-                        budget.tokens -= 1.0
-                        return _HostPermit(semaphore=budget.semaphore)
-                    refill_rate = self._refill_rate_per_second()
-                    if refill_rate <= 0:
-                        # Defensive: shouldn't happen given validation, but
-                        # would otherwise divide by zero.
-                        wait_seconds = 1.0
-                    else:
-                        deficit = 1.0 - budget.tokens
-                        wait_seconds = deficit / refill_rate
+                    now = self._monotonic()
+                    # The host's own declared gap, checked alongside the bucket.
+                    # Whichever of the two is slower decides when this goes out.
+                    wait_seconds = self._robots_gate_wait(budget, now)
+                    if wait_seconds <= 0.0:
+                        self._refill(budget)
+                        if budget.tokens >= 1.0:
+                            budget.tokens -= 1.0
+                            budget.last_granted_monotonic = now
+                            return _HostPermit(semaphore=budget.semaphore)
+                        refill_rate = self._refill_rate_per_second()
+                        if refill_rate <= 0:
+                            # Defensive: shouldn't happen given validation, but
+                            # would otherwise divide by zero.
+                            wait_seconds = 1.0
+                        else:
+                            deficit = 1.0 - budget.tokens
+                            wait_seconds = deficit / refill_rate
                 await asyncio.sleep(wait_seconds)
         except BaseException:
             budget.semaphore.release()
@@ -275,6 +331,14 @@ async def limited_get(
     URL raises :class:`RobotsDisallowedError` *before* any token is consumed,
     so robots blocks never deplete the rate budget.
 
+    ``strict`` also honours the site's ``Crawl-delay`` / ``Request-rate``: the
+    declared interval is pushed into the limiter for that host before the token
+    is taken, so the next request already waits for it. It only ever slows the
+    limiter — a site asking for less delay than our policy applies does not
+    raise our rate. A ``strict`` policy with no limiter (which the dispatch path
+    now refuses — see ``CompliancePolicyMissingError``) has nowhere to apply the
+    delay, so the pace is dropped; the ``Disallow`` check still runs.
+
     After each request the response (or exception) is fed back to the limiter
     via :meth:`HostRateLimiter.observe` so the AIMD corridor moves in response
     to the target server's behaviour.
@@ -291,16 +355,27 @@ async def limited_get(
         current_robots_context,
     )
 
+    effective = limiter if limiter is not None else current_rate_limiter.get()
+    host = (urlparse(url).hostname or "").lower()
+
     robots_ctx = current_robots_context.get()
     if robots_ctx is not None and robots_ctx.mode is RobotsMode.STRICT:
         allowed = await robots_ctx.checker.is_allowed(url, robots_ctx.user_agent)
         if not allowed:
             raise RobotsDisallowedError(url)
+        # The site's own requested pace, applied before the token is taken so
+        # the very next acquire already honours it. The checker caches
+        # robots.txt per origin, so this costs no extra fetch. `strict` used to
+        # mean "obey Disallow" only; this is the half that makes the mode's name
+        # true. It can only slow the limiter down — see `apply_robots_delay`.
+        if effective is not None and host:
+            effective.apply_robots_delay(
+                host,
+                await robots_ctx.checker.min_interval_seconds(url, robots_ctx.user_agent),
+            )
 
-    effective = limiter if limiter is not None else current_rate_limiter.get()
     if effective is None:
         return await client.get(url, **kwargs)
-    host = (urlparse(url).hostname or "").lower()
     async with await effective.acquire(host):
         try:
             response = await client.get(url, **kwargs)
