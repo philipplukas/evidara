@@ -43,6 +43,20 @@ RUN test -f out/index.html \
 # capabilities.
 FROM nginxinc/nginx-unprivileged:1.29-alpine
 
+# GHCR links a package to a repository by this label, and a base image's label is
+# INHERITED. This is the only Evidara image whose final stage is a third-party base,
+# and nginx-unprivileged ships `org.opencontainers.image.source` pointing at its own
+# repo — so an image built without CI's `docker/metadata-action` labels arrives at
+# ghcr.io attributed to nginx, and the package links to nothing. That is exactly how
+# `evidara-marketing` became an orphan: unlinked, and therefore not writable by the
+# workflow's `GITHUB_TOKEN` however much `packages: write` it is granted.
+#
+# Setting it here makes the attribution a property of the image rather than of the
+# pipeline that happened to build it. The sibling Dockerfiles need no equivalent: their
+# node/python bases set no such label, so there is nothing to inherit.
+LABEL org.opencontainers.image.source=https://github.com/philipplukas/evidara
+LABEL org.opencontainers.image.url=https://github.com/philipplukas/evidara
+
 COPY --from=build /workspace/marketing/out /usr/share/nginx/html
 
 EXPOSE 8080
