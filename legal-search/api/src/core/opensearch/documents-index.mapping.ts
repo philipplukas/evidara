@@ -89,6 +89,21 @@ export const DOCUMENTS_INDEX_PROPERTIES = {
   content_preview: { type: 'text' },
   structural_path: { type: 'text', fields: { keyword: { type: 'keyword' } } },
 
+  // Learned-sparse representation of `content` (ADR-0054). `rank_features` and
+  // not `knn_vector` on purpose: `index.knn` is a **static** setting the live
+  // `documents-*` indices do not carry and cannot gain without a reindex and an
+  // alias cutover, and HNSW graphs live in off-heap memory the 2Gi OpenSearch
+  // node does not have. This is an ordinary inverted index, so it can be added
+  // to a live mapping and costs no off-heap memory.
+  //
+  // Keys are `t<token-id>` from BGE-M3's tokenizer, never decoded token strings:
+  // a multilingual vocabulary contains `.`, which OpenSearch reads as object
+  // nesting, so decoded names would silently produce a different field structure
+  // for some tokens and not others. Produced by
+  // `document_intelligence.jobs.embedding_backfill`; see ADR-0054 D8 on why the
+  // field and its producer land together.
+  content_sparse: { type: 'rank_features' },
+
   // ── Faceted keywords (bare filter + `.keyword` aggregation) ──
   jurisdiction: facetKeyword,
   document_type: facetKeyword,
