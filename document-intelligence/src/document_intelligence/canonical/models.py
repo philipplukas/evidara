@@ -149,6 +149,13 @@ class ProcessingManifest:
     # take opposite remedies (replay vs. implement the missing class). Storing them in one
     # column is what would make the queue undrainable.
     quarantine: dict[str, Any] | None = None
+    #: Per-stage timings and counts for this document (#905). Timings and counts
+    #: ONLY — a stage entry does not yet say what it removed from the text
+    #: (footnote apparatus, page furniture, a lifted Randtitel, a dropped
+    #: citation). That is ADR-0044's subject. An empty list therefore means "not
+    #: recorded", never "no stages ran": manifests written before this field
+    #: existed have none, and so does any path that does not build a ledger.
+    stages: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         output = {
@@ -178,6 +185,11 @@ class ProcessingManifest:
             output["failure"] = dict(self.failure)
         if self.quarantine is not None:
             output["quarantine"] = dict(self.quarantine)
+        # Omitted when empty rather than emitted as `[]`. An empty array is a
+        # claim that the pipeline ran no stages; an absent key is the honest
+        # "this manifest does not carry stage timings".
+        if self.stages:
+            output["stages"] = [dict(stage) for stage in self.stages]
         return output
 
 

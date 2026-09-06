@@ -186,6 +186,56 @@
       "type": "integer",
       "minimum": 0
     },
+    "stages": {
+      "type": "array",
+      "description": "Per-stage timings and counts for this document's processing. Timings and counts ONLY: an entry does NOT say what the stage removed from the text (footnote apparatus, page furniture, a lifted Randtitel, a dropped citation) — that disclosure is ADR-0044's subject and is not implemented. An absent or empty array means the manifest does not carry stage timings, NOT that no stages ran. There is deliberately no 'persist' stage: the manifest is what persistence writes, so a stage covering that write cannot appear inside it.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "duration_us"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Closed vocabulary, in execution order. 'assemble' sits between 'extract' and 'enrich' because document construction genuinely runs there — enrichment mutates a document that must already exist.",
+            "enum": [
+              "normalize",
+              "sectionize",
+              "extract",
+              "assemble",
+              "enrich",
+              "finalize"
+            ]
+          },
+          "duration_us": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Elapsed microseconds. Microseconds, not milliseconds: measured 2026-09-06 every stage of a small HTML document reported 0 ms, which a reader cannot distinguish from \"not measured\" \u2014 the exact absence-versus-zero conflation this ledger exists to avoid."
+          },
+          "items_in": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Absent when the stage did not measure an input count. Absent is not zero."
+          },
+          "items_out": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Absent when the stage did not measure an output count. Absent is not zero."
+          },
+          "failed": {
+            "type": "boolean",
+            "description": "Present and true only when the stage raised. A failing stage is still recorded, before the exception propagates — a ledger that described only successful runs would be systematically absent for exactly the documents someone is debugging."
+          },
+          "error_type": {
+            "type": "string",
+            "description": "The exception's type name. Present only alongside failed: true."
+          },
+          "details": {
+            "type": "object",
+            "description": "Reserved for ADR-0044 transformation disclosure. Absent today, and its absence means 'not recorded', never 'nothing was removed'."
+          }
+        }
+      }
+    },
     "failure": {
       "type": "object",
       "required": [

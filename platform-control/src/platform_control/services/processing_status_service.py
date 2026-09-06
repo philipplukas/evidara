@@ -11,8 +11,26 @@ from platform_control.models.run import Run
 from platform_control.schemas.document_events import (
     DocumentProcessedEvent,
     DocumentWithdrawnEvent,
+    PipelineStage,
 )
 from platform_control.schemas.processing_status import DocumentProcessingStatusUpdatedEvent
+
+
+def _stages_for_storage(stages: list[PipelineStage]) -> list[dict] | None:
+    """Serialise the stage ledger, mapping "no ledger" to NULL rather than `[]`.
+
+    The payload's default is an empty list, which means the producer sent no
+    ledger — an older document-intelligence, or a path that builds none. Storing
+    that as `[]` would turn "we never recorded this" into "the pipeline ran no
+    stages", and a reader has no way to tell the two apart afterwards. NULL keeps
+    the distinction the column's docstring depends on.
+
+    `exclude_none` so an unmeasured `items_in` is absent rather than `null`:
+    absence is "not measured", and a rendered `0` would be a claim about the work.
+    """
+    if not stages:
+        return None
+    return [stage.model_dump(exclude_none=True) for stage in stages]
 
 
 class ProcessingStatusService:
@@ -57,6 +75,7 @@ class ProcessingStatusService:
             reason_code=None,
             reason_summary=None,
             search_disposition=None,
+            stages=_stages_for_storage(payload.stages),
             occurred_at=event.occurred_at,
         )
         return await self._insert_idempotent(event_row)

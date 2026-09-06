@@ -60,6 +60,7 @@ import {
 } from "./run-decision-support";
 import { buildDocumentSearchHref, buildMinioObjectHref } from "./runDeepLinks";
 import { buildRunTimeline, type RunTimelineEntry } from "./runTimeline";
+import { StageTimeline } from "./StageTimeline";
 
 /**
  * Maps an in-page anchor id (the `stageActionTarget` targets, shared with v1)
@@ -883,7 +884,95 @@ export default function RunDetailSectionsV2({
           columns={documentLifecycleColumns}
           getRowId={(event) => event.event_id}
         />
+        <PipelineStagesSection
+          events={documentLifecycle.data}
+          isPending={documentLifecycle.isPending}
+          error={documentLifecycle.error}
+        />
       </AccordionRoot>
     </div>
+  );
+}
+
+/**
+ * What document-intelligence did to each document, stage by stage (#905).
+ *
+ * Reads the same `run-document-lifecycle` fetch as the section above rather than
+ * issuing its own — the ledger rides on those events, so a second request would
+ * be the same rows twice.
+ *
+ * The count in the trigger is "documents WITH timings", never the row count: a
+ * run whose events all predate stage recording has rows and no timings, and
+ * saying "5 documents" over five empty timelines would misreport absence as data.
+ */
+function PipelineStagesSection({
+  events,
+  isPending,
+  error,
+}: {
+  events: DocumentLifecycleRecord[] | undefined;
+  isPending: boolean;
+  error: unknown;
+}) {
+  const withStages = (events ?? []).filter(
+    (event) => event.stages != null && event.stages.length > 0,
+  );
+  const total = events?.length ?? 0;
+
+  return (
+    <AccordionItem value="pipeline-stages" id="pipeline-stages-section">
+      <AccordionTrigger>
+        <span className="text-[15px] font-semibold text-[var(--foreground)]">Pipeline Stages</span>
+        {isPending ? (
+          <Pill variant="meta">Loading…</Pill>
+        ) : error ? (
+          <Pill level="critical">Error</Pill>
+        ) : (
+          <Pill variant="meta">
+            {`${withStages.length} of ${total} ${total === 1 ? "document" : "documents"} timed`}
+          </Pill>
+        )}
+      </AccordionTrigger>
+      <AccordionContent>
+        <div className="space-y-3">
+          <p className="text-[13px] text-[var(--foreground-subtle)]">
+            Per-stage timings and counts recorded by document-intelligence while processing each
+            document.
+          </p>
+          {isPending ? (
+            <p className="text-[13px] text-[var(--text-meta)] m-0">Loading pipeline stages…</p>
+          ) : error ? (
+            <p className="text-[13px] text-[var(--text-meta)] m-0">
+              {error instanceof Error
+                ? error.message
+                : "Unable to load pipeline stages. This is unavailable, not empty."}
+            </p>
+          ) : total === 0 ? (
+            <p className="text-[13px] text-[var(--text-meta)] m-0">
+              No document lifecycle events have been received for this run, so there is nothing to
+              time.
+            </p>
+          ) : withStages.length === 0 ? (
+            <p className="text-[13px] text-[var(--text-meta)] m-0">
+              None of this run&rsquo;s {total} document
+              {total === 1 ? "" : "s"} carries stage timings. Their processing predates stage
+              recording, or the producer emits none — this is not a report that the pipeline did no
+              work.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              {withStages.map((event) => (
+                <div key={event.event_id}>
+                  <p className="text-[13px] font-mono text-[var(--text-meta)] mt-0 mb-2">
+                    {event.document_id} · rev {event.document_revision}
+                  </p>
+                  <StageTimeline stages={event.stages} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }

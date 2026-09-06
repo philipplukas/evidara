@@ -93,6 +93,12 @@ def build_document_processed_event(
     }
     if manifest.supersedes_processing_manifest_id is not None:
         payload["supersedes_processing_manifest_id"] = manifest.supersedes_processing_manifest_id
+    # Denormalised from the manifest so the control plane can render the stage
+    # timeline without reading the lakehouse. Omitted when the manifest carries
+    # no ledger — an absent key says "not recorded", where `[]` would say "the
+    # pipeline ran no stages".
+    if manifest.stages:
+        payload["stages"] = [dict(stage) for stage in manifest.stages]
 
     return _envelope(payload, correlation_id=correlation_id, causation_id=causation_id)
 
