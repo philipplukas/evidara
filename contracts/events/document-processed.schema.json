@@ -99,7 +99,7 @@
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["name", "duration_ms"],
+                "required": ["name", "duration_us"],
                 "properties": {
                   "name": {
                     "type": "string",
@@ -112,9 +112,10 @@
                       "finalize"
                     ]
                   },
-                  "duration_ms": {
+                  "duration_us": {
                     "type": "integer",
-                    "minimum": 0
+                    "minimum": 0,
+                    "description": "Elapsed microseconds. Microseconds, not milliseconds: measured 2026-09-06 every stage of a small HTML document reported 0 ms, which a reader cannot distinguish from \"not measured\" \u2014 the exact absence-versus-zero conflation this ledger exists to avoid."
                   },
                   "items_in": {
                     "type": "integer",

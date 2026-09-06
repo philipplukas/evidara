@@ -24,12 +24,12 @@ from platform_control.schemas.document_events import (
 from platform_control.services.processing_status_service import ProcessingStatusService
 
 STAGES = [
-    {"name": "normalize", "duration_ms": 120, "items_in": 1, "items_out": 1},
-    {"name": "sectionize", "duration_ms": 45, "items_in": 1, "items_out": 24},
-    {"name": "extract", "duration_ms": 890, "items_in": 1, "items_out": 1},
-    {"name": "assemble", "duration_ms": 12, "items_in": 1, "items_out": 1},
-    {"name": "enrich", "duration_ms": 310, "items_in": 24, "items_out": 7},
-    {"name": "finalize", "duration_ms": 8, "items_in": 24, "items_out": 24},
+    {"name": "normalize", "duration_us": 120, "items_in": 1, "items_out": 1},
+    {"name": "sectionize", "duration_us": 45, "items_in": 1, "items_out": 24},
+    {"name": "extract", "duration_us": 890, "items_in": 1, "items_out": 1},
+    {"name": "assemble", "duration_us": 12, "items_in": 1, "items_out": 1},
+    {"name": "enrich", "duration_us": 310, "items_in": 24, "items_out": 7},
+    {"name": "finalize", "duration_us": 8, "items_in": 24, "items_out": 24},
 ]
 
 
@@ -60,7 +60,7 @@ async def test_stages_are_stored_in_order_with_their_counts(session) -> None:
     assert [stage["name"] for stage in row.stages] == [stage["name"] for stage in STAGES]
     sectionize = next(s for s in row.stages if s["name"] == "sectionize")
     assert sectionize["items_out"] == 24
-    assert sectionize["duration_ms"] == 45
+    assert sectionize["duration_us"] == 45
 
 
 @pytest.mark.asyncio
@@ -92,14 +92,14 @@ async def test_an_unmeasured_count_is_omitted_rather_than_stored_as_zero(session
     service = ProcessingStatusService(session)
 
     await service.record_document_processed(
-        _event_with_stages("evt_stages_partial", [{"name": "finalize", "duration_ms": 3}])
+        _event_with_stages("evt_stages_partial", [{"name": "finalize", "duration_us": 3}])
     )
 
     row = await _stored_row(session)
     (stage,) = row.stages
     assert "items_in" not in stage
     assert "items_out" not in stage
-    assert stage["duration_ms"] == 3
+    assert stage["duration_us"] == 3
 
 
 @pytest.mark.asyncio
@@ -110,7 +110,7 @@ async def test_a_failed_stage_keeps_its_error_type(session) -> None:
     await service.record_document_processed(
         _event_with_stages(
             "evt_stages_failed",
-            [{"name": "extract", "duration_ms": 41, "failed": True, "error_type": "ValueError"}],
+            [{"name": "extract", "duration_us": 41, "failed": True, "error_type": "ValueError"}],
         )
     )
 
@@ -152,4 +152,4 @@ def test_an_unknown_stage_name_is_refused_at_the_boundary() -> None:
     reach the admin as a row nothing can place in the timeline.
     """
     with pytest.raises(ValueError):
-        _event_with_stages("evt_bad", [{"name": "preprocesss", "duration_ms": 1}])
+        _event_with_stages("evt_bad", [{"name": "preprocesss", "duration_us": 1}])

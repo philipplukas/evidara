@@ -3063,8 +3063,8 @@ export interface components {
              * @enum {string}
              */
             name: "normalize" | "sectionize" | "extract" | "assemble" | "enrich" | "finalize";
-            /** Duration Ms */
-            duration_ms: number;
+            /** Duration Us */
+            duration_us: number;
             /** Items In */
             items_in?: number | null;
             /** Items Out */

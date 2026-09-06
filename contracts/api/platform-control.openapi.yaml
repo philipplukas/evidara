@@ -6273,10 +6273,10 @@ components:
           - enrich
           - finalize
           title: Name
-        duration_ms:
+        duration_us:
           type: integer
           minimum: 0.0
-          title: Duration Ms
+          title: Duration Us
         items_in:
           anyOf:
           - type: integer
@@ -6308,7 +6308,7 @@ components:
       type: object
       required:
       - name
-      - duration_ms
+      - duration_us
       title: PipelineStage
       description: |-
         One document-intelligence stage's timing and counts.

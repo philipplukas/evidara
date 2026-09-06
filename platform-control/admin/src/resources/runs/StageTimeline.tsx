@@ -64,8 +64,30 @@ export function formatCount(value: number | null | undefined): string {
   return typeof value === "number" ? String(value) : "—";
 }
 
-export function totalDurationMs(stages: PipelineStage[]): number {
-  return stages.reduce((sum, stage) => sum + (stage.duration_ms ?? 0), 0);
+/**
+ * Microseconds, rendered in the unit a human reads at that magnitude.
+ *
+ * The wire carries microseconds because milliseconds could not express this
+ * pipeline's own timings — every stage of a small HTML document measured `0 ms`,
+ * which reads as "nothing was measured" rather than "fast". So the number is
+ * never rounded away here either: below a millisecond it stays in µs.
+ *
+ * A genuine `0 µs` is possible (a stage faster than the clock's resolution) and
+ * renders as `0 µs` — a measured zero, distinct from the dash that marks an
+ * absent count.
+ */
+export function formatDuration(us: number): string {
+  if (us < 1_000) return `${us} µs`;
+  if (us < 1_000_000) {
+    const ms = us / 1_000;
+    // One decimal below 10 ms, where the fraction still carries signal.
+    return `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`;
+  }
+  return `${(us / 1_000_000).toFixed(2)} s`;
+}
+
+export function totalDurationUs(stages: PipelineStage[]): number {
+  return stages.reduce((sum, stage) => sum + (stage.duration_us ?? 0), 0);
 }
 
 export function StageTimeline({ stages }: { stages: PipelineStage[] | null | undefined }) {
@@ -90,8 +112,8 @@ export function StageTimeline({ stages }: { stages: PipelineStage[] | null | und
   }
 
   const ordered = orderStages(stages);
-  const total = totalDurationMs(ordered);
-  const widest = Math.max(...ordered.map((stage) => stage.duration_ms ?? 0), 1);
+  const total = totalDurationUs(ordered);
+  const widest = Math.max(...ordered.map((stage) => stage.duration_us ?? 0), 1);
 
   return (
     <div>
@@ -124,7 +146,9 @@ export function StageTimeline({ stages }: { stages: PipelineStage[] | null | und
                     </span>
                   ) : null}
                 </th>
-                <td className="py-2 pr-4 tabular-nums whitespace-nowrap">{stage.duration_ms} ms</td>
+                <td className="py-2 pr-4 tabular-nums whitespace-nowrap">
+                  {formatDuration(stage.duration_us)}
+                </td>
                 <td className="py-2 pr-4 tabular-nums">{formatCount(stage.items_in)}</td>
                 <td className="py-2 pr-4 tabular-nums">{formatCount(stage.items_out)}</td>
                 <td className="py-2 w-[38%] min-w-[120px]">
@@ -134,7 +158,7 @@ export function StageTimeline({ stages }: { stages: PipelineStage[] | null | und
                     aria-hidden
                     className="block h-[6px] rounded-full bg-[var(--accent-core)]"
                     style={{
-                      width: `${Math.max(2, ((stage.duration_ms ?? 0) / widest) * 100)}%`,
+                      width: `${Math.max(2, ((stage.duration_us ?? 0) / widest) * 100)}%`,
                       opacity: stage.failed ? 0.4 : 1,
                     }}
                   />
@@ -145,10 +169,10 @@ export function StageTimeline({ stages }: { stages: PipelineStage[] | null | und
         </table>
       </div>
       <p className="mt-3 mb-0 text-[13px] text-[var(--text-meta)]">
-        {ordered.length} stages · {total} ms measured. Timings and counts only — this does not
-        report what a stage removed from the text (excluded footnotes, stripped page furniture, a
-        lifted Randtitel, a dropped citation). That disclosure is not implemented, so its absence
-        here is not evidence that nothing was removed.
+        {ordered.length} stages · {formatDuration(total)} measured. Timings and counts only — this
+        does not report what a stage removed from the text (excluded footnotes, stripped page
+        furniture, a lifted Randtitel, a dropped citation). That disclosure is not implemented, so
+        its absence here is not evidence that nothing was removed.
       </p>
     </div>
   );

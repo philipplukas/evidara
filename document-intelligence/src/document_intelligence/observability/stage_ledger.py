@@ -67,7 +67,7 @@ class UnknownStageError(ValueError):
 @dataclass
 class StageEntry:
     name: str
-    duration_ms: int
+    duration_us: int
     items_in: int | None = None
     items_out: int | None = None
     failed: bool = False
@@ -77,7 +77,7 @@ class StageEntry:
     details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        output: dict[str, Any] = {"name": self.name, "duration_ms": self.duration_ms}
+        output: dict[str, Any] = {"name": self.name, "duration_us": self.duration_us}
         if self.items_in is not None:
             output["items_in"] = self.items_in
         if self.items_out is not None:
@@ -122,17 +122,17 @@ class StageLedger:
         """
         if name not in STAGE_NAMES:
             raise UnknownStageError(f"Unknown pipeline stage {name!r}. Known stages: {', '.join(STAGE_NAMES)}.")
-        entry = StageEntry(name=name, duration_ms=0, items_in=items_in)
-        started = time.perf_counter()
+        entry = StageEntry(name=name, duration_us=0, items_in=items_in)
+        started = time.perf_counter_ns()
         try:
             yield entry
         except BaseException as exc:
-            entry.duration_ms = _elapsed_ms(started)
+            entry.duration_us = _elapsed_us(started)
             entry.failed = True
             entry.error_type = type(exc).__name__
             self._entries.append(entry)
             raise
-        entry.duration_ms = _elapsed_ms(started)
+        entry.duration_us = _elapsed_us(started)
         self._entries.append(entry)
 
     @property
@@ -142,14 +142,22 @@ class StageLedger:
     def to_list(self) -> list[dict[str, Any]]:
         return [entry.to_dict() for entry in self._entries]
 
-    def total_duration_ms(self) -> int:
-        return sum(entry.duration_ms for entry in self._entries)
+    def total_duration_us(self) -> int:
+        return sum(entry.duration_us for entry in self._entries)
 
 
-def _elapsed_ms(started: float) -> int:
-    """Elapsed milliseconds, floored at 0.
+def _elapsed_us(started: int) -> int:
+    """Elapsed MICROSECONDS, floored at 0.
 
-    ``perf_counter`` is monotonic, so a negative value is impossible; the floor
-    guards against a 0-duration stage rendering as a missing measurement.
+    Microseconds, not milliseconds, because milliseconds cannot express this
+    pipeline's own measurements. Measured 2026-09-06 against the HTML fixture,
+    every one of the six stages reported `0 ms` — truthful, and useless: a reader
+    cannot tell "fast" from "nothing was measured", which is precisely the
+    absence-versus-zero conflation this ledger exists to avoid. At microsecond
+    resolution the same run separates into real numbers.
+
+    `perf_counter_ns` rather than `perf_counter`: the float version loses
+    resolution at exactly the scale being measured here, and integer nanoseconds
+    divide down without accumulating error.
     """
-    return max(0, int((time.perf_counter() - started) * 1000))
+    return max(0, (time.perf_counter_ns() - started) // 1000)

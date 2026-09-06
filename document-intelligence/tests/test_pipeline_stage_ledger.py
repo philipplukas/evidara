@@ -73,9 +73,9 @@ class PipelineStageLedgerTests(unittest.TestCase):
     def test_each_stage_carries_a_duration(self):
         for stage in self._run().manifest.stages:
             with self.subTest(stage=stage["name"]):
-                self.assertIn("duration_ms", stage)
-                self.assertIsInstance(stage["duration_ms"], int)
-                self.assertGreaterEqual(stage["duration_ms"], 0)
+                self.assertIn("duration_us", stage)
+                self.assertIsInstance(stage["duration_us"], int)
+                self.assertGreaterEqual(stage["duration_us"], 0)
 
     def test_sectionize_reports_the_sections_it_produced(self):
         """The counts are real measurements, not placeholders."""

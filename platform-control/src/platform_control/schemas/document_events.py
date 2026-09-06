@@ -45,7 +45,11 @@ class PipelineStage(BaseModel):
     """
 
     name: Literal["normalize", "sectionize", "extract", "assemble", "enrich", "finalize"]
-    duration_ms: int = Field(ge=0)
+    #: MICROSECONDS. Measured 2026-09-06, every stage of a small HTML document
+    #: reported `0 ms` — truthful and useless, because a reader cannot tell
+    #: "fast" from "not measured". Milliseconds cannot express this pipeline's
+    #: own timings, so the unit is microseconds and clients format for display.
+    duration_us: int = Field(ge=0)
     items_in: int | None = Field(default=None, ge=0)
     items_out: int | None = Field(default=None, ge=0)
     failed: bool = False
