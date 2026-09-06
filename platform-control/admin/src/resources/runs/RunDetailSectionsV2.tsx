@@ -59,6 +59,7 @@ import {
   stageNextAction,
 } from "./run-decision-support";
 import { buildDocumentSearchHref, buildMinioObjectHref } from "./runDeepLinks";
+import { buildRunTimeline, type RunTimelineEntry } from "./runTimeline";
 
 /**
  * Maps an in-page anchor id (the `stageActionTarget` targets, shared with v1)
@@ -619,6 +620,35 @@ const processingStatusColumns: DataTableColumn<ProcessingStatusRecord>[] = [
   },
 ];
 
+const timelineColumns: DataTableColumn<RunTimelineEntry>[] = [
+  {
+    key: "occurred",
+    header: "When",
+    // An undated entry says so rather than borrowing its neighbour's time.
+    render: (item) =>
+      item.occurredAt ? (
+        formatDateTime(item.occurredAt)
+      ) : (
+        <span className="text-[var(--foreground-faint)]">no timestamp</span>
+      ),
+  },
+  {
+    key: "stage",
+    header: "Stage",
+    render: (item) => <Pill variant="meta">{item.stageLabel}</Pill>,
+  },
+  {
+    key: "summary",
+    header: "Event",
+    render: (item) => (
+      <span className={item.isFailure ? "text-[var(--status-critical)]" : undefined}>
+        {item.summary}
+      </span>
+    ),
+  },
+  { key: "detail", header: "Detail", render: (item) => renderInlineValue(item.detail) },
+];
+
 const documentLifecycleColumns: DataTableColumn<DocumentLifecycleRecord>[] = [
   { key: "event_type", header: "Event", render: (event) => event.event_type },
   {
@@ -711,6 +741,36 @@ export default function RunDetailSectionsV2({
     { enabled: Boolean(run?.run_id) },
   );
 
+  const timelineRows = useMemo(
+    () =>
+      buildRunTimeline({
+        providerJobs: providerJobs.data,
+        capturedResources: capturedResources.data,
+        rawArtifacts: rawArtifacts.data,
+        processingStatus: processingStatus.data,
+        documentLifecycle: documentLifecycle.data,
+      }),
+    [
+      providerJobs.data,
+      capturedResources.data,
+      rawArtifacts.data,
+      processingStatus.data,
+      documentLifecycle.data,
+    ],
+  );
+  const timelineIsPending =
+    providerJobs.isPending ||
+    capturedResources.isPending ||
+    rawArtifacts.isPending ||
+    processingStatus.isPending ||
+    documentLifecycle.isPending;
+  const timelineError =
+    providerJobs.error ??
+    capturedResources.error ??
+    rawArtifacts.error ??
+    processingStatus.error ??
+    documentLifecycle.error;
+
   if (!run) {
     return null;
   }
@@ -731,6 +791,21 @@ export default function RunDetailSectionsV2({
         onValueChange={setOpenSections}
         className="flex flex-col gap-3"
       >
+        <RunAccordionSection<RunTimelineEntry>
+          value="timeline"
+          title="Timeline"
+          description="All five stages in one sequence, oldest first — the last entry is how far this run got."
+          rows={timelineRows}
+          // Pending until every stage has loaded, and any single stage's error
+          // is surfaced rather than swallowed: a timeline assembled from four of
+          // five lists looks complete and is not, which would point the operator
+          // at the wrong stall.
+          isPending={timelineIsPending}
+          error={timelineError}
+          emptyMessage="No stage events were recorded for this run."
+          columns={timelineColumns}
+          getRowId={(entry) => entry.id}
+        />
         <RunAccordionSection<ProviderJobRecord>
           value="provider-jobs"
           sectionId="provider-jobs-section"
