@@ -20,6 +20,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AppBar } from "./AppBar";
+import { ResourceTabs } from "./ResourceTabs";
 import { SidebarMenu, type SidebarMenuExtraItem } from "./SidebarMenu";
 import { ThemeSync } from "./ThemeToggle";
 import { ToastAdapter } from "./ToastAdapter";
@@ -31,33 +32,29 @@ interface AppShellProps {
 }
 
 /**
- * Workflow shortcuts rendered below the auto-registered resource links. The
- * "setup" entries jump straight to a resource's create page.
+ * The WORKFLOWS section: cross-cutting tasks that no single resource page owns.
  *
- * Sources, reference data (authorities, jurisdictions), and runs have all
- * graduated (ADR-0026 / #501 / #520): their resource links are canonical
- * Tailwind, so no `kind: "preview"` entries remain — the runs table is now
- * reached through the single "Runs" resource link, not a separate "Run queue"
- * preview entry.
+ * This used to hold three entries — "Source setup", "Authority setup",
+ * "Jurisdiction setup" — which were deep links to `/sources/create`,
+ * `/authorities/create` and `/jurisdictions/create`. They were not workflows.
+ * They were the *same routes* as three of the resource pages, and the collision
+ * was bad enough that `resourceLinkIsActive` had to exist purely to stop two nav
+ * items lighting up at once. Creating a record now belongs on that record's own
+ * page, where its group's tab strip already puts it in context.
+ *
+ * What remains is the one genuinely cross-cutting task: onboarding a source runs
+ * scope → discovery plan → pilot run → decision → scale, touching every nav
+ * group in order. `routers/wizard.py` has carried nine endpoints and a run
+ * ledger for exactly this since ADR-0021, with no caller until now.
  */
 export const DEFAULT_EXTRA_ITEMS: SidebarMenuExtraItem[] = [
   {
-    to: "/sources/create",
-    label: "Source setup",
+    to: "/workflows/onboard",
+    label: "Onboard a source",
     kind: "custom",
-    exact: true,
-  },
-  {
-    to: "/authorities/create",
-    label: "Authority setup",
-    kind: "custom",
-    exact: true,
-  },
-  {
-    to: "/jurisdictions/create",
-    label: "Jurisdiction setup",
-    kind: "custom",
-    exact: true,
+    // Prefix-match, NOT exact: an open project lives at
+    // /workflows/onboard/:projectId and must keep this item highlighted.
+    exact: false,
   },
 ];
 
@@ -93,7 +90,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
 
   return (
     <div className="admin-app-shell min-h-screen grid">
-      {/* Header row (spans the main-content column on desktop) */}
+      {/* Header row — spans the full width at every breakpoint. */}
       <div
         style={{ gridArea: "header" }}
         className="relative z-20 flex items-stretch border-b border-[var(--admin-header-border)]"
@@ -120,7 +117,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
       {/* Desktop sidebar */}
       <aside
         style={{ gridArea: "sidebar" }}
-        className="hidden md:block row-span-2 border-r border-[var(--admin-sidebar-border)] bg-[image:var(--admin-sidebar-bg)] backdrop-blur-[14px]"
+        className="hidden md:block border-r border-[var(--admin-sidebar-border)] bg-[image:var(--admin-sidebar-bg)] backdrop-blur-[14px]"
       >
         <SidebarMenu extraItems={extraSidebarItems} />
       </aside>
@@ -128,6 +125,9 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
       {/* Main content area */}
       <main style={{ gridArea: "main" }} className="relative overflow-x-hidden">
         <div className="w-full max-w-[var(--container-max)] mx-auto px-4 sm:px-6 pt-5 sm:pt-10 pb-8 sm:pb-10">
+          {/* Sibling tabs for the current nav group. Renders nothing off a
+              grouped list route — see ResourceTabs. */}
+          <ResourceTabs />
           {children}
         </div>
       </main>

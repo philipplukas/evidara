@@ -146,7 +146,11 @@ test.describe("Blueprint coverage inventory", () => {
     await mockBlueprintApi(page);
     await page.goto("/#/sources");
 
-    await page.getByRole("link", { name: "Blueprints" }).click();
+    // Scoped to the sidebar, which is what this test's name claims to check.
+    // Sources and Blueprints are siblings in the BUILD nav group, so the group's
+    // tab strip renders a second "Blueprints" link on this page — an unscoped
+    // locator matches both and fails strict mode.
+    await page.getByLabel("Primary navigation").getByRole("link", { name: "Blueprints" }).click();
 
     await expect(page.locator("h1")).toContainText("Blueprints");
     await expect(page.getByText("fedlex-default")).toBeVisible();

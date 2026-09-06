@@ -17,6 +17,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { publicConfig } from "../../config/publicConfig";
+import { groupResources } from "../../domain/navGroups";
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
@@ -93,6 +94,7 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
   }, []);
 
   const resourceEntries = Object.values(definitions).filter((r) => r?.hasList);
+  const navGroups = groupResources(resourceEntries.map((r) => [r.name, r] as [string, typeof r]));
   // Exact routes owned by the "… setup" workflow shortcuts; a resource link
   // must not stay highlighted when the operator is on one of these.
   const workflowExactPaths = extraItems.filter((item) => item.exact).map((item) => item.to);
@@ -101,11 +103,14 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
   const footerSecondary = describeLegalSearchHandoff(handoff);
   const buildLabel = formatBuildLabel(publicConfig.buildSha, publicConfig.buildDate);
 
+  // `h-full` only — NOT `min-h-[calc(100vh-80px)]`. That calc hardcoded the
+  // header at 80px while the grid row is `minmax(80px, auto)` and grows whenever
+  // the header wraps (it stacks below `lg`). Now that the sidebar sits *below* a
+  // full-width header rather than beside it, an over-tall `min-h` pushes the
+  // footer off-screen by exactly the header's overflow. The grid row already
+  // gives this element its height.
   return (
-    <nav
-      aria-label="Primary navigation"
-      className="flex flex-col h-full min-h-[calc(100vh-80px)] pt-4 md:pt-6"
-    >
+    <nav aria-label="Primary navigation" className="flex flex-col h-full pt-4 md:pt-6">
       <ul className="flex-shrink-0 list-none m-0 p-0">
         {/*
          * The dashboard, which nothing linked to.
@@ -124,27 +129,51 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
             <span>Overview</span>
           </NavLink>
         </li>
-        {resourceEntries.map((resource) => {
-          const to = `/${resource.name}`;
-          // Replicate NavLink's prefix match (`end={false}`) ourselves so that
-          // `aria-current` and the active class share one source of truth.
-          // NavLink sets `aria-current` from its own internal match, which we
-          // cannot override — so it would leave two items marked current on a
-          // resource's `/create` route even after the class yields (#6).
-          const prefixActive = location.pathname === to || location.pathname.startsWith(`${to}/`);
-          const active = resourceLinkIsActive(prefixActive, location.pathname, workflowExactPaths);
-          return (
-            <li key={resource.name}>
-              <Link
-                to={to}
-                className={navItemClass(active)}
-                aria-current={active ? "page" : undefined}
-              >
-                <span>{labelForResource(resource.name, resource.options)}</span>
-              </Link>
-            </li>
-          );
-        })}
+        {/*
+         * Grouped by the operator loop (SCOPE / BUILD / VERIFY / LEARN) rather
+         * than rendered as one flat list. `groupResources` is the single source
+         * for both this and the per-page tab strip, and it puts any resource no
+         * group claims into a trailing "More" section — a registered resource
+         * can never silently disappear from navigation.
+         */}
+        {navGroups.map((group) => (
+          <li key={group.id}>
+            <div className="mx-[10px] mt-4 mb-1">
+              <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--text-meta)] px-[14px]">
+                {group.label}
+              </div>
+            </div>
+            <ul className="list-none m-0 p-0">
+              {group.items.map(({ name, resource }) => {
+                const to = `/${name}`;
+                // Replicate NavLink's prefix match (`end={false}`) ourselves so
+                // that `aria-current` and the active class share one source of
+                // truth. NavLink sets `aria-current` from its own internal
+                // match, which we cannot override — so it would leave two items
+                // marked current on a resource's `/create` route even after the
+                // class yields (#6).
+                const prefixActive =
+                  location.pathname === to || location.pathname.startsWith(`${to}/`);
+                const active = resourceLinkIsActive(
+                  prefixActive,
+                  location.pathname,
+                  workflowExactPaths,
+                );
+                return (
+                  <li key={name}>
+                    <Link
+                      to={to}
+                      className={navItemClass(active)}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      <span>{labelForResource(name, resource.options)}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        ))}
         {extraItems.length > 0 ? (
           <li className="mx-[10px] my-2">
             <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--text-meta)] px-[14px]">

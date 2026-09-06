@@ -27,8 +27,6 @@ import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
 import { adminMuiDarkTheme, adminMuiTheme } from "../lib/admin/muiTheme";
 import BlueprintTemplateList from "../resources/blueprints/BlueprintTemplateList";
-import { CommentaryInsightList } from "../resources/corrections/CommentaryInsightList";
-import { CommentaryInsightShow } from "../resources/corrections/CommentaryInsightShow";
 import { CorrectionShow } from "../resources/corrections/CorrectionShow";
 import { CorrectionsList } from "../resources/corrections/CorrectionsList";
 import { AcquisitionCoverageList } from "../resources/coverage/AcquisitionCoverageList";
@@ -46,6 +44,7 @@ import RunShowV2 from "../resources/runs/RunShowV2";
 import SourceCreate from "../resources/sources/SourceCreate";
 import SourceList from "../resources/sources/SourceList";
 import SourceShow from "../resources/sources/SourceShow";
+import SourceOnboarding from "../resources/workflows/SourceOnboarding";
 import { AppShell } from "../ui/shell";
 
 /** Thin adapter — ra-core's `LayoutComponent` contract takes `{ children }`. */
@@ -171,13 +170,18 @@ export default function AdminApp() {
         recordRepresentation="jurisdiction_id"
         options={{ label: "Coverage" }}
       />
-      <Resource
-        name={ResourceName.CommentaryInsights}
-        list={CommentaryInsightList}
-        show={CommentaryInsightShow}
-        recordRepresentation="insight_id"
-        options={{ label: "Commentary insights" }}
-      />
+      {/*
+       * Commentary insights is PARKED, not deleted. The resource registration is
+       * removed so it leaves the sidebar and the Learn tab strip, but
+       * `CommentaryInsightList` / `CommentaryInsightShow` and the
+       * `commentary-insights` dataProvider case are untouched — re-registering
+       * this block is the whole of putting it back.
+       *
+       * Parked rather than deleted because the API surface is live
+       * (`routers/commentary_insights.py`) and the components have tests. What
+       * is being removed is the operator-facing claim that this is part of the
+       * loop today.
+       */}
       {/*
        * Tailwind + ra-core v2 previews (coexistence window, see ADR-0026).
        * Reference-data forms (authorities, jurisdictions) graduated to the
@@ -197,6 +201,14 @@ export default function AdminApp() {
         <Route path="/runs-v2/:id" element={<RunsV2DetailRedirect />} />
         <Route path="/preview-review-v2" element={<Navigate to="/preview-review" replace />} />
         <Route path="/preview-review-v2/:id" element={<PreviewReviewV2DetailRedirect />} />
+        {/*
+         * WORKFLOWS. Not a `<Resource>` — the wizard is not CRUD over a
+         * collection, and the API cannot enumerate one anyway
+         * (`GET /v1/wizard/projects` is 405). Two routes: the entry point, and
+         * one open project.
+         */}
+        <Route path="/workflows/onboard" element={<SourceOnboarding />} />
+        <Route path="/workflows/onboard/:projectId" element={<SourceOnboarding />} />
       </CustomRoutes>
     </Admin>
   );
