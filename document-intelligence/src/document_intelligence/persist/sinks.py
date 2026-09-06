@@ -1002,19 +1002,53 @@ def _widen_for_new_nested_fields(schema: pa.Schema, rows: list[dict[str, object]
     """
     try:
         inferred = pa.Table.from_pylist(rows).schema
-        unified = pa.unify_schemas([schema, inferred], promote_options="permissive")
     except Exception:
-        logger.debug("delta_schema_unify_skipped", exc_info=True)
+        logger.debug("delta_schema_infer_skipped", exc_info=True)
         return schema
-    if set(unified.names) != set(schema.names):
-        # Unification introduced a *top-level* column. Returning the table's own schema keeps
-        # both callers on the path they already had for that case: the Delta sink has already
-        # established the batch's keys are a subset of the table's, so it cannot come from the
-        # data; the Iceberg sink checks afterwards and drops to inference, which is how a new
-        # column reaches its catalog loudly. Either way, do not evolve the surface by accident
-        # from inside a widening helper.
-        return schema
-    return unified
+
+    # Unify PER FIELD, not the whole schema at once (#871, second route).
+    #
+    # `pa.unify_schemas` is all-or-nothing: it raises on the first incompatible
+    # column and the caller then keeps the un-widened schema for EVERY column.
+    # `published_commentary_insights` hits that on every single write —
+    # `metadata` is declared `map<string, string>` while `from_pylist` infers
+    # `struct<...>` from the Python dict, so unification raises
+    #
+    #     Unable to merge: Field metadata has incompatible types:
+    #     map<string, string> vs struct<extractive: string>
+    #
+    # ...and `generator`, `support`, `referenced_authorities` and `scores` all
+    # silently lose their new nested fields as collateral. Struct widening was
+    # never broken; one map-typed column was poisoning it.
+    #
+    # Per field, an incompatible column falls back to its declared type — which
+    # is exactly the pre-existing behaviour for that column — and every other
+    # column still widens.
+    merged_fields: list[pa.Field] = []
+    for declared in schema:
+        if declared.name not in inferred.names:
+            merged_fields.append(declared)
+            continue
+        try:
+            unified_field = pa.unify_schemas(
+                [pa.schema([declared]), pa.schema([inferred.field(declared.name)])],
+                promote_options="permissive",
+            ).field(declared.name)
+        except Exception:
+            # A genuine type conflict between batch and table is not something to
+            # paper over here; the cast then behaves exactly as it did before.
+            logger.debug("delta_schema_field_unify_skipped", field=declared.name, exc_info=True)
+            merged_fields.append(declared)
+            continue
+        merged_fields.append(unified_field)
+
+    # Never introduce a *top-level* column from inside a widening helper: only
+    # fields already declared by `schema` are carried above, so the surface can
+    # gain nested fields but not columns. The Delta sink has already established
+    # the batch's keys are a subset of the table's; the Iceberg sink checks
+    # afterwards and drops to inference, which is how a new column reaches its
+    # catalog loudly.
+    return pa.schema(merged_fields)
 
 
 def _delta_ready_rows(

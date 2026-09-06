@@ -263,6 +263,84 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             # The pre-existing row keeps its shape; widening the schema did not rewrite it.
             self.assertIsNone(rows[without.document_id]["metadata"].get("regeste"))
 
+    def test_a_new_generator_field_survives_a_commentary_insights_write(self) -> None:
+        """The second #871 route: one map column was poisoning widening for all of them.
+
+        `published_commentary_insights` is written with a hand-maintained
+        `schema_override`, and `generator` is a plain `dict[str, Any]` on the model —
+        so a producer adding a key needs no code change at all to hit this.
+
+        The mechanism was NOT that struct widening failed. `pa.unify_schemas` merges
+        struct fields correctly. It is all-or-nothing across the schema, and this
+        surface declares `metadata` as `map<string, string>` while `from_pylist`
+        infers `struct<...>` from the Python dict:
+
+            Unable to merge: Field metadata has incompatible types:
+            map<string, string> vs struct<extractive: string>
+
+        That raised on every single write, so the helper returned the un-widened
+        schema and `generator`, `support`, `referenced_authorities` and `scores` all
+        lost their nested fields as collateral.
+
+        A FRESH table, deliberately — the issue reports this route as worse than the
+        append defect because it drops the field even on first write.
+        """
+        import dataclasses
+
+        import deltalake
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            insights_uri = os.path.join(temp_dir, "published_commentary_insights")
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                    published_commentary_insights_uri=insights_uri,
+                )
+            )
+
+            base = build_commentary_insight()
+            extended = dataclasses.replace(
+                base,
+                generator={**base.generator, "run_id": "run_xyz"},
+            )
+            sink.persist_commentary_insights([extended])
+
+            written = deltalake.DeltaTable(insights_uri).to_pyarrow_table().to_pylist()[0]
+            self.assertEqual(written["generator"].get("run_id"), "run_xyz")
+            # The declared fields are untouched — widening added, it did not replace.
+            self.assertEqual(written["generator"]["name"], base.generator["name"])
+
+    def test_an_incompatible_column_does_not_abandon_widening_for_the_others(self) -> None:
+        """`metadata` stays a map; that must cost only `metadata` (#871).
+
+        Guard for the per-field unification specifically. Restore the whole-schema
+        `pa.unify_schemas` and this fails, because the map/struct conflict returns the
+        original schema for every column.
+        """
+        import pyarrow as pa
+
+        from document_intelligence.persist.sinks import (
+            _COMMENTARY_INSIGHTS_ARROW_SCHEMA,
+            _widen_for_new_nested_fields,
+        )
+
+        rows = [
+            {
+                "generator": {"name": "x", "version": "v1", "run_id": "run_xyz"},
+                # The column that raises on unification: declared map, inferred struct.
+                "metadata": {"extractive": "yes"},
+            }
+        ]
+        widened = _widen_for_new_nested_fields(_COMMENTARY_INSIGHTS_ARROW_SCHEMA, rows)
+
+        self.assertIn("run_id", [f.name for f in widened.field("generator").type])
+        # The incompatible column keeps its declared type rather than being coerced.
+        self.assertEqual(widened.field("metadata").type, pa.map_(pa.string(), pa.string()))
+        # And no top-level column was invented.
+        self.assertEqual(set(widened.names), set(_COMMENTARY_INSIGHTS_ARROW_SCHEMA.names))
+
     def test_an_optional_provenance_field_survives_append_to_an_existing_table(self) -> None:
         """The loss is not about `metadata` — it is about every struct column (#871).
 
