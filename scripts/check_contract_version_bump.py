@@ -62,12 +62,66 @@ def load_manifest_version_from_git(ref: str) -> str | None:
     return data["version"].strip()
 
 
+def uncommitted_locked_paths() -> list[str]:
+    """Locked contract paths modified in the working tree but not yet committed.
+
+    This guard compares COMMITS (`base...head`), which is correct in CI — the
+    checkout is clean, so the commit range is the whole change. Locally it is a
+    trap: a developer who has edited `contracts/api/*` but not committed gets
+    "No locked contract files changed; version bump guard skipped", which reads
+    as a pass over work the guard never looked at. That is exactly the class of
+    silent abstention this repo keeps getting bitten by, and it bit here: the
+    first local run of this gate on a real contract change reported "skipped".
+    """
+    proc = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return []
+    paths: list[str] = []
+    for line in proc.stdout.splitlines():
+        # Porcelain v1: 2 status chars, a space, then the path. Renames carry
+        # "old -> new"; the destination is what matters here.
+        path = line[3:].strip()
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        path = path.strip('"')
+        if path.startswith(LOCKED_PREFIXES):
+            paths.append(path)
+    return sorted(set(paths))
+
+
 def evaluate(base: str, head: str) -> int:
     changed_files = changed_files_between(base, head)
     locked_changed = [p for p in changed_files if p.startswith(LOCKED_PREFIXES)]
 
+    # Reported whatever the committed verdict is, so a local run can never
+    # present a clean result over edits it did not examine.
+    pending = [p for p in uncommitted_locked_paths() if p not in locked_changed]
+    if pending:
+        print(
+            "⚠️  NOT EVALUATED: uncommitted changes to locked contract paths.\n"
+            "    This guard compares commits, so these are invisible to it:",
+            file=sys.stderr,
+        )
+        for path in pending:
+            print(f"      - {path}", file=sys.stderr)
+        print(
+            "    Commit them and re-run; the result below covers committed work only.",
+            file=sys.stderr,
+        )
+
     if not locked_changed:
-        print("No locked contract files changed; version bump guard skipped.")
+        if pending:
+            print(
+                "DID-NOT-RUN: no locked contract files changed in the commit range, "
+                "but uncommitted ones exist (listed above)."
+            )
+        else:
+            print("No locked contract files changed; version bump guard skipped.")
         return 0
 
     print("Locked contract files changed:")
