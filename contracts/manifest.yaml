@@ -61,7 +61,7 @@ apis:
     # rather than being omitted, so consumers never have to distinguish "no
     # version" from "old server".
     # 0.26.0: adds the optional `stages` to the lifecycle-event response on the
-    # locked `/v1/runs/{run_id}/document-lifecycle` path (#903) — per-stage DI
+    # locked `/v1/runs/{run_id}/document-lifecycle` path (#905) — per-stage DI
     # timings and counts. Additive: `null` is the value for every row written
     # before this, and it means "document-intelligence recorded no ledger", NOT
     # "the pipeline ran no stages". A reader that ignores the field is unaffected;

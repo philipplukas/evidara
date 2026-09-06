@@ -1,4 +1,4 @@
-"""Add `document_lifecycle_events.stages` — per-stage DI timings (#903).
+"""Add `document_lifecycle_events.stages` — per-stage DI timings (#905).
 
 document-intelligence now records what each pipeline stage did for a document
 (`normalize`, `sectionize`, `extract`, `assemble`, `enrich`, `finalize`: duration

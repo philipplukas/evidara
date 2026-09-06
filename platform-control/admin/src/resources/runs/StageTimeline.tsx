@@ -3,7 +3,7 @@
 /**
  * `StageTimeline` — what document-intelligence actually did to one document.
  *
- * Until #903 a document's whole journey through the pipeline was visible as
+ * Until #905 a document's whole journey through the pipeline was visible as
  * three status transitions, so "where did the time go" and "which stage dropped
  * it" had no answer on any operator surface. This renders the per-stage ledger
  * that `document.processed` now carries.
@@ -13,7 +13,7 @@
  *
  * - **A missing ledger renders as a stated absence, never as an empty timeline.**
  *   `stages === null` means document-intelligence recorded nothing — an event
- *   from before #903, or a producer that emits none. Drawing six empty rows
+ *   from before #905, or a producer that emits none. Drawing six empty rows
  *   would claim the pipeline ran and did nothing.
  * - **A missing count renders as a dash, never as `0`.** `items_in`/`items_out`
  *   are absent when the stage did not measure them. `0 → 0` is a claim about the

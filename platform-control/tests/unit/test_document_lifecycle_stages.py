@@ -1,4 +1,4 @@
-"""The DI stage ledger survives the crossing into platform-control (#903).
+"""The DI stage ledger survives the crossing into platform-control (#905).
 
 document-intelligence records what each pipeline stage did and denormalises it
 onto `document.processed`. These tests cover the receiving half: that it is
@@ -68,7 +68,7 @@ async def test_a_producer_that_sends_no_ledger_stores_null_not_an_empty_list(ses
     """The load-bearing case.
 
     `[]` is a claim that the pipeline ran no stages. NULL is "we recorded none".
-    Every row written before #903 is NULL, and every event from an older
+    Every row written before #905 is NULL, and every event from an older
     document-intelligence produces NULL. Collapsing the two would turn "never
     recorded" into "nothing happened" — the silent-zero failure this repo has
     already paid for in #605, #675 and #713.

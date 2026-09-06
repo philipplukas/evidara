@@ -149,7 +149,7 @@ class ProcessingManifest:
     # take opposite remedies (replay vs. implement the missing class). Storing them in one
     # column is what would make the queue undrainable.
     quarantine: dict[str, Any] | None = None
-    #: Per-stage timings and counts for this document (#903). Timings and counts
+    #: Per-stage timings and counts for this document (#905). Timings and counts
     #: ONLY — a stage entry does not yet say what it removed from the text
     #: (footnote apparatus, page furniture, a lifted Randtitel, a dropped
     #: citation). That is ADR-0044's subject. An empty list therefore means "not

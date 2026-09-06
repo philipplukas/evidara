@@ -138,7 +138,7 @@ class DocumentLifecycleEventResponse(BaseModel):
     reason_summary: str | None
     search_disposition: str | None
     #: `null` means document-intelligence recorded no stage ledger for this
-    #: document — an event from before #903, or a producer that emits none. It
+    #: document — an event from before #905, or a producer that emits none. It
     #: does NOT mean the pipeline ran no stages, and a client must render it as
     #: "not recorded" rather than as an empty or zeroed timeline.
     stages: list[PipelineStage] | None = None

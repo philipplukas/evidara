@@ -225,7 +225,7 @@ class ProcessingPipeline:
             ),
         ]
 
-        # Per-stage timings and counts for THIS document (#903). The run was
+        # Per-stage timings and counts for THIS document (#905). The run was
         # previously observable only as its three status transitions, so "where
         # did the time go" and "which stage dropped it" were unanswerable per
         # document on every surface.

@@ -895,7 +895,7 @@ export default function RunDetailSectionsV2({
 }
 
 /**
- * What document-intelligence did to each document, stage by stage (#903).
+ * What document-intelligence did to each document, stage by stage (#905).
  *
  * Reads the same `run-document-lifecycle` fetch as the section above rather than
  * issuing its own — the ledger rides on those events, so a second request would
