@@ -19,7 +19,8 @@ class ProcessingStatusUpdate(TimestampMixin, Base):
     status: Mapped[ProcessingStatus] = mapped_column(
         Enum(
             ProcessingStatus,
-            native_enum=False,
+            native_enum=True,
+            name="processing_status",
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         default=ProcessingStatus.ACCEPTED,
