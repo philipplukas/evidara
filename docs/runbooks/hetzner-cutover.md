@@ -5,6 +5,20 @@ Last reviewed: 2026-07-01
 Last verified: Not yet verified
 Applies to: dev, staging, prod
 
+> ## ⚠️ SUPERSEDED (2026-09-06, ADR-0055)
+>
+> **Do not follow this runbook.** It describes ADR-0029 Slice 6 as originally planned: a
+> cutover onto `k8s/gitops/{dev,staging,prod}` with Vault-backed `ExternalSecret`s and
+> `evidare-*` namespaces. None of that was adopted. The cluster runs one namespace
+> (`evidara`), plain Kubernetes Secrets created by `infra/hetzner/deploy-stage4.sh`, and
+> in-cluster stores. `k8s/gitops/` was deleted in ADR-0055.
+>
+> The live procedure is [`infra/hetzner/README.md`](../../infra/hetzner/README.md),
+> stages 1–9. Argo CD syncs `infra/hetzner/apps` (stage 9).
+>
+> Kept for the history of what was intended, and because the store-provisioning and
+> validation steps still record real decisions.
+
 Step-by-step for ADR-0029 **Slice 6** — bringing Evidara up on the self-hosted Hetzner
 cluster and retiring GCP. Slices 1–5 are done in-repo (NATS, MinIO/S3, k8s manifests);
 this runbook is the operator sequence that uses them.

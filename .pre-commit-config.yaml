@@ -65,12 +65,12 @@ repos:
         pass_filenames: false
         files: ^(README\.md|vendor/platform-contract\.yaml)$
 
-      - id: validate-k8s-gitops-kustomize
-        name: Validate k8s GitOps kustomizations
-        entry: bash scripts/validate_k8s_gitops_kustomize.sh
+      - id: validate-hetzner-apps-kustomize
+        name: Validate the Hetzner apps kustomization
+        entry: bash scripts/validate_hetzner_apps_kustomize.sh
         language: system
         pass_filenames: false
-        files: ^k8s/gitops/
+        files: ^infra/hetzner/apps/
 
       # An IdP values file is the worst place to repeat #792 (a placeholder MinIO
       # root password committed to main). Also catches the ExternalDomain/ingress-host

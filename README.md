@@ -153,7 +153,8 @@ dependencies, so run `npm ci` in each surface first.
 | [`scripts/`](scripts/) | Shared tooling and the repo's quality gates |
 | [`structurizr/`](structurizr/) | `workspace.dsl` — the canonical architecture model |
 | [`vendor/`](vendor/) | Vendored external pins (see the MacConfig section below) |
-| [`k8s/gitops/`](k8s/gitops/), [`service-template/`](service-template/) | Argo CD Kustomize roots and manifest conventions |
+| [`service-template/`](service-template/) | Manifest conventions for a new service |
+| [`infra/hetzner/apps/`](infra/hetzner/apps/) | The Kustomize root Argo CD syncs into the cluster (ADR-0055) |
 
 Contracts live at the repo root only, never inside a component (ADR-0004). Repo-wide conventions —
 including the per-surface quality gates — are in [`AGENTS.md`](AGENTS.md).

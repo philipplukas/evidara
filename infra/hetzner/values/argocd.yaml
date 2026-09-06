@@ -1,0 +1,72 @@
+# Argo CD for the self-hosted Evidara cluster (ADR-0055).
+#
+# Scope: this controller syncs ONE Application — `infra/hetzner/apps` into the
+# `evidara` namespace. It is not a multi-tenant platform install, so most of the
+# chart's surface is deliberately off.
+#
+# Installed by `infra/hetzner/deploy-argocd.sh`.
+
+global:
+  # k3s single-node control plane plus one GPU worker. Nothing here needs HA, and
+  # a 3-replica Redis on a 2-node cluster spends memory to buy nothing.
+  domain: argocd.ts.veyo.dev
+
+configs:
+  params:
+    # Terminate TLS at the tailnet ingress, not in argocd-server. Matches how
+    # grafana/prometheus/minio are exposed here — one place does TLS.
+    server.insecure: true
+  cm:
+    # Argo CD's own health assessment for a Job is "did it complete", which is
+    # exactly the PreSync semantics the migrate hook relies on. Left at default;
+    # named here so the reliance is visible.
+    timeout.reconciliation: 180s
+    # The repository is private; credentials are created imperatively by
+    # deploy-argocd.sh (same create-once pattern as the GHCR pull secret).
+  rbac:
+    # Single operator. `admin` is the only account, and it is reachable only over
+    # the tailnet — see the ingress below.
+    policy.default: role:admin
+
+server:
+  ingress:
+    enabled: true
+    ingressClassName: tailnet-ingress
+    hostname: argocd.ts.veyo.dev
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/group: Tailnet
+      gethomepage.dev/name: Argo CD
+      gethomepage.dev/icon: argocd.png
+      gethomepage.dev/description: >-
+        What the cluster is actually running versus what main says it should be.
+        Login secret argocd/argocd-initial-admin-secret.
+    tls:
+      - hosts:
+          - argocd.ts.veyo.dev
+
+# Argo CD ships a bundled Redis. Keep the single-replica default; HA would need a
+# third node and buys nothing for one Application.
+redis-ha:
+  enabled: false
+
+# Not used, and genuinely off: no notification integrations are wired, and there is
+# no SSO — the UI is reachable only over the tailnet with the local admin account.
+# Both keys exist in chart 7.7.11 and both take effect (verified: neither pod runs).
+notifications:
+  enabled: false
+dex:
+  enabled: false
+
+# NOT disabled, deliberately not pretended otherwise.
+#
+# `applicationSet.enabled` DOES NOT EXIST in chart 7.7.11 — the `applicationSet`
+# block has no `enabled` key at all, so setting one is silently ignored and the
+# controller runs regardless. This file carried exactly that dead key on the first
+# install; the pod was running while the values said it was off, which is ADR-0052
+# in a config file (a knob nothing reads still reads as configured).
+#
+# The ApplicationSet controller is therefore installed and idle. That is
+# acceptable — it generates nothing without an `ApplicationSet` resource, and this
+# install has one hand-written `Application`. Recorded here so the extra pod is a
+# known cost rather than a mystery.

@@ -108,8 +108,8 @@ jobs:
         run: |
           python scripts/check_platform_contract_vendor.py
 
-      - name: Validate k8s GitOps kustomizations
-        run: bash scripts/validate_k8s_gitops_kustomize.sh
+      - name: Validate the Hetzner apps kustomization
+        run: bash scripts/validate_hetzner_apps_kustomize.sh
 
       - name: Validate Zitadel deployment values
         # Deliberately WITHOUT --render. This job runs on the self-hosted ARC pool
