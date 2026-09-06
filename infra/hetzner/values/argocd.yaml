@@ -50,13 +50,23 @@ server:
 redis-ha:
   enabled: false
 
-# Not used: this install has no multi-repo dashboards and no notification
-# integrations wired. Turning them off keeps the pod count honest about what is
-# actually load-bearing rather than leaving idle components to be mistaken for
-# configured ones (ADR-0052).
+# Not used, and genuinely off: no notification integrations are wired, and there is
+# no SSO — the UI is reachable only over the tailnet with the local admin account.
+# Both keys exist in chart 7.7.11 and both take effect (verified: neither pod runs).
 notifications:
   enabled: false
 dex:
   enabled: false
-applicationSet:
-  enabled: false
+
+# NOT disabled, deliberately not pretended otherwise.
+#
+# `applicationSet.enabled` DOES NOT EXIST in chart 7.7.11 — the `applicationSet`
+# block has no `enabled` key at all, so setting one is silently ignored and the
+# controller runs regardless. This file carried exactly that dead key on the first
+# install; the pod was running while the values said it was off, which is ADR-0052
+# in a config file (a knob nothing reads still reads as configured).
+#
+# The ApplicationSet controller is therefore installed and idle. That is
+# acceptable — it generates nothing without an `ApplicationSet` resource, and this
+# install has one hand-written `Application`. Recorded here so the extra pod is a
+# known cost rather than a mystery.
