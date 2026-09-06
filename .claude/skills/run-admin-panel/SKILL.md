@@ -1,6 +1,6 @@
 ---
 name: run-admin-panel
-description: Launch and drive the platform-control admin panel (Next.js react-admin ops UI) end-to-end against the real backend — to see a change working, screenshot a view, or verify list/table behaviour. Use when asked to run/start/screenshot the admin panel, or to confirm an admin change works in the real app (Jurisdictions/Authorities/Sources/Runs lists, pagination, table overflow). Covers Node 22 setup, backend bring-up, the auth env vars, hash routing, and — the hard-won part — why you must drive it with Playwright (prod build), not the Chrome-extension automation against `npm run dev`.
+description: Launch and drive the platform-control admin panel (Next.js react-admin ops UI) end-to-end against the real backend — to see a change working, screenshot a view, or verify list/table behaviour. Use when asked to run/start/screenshot the admin panel, or to confirm an admin change works in the real app (Jurisdictions/Authorities/Sources/Runs lists, pagination, table overflow). Covers Node 22 setup, backend bring-up, the two auth traps (role vars and the keyless-dev opt-in), hash routing, and — the hard-won part — why you must drive it with Playwright rather than the Chrome-extension automation, which is the only path that needs a production build.
 ---
 
 # Run the platform-control admin panel
@@ -35,6 +35,23 @@ bash scripts/platform-control-demo.sh bootstrap   # DB + migrations + seed
 bash scripts/platform-control-demo.sh api         # uvicorn platform_control.main:app on :8000
 ```
 
+Or start Postgres + API + admin in one command, both with reload:
+
+```bash
+bash scripts/platform-control-demo.sh dev         # API :8000, admin :3000, Ctrl-C stops both
+```
+
+**Auth fails closed.** With no API key configured, every protected route answers **503** and the
+admin renders empty lists — which looks like a data bug and is a config one. The `api` and `dev`
+targets default `PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1` for you; if you start uvicorn
+by hand, set it yourself. Local only. Confirm with a protected route, not `/health`, which is
+unauthenticated and answers 200 either way:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+  'http://127.0.0.1:8000/v1/reference-data/jurisdictions?limit=1'   # want 200, not 503
+```
+
 Docker alternative: `docker compose -f docker-compose.local.yml --profile apps up platform-control-api`.
 
 **If you need to see the run queue's triage UI**, seed the missing states first:
@@ -67,12 +84,20 @@ bash scripts/platform-control-demo.sh admin   # = npm run dev, http://localhost:
 
 (Set the two `NEXT_PUBLIC_*` vars in `platform-control/admin/.env.local` first.)
 
-## 3b. For automated driving / screenshots → PRODUCTION build, then Playwright
+## 3b. For automated driving / screenshots → Playwright
 
-**Do NOT try to drive `npm run dev` with the Chrome-extension automation.** This Next 16 /
-React 19 dev server never reports `document_idle` (HMR keeps it busy), so
-`claude-in-chrome` screenshot/read_page calls time out ("Script injection timed out",
-"waited 45000ms for document_idle"). A production build removes HMR:
+**The rule is about the Chrome extension, not about automation generally.**
+
+- **Playwright against `npm run dev` — works, and is the fast path.** Playwright does not wait
+  on `document_idle`, so HMR does not block it. You get screenshots and DOM assertions with
+  **no build step per iteration**. Prefer this while iterating (verified 2026-09-06 against
+  `platform-control-demo.sh dev`).
+- **`claude-in-chrome` against `npm run dev` — does not work.** This Next 16 / React 19 dev
+  server never reports `document_idle` (HMR keeps it busy), so screenshot/read_page calls time
+  out ("Script injection timed out", "waited 45000ms for document_idle").
+
+So: reach for a production build only when you must use the Chrome-extension path, or when you
+are specifically testing the built artifact. A production build removes HMR:
 
 ```bash
 cd platform-control/admin
@@ -122,6 +147,17 @@ assertions. The invariants are: lists are non-empty, the pager reports a real to
 
 - System node → dishonest gates and build breakage; always `nvm use`.
 - Missing `NEXT_PUBLIC_*` role vars → empty lists.
-- Chrome-extension automation vs `npm run dev` → injection timeouts; use prod build + Playwright.
+- Chrome-extension automation vs `npm run dev` → injection timeouts. Playwright against the dev
+  server is fine and avoids a build per iteration; only the extension path needs a prod build.
+- API auth fails closed: without `PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1` every
+  protected route is 503 and the admin looks like it has no data. `/health` stays 200, so it
+  does not reveal this — probe a protected route.
+- Two admins, two ports: dev server `:3000`, compose prod build `:3100`. Reading the stale one
+  is the usual reason "my change did not show up".
 - Reference-data lists (jurisdictions/authorities/sources) return the FULL array; the admin
   paginates client-side (`applyClientListWindow`), so the total count is the array length.
+
+## Related
+
+- [docs/setup/local-dev-loops.md](../../../docs/setup/local-dev-loops.md) — which stack to run
+  (inner loop vs the compose integration stack) and why the compose one is not a dev loop.

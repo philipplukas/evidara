@@ -30,6 +30,10 @@ Commands:
                 failed / cancelled) so the admin run queue has something to triage.
                 LOCAL ONLY - refuses unless PLATFORM_CONTROL_ENVIRONMENT=development.
   bootstrap     Run up + sync + migrate + seed
+  dev           The inner dev loop: Postgres + API + admin, all with reload.
+                Admin on :3000, API on :8000. Ctrl-C stops both. Use this for
+                writing code; use docker-compose.local.yml --profile apps for
+                acceptance runs and e2e (see docs/setup/local-dev-loops.md).
   api           Start the platform-control API with reload
   admin         Start the platform-control/admin app
   health        Call the local /health endpoint
@@ -133,8 +137,14 @@ seed_demo_runs() {
     --i-know-this-writes-fake-runs
 }
 
+# Auth fails closed: with no API key configured, EVERY protected route answers
+# 503 and the admin renders empty lists - which reads as a data bug, not a config
+# one. `docker-compose.local.yml` already opts the local stack into the keyless
+# path by name; this script did not, so the two local paths disagreed and only
+# the compose one worked. LOCAL ONLY - never set in a deployment.
 start_api() {
   require_cmd uv
+  export PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED="${PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED:-1}"
   run_in_platform_control uv run uvicorn platform_control.main:app --reload --app-dir src
 }
 
@@ -147,6 +157,69 @@ check_health() {
   require_cmd curl
   curl -fsS http://127.0.0.1:8000/health
   echo
+}
+
+# The inner dev loop in one command: Postgres in Docker, API and admin on the
+# host with reload. Three terminals in the right order was the previous answer,
+# and the order matters - the admin's BFF proxies to :8000, so an admin started
+# first serves a wall of connection errors that look like real failures.
+#
+# This is deliberately NOT `docker-compose.local.yml --profile apps`: that stack
+# builds both services from Dockerfiles with no source mounts and no --reload, so
+# every edit costs a rebuild. It is the integration stack (NATS, MinIO,
+# OpenSearch, worker, projection bridge) and stays the right tool for acceptance
+# runs and e2e. See docs/setup/local-dev-loops.md.
+start_dev() {
+  require_cmd uv
+  require_cmd npm
+  # setsid puts each child in its own process group so the trap can signal the
+  # WHOLE tree. Without it, `uv run uvicorn` and `npm run dev` leave orphaned
+  # grandchildren still holding :8000 and :3000 after Ctrl-C, and the next `dev`
+  # fails with "address already in use" for reasons nothing on screen explains.
+  require_cmd setsid
+  local api_pid="" admin_pid=""
+
+  stop_dev() {
+    echo
+    echo "Stopping dev stack..."
+    # Negative PID signals the process GROUP. setsid made each child a group
+    # leader, so its PID doubles as its PGID.
+    [ -n "$admin_pid" ] && kill -TERM -- "-$admin_pid" 2>/dev/null || true
+    [ -n "$api_pid" ] && kill -TERM -- "-$api_pid" 2>/dev/null || true
+    wait 2>/dev/null || true
+  }
+  trap stop_dev INT TERM EXIT
+
+  compose_up
+  wait_for_postgres
+
+  setsid bash "$0" api > >(sed -u 's/^/[api]   /') 2>&1 &
+  api_pid=$!
+
+  echo "Waiting for the API on :8000..."
+  for _ in $(seq 1 40); do
+    if curl -fsS -m 2 http://127.0.0.1:8000/health >/dev/null 2>&1; then break; fi
+    sleep 1
+  done
+  if ! curl -fsS -m 2 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+    echo "API did not become healthy on :8000 - see the [api] lines above." >&2
+    return 1
+  fi
+  echo "API is healthy."
+
+  setsid bash "$0" admin > >(sed -u 's/^/[admin] /') 2>&1 &
+  admin_pid=$!
+
+  cat <<'BANNER'
+
+  Dev loop is up. Edits reload automatically - no rebuild, no deploy.
+    admin  http://localhost:3000     (HMR; compose serves its own build on :3100)
+    api    http://127.0.0.1:8000     (uvicorn --reload)
+
+  Ctrl-C stops both.
+
+BANNER
+  wait
 }
 
 bootstrap() {
@@ -189,6 +262,9 @@ case "$COMMAND" in
     ;;
   bootstrap)
     bootstrap
+    ;;
+  dev)
+    start_dev
     ;;
   api)
     start_api
