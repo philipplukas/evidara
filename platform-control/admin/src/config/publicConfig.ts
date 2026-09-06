@@ -61,6 +61,14 @@ export type PublicConfig = {
    * behavior.
    */
   readonly adminAllowedRoles: readonly string[];
+  /**
+   * Commit SHA this bundle was built from (`NEXT_PUBLIC_BUILD_SHA`), or
+   * `undefined` outside a released image. No default: an invented version is
+   * worse than none, because it looks like an answer.
+   */
+  readonly buildSha: string | undefined;
+  /** RFC 3339 UTC build timestamp (`NEXT_PUBLIC_BUILD_DATE`), or `undefined`. */
+  readonly buildDate: string | undefined;
 };
 
 function trimToUndefined(value: string | undefined): string | undefined {
@@ -89,6 +97,8 @@ export function buildPublicConfig(env: EnvSource = process.env): PublicConfig {
     legalSearchBaseUrlOrUndefined,
     minioConsoleBaseUrl: trimToUndefined(env.NEXT_PUBLIC_MINIO_CONSOLE_URL),
     defaultUserRole: env.NEXT_PUBLIC_USER_ROLE,
+    buildSha: trimToUndefined(env.NEXT_PUBLIC_BUILD_SHA),
+    buildDate: trimToUndefined(env.NEXT_PUBLIC_BUILD_DATE),
     adminAllowedRoles: parseAllowedRoles(rawAllowedRoles),
   };
 }
@@ -110,6 +120,8 @@ export function buildPublicConfig(env: EnvSource = process.env): PublicConfig {
 const NEXT_PUBLIC_ENV: EnvSource = {
   NEXT_PUBLIC_LEGAL_SEARCH_URL: process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL,
   NEXT_PUBLIC_MINIO_CONSOLE_URL: process.env.NEXT_PUBLIC_MINIO_CONSOLE_URL,
+  NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA,
+  NEXT_PUBLIC_BUILD_DATE: process.env.NEXT_PUBLIC_BUILD_DATE,
   NEXT_PUBLIC_USER_ROLE: process.env.NEXT_PUBLIC_USER_ROLE,
   NEXT_PUBLIC_ADMIN_ALLOWED_ROLES: process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES,
 };

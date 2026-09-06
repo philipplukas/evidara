@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.24.0
+  version: 0.25.0
 paths:
   /health:
     get:
@@ -3755,6 +3755,20 @@ components:
       - default_enabled
       - source
       title: BlueprintTemplateEnablementResponse
+    BuildInfo:
+      properties:
+        git_sha:
+          type: string
+          title: Git Sha
+        build_date:
+          type: string
+          title: Build Date
+      type: object
+      required:
+      - git_sha
+      - build_date
+      title: BuildInfo
+      description: Provenance of the running process.
     BundeslandHttpAcquisitionSpec:
       properties:
         tenant_id:
@@ -5860,10 +5874,13 @@ components:
         service:
           type: string
           title: Service
+        build:
+          $ref: '#/components/schemas/BuildInfo'
       type: object
       required:
       - status
       - service
+      - build
       title: HealthResponse
     HierarchySyncCountsResponse:
       properties:

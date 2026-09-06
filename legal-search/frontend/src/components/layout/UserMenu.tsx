@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/popover";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { AnalyticsEvent, track } from "@/lib/analytics";
+import { formatBuildLabel, getBuildInfo } from "@/lib/build-info";
 import { SUPPORTED_LOCALES, useLocale } from "@/lib/locale-context";
 
 interface UserMenuProps {
@@ -33,6 +34,8 @@ export function UserMenu({ hasControlPanelAccess }: UserMenuProps) {
   const tMenu = useTranslations("userMenu");
   const { theme, mounted, toggle: toggleTheme } = useThemePreference();
   const { locale, setLocale } = useLocale();
+  // Module-level constants underneath, so this is a plain read, not state.
+  const buildInfo = getBuildInfo();
 
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,6 +137,28 @@ export function UserMenu({ hasControlPanelAccess }: UserMenuProps) {
             {copied ? tShare("linkCopied") : tShare("copyLink")}
           </button>
         </MenuRow>
+
+        {/*
+          Build provenance. Renders only when the bundle was built from a tagged
+          image — `getBuildInfo()` is null under `npm run dev`, and an empty
+          version line reads as "no version" rather than "not applicable".
+
+          Deliberately not translated: a commit SHA and an ISO date are the same
+          in every locale, and routing them through i18n would imply otherwise.
+        */}
+        {buildInfo ? (
+          <div className="border-t border-border/60 pt-2">
+            <a
+              href={buildInfo.commitUrl}
+              target="_blank"
+              rel="noreferrer"
+              title={buildInfo.sha}
+              className="font-mono text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              {formatBuildLabel(buildInfo)}
+            </a>
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

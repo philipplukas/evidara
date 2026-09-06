@@ -23,6 +23,13 @@ COPY --from=build /app/dist ./dist
 # Vocabularies needed at runtime (/contracts/vocabularies/*)
 COPY contracts /contracts
 
+
+# Build provenance. Same value the image is tagged with in `runtime-images.yml`.
+ARG GIT_SHA=""
+ARG BUILD_DATE=""
+ENV EVIDARA_GIT_SHA=$GIT_SHA
+ENV EVIDARA_BUILD_DATE=$BUILD_DATE
+
 EXPOSE 8080
 
 CMD ["node", "dist/main.js"]

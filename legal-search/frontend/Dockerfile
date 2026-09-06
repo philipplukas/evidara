@@ -29,6 +29,18 @@ RUN npm ci
 
 COPY legal-search/frontend ./
 
+
+# Build provenance, rendered in the footer so "what is actually deployed?" is
+# answerable from the browser. These MUST be baked here, before `npm run build`:
+# NEXT_PUBLIC_* only reaches the client bundle when Next sees it at build time, so
+# a runtime Deployment env would leave the footer permanently blank.
+ARG GIT_SHA=""
+ARG BUILD_DATE=""
+ENV EVIDARA_GIT_SHA=$GIT_SHA
+ENV EVIDARA_BUILD_DATE=$BUILD_DATE
+ENV NEXT_PUBLIC_BUILD_SHA=$GIT_SHA
+ENV NEXT_PUBLIC_BUILD_DATE=$BUILD_DATE
+
 RUN npm run build
 
 EXPOSE 8080
