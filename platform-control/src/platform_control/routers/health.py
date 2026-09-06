@@ -8,6 +8,7 @@ from platform_control.database import get_session_maker
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.observability.metrics import CONTENT_TYPE_LATEST, render_latest
+from platform_control.schema_revision import SchemaRevisionStatus, read_schema_revision
 from platform_control.schemas.health import DependencyCheck, HealthResponse, ReadinessResponse
 
 router = APIRouter(tags=["health"])
@@ -54,7 +55,22 @@ async def get_readiness() -> JSONResponse:
     try:
         async with session_maker() as session:
             await session.execute(text("SELECT 1"))
-        checks["database"] = DependencyCheck(status="ok")
+            checks["database"] = DependencyCheck(status="ok")
+
+            # Reachable is not the same as usable. A pod whose code expects a
+            # newer schema than the database has will pass `SELECT 1`, serve
+            # traffic, and fail only at the statement that needs the new column
+            # or enum label — which is how a 2026-09-06 pin bump rolled an API
+            # ahead of its migration with every signal reading green.
+            revision = await read_schema_revision(session)
+            checks["schema_revision"] = DependencyCheck(
+                # UNKNOWN is reported, never asserted: it is the normal answer
+                # under `create_all`, and degrading on it would make every test
+                # suite unready. Only a real MISMATCH takes the pod out of
+                # service.
+                status="error" if revision.status is SchemaRevisionStatus.MISMATCH else "ok",
+                detail=revision.detail,
+            )
     except Exception as error:  # pragma: no cover - defensive runtime safety
         checks["database"] = DependencyCheck(
             status="error",
