@@ -148,8 +148,17 @@ bash scripts/platform-control-demo.sh admin-sync
 bash scripts/platform-control-demo.sh admin
 ```
 
-The admin app runs on `http://127.0.0.1:3100` by default and proxies
-`/api/platform-control/*` to the local FastAPI backend.
+The admin app runs on `http://localhost:3000` (`next dev`) and proxies
+`/api/platform-control/*` to the local FastAPI backend. `:3100` is a **different** admin —
+the production build served by `docker-compose.local.yml`. If both are up it is easy to read
+the stale one; check the port before concluding a change did not take. See
+[local-dev-loops.md](local-dev-loops.md).
+
+To start Postgres, the API and the admin together, both with reload:
+
+```bash
+bash scripts/platform-control-demo.sh dev
+```
 
 Today the code-managed admin covers the main operator slice:
 
