@@ -33,29 +33,8 @@ resources:
 # at d695b990 while three newer complete sets existed). Confirm with
 # `gh run list --workflow=runtime-images.yml --commit <sha>`.
 #
-# ── THE RUN CONCLUSION IS NOT THE PIN CRITERION. THE TAGS ARE. ──
-#
-# This pin is the first to be set from a run whose overall conclusion is
-# `failure`, and that is deliberate — read this before "fixing" it.
-#
-# Until now the rule above read "pin the newest SHA with a green `push` run".
-# That rule silently acquired a second meaning when `marketing` joined
-# `runtime-images.yml` as an eighth image on 2026-09-04. Its GHCR package
-# (`ghcr.io/philipplukas/evidara-marketing`) is **not linked to this repository** —
-# `gh api user/packages/container/evidara-marketing --jq .repository` returns
-# `null` while all eight siblings return `philipplukas/evidara` — so the workflow's
-# `GITHUB_TOKEN` cannot push it even with `packages: write`, and every push fails
-# with `denied: permission_denied: read_package`. The `Runtime Images gate` job
-# aggregates all eight, so one unpushable image turns the whole run red.
-#
-# The six images pinned below built and pushed *successfully* on those same red
-# runs. Reading the conclusion instead of the registry is what held production at
-# 4dddce3c for 27 commits while every artifact needed to roll forward already
-# existed in GHCR. A rollup conclusion is evidence about eight images; this file
-# only deploys six.
-#
-# So the criterion is now explicit: **verify the six tags exist**, do not read the
-# run's conclusion.
+# Verify the tags, not just the run's conclusion. A green rollup is necessary but
+# it is not what this file depends on — these six tags existing in GHCR is:
 #
 #   for i in platform-control platform-control-admin legal-search-api \
 #            legal-search-frontend document-intelligence-document-service \
@@ -64,18 +43,26 @@ resources:
 #       --jq "[.[]|select(.metadata.container.tags[]? == \"<sha>\")]|length"
 #   done
 #
-# All six returned 1 for the SHA below before this pin was written.
+# Why that distinction is written down (2026-09-04 → 2026-09-06). `marketing`
+# joined `runtime-images.yml` as an eighth image, and its GHCR package was not
+# linked to this repository, so `GITHUB_TOKEN` could not push it even with
+# `packages: write` — every push failed `denied: permission_denied: read_package`.
+# `Runtime Images gate` aggregates all eight, so one unpushable image turned every
+# `main` run red while the six images below were building and pushing perfectly.
+# Production sat at 4dddce3c for 27 commits with every artifact it needed already
+# in the registry, because the rollup conclusion was read as the pin criterion.
 #
-# This exception expires the moment the marketing package is linked (package →
-# Package settings → Manage Actions access → add `philipplukas/evidara`, role
-# Write — a manual step, not a repo change; #881 tried to fix it in the Dockerfile
-# via `org.opencontainers.image.source` and could not, because GHCR only reads
-# that label on a push it accepts, and the push is what is denied). Once linked,
-# runs go green again and "newest green `push` run" becomes the correct rule
-# again. Do not treat a red run as routinely pinnable.
+# Two traps worth keeping: the failure is invisible on a PR, because PRs build
+# without pushing (#719 and the `push:` expression in `runtime-images.yml`), so it
+# surfaces only after merge. And it cannot be fixed from the repo — #881 tried, via
+# `org.opencontainers.image.source` in `marketing/Dockerfile`, which cannot work
+# because GHCR reads that label only on a push it accepts. The fix was linking the
+# package (Package settings → Manage Actions access → `philipplukas/evidara`,
+# Write). See #884.
 #
-# 4932ec2c (#881) is `main`'s tip at the time of this pin. Its run (34027393200)
-# is `failure` on `marketing` alone; the other seven image jobs are `success`.
+# 4932ec2c (#881) is `main`'s tip at the time of this pin. Run 34028538455 is green
+# across all eight image jobs — the first since the marketing package was linked —
+# and all six tags below were confirmed present in GHCR before this pin was written.
 #
 # What this pin adds over 4dddce3c (2026-09-04, 27 commits back). Almost none of it
 # is user-visible in `search.evidara.veyo.dev` — this is a correctness and operator
