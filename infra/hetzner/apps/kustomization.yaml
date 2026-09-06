@@ -33,58 +33,122 @@ resources:
 # at d695b990 while three newer complete sets existed). Confirm with
 # `gh run list --workflow=runtime-images.yml --commit <sha>`.
 #
-# 4dddce3c (#858) is the newest `main` commit that actually published images: all
-# seven image jobs are green on its push (run 33759401696), and all six tags below
-# were confirmed present in GHCR before this pin was written.
+# ── THE RUN CONCLUSION IS NOT THE PIN CRITERION. THE TAGS ARE. ──
 #
-# It is NOT `main`'s tip. The four commits after it (6d5dca3c, e4c38650, 4dd8d081,
-# 7cb76544) touch only `docs/`, `scripts/` and `.github/`, so `runtime-images.yml`
-# never started on their pushes and no image carries their SHA. Pinning the tip
-# would be unpullable — which is the trap the paragraph above describes, met for
-# real. When you bump this, pin the newest SHA with a green `push` run — which is
-# not always `main`'s tip.
+# This pin is the first to be set from a run whose overall conclusion is
+# `failure`, and that is deliberate — read this before "fixing" it.
 #
-# What this pin adds over 8759bec5 (2026-07-23, 35 commits back). User-visible in
-# `search.evidara.veyo.dev`:
-#   - a deep-linked search reaches the right parser (#822 / #829). Each URL search
-#     param had its own ad-hoc parse at every call site, so the same query string
-#     resolved differently depending on which component read it first.
-#   - the regeste renders as a headnote on document detail (#760 / #830), which is
-#     the first thing a lawyer reads on a court decision.
-#   - the BFF owns metadata visibility outright (#787 / #821) rather than splitting
-#     the rule across BFF and frontend — the AGENTS.md "one rule, one enforcer"
-#     failure, where the weaker of the two clients silently became the policy.
-# In the acquisition platform (not user-visible, but this is where the corpus comes
-# from): the LexFind cantonal rung goes from one canton to a working enumeration —
-# BE acceptance evidence (#814), `lexfind_api` promoted to LIVE (#815), whole-canton
-# enumeration with the run proving its own denominator (#818), the coverage ledger
-# that stores what a jurisdiction should hold (#819), a locator-less artifact no
-# longer collapsing onto one `document_id` (#831), an idempotent shard crawl whose
-# progress writes cannot be lost (#834), a temporal boolean no longer frozen at
-# capture time — the #661 trap (#837), a mirror that keeps proving it equals the
-# source (#845), and a FAILED dispatch that no longer publishes what it captured
-# (#858). Plus DI quarantine for a manifestation whose text is not law (#841).
+# Until now the rule above read "pin the newest SHA with a green `push` run".
+# That rule silently acquired a second meaning when `marketing` joined
+# `runtime-images.yml` as an eighth image on 2026-09-04. Its GHCR package
+# (`ghcr.io/philipplukas/evidara-marketing`) is **not linked to this repository** —
+# `gh api user/packages/container/evidara-marketing --jq .repository` returns
+# `null` while all eight siblings return `philipplukas/evidara` — so the workflow's
+# `GITHUB_TOKEN` cannot push it even with `packages: write`, and every push fails
+# with `denied: permission_denied: read_package`. The `Runtime Images gate` job
+# aggregates all eight, so one unpushable image turns the whole run red.
 #
-# NOT zero alembic delta. TWO forward revisions apply on rollout, and the migrate
+# The six images pinned below built and pushed *successfully* on those same red
+# runs. Reading the conclusion instead of the registry is what held production at
+# 4dddce3c for 27 commits while every artifact needed to roll forward already
+# existed in GHCR. A rollup conclusion is evidence about eight images; this file
+# only deploys six.
+#
+# So the criterion is now explicit: **verify the six tags exist**, do not read the
+# run's conclusion.
+#
+#   for i in platform-control platform-control-admin legal-search-api \
+#            legal-search-frontend document-intelligence-document-service \
+#            document-intelligence-consumer; do
+#     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"<sha>\")]|length"
+#   done
+#
+# All six returned 1 for the SHA below before this pin was written.
+#
+# This exception expires the moment the marketing package is linked (package →
+# Package settings → Manage Actions access → add `philipplukas/evidara`, role
+# Write — a manual step, not a repo change; #881 tried to fix it in the Dockerfile
+# via `org.opencontainers.image.source` and could not, because GHCR only reads
+# that label on a push it accepts, and the push is what is denied). Once linked,
+# runs go green again and "newest green `push` run" becomes the correct rule
+# again. Do not treat a red run as routinely pinnable.
+#
+# 4932ec2c (#881) is `main`'s tip at the time of this pin. Its run (34027393200)
+# is `failure` on `marketing` alone; the other seven image jobs are `success`.
+#
+# What this pin adds over 4dddce3c (2026-09-04, 27 commits back). Almost none of it
+# is user-visible in `search.evidara.veyo.dev` — this is a correctness and operator
+# roll, not a feature roll:
+#   - the operator panel becomes usable under pressure (#M16 / #873), and a run now
+#     renders what it refused, discarded and cannot prove (#634 / #861). Both are
+#     `platform-control-admin`, not the public search UI.
+#   - the wizard human gate expires into a terminal state instead of hanging
+#     forever (#560 / #844).
+# In the pipeline and acquisition platform:
+#   - the nested-field loss is fixed across every struct column and sink
+#     (#871 / #876). Deployed canonical tables were silently dropping every
+#     metadata key their first batch lacked. NOTE: #871 remains OPEN for a second,
+#     independent route through `persist_commentary_insights`' hand-maintained
+#     `_COMMENTARY_INSIGHTS_ARROW_SCHEMA`, which this pin does NOT fix.
+#   - the rescore store reads canonical Delta with credentials (#847 / #860), and
+#     the backfill's exit code matches its summary (#825 / #840).
+#   - the projection can emit a regeste (#836 / #857).
+#   - `strict` means what robots.txt says, and `Retry-After` has two forms (#866).
+#   - the capture guard protects nine providers rather than one (M14 #6 / #862).
+#   - a cantonal source with no compliance policy is refused, not defaulted (#878).
+#   - one measured meaning for `in_force_until` at the boundary (#843 / #859).
+#   - platform-control can record ADR-0047's quarantine (#731 / #851).
+#   - learned-sparse embeddings on the GPU node (#882, first slice of ADR-0054).
+#     Ships the code and the `rank_features` mapping field; nothing serves it, and
+#     ADR-0054's D4 abstention gate does not exist yet. Sparse retrieval must not
+#     reach a user before it does — measured, an unrelated query returned every
+#     document in the index while BM25 correctly abstained.
+#
+# NOT zero alembic delta. ONE forward revision applies on rollout, and the migrate
 # Job must complete before the API rolls:
-#   20260728_0024_coverage_reconciliations
-#   20260903_0025_wizard_shard_idempotency
+#   20260903_0026_processing_status_quarantined   (down_revision 20260903_0025)
+# 0024 and 0025 were applied by the 4dddce3c rollout, whose migrate Job completed.
 # migrate-job.yaml is bumped to this same SHA in this change; keep the two in
 # lockstep, since the `images:` transformer below deliberately does not reach it.
 #
-# ── PRECONDITION THIS PIN DOES NOT SATISFY ON ITS OWN ──
+# ── PRECONDITION, SATISFIED AS OF THIS PIN ──
 #
 # `platform-control.yaml`, `document-intelligence.yaml` and
-# `retention-sweep-cronjob.yaml` now `envFrom` the per-workload MinIO Secrets
+# `retention-sweep-cronjob.yaml` `envFrom` the per-workload MinIO Secrets
 # `evidara-s3-platform-control`, `evidara-s3-di-consumer` and
-# `evidara-s3-document-service` (#813). Those Secrets do not exist in a cluster that
-# has not been cut over, and a pod that starts without one fails at its first
-# artifact write rather than at startup. Run
-# `infra/hetzner/provision-minio-users.sh` (then `verify-minio-scoping.sh`) BEFORE
-# applying this kustomization; `deploy-stage4.sh` fails fast if they are absent.
+# `evidara-s3-document-service` (#813). The 4dddce3c pin carried this as an
+# UNSATISFIED precondition; the cutover has since been run and all three Secrets
+# exist in the `evidara` namespace. Re-check before applying to any cluster that
+# is not this one — a pod that starts without one fails at its first artifact
+# write rather than at startup, so absence is silent until it matters. Run
+# `infra/hetzner/provision-minio-users.sh` (then `verify-minio-scoping.sh`);
+# `deploy-stage4.sh` fails fast if they are absent.
 # Procedure: docs/runbooks/minio-least-privilege-cutover.md.
 #
+# ── NOT COVERED BY THIS PIN ──
+#
+# `marketing` is not in `resources:` and has no entry under `images:`. Its manifest
+# `infra/hetzner/marketing/deployment.yaml` hardcodes its own tag, so bumping this
+# file does NOT roll the marketing site. That tag is currently
+# 32a13330873d67d57c3bdd0d1dd03a0f81e41b16 — a pre-squash branch commit that is not
+# on `main` at all. Tracked separately; do not assume this pin moved it.
+#
 # ── prior pins, newest first ──
+#
+# 4dddce3c (#858, 2026-09-04) brought six weeks of fixes to the deployed site after
+# production had sat at 8759bec5 for 35 commits. User-visible: the URL search-param
+# parser unification (#822 / #829), the regeste headnote on document detail
+# (#760 / #830), and the BFF taking sole ownership of metadata visibility
+# (#787 / #821). In the acquisition platform: the LexFind cantonal rung went from
+# one canton to a working enumeration — BE acceptance evidence (#814), `lexfind_api`
+# promoted to LIVE (#815), whole-canton enumeration proving its own denominator
+# (#818), the coverage ledger (#819), a locator-less artifact no longer collapsing
+# onto one `document_id` (#831), an idempotent shard crawl (#834), the #661 temporal
+# trap (#837), a mirror that keeps proving it equals the source (#845), and a FAILED
+# dispatch that no longer publishes what it captured (#858). Two alembic revisions
+# (0024, 0025). It was pinned with the MinIO per-workload Secrets (#813) listed as
+# an unsatisfied precondition; that cutover has since been completed.
 #
 # 8759bec5 (#804, 2026-07-23) carried the LexFind provider (#797) — 26 cantons plus
 # federal behind one unauthenticated JSON API, the rung that holds ADR-0033's dog
@@ -109,14 +173,14 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
+    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
+    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
+    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
+    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
+    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 4dddce3c02e6966b4e37afcc2262658f990eae91
+    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
