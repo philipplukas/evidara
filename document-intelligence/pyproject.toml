@@ -50,6 +50,18 @@ llm = [
   "instructor>=1.7.0",
   "openai>=1.30.0",
 ]
+# Learned-sparse embeddings (ADR-0054). An extra, not a core dependency: torch is
+# multi-gigabyte and the default DI image must not carry it. The GPU embedding
+# worker is the only workload that installs this.
+#
+# Nothing is pinned to a CUDA wheel index here on purpose — the default PyPI torch
+# wheel already carries the CUDA runtime, and pinning an index would break the CPU
+# install that CI uses to import the module at all.
+embeddings = [
+  "FlagEmbedding>=1.3.0",
+  "torch>=2.7.0",
+  "transformers>=4.44.0",
+]
 # Pytest + anything eval/CI needs to import the package without the full dev stack.
 # Used by: scripts/check-document-intelligence.sh, eval-ris workflow, local `make eval-*`.
 # reportlab generates the synthetic multi-column PDF fixture that reproduces the
@@ -79,6 +91,7 @@ document_intelligence_runtime_consumer = "document_intelligence.jobs.runtime_con
 document_intelligence_replay_local_outbox = "document_intelligence.jobs.local_outbox_replay:main"
 document_intelligence_delta_projection_backfill = "document_intelligence.jobs.delta_projection_backfill:main"
 document_intelligence_projection_reconcile = "document_intelligence.jobs.projection_reconcile:main"
+document_intelligence_embedding_backfill = "document_intelligence.jobs.embedding_backfill:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

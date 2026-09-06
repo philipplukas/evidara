@@ -1,0 +1,48 @@
+# GPU embedding worker for the learned-sparse backfill (ADR-0054).
+#
+# A separate Dockerfile, and not an extra on the main image, because torch plus
+# CUDA runtime is several gigabytes. Every DI pod would pay that on every pull for
+# a capability exactly one workload uses. The main image must stay small.
+#
+# The base is CUDA runtime rather than `python:3.12-slim`: the workstation node
+# runs Blackwell (RTX 5090, sm_120), which needs a recent CUDA. Verified on the
+# host — torch 2.14.0+cu130 reports `sm_120` and runs.
+#
+# MEASURED SIZE: 21.5GB (2026-09-05). That is large enough to be a decision, not a
+# detail — it is why there is no runtime-images.yml job building this on every push
+# to `main`, and why the Job that uses it lives in a runbook rather than in
+# infra/hetzner/apps/.
+#
+# KNOWN, UNTESTED OPTIMISATION: this base is probably redundant. torch's PyPI wheel
+# bundles its own CUDA runtime libraries, so `python:3.12-slim` + torch may produce
+# a substantially smaller image than cuda-runtime + torch, which ships two copies.
+# Only the driver has to come from the host, and `runtimeClassName: nvidia` is what
+# provides that. Worth measuring before this is ever pushed to a registry.
+FROM nvidia/cuda:13.0.1-runtime-ubuntu24.04
+
+# Same uv-pinned-by-digest discipline as document-intelligence/Dockerfile, and for
+# the same reason (#848): `uv sync --frozen` installs from `uv.lock`, fails the
+# build when the lock and `pyproject.toml` disagree, and so makes the image and
+# the gate provably the same software.
+COPY --from=ghcr.io/astral-sh/uv@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff /uv /usr/local/bin/uv
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    # `automatic`, unlike the slim-python images: this base carries no Python at
+    # all, so uv must fetch the 3.12 the lock is resolved for. With `manual` the
+    # build fails at `uv sync` with an exit code that a piped `tail` will happily
+    # swallow — which is how this Dockerfile "built successfully" the first time.
+    UV_PYTHON_DOWNLOADS=automatic \
+    PATH="/app/.venv/bin:$PATH" \
+    # Model weights land here; mount a volume at this path to avoid re-downloading
+    # 2.3GB on every Job run.
+    HF_HOME=/models
+
+WORKDIR /app
+
+COPY document-intelligence/ /app/
+
+RUN uv sync --frozen --no-dev --no-editable --extra embeddings
+
+CMD ["document_intelligence_embedding_backfill"]
