@@ -78,6 +78,12 @@ The current React-admin slice includes:
 - run cancellation from the list and detail screens
 - `Run Detail` summary
 - `Preview Summary` review for preview runs
+- `Run Detail` **Timeline** — all five stages merged into one sequence, oldest first,
+  so "where did this run stall?" is read rather than inferred. Undated rows are kept
+  and labelled, never dropped; if any one stage fails to load the section reports the
+  error instead of showing a partial timeline as if it were complete
+- `Run Detail` raw artifact payloads rendered as labelled fields + a body block
+  (captured markup is always shown as **text**, never as HTML)
 - `Run Detail` diagnostics for:
   - provider jobs
   - captured resources
