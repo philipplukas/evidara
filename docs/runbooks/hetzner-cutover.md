@@ -5,13 +5,6 @@ Last reviewed: 2026-07-01
 Last verified: Not yet verified
 Applies to: dev, staging, prod
 
-Step-by-step for ADR-0029 **Slice 6** — bringing Evidara up on the self-hosted Hetzner
-cluster and retiring GCP. Slices 1–5 are done in-repo (NATS, MinIO/S3, k8s manifests);
-this runbook is the operator sequence that uses them.
-
-> Order matters: stores → secrets → images → migrate → deploy → validate → destroy.
-> Do **staging first** (it is the preferred-first environment), prove it, then prod.
-
 > ## ⚠️ SUPERSEDED (2026-09-06, ADR-0055)
 >
 > **Do not follow this runbook.** It describes ADR-0029 Slice 6 as originally planned: a
@@ -25,6 +18,13 @@ this runbook is the operator sequence that uses them.
 >
 > Kept for the history of what was intended, and because the store-provisioning and
 > validation steps still record real decisions.
+
+Step-by-step for ADR-0029 **Slice 6** — bringing Evidara up on the self-hosted Hetzner
+cluster and retiring GCP. Slices 1–5 are done in-repo (NATS, MinIO/S3, k8s manifests);
+this runbook is the operator sequence that uses them.
+
+> Order matters: stores → secrets → images → migrate → deploy → validate → destroy.
+> Do **staging first** (it is the preferred-first environment), prove it, then prod.
 
 ## 0. Prerequisites (one-time)
 
