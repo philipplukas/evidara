@@ -11,9 +11,15 @@ resources:
   - platform-control.yaml
   - legal-search.yaml
   - document-intelligence.yaml
-  # Legal-retention hard delete (ADR-0031). In `resources:` — unlike migrate-job.yaml —
-  # so the `images:` pin below applies and the tag never has to be maintained by hand.
+  # Legal-retention hard delete (ADR-0031). In `resources:` so the `images:` pin
+  # below applies and the tag never has to be maintained by hand.
   - retention-sweep-cronjob.yaml
+  # The Alembic migrate Job, as an Argo CD `PreSync` hook (ADR-0055). It is in
+  # `resources:` so Argo CD sees it at all — a hook Argo never renders cannot run,
+  # and the rollout would then apply a platform-control expecting a migration the
+  # DB has never had. `deploy-stage4.sh` still applies it directly first for
+  # bootstrap; the hook annotations are inert to `kubectl apply`.
+  - migrate-job.yaml
 
 # Single place to pin the image tag.
 #

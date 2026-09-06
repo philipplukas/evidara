@@ -65,7 +65,7 @@ Once MacConfig publishes Kubernetes-managed GitHub Actions runners for Evidara, 
 | Light | `["self-hosted","linux","x64","evidara","light","k8s"]` | Generic Node/Python CI and smaller validation jobs |
 | Heavy | `["self-hosted","linux","x64","evidara","heavy","k8s"]` | Browser and higher-resource validation jobs |
 
-Evidara should not own the runner controller, CRDs, or cluster RBAC in `k8s/gitops/`; those belong in MacConfig with the cluster platform setup.
+Evidara should not own the runner controller, CRDs, or cluster RBAC in its product manifests (`infra/hetzner/apps`); those belong with the cluster platform setup.
 
 ## Post-cutover validation checklist
 

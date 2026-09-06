@@ -1,15 +1,33 @@
 # One-shot: run Alembic migrations + seed reference data against the CNPG Postgres.
 # Uses the platform-control image (carries alembic + seeds). ADR-0029 stage 4.
 #
-# This Job is NOT in kustomization.yaml's `resources:`, so the `images:` tag
-# transformer does not reach it — the tag below has to be bumped by hand,
-# in lockstep with the one there. Letting it drift is how you roll out a
-# platform-control that expects a migration the DB has never run.
+# Ordering: this Job must COMPLETE before the API rolls. Two mechanisms enforce
+# that, because two things apply this tree (ADR-0055):
+#
+#   - Argo CD: the `PreSync` hook below. Argo runs it, waits for completion, and
+#     abandons the sync if it fails — so a failed migration cannot be followed by
+#     a platform-control that expects it.
+#   - `deploy-stage4.sh` (bootstrap, and the fallback if Argo is unavailable):
+#     deletes the Job, applies this file directly, and waits. The hook
+#     annotations are inert to `kubectl apply`, so that path is unchanged.
+#
+# The tag below is explicit rather than left to the `images:` transformer, so
+# `kubectl apply -f` on this file alone still pulls the right image. The
+# transformer ALSO rewrites it when applied via the kustomization, to the same
+# value — `scripts/check_hetzner_image_pins.py` fails the build if the two ever
+# disagree, so the redundancy cannot become a second source of truth.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: platform-control-migrate
   namespace: evidara
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    # Delete the previous Job immediately before creating the next one. Job specs
+    # are immutable, so without this a second sync fails on the completed Job
+    # from the first. `HookSucceeded` would instead delete it on success and
+    # throw away the logs of the migration that just ran.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 5
   template:

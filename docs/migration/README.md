@@ -5,6 +5,12 @@ This section tracks the **strangler migration** from Evidara-only provisioning t
 (namespaces, baseline `NetworkPolicy`, RBAC, future operators), while Evidara keeps
 **product** delivery (services, images, contracts) until GitOps paths exist.
 
+> **Status note (2026-09-06, ADR-0055).** The *product GitOps* half of this migration did not
+> happen as written. `k8s/gitops/` — the Kustomize roots this section points at — was deleted:
+> it described namespaces, a Vault `ClusterSecretStore` and ingress hosts that never existed in
+> the Hetzner cluster, and nothing ever applied it. Product delivery is now Argo CD syncing
+> `infra/hetzner/apps`. References to `k8s/gitops/` below are historical.
+
 **Parallel execution map:** [Parallel workstreams (migration)](parallel-workstreams.md) — which
 lanes can run at the same time and what to serialize.
 

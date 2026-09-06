@@ -1,0 +1,63 @@
+# The one Application: `infra/hetzner/apps` → the `evidara` namespace (ADR-0055).
+#
+# This replaces the manual `bash infra/hetzner/deploy-stage4.sh` roll. Merging a
+# change to `infra/hetzner/apps/kustomization.yaml` is now what deploys it, and a
+# cluster that disagrees with `main` shows as OutOfSync rather than being
+# discoverable only by asking the cluster. Production sat 35 commits stale, then
+# 27, because nothing reconciled.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: evidara-apps
+  namespace: argocd
+  # Keep the Application itself if someone deletes it by accident; removing the
+  # finalizer is a deliberate act, and without it a stray `kubectl delete
+  # application` would cascade-delete the workloads.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/philipplukas/evidara.git
+    targetRevision: main
+    path: infra/hetzner/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: evidara
+  syncPolicy:
+    automated:
+      # Revert drift introduced outside git — a `kubectl edit`, a partial apply.
+      # This is the property being bought; automating the apply alone would have
+      # closed the 27-commit gap but left manual edits invisible.
+      selfHeal: true
+      # Deliberately OFF for the first phase (ADR-0055). The `evidara` namespace
+      # holds a great deal Argo does not own: imperative Secrets from
+      # deploy-stage4.sh, Helm-installed NATS / MinIO / OpenSearch / Trino /
+      # Nessie / Zitadel, and CNPG's Postgres cluster. A pruning controller
+      # meeting those for the first time is not a day-one risk worth taking.
+      # Turn on only after ownership has been observed to be correct.
+      prune: false
+    syncOptions:
+      # The namespace is created by deploy-stage4.sh along with the Secrets that
+      # must exist before any workload starts; Argo does not need to own it.
+      - CreateNamespace=false
+      # Report a Job's own completion rather than treating apply as success —
+      # the migrate hook's whole value is that a failed migration blocks the
+      # rollout.
+      - ApplyOutOfSyncOnly=false
+    retry:
+      limit: 3
+      backoff:
+        duration: 20s
+        maxDuration: 3m
+        factor: 2
+  # Surface meaningful diffs only. `metadata.generation` and the Job's
+  # controller-managed selector/labels churn on every reconcile and would keep
+  # the Application permanently OutOfSync, which trains the operator to ignore
+  # the one signal this install exists to provide.
+  ignoreDifferences:
+    - group: batch
+      kind: Job
+      jsonPointers:
+        - /spec/selector
+        - /spec/template/metadata/labels

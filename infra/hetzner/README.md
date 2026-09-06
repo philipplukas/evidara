@@ -2,9 +2,10 @@
 
 Deploy guide for the single-node k3s cluster (`evidara-k3s`, dedicated server) that
 replaces GCP — see [ADR-0029](../../docs/adr/0029-self-hosted-hetzner-runtime.md).
-Unlike `k8s/gitops/` (which assumes a MacConfig-managed platform with external stores),
-this tree is **self-contained**: it deploys the stores in-cluster too, because we own the
-whole node.
+This tree is **self-contained**: it deploys the stores in-cluster too, because we own the
+whole node. It is also the *only* manifest tree — `k8s/gitops/` was removed in ADR-0055,
+having described a MacConfig-managed platform this deployment never became (wrong
+namespaces, a Vault store that is not installed, placeholder hosts) while nothing applied it.
 
 > Run everything from your **laptop** with `kubectl` + `helm` pointed at the cluster.
 > Apply in stages; verify each before the next.
@@ -19,7 +20,7 @@ whole node.
 | Search | **OpenSearch** | helm `opensearch/opensearch` |
 | Lakehouse catalog | **Nessie** (Iceberg REST, git-like) | helm `nessie/nessie`, Postgres-backed |
 | Lakehouse query | **Trino** | helm `trino/trino` |
-| Apps | Evidara services | `k8s/gitops` overlay (adapted) |
+| Apps | Evidara services | `apps/` kustomization, synced by Argo CD (ADR-0055) |
 | Observability | **Prometheus + Alertmanager + Grafana** | helm `prometheus-community/kube-prometheus-stack` |
 | Identity | **Zitadel** (OIDC provider) | helm `zitadel/zitadel`, Postgres-backed — ADR-0038 |
 
@@ -226,8 +227,10 @@ MinIO. The DI pipeline writes Iceberg via PyIceberg → Nessie. See the lakehous
 
 ## Stage 4 — Evidara apps
 
-Adapt the `k8s/gitops` overlay to this cluster: plain k8s `Secret`s (no Vault/ESO here),
-in-cluster store endpoints, k3s `traefik` ingress (or swap to nginx).
+`apps/` is the deployed kustomization: plain k8s `Secret`s (no Vault/ESO here), in-cluster
+store endpoints, k3s ingress. Since ADR-0055 **Argo CD syncs this path continuously** — see
+[Stage 9](#stage-9--argo-cd-gitops-adr-0055). Running `deploy-stage4.sh` remains how a cluster is
+bootstrapped (it creates the namespace and the imperative Secrets Argo does not manage).
 
 `apps/configmap.yaml` wires platform-control onto the real self-hosted backends
 (`event_publisher_backend=nats`, `artifact_store_backend=s3`/MinIO) so an admin-launched run
@@ -498,3 +501,47 @@ Operations, the restore drill that gates this step, and the break-glass procedur
 > Postgres PVC, so a disk loss takes the IdP and its backup together. ADR-0038 §2b makes
 > an offsite destination a prerequisite **before Zitadel holds real user credentials** —
 > deploying it empty is fine; onboarding people into it is not.
+
+## Stage 9 — Argo CD GitOps (ADR-0055)
+
+```bash
+bash infra/hetzner/deploy-argocd.sh
+```
+
+Installs Argo CD into `argocd` and registers one `Application`: this repo's
+`infra/hetzner/apps` path → the `evidara` namespace. After this, **merging a change to
+`apps/kustomization.yaml` is what rolls production.** A cluster that disagrees with `main`
+reports `OutOfSync` instead of being discoverable only by asking the cluster — production
+sat 35 commits stale, then 27, because nothing reconciled (#879, #883).
+
+| | |
+|---|---|
+| UI | `https://argocd.ts.veyo.dev` (tailnet only) |
+| User | `admin` |
+| Password | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
+| Sync state | `kubectl -n argocd get application evidara-apps -o custom-columns=SYNC:.status.sync.status,HEALTH:.status.health.status` |
+
+**Stage 4 is still the prerequisite, and the script refuses without it.** Argo CD does not
+manage the `evidara` namespace or the imperative Secrets (`evidara-app-secrets`,
+`ghcr-pull`) — the Application sets `CreateNamespace=false` precisely so a namespace Argo
+created would not appear without them. `deploy-argocd.sh` checks for all three and exits
+naming what is missing, rather than syncing workloads that would CrashLoop on a Secret
+nobody created.
+
+**Migrations run as a `PreSync` hook.** `apps/migrate-job.yaml` carries
+`argocd.argoproj.io/hook: PreSync`, so Alembic completes before the API rolls, and a failed
+migration abandons the sync instead of being followed by a platform-control that expects it.
+`scripts/validate_hetzner_apps_kustomize.sh` fails if that annotation ever stops rendering.
+The hook annotations are inert to `kubectl apply`, so `deploy-stage4.sh` still works as the
+bootstrap and as a fallback if Argo is unavailable.
+
+**`prune` is deliberately OFF.** The `evidara` namespace holds a lot Argo does not own —
+Helm-installed NATS, MinIO, OpenSearch, Trino, Nessie and Zitadel, CNPG's Postgres, and the
+imperative Secrets. Enable pruning only after `Application` ownership has been observed to be
+correct; `selfHeal` (which is on) is the property that closes the drift window.
+
+### Rolling back
+
+Revert the commit and let Argo sync — that keeps the repository and the cluster telling the
+same story. `argocd app rollback` works too, but leaves `main` describing something the
+cluster is not running, which is the condition this stage exists to end.

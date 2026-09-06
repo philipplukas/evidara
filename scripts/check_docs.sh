@@ -8,7 +8,7 @@ python3 scripts/validate_openapi.py
 python3 scripts/validate_json_schemas.py
 python3 scripts/check_contract_manifest.py
 python3 scripts/check_platform_contract_vendor.py
-bash scripts/validate_k8s_gitops_kustomize.sh
+bash scripts/validate_hetzner_apps_kustomize.sh
 
 # 2. Check doc structure
 python3 scripts/check_component_docs.py

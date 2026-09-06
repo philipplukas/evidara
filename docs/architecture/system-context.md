@@ -142,13 +142,21 @@ All backing services run in-cluster.
 
 ### How it is deployed
 
-Deployment is **operator-driven, not GitOps and not CI**: idempotent staged scripts
-(`infra/hetzner/deploy-stage1.sh` … `deploy-stage5.sh`) are run from a laptop with
-`kubectl`/`helm` pointed at the cluster. See [`infra/hetzner/README.md`](../../infra/hetzner/README.md).
+**Application workloads are GitOps-synced** (ADR-0055): Argo CD watches this repository's
+`infra/hetzner/apps` path and reconciles it into the `evidara` namespace, so merging a change
+to `apps/kustomization.yaml` is what rolls production, and a cluster that disagrees with
+`main` reports `OutOfSync`. Alembic runs as a `PreSync` hook, ahead of the API.
 
-The `k8s/gitops/` + Argo CD + Vault path (ADR-0029 Slice 5) is **scaffolding only** — it
-still carries placeholder hostnames, an empty `prod/`, and has never been applied. Do not
-read it as the deployment mechanism.
+**Everything underneath is still operator-driven**: idempotent staged scripts
+(`infra/hetzner/deploy-stage1.sh` … `deploy-stage9.sh`) are run from a laptop with
+`kubectl`/`helm` pointed at the cluster. They install the stores, create the imperative
+Secrets Argo does not manage, and install Argo CD itself. A cluster still bootstraps by
+running them. See [`infra/hetzner/README.md`](../../infra/hetzner/README.md).
+
+The `k8s/gitops/` + Vault scaffolding from ADR-0029 Slice 5 was **deleted** in ADR-0055: it
+described a MacConfig-managed platform this deployment never became — wrong namespaces, a
+`ClusterSecretStore` that is not installed, placeholder hostnames, an empty `prod/` — and
+nothing ever applied it.
 
 ### Runtime backends are config-selected
 

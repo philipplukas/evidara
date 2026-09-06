@@ -8,7 +8,7 @@ unrelated work. It extends the general monorepo rules in
 
 | Lane | Where | Typical owner | In-repo status | Needs outside repo |
 | --- | --- | --- | --- | --- |
-| **A — Product GitOps tree** | [`k8s/gitops/`](../../k8s/gitops/) (`dev/`, `staging/`, `prod/`) | Infra + service teams | **dev/staging:** placeholder `ConfigMap` + `kubectl kustomize` CI; **prod:** still empty | Argo `Application` + cluster |
+| **A — Product GitOps tree** | ``k8s/gitops/`` (`dev/`, `staging/`, `prod/`) | Infra + service teams | **dev/staging:** placeholder `ConfigMap` + `kubectl kustomize` CI; **prod:** still empty | Argo `Application` + cluster |
 | **B — Contract + inventory** | [`vendor/`](../../vendor/), [`platform-product-inventory.md`](platform-product-inventory.md) | Platform | Vendor + CI + inventory tables | MacConfig `main` when bumping contract |
 | **C — MacConfig platform** | [MacConfig](https://github.com/philipplukas/MacConfig) `clusters/<env>/` | Platform / MacConfig | Not this repo | PRs + `make platform-k8s-check` there |
 | **D — Argo cutover (non-prod first)** | [`examples/`](examples/), cluster | Platform / SRE | Example YAML + checklists | `kubectl` / Argo UI, `AppProject` |
