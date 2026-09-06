@@ -38,7 +38,7 @@ export function parseS3Uri(storagePath: string | null | undefined): {
   key: string;
 } | null {
   const trimmed = storagePath?.trim();
-  if (!trimmed || !trimmed.startsWith("s3://")) {
+  if (!trimmed?.startsWith("s3://")) {
     return null;
   }
   const withoutScheme = trimmed.slice("s3://".length);
