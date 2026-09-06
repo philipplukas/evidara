@@ -130,7 +130,12 @@ def evaluate(base: str, head: str) -> int:
 
     if MANIFEST_PATH not in changed_files:
         print(
-            "❌ Locked contract files changed but contracts/manifest.yaml was not updated.",
+            "❌ Locked contract files changed but contracts/manifest.yaml was not updated.\n"
+            "   Fix:  python3 scripts/bump_contract_version.py --minor\n"
+            "   Add --api when the platform-control OpenAPI surface changed; that also\n"
+            "   moves apis.platform_control.version, which a SECOND gate\n"
+            "   (check_contract_manifest.py) asserts separately. Missing one of the two\n"
+            "   is the most repeated contract mistake against this repo.",
             file=sys.stderr,
         )
         return 2
@@ -145,7 +150,8 @@ def evaluate(base: str, head: str) -> int:
 
     if current_version == base_version:
         print(
-            f"❌ contracts/manifest.yaml version did not change (still {current_version}).",
+            f"❌ contracts/manifest.yaml version did not change (still {current_version}).\n"
+            "   Fix:  python3 scripts/bump_contract_version.py --minor",
             file=sys.stderr,
         )
         return 2
