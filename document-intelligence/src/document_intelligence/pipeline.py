@@ -54,6 +54,7 @@ from document_intelligence.normalize.quarantine import (
 from document_intelligence.normalize.titles import is_placeholder_title
 from document_intelligence.normalize.xml import normalize_xml_document
 from document_intelligence.observability.metrics import record_quarantine
+from document_intelligence.observability.stage_ledger import StageLedger
 from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
 from document_intelligence.persist.surfaces import PUBLISHED_DOCUMENTS, PUBLISHED_SECTIONS
 from document_intelligence.profiles.registry import resolve_selected_profiles
@@ -224,20 +225,28 @@ class ProcessingPipeline:
             ),
         ]
 
-        if primary_content_type == "application/pdf":
-            # PDFs always normalise geometrically (ADR-0041); ``parser_backend`` selects
-            # between legacy and docling for *text* modalities only. Deliberately not
-            # configurable: a text-order extractor splices marginal headings into body
-            # sentences, and no environment variable should be able to silently select
-            # silently-corrupted legal text.
-            normalized_document = normalize_pdf_document(pdf_bytes, primary_artifact.artifact_id)
-        else:
-            assert artifact_text is not None  # guaranteed by the content-type branch above
-            normalized_document = self._normalize_artifact(primary_artifact, artifact_text)
-        normalized_document = _merge_extraction_hints_into_ir(
-            selected_bundle.manifest,
-            normalized_document,
-        )
+        # Per-stage timings and counts for THIS document (#903). The run was
+        # previously observable only as its three status transitions, so "where
+        # did the time go" and "which stage dropped it" were unanswerable per
+        # document on every surface.
+        ledger = StageLedger()
+
+        with ledger.stage("normalize", items_in=1) as stage:
+            if primary_content_type == "application/pdf":
+                # PDFs always normalise geometrically (ADR-0041); ``parser_backend`` selects
+                # between legacy and docling for *text* modalities only. Deliberately not
+                # configurable: a text-order extractor splices marginal headings into body
+                # sentences, and no environment variable should be able to silently select
+                # silently-corrupted legal text.
+                normalized_document = normalize_pdf_document(pdf_bytes, primary_artifact.artifact_id)
+            else:
+                assert artifact_text is not None  # guaranteed by the content-type branch above
+                normalized_document = self._normalize_artifact(primary_artifact, artifact_text)
+            normalized_document = _merge_extraction_hints_into_ir(
+                selected_bundle.manifest,
+                normalized_document,
+            )
+            stage.items_out = 1
 
         # ADR-0047's invariant, applied before anything downstream can treat this as a
         # document. Placed here on purpose: extraction has happened (so the text-level
@@ -264,70 +273,109 @@ class ProcessingPipeline:
                 status_events=status_events,
             )
 
-        sections = _build_sections(
-            document_id=document_id,
-            document_revision=document_revision,
-            processing_manifest_id=processing_manifest_id,
-            provenance=provenance,
-            section_candidates=build_sections_from_ir(normalized_document),
-        )
-        llm_metadata = self._extract_metadata_candidate(
-            normalized_document=normalized_document,
-            manifest=selected_bundle.manifest,
-            primary_artifact=primary_artifact,
-        )
-
-        document = _build_document(
-            normalized_document=normalized_document,
-            manifest=selected_bundle.manifest,
-            primary_artifact=primary_artifact,
-            provenance=provenance,
-            document_id=document_id,
-            document_revision=document_revision,
-            processing_manifest_id=processing_manifest_id,
-            processing_version=self._processing_version,
-            llm_metadata=llm_metadata,
-            llm_confidence_threshold=self._llm_confidence_threshold,
-            llm_extractor_enabled=self._enable_llm_extractor,
-        )
-        if self._enable_spacy:
-            document.metadata["nlp"] = enrich_with_spacy(
-                document.body_text or document.full_text,
-                enabled=True,
-                model_name=self._spacy_model_name,
-                max_chars_per_section=self._spacy_max_chars_per_section,
-                batch_size=self._spacy_batch_size,
+        with ledger.stage("sectionize", items_in=1) as stage:
+            sections = _build_sections(
+                document_id=document_id,
+                document_revision=document_revision,
+                processing_manifest_id=processing_manifest_id,
+                provenance=provenance,
+                section_candidates=build_sections_from_ir(normalized_document),
             )
+            stage.items_out = len(sections)
 
-        # Citation extraction
-        citations = extract_citations(document.body_text or document.full_text)
-        if citations:
-            citation_dicts = []
-            for c in citations:
-                d = c.to_dict()
-                normalized = normalize_citation(c)
-                if normalized:
-                    d["normalized_reference"] = normalized
-                citation_dicts.append(d)
-            document.extensions["citations"] = citation_dicts
+        with ledger.stage("extract", items_in=1) as stage:
+            llm_metadata = self._extract_metadata_candidate(
+                normalized_document=normalized_document,
+                manifest=selected_bundle.manifest,
+                primary_artifact=primary_artifact,
+            )
+            # 1 when the LLM extractor produced a metadata candidate, 0 when it
+            # was disabled, not needed, or returned nothing. Not a document
+            # count — this stage neither creates nor drops documents.
+            stage.items_out = 1 if llm_metadata is not None else 0
 
-        commentary_insights = []
-        if self._enable_commentary_insights and _should_extract_commentary_insights(
-            document=document,
-            manifest=selected_bundle.manifest,
-            normalized_document=normalized_document,
-        ):
-            commentary_insights = extract_commentary_insights(
+        with ledger.stage("assemble", items_in=1) as stage:
+            document = _build_document(
+                normalized_document=normalized_document,
+                manifest=selected_bundle.manifest,
+                primary_artifact=primary_artifact,
+                provenance=provenance,
+                document_id=document_id,
+                document_revision=document_revision,
+                processing_manifest_id=processing_manifest_id,
+                processing_version=self._processing_version,
+                llm_metadata=llm_metadata,
+                llm_confidence_threshold=self._llm_confidence_threshold,
+                llm_extractor_enabled=self._enable_llm_extractor,
+            )
+            stage.items_out = 1
+        with ledger.stage("enrich", items_in=len(sections)) as stage:
+            if self._enable_spacy:
+                document.metadata["nlp"] = enrich_with_spacy(
+                    document.body_text or document.full_text,
+                    enabled=True,
+                    model_name=self._spacy_model_name,
+                    max_chars_per_section=self._spacy_max_chars_per_section,
+                    batch_size=self._spacy_batch_size,
+                )
+
+            # Citation extraction
+            citations = extract_citations(document.body_text or document.full_text)
+            if citations:
+                citation_dicts = []
+                for c in citations:
+                    d = c.to_dict()
+                    normalized = normalize_citation(c)
+                    if normalized:
+                        d["normalized_reference"] = normalized
+                    citation_dicts.append(d)
+                document.extensions["citations"] = citation_dicts
+
+            commentary_insights = []
+            if self._enable_commentary_insights and _should_extract_commentary_insights(
                 document=document,
-                sections=sections,
-                min_confidence=self._commentary_insight_min_confidence,
+                manifest=selected_bundle.manifest,
+                normalized_document=normalized_document,
+            ):
+                commentary_insights = extract_commentary_insights(
+                    document=document,
+                    sections=sections,
+                    min_confidence=self._commentary_insight_min_confidence,
+                )
+            if self._enable_commentary_insights:
+                document.metadata["commentary_insights"] = {
+                    "enabled": True,
+                    "emitted_count": len(commentary_insights),
+                    "min_confidence": self._commentary_insight_min_confidence,
+                }
+            # Citations found, not sections consumed: this stage's output IS the
+            # citation edges, and a reader comparing in/out here is asking "how
+            # much did enrichment find", not "did it drop a section".
+            stage.items_out = len(citations)
+
+        # `finalize` closes BEFORE the manifest is built, because the manifest
+        # carries the ledger: a stage that wrapped its own serialisation could
+        # not appear in it. So this times validation and event construction, and
+        # the manifest is assembled from the closed ledger immediately after.
+        with ledger.stage("finalize", items_in=len(sections)) as stage:
+            canonical_ready_event = build_processing_status_event(
+                processing_manifest_id=processing_manifest_id,
+                provenance=provenance,
+                processing_version=self._processing_version,
+                status="canonical_ready",
+                document_id=document_id,
+                document_revision=document_revision,
+                correlation_id=event.correlation_id or provenance.run_id,
+                causation_id=event.event_id,
             )
-        if self._enable_commentary_insights:
-            document.metadata["commentary_insights"] = {
-                "enabled": True,
-                "emitted_count": len(commentary_insights),
-                "min_confidence": self._commentary_insight_min_confidence,
-            }
+            status_events.append(canonical_ready_event)
+            validate_document_and_sections(document, sections)
+            validate_document(document)
+            validate_sections(sections)
+            validate_commentary_insights(commentary_insights)
+            for status_event in status_events:
+                validate_event(status_event)
+            stage.items_out = len(sections)
 
         manifest = _build_processing_manifest(
             manifest=selected_bundle.manifest,
@@ -340,20 +388,12 @@ class ProcessingPipeline:
             input_bundle_manifest_ref=event.payload.bundle_manifest_ref.to_dict(),
             normalized_document=normalized_document,
             citation_count=len(citations),
+            stages=ledger.to_list(),
         )
 
-        canonical_ready_event = build_processing_status_event(
-            processing_manifest_id=processing_manifest_id,
-            provenance=provenance,
-            processing_version=self._processing_version,
-            status="canonical_ready",
-            document_id=document_id,
-            document_revision=document_revision,
-            correlation_id=event.correlation_id or provenance.run_id,
-            causation_id=event.event_id,
-        )
-        status_events.append(canonical_ready_event)
-
+        # Built and validated after the ledger closes, because both depend on the
+        # finished manifest. The document/section/status validations above cover
+        # everything that does not.
         document_processed_event = build_document_processed_event(
             document=document,
             manifest=manifest,
@@ -361,13 +401,7 @@ class ProcessingPipeline:
             causation_id=event.event_id,
         )
 
-        validate_document_and_sections(document, sections)
-        validate_document(document)
-        validate_sections(sections)
-        validate_commentary_insights(commentary_insights)
         validate_processing_manifest(manifest)
-        for status_event in status_events:
-            validate_event(status_event)
         validate_event(document_processed_event)
 
         self._sink.persist(document, sections, manifest)
@@ -978,6 +1012,7 @@ def _build_processing_manifest(
     input_bundle_manifest_ref: dict[str, Any],
     normalized_document: NormalizedDocumentIR,
     citation_count: int = 0,
+    stages: list[dict[str, Any]] | None = None,
 ) -> ProcessingManifest:
     published_document_ref = PUBLISHED_DOCUMENTS.dataset_ref(
         document_id=document.document_id,
@@ -1014,6 +1049,7 @@ def _build_processing_manifest(
         section_count=len(sections),
         citation_count=citation_count,
         failure=None,
+        stages=list(stages or []),
     )
 
 
