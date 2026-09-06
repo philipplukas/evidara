@@ -22,7 +22,8 @@ class SourceVersion(TimestampMixin, Base):
     status: Mapped[SourceVersionStatus] = mapped_column(
         Enum(
             SourceVersionStatus,
-            native_enum=False,
+            native_enum=True,
+            name="source_version_status",
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         default=SourceVersionStatus.DRAFT,

@@ -23,7 +23,8 @@ class Source(TimestampMixin, Base):
     status: Mapped[SourceStatus] = mapped_column(
         Enum(
             SourceStatus,
-            native_enum=False,
+            native_enum=True,
+            name="source_status",
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         default=SourceStatus.ACTIVE,

@@ -20,7 +20,8 @@ class ProviderJob(TimestampMixin, Base):
     status: Mapped[ProviderJobStatus] = mapped_column(
         Enum(
             ProviderJobStatus,
-            native_enum=False,
+            native_enum=True,
+            name="provider_job_status",
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         default=ProviderJobStatus.ACCEPTED,

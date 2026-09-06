@@ -51,7 +51,8 @@ class Run(TimestampMixin, Base):
     mode: Mapped[RunMode] = mapped_column(
         Enum(
             RunMode,
-            native_enum=False,
+            native_enum=True,
+            name="run_mode",
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         default=RunMode.PREVIEW,
@@ -59,7 +60,8 @@ class Run(TimestampMixin, Base):
     status: Mapped[RunStatus] = mapped_column(
         Enum(
             RunStatus,
-            native_enum=False,
+            native_enum=True,
+            name="run_status",
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         default=RunStatus.PENDING,

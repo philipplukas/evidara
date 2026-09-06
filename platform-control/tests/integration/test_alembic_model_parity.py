@@ -61,23 +61,22 @@ _ALEMBIC_OWNED_TABLES = {"alembic_version"}
 # newly-authored migration may disagree with its model, which is the thing this
 # file exists to stop.
 #
-# GROUP 1 — native enum vs `native_enum=False`. THIS IS THE 2026-09-06 DEFECT,
-# and it is loaded on six columns. The migrations create a real Postgres ENUM
-# type; the models declare a VARCHAR with Python-side validation. Postgres
-# rejects any label outside the type, so adding a value to any of these enums
-# in the model inserts happily in every test (schema built by `create_all`) and
-# fails in production on the first write. That is exactly how `quarantined`
-# reached a production API that could not store it. Tracked in #899.
-_KNOWN_ENUM_DIVERGENCES = frozenset(
-    {
-        "modify_type:processing_status_updates.status",
-        "modify_type:provider_jobs.status",
-        "modify_type:runs.mode",
-        "modify_type:runs.status",
-        "modify_type:source_versions.status",
-        "modify_type:sources.status",
-    }
-)
+# GROUP 1 — RESOLVED 2026-09-06 (#899), kept empty as the record that this class
+# was closed rather than never present.
+#
+# Six columns were native Postgres ENUMs in the migrations and `native_enum=False`
+# on the models: processing_status_updates.status, provider_jobs.status, runs.mode,
+# runs.status, source_versions.status, sources.status. That is the 2026-09-06
+# defect, loaded six times over — adding a value to any of those enums inserted
+# happily in every test (schema built by `create_all`) and would have failed in
+# production on the first write.
+#
+# The models now declare `native_enum=True` with the type name the migrations
+# actually created, so Postgres enforces the domain again. Adding a value now
+# REQUIRES a migration — which is the point, and is only safe because #888's
+# PreSync hook and #898's readiness check make a forgotten one visible instead
+# of silent.
+_KNOWN_ENUM_DIVERGENCES: frozenset[str] = frozenset()
 
 # GROUP 2 — indexes present in the database that the models do not declare.
 # Lower risk than group 1: they do not break writes. But an `alembic revision
