@@ -325,10 +325,24 @@ a {
 }
 
 @media (min-width: 768px) {
+  /*
+   * The header spans the FULL width, with the sidebar beneath it — not beside
+   * it. Two reasons, in order of weight:
+   *
+   * 1. The header carries global chrome (brand, theme, account, the link back
+   *    to legal-search). The sidebar carries navigation *within* this app. The
+   *    old "sidebar header" / "sidebar main" areas let the scoped rail sit
+   *    visually above the product identity, which inverts that hierarchy. The
+   *    full-height-rail pattern works for apps that put identity at the top of
+   *    the rail; this admin puts it in the header, so the rail must sit below.
+   * 2. legal-search's `.app-header` is a full-viewport-width sticky bar. Users
+   *    cross between the two surfaces (the sidebar footer links back), and the
+   *    chrome should not reshape under them.
+   */
   .admin-app-shell {
     grid-template-columns: 288px 1fr;
     grid-template-areas:
-      "sidebar header"
+      "header  header"
       "sidebar main";
   }
 }

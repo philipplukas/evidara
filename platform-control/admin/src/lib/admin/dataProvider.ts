@@ -1066,6 +1066,64 @@ const getRunDetailList = async <TResource extends RunDetailResourceName>(
   };
 };
 
+/**
+ * Wizard wire types, mirroring `platform_control.schemas.wizard`.
+ *
+ * `WizardRunState` repeats `platform_control.domain.WizardRunState`. The
+ * terminal member matters: `GateExpired` is what an un-actioned human gate
+ * becomes, and it is terminal *on purpose* — the fallback is always to refuse to
+ * scale, never to auto-approve a fan-out of crawls against live government
+ * portals. Anything rendering these states must not present it as a transient
+ * error with a retry.
+ */
+export type WizardRunState =
+  | "DraftScope"
+  | "DiscoveryPlan"
+  | "PilotRun"
+  | "HumanGateApproval"
+  | "ScaledRun"
+  | "ReviewRouting"
+  | "FinalizePublish"
+  | "MonitorAndDrift"
+  | "GateExpired";
+
+export interface WizardProject {
+  wizard_project_id: string;
+  name: string;
+  status: "draft" | "active" | "archived";
+  scope: Record<string, unknown>;
+  discovery_plan: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WizardRunStatus {
+  wizard_run_id: string;
+  wizard_project_id: string;
+  workflow_id: string | null;
+  state: WizardRunState;
+  state_entered_at: string;
+  progress: {
+    total_nodes: number;
+    processed_nodes: number;
+    routed_to_review: number;
+    accepted_records: number;
+  };
+  quality: {
+    confidence_distribution: Record<string, unknown>;
+    conflict_count: number;
+    review_backlog: number;
+  };
+  health: {
+    retry_counters: Record<string, unknown>;
+    last_errors: string[];
+    next_retry_window: string | null;
+  };
+  failure_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const controlPlaneActions = {
   async cancelRun(runId: string): Promise<RunRecord> {
     const response = await requestJson<RunResponse>(`/v1/runs/${runId}/cancel`, {
@@ -1203,6 +1261,84 @@ export const controlPlaneActions = {
     const path =
       queryString.length > 0 ? `/v1/corrections/metrics?${queryString}` : "/v1/corrections/metrics";
     return requestJson<CorrectionMetricsResponseRecord>(path);
+  },
+
+  /* ---------------------------------------------------------------------- *
+   * Wizard (ADR-0021). Nine endpoints under /v1/wizard that no UI called.
+   *
+   * NOTE: there is deliberately no `listWizardProjects` here, because the API
+   * has no such route — `GET /v1/wizard/projects` answers 405 (verified
+   * 2026-09-06). Only `GET /projects/{id}` exists, so the onboarding surface
+   * carries the project id in its URL and cannot render an index. Adding the
+   * list route is a contract change (regenerate + manifest bump); until then,
+   * do not fake an index client-side.
+   * ---------------------------------------------------------------------- */
+
+  async createWizardProject(name: string): Promise<WizardProject> {
+    return requestJson<WizardProject>("/v1/wizard/projects", {
+      method: "POST",
+      body: { name },
+    });
+  },
+
+  async getWizardProject(projectId: string): Promise<WizardProject> {
+    return requestJson<WizardProject>(`/v1/wizard/projects/${encodeURIComponent(projectId)}`);
+  },
+
+  async saveWizardScope(projectId: string, scope: Record<string, unknown>): Promise<WizardProject> {
+    return requestJson<WizardProject>(
+      `/v1/wizard/projects/${encodeURIComponent(projectId)}/scope`,
+      { method: "POST", body: { scope } },
+    );
+  },
+
+  async saveWizardDiscoveryPlan(
+    projectId: string,
+    discoveryPlan: Record<string, unknown>,
+  ): Promise<WizardProject> {
+    return requestJson<WizardProject>(
+      `/v1/wizard/projects/${encodeURIComponent(projectId)}/discovery-plan`,
+      { method: "POST", body: { discovery_plan: discoveryPlan } },
+    );
+  },
+
+  async startWizardPilotRun(projectId: string, sampleLimit?: number): Promise<WizardRunStatus> {
+    return requestJson<WizardRunStatus>(
+      `/v1/wizard/projects/${encodeURIComponent(projectId)}/pilot-run`,
+      { method: "POST", body: { sample_limit: sampleLimit ?? null } },
+    );
+  },
+
+  async getWizardRun(runId: string): Promise<WizardRunStatus> {
+    return requestJson<WizardRunStatus>(`/v1/wizard/runs/${encodeURIComponent(runId)}`);
+  },
+
+  async approveWizardRun(runId: string, reason?: string): Promise<WizardRunStatus> {
+    return requestJson<WizardRunStatus>(`/v1/wizard/runs/${encodeURIComponent(runId)}/approve`, {
+      method: "POST",
+      body: { reason: reason ?? null },
+    });
+  },
+
+  async rejectWizardRun(runId: string, reason?: string): Promise<WizardRunStatus> {
+    return requestJson<WizardRunStatus>(`/v1/wizard/runs/${encodeURIComponent(runId)}/reject`, {
+      method: "POST",
+      body: { reason: reason ?? null },
+    });
+  },
+
+  /**
+   * `POST /v1/wizard/runs/{id}/restart` — the ONLY exit from `GateExpired`.
+   *
+   * That state is terminal by design: an un-actioned human gate must never
+   * auto-approve a fan-out of crawls against live government portals. Restart
+   * starts a *fresh* run on the same project (keeping scope and discovery plan)
+   * and returns the NEW run, so the caller must re-point at the returned id.
+   */
+  async restartWizardRun(runId: string): Promise<WizardRunStatus> {
+    return requestJson<WizardRunStatus>(`/v1/wizard/runs/${encodeURIComponent(runId)}/restart`, {
+      method: "POST",
+    });
   },
 };
 
