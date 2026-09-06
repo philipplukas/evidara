@@ -100,6 +100,31 @@ class PipelineStageLedgerTests(unittest.TestCase):
         payload = self._run().manifest.to_dict()
         validate_instance_against_contract(payload, "schemas/processing-manifest.schema.json")
 
+    def test_the_ledger_crosses_the_boundary_on_document_processed(self):
+        """The control plane renders the timeline from this event, not from the
+        lakehouse. Drop the `stages` block in `build_document_processed_event`
+        and this fails — the manifest would still carry the ledger while every
+        operator surface showed nothing.
+        """
+        result = self._run()
+        payload = result.document_processed_event["payload"]
+
+        self.assertIn("stages", payload)
+        self.assertEqual(
+            [stage["name"] for stage in payload["stages"]],
+            [stage["name"] for stage in result.manifest.stages],
+        )
+
+    def test_the_emitted_event_validates_against_its_contract(self):
+        """`payload` is `additionalProperties: false`, so an undeclared `stages`
+        key fails here — this is what keeps the producer and the event contract
+        from drifting.
+        """
+        validate_instance_against_contract(
+            self._run().document_processed_event,
+            "events/document-processed.schema.json",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

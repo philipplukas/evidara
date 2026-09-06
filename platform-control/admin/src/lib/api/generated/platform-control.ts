@@ -2433,6 +2433,8 @@ export interface components {
             reason_summary: string | null;
             /** Search Disposition */
             search_disposition: string | null;
+            /** Stages */
+            stages?: components["schemas"]["PipelineStage"][] | null;
             /**
              * Occurred At
              * Format: date-time
@@ -3041,6 +3043,43 @@ export interface components {
             applied: number;
             /** Rejected */
             rejected: number;
+        };
+        /**
+         * PipelineStage
+         * @description One document-intelligence stage's timing and counts.
+         *
+         *     Mirrors `contracts/events/document-processed.schema.json#/…/stages/items`.
+         *     Timings and counts ONLY: this does NOT say what the stage removed from the
+         *     text (footnote apparatus, page furniture, a lifted Randtitel, a dropped
+         *     citation) — that disclosure is ADR-0044's subject and is not implemented.
+         *
+         *     `items_in` / `items_out` are `None` when the stage did not measure them, and
+         *     a renderer must show that as "not recorded" rather than as `0`: absence and
+         *     zero are different facts, and only one of them is a claim about the work.
+         */
+        PipelineStage: {
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "normalize" | "sectionize" | "extract" | "assemble" | "enrich" | "finalize";
+            /** Duration Ms */
+            duration_ms: number;
+            /** Items In */
+            items_in?: number | null;
+            /** Items Out */
+            items_out?: number | null;
+            /**
+             * Failed
+             * @default false
+             */
+            failed: boolean;
+            /** Error Type */
+            error_type?: string | null;
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ProcessingStatus

@@ -31,6 +31,32 @@ class ManifestRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class PipelineStage(BaseModel):
+    """One document-intelligence stage's timing and counts.
+
+    Mirrors `contracts/events/document-processed.schema.json#/…/stages/items`.
+    Timings and counts ONLY: this does NOT say what the stage removed from the
+    text (footnote apparatus, page furniture, a lifted Randtitel, a dropped
+    citation) — that disclosure is ADR-0044's subject and is not implemented.
+
+    `items_in` / `items_out` are `None` when the stage did not measure them, and
+    a renderer must show that as "not recorded" rather than as `0`: absence and
+    zero are different facts, and only one of them is a claim about the work.
+    """
+
+    name: Literal["normalize", "sectionize", "extract", "assemble", "enrich", "finalize"]
+    duration_ms: int = Field(ge=0)
+    items_in: int | None = Field(default=None, ge=0)
+    items_out: int | None = Field(default=None, ge=0)
+    failed: bool = False
+    error_type: str | None = None
+    #: Reserved for ADR-0044. Absent today; absence means "not recorded", never
+    #: "nothing was removed".
+    details: dict[str, Any] | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class DocumentProcessedPayload(BaseModel):
     document_id: str = Field(pattern=r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
     document_revision: int = Field(ge=1)
@@ -48,6 +74,11 @@ class DocumentProcessedPayload(BaseModel):
         default=None,
         pattern=r"^pm_[0-9a-hjkmnp-tv-z]{26}$",
     )
+    #: Defaults to an EMPTY list, and that default means "the producer sent no
+    #: ledger" — an older document-intelligence, or a path that builds no
+    #: ledger. It does not mean the pipeline ran no stages, and no surface may
+    #: render it as though it did.
+    stages: list[PipelineStage] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -102,6 +133,11 @@ class DocumentLifecycleEventResponse(BaseModel):
     reason_code: str | None
     reason_summary: str | None
     search_disposition: str | None
+    #: `null` means document-intelligence recorded no stage ledger for this
+    #: document — an event from before #903, or a producer that emits none. It
+    #: does NOT mean the pipeline ran no stages, and a client must render it as
+    #: "not recorded" rather than as an empty or zeroed timeline.
+    stages: list[PipelineStage] | None = None
     occurred_at: datetime
     created_at: datetime
     updated_at: datetime

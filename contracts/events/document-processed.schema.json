@@ -92,6 +92,49 @@
                 "null"
               ],
               "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "stages": {
+              "type": "array",
+              "description": "Per-stage timings and counts, denormalised from the processing manifest so the control plane can render them without reading the lakehouse. Same shape and same caveats as `processing-manifest.schema.json#/properties/stages`: timings and counts ONLY — an entry does NOT say what the stage removed from the text (ADR-0044). An absent or empty array means the producer did not record stages, NOT that no stages ran, so a consumer must render absence as 'not recorded' rather than as zero work.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "duration_ms"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "normalize",
+                      "sectionize",
+                      "extract",
+                      "assemble",
+                      "enrich",
+                      "finalize"
+                    ]
+                  },
+                  "duration_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "items_in": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "items_out": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "failed": {
+                    "type": "boolean"
+                  },
+                  "error_type": {
+                    "type": "string"
+                  },
+                  "details": {
+                    "type": "object"
+                  }
+                }
+              }
             }
           },
           "additionalProperties": false

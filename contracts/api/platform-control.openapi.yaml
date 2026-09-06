@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.25.0
+  version: 0.26.0
 paths:
   /health:
     get:
@@ -5313,6 +5313,13 @@ components:
           - type: string
           - type: 'null'
           title: Search Disposition
+        stages:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/PipelineStage'
+            type: array
+          - type: 'null'
+          title: Stages
         occurred_at:
           type: string
           format: date-time
@@ -6254,6 +6261,66 @@ components:
       - applied
       - rejected
       title: OperatorThroughputEntry
+    PipelineStage:
+      properties:
+        name:
+          type: string
+          enum:
+          - normalize
+          - sectionize
+          - extract
+          - assemble
+          - enrich
+          - finalize
+          title: Name
+        duration_ms:
+          type: integer
+          minimum: 0.0
+          title: Duration Ms
+        items_in:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Items In
+        items_out:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Items Out
+        failed:
+          type: boolean
+          title: Failed
+          default: false
+        error_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Type
+        details:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Details
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - duration_ms
+      title: PipelineStage
+      description: |-
+        One document-intelligence stage's timing and counts.
+
+        Mirrors `contracts/events/document-processed.schema.json#/…/stages/items`.
+        Timings and counts ONLY: this does NOT say what the stage removed from the
+        text (footnote apparatus, page furniture, a lifted Randtitel, a dropped
+        citation) — that disclosure is ADR-0044's subject and is not implemented.
+
+        `items_in` / `items_out` are `None` when the stage did not measure them, and
+        a renderer must show that as "not recorded" rather than as `0`: absence and
+        zero are different facts, and only one of them is a claim about the work.
     ProcessingStatus:
       type: string
       enum:

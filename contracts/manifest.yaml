@@ -11,7 +11,12 @@
 # 2.36.0: platform-control 0.25.0 — `/health` reports the commit the process was
 # built from. Additive and unauthenticated; a reader that ignores `build` sees
 # exactly what it saw before.
-version: "2.36.0"
+# 2.37.0: `document.processed` carries `payload.stages` — per-stage timings and
+# counts for the document, denormalised from the processing manifest so the
+# control plane can render them without reading the lakehouse. Additive and
+# optional: a consumer that ignores it is unaffected, and an absent array means
+# "not recorded", never "no stages ran".
+version: "2.37.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -55,7 +60,13 @@ apis:
     # field is always present and reports `"unknown"` outside a released image
     # rather than being omitted, so consumers never have to distinguish "no
     # version" from "old server".
-    version: "0.25.0"
+    # 0.26.0: adds the optional `stages` to the lifecycle-event response on the
+    # locked `/v1/runs/{run_id}/document-lifecycle` path (#903) — per-stage DI
+    # timings and counts. Additive: `null` is the value for every row written
+    # before this, and it means "document-intelligence recorded no ledger", NOT
+    # "the pipeline ran no stages". A reader that ignores the field is unaffected;
+    # a reader that renders it must render `null` as unrecorded, never as zero.
+    version: "0.26.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
