@@ -20,6 +20,7 @@
 
 import { type Identifier, useGetList, useRecordContext } from "ra-core";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { publicConfig } from "../../config/publicConfig";
 import type {
   CapturedResourceRecord,
   DocumentLifecycleRecord,
@@ -52,6 +53,7 @@ import {
   stageNeedsAction,
   stageNextAction,
 } from "./run-decision-support";
+import { buildDocumentSearchHref, buildMinioObjectHref } from "./runDeepLinks";
 
 /**
  * Maps an in-page anchor id (the `stageActionTarget` targets, shared with v1)
@@ -79,6 +81,32 @@ const renderInlineValue = (value: string | number | null | undefined) =>
 
 function rowFailureLevel(isFailed: boolean): PillLevel {
   return isFailed ? "critical" : "neutral";
+}
+
+/**
+ * Render `label` as an external link when `href` is non-null, and as the same
+ * plain text when it is not.
+ *
+ * The fallback is the point, not a nicety: the link targets are tailnet-only and
+ * some deployments configure none of them, so the unconfigured case must degrade
+ * to exactly what this column showed before deep links existed. `runDeepLinks`
+ * returns `null` for every unconfigured or unparseable input precisely so this
+ * decision is made in one place.
+ */
+function ExternalValueLink({ href, label }: { href: string | null; label: string }) {
+  if (!href) {
+    return <span className="font-mono text-[12px]">{label}</span>;
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-mono text-[12px] text-[var(--brand)] underline-offset-2 hover:underline"
+    >
+      {label}
+    </a>
+  );
 }
 
 function CodeBlock({ value }: { value: unknown }) {
@@ -110,7 +138,10 @@ function PipelineHealthBanner({
   error: unknown;
   onJumpToSection: (href: string) => void;
 }) {
-  const legalSearchUrl = process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim();
+  // publicConfig, not `process.env` — see SidebarMenu.tsx. `OrUndefined` keeps
+  // the existing "hide when unconfigured" behaviour of this call site rather
+  // than substituting the localhost default.
+  const legalSearchUrl = publicConfig.legalSearchBaseUrlOrUndefined;
   const evidenceRunbookPath =
     "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
 
@@ -447,7 +478,16 @@ const capturedResourceColumns: DataTableColumn<CapturedResourceRecord>[] = [
 const rawArtifactColumns: DataTableColumn<RawArtifactRecord>[] = [
   { key: "artifact_id", header: "Artifact", render: (artifact) => artifact.artifact_id },
   { key: "content_type", header: "Type", render: (artifact) => artifact.content_type },
-  { key: "storage_path", header: "Storage path", render: (artifact) => artifact.storage_path },
+  {
+    key: "storage_path",
+    header: "Storage path",
+    render: (artifact) => (
+      <ExternalValueLink
+        href={buildMinioObjectHref(publicConfig.minioConsoleBaseUrl, artifact.storage_path)}
+        label={artifact.storage_path}
+      />
+    ),
+  },
   {
     key: "created_at",
     header: "Created",
@@ -472,7 +512,23 @@ const processingStatusColumns: DataTableColumn<ProcessingStatusRecord>[] = [
     key: "document",
     header: "Document",
     render: (update) =>
-      update.document_id ? `${update.document_id} rev ${update.document_revision ?? "—"}` : "—",
+      update.document_id ? (
+        <span>
+          <ExternalValueLink
+            href={buildDocumentSearchHref(
+              publicConfig.legalSearchBaseUrlOrUndefined,
+              update.document_id,
+            )}
+            label={update.document_id}
+          />
+          <span className="text-[12px] text-[var(--foreground-subtle)]">
+            {" "}
+            rev {update.document_revision ?? "—"}
+          </span>
+        </span>
+      ) : (
+        "—"
+      ),
   },
   {
     key: "manifest",
@@ -496,7 +552,21 @@ const documentLifecycleColumns: DataTableColumn<DocumentLifecycleRecord>[] = [
   {
     key: "document",
     header: "Document",
-    render: (event) => `${event.document_id} rev ${event.document_revision}`,
+    render: (event) => (
+      <span>
+        <ExternalValueLink
+          href={buildDocumentSearchHref(
+            publicConfig.legalSearchBaseUrlOrUndefined,
+            event.document_id,
+          )}
+          label={event.document_id}
+        />
+        <span className="text-[12px] text-[var(--foreground-subtle)]">
+          {" "}
+          rev {event.document_revision}
+        </span>
+      </span>
+    ),
   },
   {
     key: "lifecycle_status",

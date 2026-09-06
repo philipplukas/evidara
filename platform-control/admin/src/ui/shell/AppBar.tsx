@@ -16,6 +16,7 @@ import { BrandMark } from "@evidara/shell";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { publicConfig } from "../../config/publicConfig";
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
@@ -23,8 +24,8 @@ import {
 } from "../../lib/admin/navigationContext";
 import { ThemeToggle } from "./ThemeToggle";
 
-const LEGAL_SEARCH_URL =
-  process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
+// See SidebarMenu.tsx — publicConfig is the single read point for NEXT_PUBLIC_*.
+const LEGAL_SEARCH_URL = publicConfig.legalSearchBaseUrl;
 
 /**
  * Map the current pathname to a friendly title. Replaces MUI's `<TitlePortal>`

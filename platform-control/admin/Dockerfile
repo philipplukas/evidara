@@ -41,6 +41,17 @@ ENV NEXT_PUBLIC_USER_ROLE=admin
 # back to the localhost:3101 dev default and sends real operators to their own
 # machine. Override at build for other environments via --build-arg if needed.
 ENV NEXT_PUBLIC_LEGAL_SEARCH_URL=https://search.evidara.veyo.dev
+# MinIO console origin, used to deep-link a raw artifact's `storage_path` to the
+# object itself. Same build-time inlining constraint as the two above.
+#
+# This host is tailnet-only, and that is deliberate rather than an oversight: the
+# console needs its own credentials, so the audience for the link is exactly the
+# operator who already has both. Leaving this UNSET is a fully supported
+# configuration — `runDeepLinks` returns `null` and the column renders the same
+# plain `s3://…` text it did before deep links existed. Do not substitute a
+# default origin here; a link that asserts an object is reachable when it is not
+# is worse than the text it replaced.
+ENV NEXT_PUBLIC_MINIO_CONSOLE_URL=https://minio-evidara.ts.veyo.dev
 RUN npm run build
 
 EXPOSE 8080

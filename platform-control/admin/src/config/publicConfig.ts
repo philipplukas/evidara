@@ -38,6 +38,16 @@ export type PublicConfig = {
    */
   readonly legalSearchBaseUrlOrUndefined: string | undefined;
   /**
+   * Trimmed `NEXT_PUBLIC_MINIO_CONSOLE_URL`, or `undefined` when unset.
+   *
+   * Deliberately has NO default. The MinIO console is tailnet-only
+   * (`minio-evidara.ts.veyo.dev`), so there is no origin that is correct for
+   * every deployment — and a wrong one produces a link that asserts the object
+   * is reachable when it is not. Consumers render plain text when this is
+   * unset; see `resources/runs/runDeepLinks.ts`.
+   */
+  readonly minioConsoleBaseUrl: string | undefined;
+  /**
    * Raw fallback user role (pre-normalization). The consumer calls
    * `normalizeRole` — kept as passthrough so that module stays the single
    * source of truth for role normalization.
@@ -77,6 +87,7 @@ export function buildPublicConfig(env: EnvSource = process.env): PublicConfig {
   return {
     legalSearchBaseUrl,
     legalSearchBaseUrlOrUndefined,
+    minioConsoleBaseUrl: trimToUndefined(env.NEXT_PUBLIC_MINIO_CONSOLE_URL),
     defaultUserRole: env.NEXT_PUBLIC_USER_ROLE,
     adminAllowedRoles: parseAllowedRoles(rawAllowedRoles),
   };
@@ -98,6 +109,7 @@ export function buildPublicConfig(env: EnvSource = process.env): PublicConfig {
  */
 const NEXT_PUBLIC_ENV: EnvSource = {
   NEXT_PUBLIC_LEGAL_SEARCH_URL: process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL,
+  NEXT_PUBLIC_MINIO_CONSOLE_URL: process.env.NEXT_PUBLIC_MINIO_CONSOLE_URL,
   NEXT_PUBLIC_USER_ROLE: process.env.NEXT_PUBLIC_USER_ROLE,
   NEXT_PUBLIC_ADMIN_ALLOWED_ROLES: process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES,
 };

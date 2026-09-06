@@ -16,14 +16,18 @@ import { useResourceDefinitions } from "ra-core";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { publicConfig } from "../../config/publicConfig";
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
   resolveLegalSearchHandoff,
 } from "../../lib/admin/navigationContext";
 
-const LEGAL_SEARCH_URL =
-  process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
+// Reads the config boundary rather than `process.env` directly (publicConfig's
+// own rule). The literal-snapshot mechanism there is what makes NEXT_PUBLIC_*
+// reach the client bundle at all, so a second ad-hoc read is not merely
+// duplication — it is a second, weaker source of truth.
+const LEGAL_SEARCH_URL = publicConfig.legalSearchBaseUrl;
 
 export interface SidebarMenuExtraItem {
   to: string;
