@@ -55,6 +55,7 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0051 | [A gate that cannot fail is not a gate](0051-a-gate-that-cannot-fail-is-not-a-gate.md) (Proposed) |
 | ADR-0052 | [Declared means produced](0052-declared-means-produced.md) (Proposed) |
 | ADR-0053 | [Effects follow the verdict](0053-effects-follow-the-verdict.md) (Proposed) |
+| ADR-0054 | [Semantic retrieval as a measured cascade](0054-semantic-retrieval-as-a-measured-cascade.md) (Proposed) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.
