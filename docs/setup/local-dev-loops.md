@@ -7,7 +7,21 @@ a rebuild per edit, or a missing service that makes a run sit `PENDING` forever.
 | Loop | Command | Reload | Use it for |
 |---|---|---|---|
 | **Inner** (seconds) | `bash scripts/platform-control-demo.sh dev` | yes — uvicorn `--reload` + Next HMR | writing code: UI work, API handlers, anything you iterate on |
-| **Outer** (minutes) | `docker compose -f docker-compose.local.yml --profile apps up` | **no** | acceptance runs, NATS/MinIO/OpenSearch paths, e2e scripts, "does the built image work" |
+| **Outer** (minutes) | `docker compose -f docker-compose.yml -f docker-compose.local.yml --profile apps --profile nats --profile minio --profile search up` | **no** | acceptance runs, NATS/MinIO/OpenSearch paths, e2e scripts, "does the built image work" |
+
+Both `-f` flags and all four profiles are required, and neither is boilerplate:
+
+- **Both files.** `docker-compose.local.yml` is an *overlay* that defines the app
+  services; `postgres` and `opensearch` live in the base `docker-compose.yml`. Passing
+  only the overlay selects services whose dependencies are then undefined, and compose
+  rejects the whole project as invalid rather than starting a subset — so the failure is
+  total, and its message names a service you never asked for.
+- **`--profile search`.** OpenSearch declares `profiles: [search, full, lean-stack]`, so
+  `--profile apps` alone selects `legal-search-api` with its dependency missing. This one
+  was absent from `scripts/ch-fedlex-compose-e2e.sh`'s own header until 2026-07-22.
+
+`python3 scripts/check_compose_profiles.py` is the gate that enforces this against every
+compose command written in the docs, and it runs in CI.
 
 ## Why the compose stack is not a dev loop
 
@@ -100,7 +114,8 @@ idle. That is a limitation of the extension path, not of automation generally.
 
 ## Housekeeping
 
-`docker compose -f docker-compose.local.yml down --remove-orphans` when you are not mid-flight.
+`docker compose -f docker-compose.yml -f docker-compose.local.yml down --remove-orphans` when
+you are not mid-flight.
 Compose warns about orphan `evidara-*` containers from previous runs of the outer loop; they
 keep holding memory, and an old `platform-control-admin` still up on `:3100` is the most likely
 way to end up reading a stale UI.
