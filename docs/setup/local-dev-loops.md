@@ -58,7 +58,8 @@ Prerequisites the loop does not install for you:
   System Node breaks the build and makes gates dishonest.
 - **`platform-control/admin/.env.local`** with the build-time role vars, or every list renders
   empty:
-  ```
+
+  ```text
   NEXT_PUBLIC_USER_ROLE=admin
   NEXT_PUBLIC_ADMIN_ALLOWED_ROLES=admin
   PLATFORM_CONTROL_API_URL=http://127.0.0.1:8000
