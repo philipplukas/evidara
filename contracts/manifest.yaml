@@ -8,7 +8,10 @@
 # 2.34.0: platform-control 0.23.0 — the wizard human gate expires into a terminal
 # state (#560). Additive; no locked path changed shape.
 # 2.35.0: platform-control 0.24.0 — the enablement guard moves server-side (#854).
-version: "2.35.0"
+# 2.36.0: platform-control 0.25.0 — `/health` reports the commit the process was
+# built from. Additive and unauthenticated; a reader that ignores `build` sees
+# exactly what it saw before.
+version: "2.36.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -47,7 +50,12 @@ apis:
     # answers 409 with machine-readable `refusals[].code`, and reports `applied` /
     # `needs_human` / `evidence_binding`. Additive on the wire — but `{enabled, note}`
     # alone can no longer arm a key, which is the point.
-    version: "0.24.0"
+    # 0.25.0: `/health` gains `build` (`git_sha`, `build_date`), baked at image
+    # build from the same `github.sha` the image is tagged with. Additive — the
+    # field is always present and reports `"unknown"` outside a released image
+    # rather than being omitted, so consumers never have to distinguish "no
+    # version" from "old server".
+    version: "0.25.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

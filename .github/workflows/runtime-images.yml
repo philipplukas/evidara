@@ -48,11 +48,18 @@ jobs:
       legal_search_frontend: ${{ steps.filter.outputs.legal_search_frontend }}
       document_intelligence_consumer: ${{ steps.filter.outputs.document_intelligence_consumer }}
       marketing: ${{ steps.filter.outputs.marketing }}
+      # One build date for every image in this run, so eight images built from one
+      # commit report the same timestamp instead of eight timestamps minutes apart.
+      build_date: ${{ steps.buildmeta.outputs.date }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Build metadata
+        id: buildmeta
+        run: echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Paths filter
         uses: dorny/paths-filter@v3
@@ -151,6 +158,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.changes.outputs.build_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -217,6 +227,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.changes.outputs.build_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -283,6 +296,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.changes.outputs.build_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -349,6 +365,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.changes.outputs.build_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -415,6 +434,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.changes.outputs.build_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -481,6 +503,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.changes.outputs.build_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -547,6 +572,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.changes.outputs.build_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -613,6 +641,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.changes.outputs.build_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

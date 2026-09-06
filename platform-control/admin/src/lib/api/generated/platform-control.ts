@@ -1584,6 +1584,16 @@ export interface components {
             evidence_binding?: string | null;
             acceptance_verdict?: components["schemas"]["BlueprintTemplateAcceptanceVerdict"] | null;
         };
+        /**
+         * BuildInfo
+         * @description Provenance of the running process.
+         */
+        BuildInfo: {
+            /** Git Sha */
+            git_sha: string;
+            /** Build Date */
+            build_date: string;
+        };
         /** BundeslandHttpAcquisitionSpec */
         BundeslandHttpAcquisitionSpec: {
             /**
@@ -2788,6 +2798,7 @@ export interface components {
             status: string;
             /** Service */
             service: string;
+            build: components["schemas"]["BuildInfo"];
         };
         /** HierarchySyncCountsResponse */
         HierarchySyncCountsResponse: {

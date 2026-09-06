@@ -2,6 +2,7 @@ from fastapi import APIRouter, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
 
+from platform_control.build_info import get_build_info
 from platform_control.config import get_settings
 from platform_control.database import get_session_maker
 from platform_control.models.run import Run
@@ -15,7 +16,11 @@ router = APIRouter(tags=["health"])
 @router.get("/health", response_model=HealthResponse)
 async def get_health() -> HealthResponse:
     settings = get_settings()
-    return HealthResponse(status="ok", service=settings.app_name)
+    return HealthResponse(
+        status="ok",
+        service=settings.app_name,
+        build=get_build_info(),
+    )
 
 
 @router.get("/metrics", include_in_schema=False)

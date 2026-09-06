@@ -22,6 +22,7 @@ import {
   type LegalSearchHandoff,
   resolveLegalSearchHandoff,
 } from "../../lib/admin/navigationContext";
+import { formatBuildLabel } from "../../lib/format/buildLabel";
 
 // Reads the config boundary rather than `process.env` directly (publicConfig's
 // own rule). The literal-snapshot mechanism there is what makes NEXT_PUBLIC_*
@@ -98,6 +99,7 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
   const footerLabel =
     handoff.hasOrigin && handoff.query ? "Return to active search" : "Back to legal search";
   const footerSecondary = describeLegalSearchHandoff(handoff);
+  const buildLabel = formatBuildLabel(publicConfig.buildSha, publicConfig.buildDate);
 
   return (
     <nav
@@ -198,6 +200,24 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
               </span>
             </span>
           </a>
+
+          {/*
+            Build provenance. Renders only when this bundle was built from a
+            tagged image — under `npm run dev` there is none, and a blank where a
+            version belongs reads as "no version" rather than "not applicable".
+            Full SHA in the title so it can be copied for a `git show`.
+          */}
+          {buildLabel ? (
+            <a
+              href={`https://github.com/philipplukas/evidara/commit/${publicConfig.buildSha}`}
+              target="_blank"
+              rel="noreferrer"
+              title={publicConfig.buildSha}
+              className="mx-[10px] block px-[14px] pt-1 font-mono text-[11px] text-[var(--text-meta)] no-underline hover:text-[var(--brand)] hover:underline"
+            >
+              {buildLabel}
+            </a>
+          ) : null}
         </div>
       </div>
     </nav>
