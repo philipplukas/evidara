@@ -27,16 +27,25 @@ err() {
   fail=1
 }
 
-# Paths matching a pattern, EXCLUDING anything under node_modules. Prints one
-# path per line; prints nothing when there is no match.
+# Paths matching a pattern, EXCLUDING anything under node_modules or a nested
+# checkout. Prints one path per line; prints nothing when there is no match.
 #
 # Callers must test the OUTPUT for emptiness, never a pipeline's exit status.
 # The obvious-looking `grep -rl … | grep -qv node_modules` is INVERTED: on empty
 # input `grep -qv` returns 0 under some implementations (ugrep among them) and 1
 # under GNU grep, so the guard fires precisely when the violation is ABSENT.
 # That mis-fired for real — it reported a Dockerfile that does not exist.
+#
+# `.claude/worktrees/` holds agent git worktrees, each a full checkout of some
+# OTHER branch. It is gitignored, but `grep -r` does not know that, so every
+# worktree still carrying a pre-#588 branch reported as a live violation of the
+# very invariant #588 fixed. The result: this gate FAILED on a clean tree
+# locally while passing in CI (which checks out fresh and has no worktrees) —
+# a gate that disagrees with CI in the direction of false alarm, which is how
+# a gate stops being read. Excluded by path, not by `git check-ignore`, so the
+# fixture-based self-test does not need a git repo.
 matches_outside_node_modules() {
-  grep -rl "$@" . 2>/dev/null | grep -v '/node_modules/' || true
+  grep -rl "$@" . 2>/dev/null | grep -v -e '/node_modules/' -e '^\./\.claude/' -e '/\.git/' || true
 }
 
 # 1. The root `node_modules` must never be a symlink into a surface.

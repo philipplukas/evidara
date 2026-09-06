@@ -135,6 +135,38 @@ class CheckJsWorkspaceHygieneTest(unittest.TestCase):
         (vendored / "Dockerfile").write_text("COPY scripts/ensure-monorepo-shared-modules.mjs .\n")
         self.assert_passes("a vendored Dockerfile must not trip the guard")
 
+    # --- nested checkouts (.claude/worktrees) -------------------------------
+
+    def test_violation_inside_a_claude_worktree_is_ignored(self) -> None:
+        """An agent worktree is a checkout of ANOTHER branch, not this tree.
+
+        `.claude/worktrees/` is gitignored, but `grep -r` does not know that. Every
+        worktree still holding a pre-#588 branch reported as a live violation of the
+        invariant #588 fixed — so this gate FAILED on a clean working tree locally
+        while passing in CI, which checks out fresh and has no worktrees. A gate that
+        disagrees with CI in the direction of false alarm is one people stop reading.
+        """
+        worktree = self.root / ".claude/worktrees/agent-abc/legal-search/frontend"
+        worktree.mkdir(parents=True)
+        (worktree / "package.json").write_text(
+            '{"scripts": {"postinstall": "node scripts/ensure-monorepo-shared-modules.mjs"}}'
+        )
+        (worktree / "Dockerfile").write_text("COPY scripts/ensure-monorepo-shared-modules.mjs .\n")
+        self.assert_passes("a violation inside a nested agent worktree must not trip the guard")
+
+    def test_exclusion_does_not_swallow_a_real_dot_prefixed_path(self) -> None:
+        """The exclusion is `.claude/worktrees`, not "anything dot-prefixed".
+
+        Guard against widening it to `/\..*/` — a real violation in a dotted
+        directory this repo does track would then pass silently.
+        """
+        dotted = self.root / ".config/legal-search/frontend"
+        dotted.mkdir(parents=True)
+        (dotted / "Dockerfile").write_text("COPY scripts/ensure-monorepo-shared-modules.mjs .\n")
+        self.assert_fails_with(
+            "Dockerfile", "a violation in a tracked dot-directory must still fail"
+        )
+
     # --- check 3: stray legal-search package --------------------------------
 
     def test_legal_search_package_json_fires(self) -> None:
