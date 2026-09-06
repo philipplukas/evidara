@@ -18,7 +18,16 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/philipplukas/evidara.git
+    # SSH, not HTTPS: the repository is private and the credential is a
+    # repository-scoped READ-ONLY deploy key, which has no account behind it and
+    # no expiry to rotate. An HTTPS URL here would need a PAT instead — a
+    # credential that reads one repository should not carry a whole account.
+    #
+    # This URL must match the `url` in the `evidara-repo` Secret EXACTLY, or Argo
+    # CD does not associate the two and falls back to anonymous access, which for
+    # a private repo fails as `authentication required` — with health still
+    # reporting `Healthy`. See deploy-argocd.sh.
+    repoURL: git@github.com:philipplukas/evidara.git
     targetRevision: main
     path: infra/hetzner/apps
   destination:

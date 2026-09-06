@@ -24,18 +24,26 @@
 # that health still shows `Healthy`, so a glance at the wrong column reads as
 # working. (Observed on first install, 2026-09-06.)
 #
-# Supply a token once, out of band:
+# The credential is a repository-scoped, READ-ONLY GitHub deploy key. Not a PAT:
+# a deploy key has no account behind it, cannot reach any other repository, and
+# has no expiry to rotate. GitHub has no API for minting a fine-grained PAT, so a
+# PAT would also have to be created by hand in a browser.
 #
-#   ARGOCD_REPO_TOKEN=<token> bash infra/hetzner/deploy-argocd.sh
+# The private key lives in 1Password and is read at deploy time — it is never
+# committed, never echoed, and never stored on disk:
 #
-# Use a fine-grained PAT scoped to this repository with **Contents: read-only** —
-# not a classic `repo` token, and not a personal OAuth token from `gh auth token`,
-# which carries the full scope of your account into the cluster for a job that
-# needs to read one repository.
+#   op://Infrastructure/evidara-argocd-repo/private_key
 #
-# The Secret is created once and preserved on re-runs (same pattern as the
-# Grafana admin password in deploy-observability.sh), so routine re-runs need no
-# token in the environment.
+# so the normal invocation needs no secret in the environment at all:
+#
+#   bash infra/hetzner/deploy-argocd.sh
+#
+# `ARGOCD_REPO_SSH_KEY` overrides the 1Password read for a machine without `op`
+# (CI, a recovery shell). The Secret is created once and preserved on re-runs
+# (same pattern as the Grafana admin password in deploy-observability.sh).
+#
+# To rotate: delete the deploy key on GitHub, delete the `evidara-repo` Secret,
+# generate a new keypair, update the 1Password item, re-run this script.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,24 +82,53 @@ helm upgrade --install argocd argo/argo-cd \
   --wait --timeout 10m
 
 echo "==> Repository credential (created once; re-runs preserve it)"
+# This URL must match the Application's `repoURL` EXACTLY. Argo CD matches the
+# credential to the repository by string, so a mismatch does not error — it
+# silently falls back to anonymous access, which for a private repo fails as
+# `authentication required` while health still reads `Healthy`.
+REPO_SSH_URL="git@github.com:philipplukas/evidara.git"
+
 if kubectl -n "$NS" get secret evidara-repo >/dev/null 2>&1; then
   echo "    reusing existing evidara-repo"
-elif [ -n "${ARGOCD_REPO_TOKEN:-}" ]; then
-  # `--type` and the argocd.argoproj.io/secret-type label are what make Argo CD
-  # pick this up as a repository credential rather than an inert Secret.
+else
+  ssh_key="${ARGOCD_REPO_SSH_KEY:-}"
+  if [ -z "$ssh_key" ]; then
+    if ! command -v op >/dev/null 2>&1; then
+      echo "!! No 'evidara-repo' Secret, no ARGOCD_REPO_SSH_KEY, and the 1Password"
+      echo "!! CLI ('op') is not installed, so the deploy key cannot be read from"
+      echo "!! op://Infrastructure/evidara-argocd-repo/private_key."
+      exit 1
+    fi
+    echo "    reading the deploy key from 1Password"
+    # Read straight into a variable: the key never lands on disk, and command
+    # substitution keeps it out of the process table (unlike passing it as an arg).
+    if ! ssh_key="$(op read "op://Infrastructure/evidara-argocd-repo/private_key" 2>/dev/null)"; then
+      echo "!! Could not read op://Infrastructure/evidara-argocd-repo/private_key"
+      echo "!! Sign in first:  eval \$(op signin)"
+      exit 1
+    fi
+  fi
+
+  if [ -z "$ssh_key" ]; then
+    echo "!! The deploy key resolved to an empty value; refusing to create an"
+    echo "!! unusable credential that would fail as 'authentication required'."
+    exit 1
+  fi
+
+  # An OpenSSH private key must end with a newline or ssh rejects it as malformed.
+  # `op read` and $(...) both strip trailing newlines, so it has to be put back —
+  # without this the Secret looks correct and every fetch fails.
   kubectl -n "$NS" create secret generic evidara-repo \
     --from-literal=type=git \
-    --from-literal=url=https://github.com/philipplukas/evidara.git \
-    --from-literal=username=git \
-    --from-literal=password="$ARGOCD_REPO_TOKEN"
+    --from-literal=url="$REPO_SSH_URL" \
+    --from-file=sshPrivateKey=/dev/stdin <<EOF_KEY
+${ssh_key}
+EOF_KEY
+  # The label is what makes Argo CD treat this as a repository credential rather
+  # than an inert Secret.
   kubectl -n "$NS" label secret evidara-repo argocd.argoproj.io/secret-type=repository
-  echo "    created evidara-repo"
-else
-  echo "!! No 'evidara-repo' Secret and no ARGOCD_REPO_TOKEN in the environment."
-  echo "!! The repository is private; without a credential the Application reports"
-  echo "!! 'authentication required' and never syncs — while still showing Healthy."
-  echo "!! Re-run as: ARGOCD_REPO_TOKEN=<fine-grained PAT, Contents: read> bash $0"
-  exit 1
+  unset ssh_key
+  echo "    created evidara-repo from the read-only deploy key"
 fi
 
 echo "==> Application: evidara-apps"
