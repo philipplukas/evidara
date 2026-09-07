@@ -1,15 +1,17 @@
 # UX / Aesthetic review runbook
 
 Owner: Design / frontend
-Last reviewed: 2026-04-27
-Last verified: 2026-04-16 (Pass 3, commit 78ee96b)
+Last reviewed: 2026-09-07
+Last verified: 2026-09-07 (operator-panel walkthrough — #928, #929, #930)
 Applies to: legal-search/frontend, platform-control/admin
 
 A reusable checklist for periodically auditing the visual and interaction
 quality of Evidara's two user-facing surfaces:
 
 - `legal-search/frontend` — operator and end-user search experience (Next.js, Tailwind, design tokens).
-- `platform-control/admin` — operator control plane (Next.js, react-admin, MUI).
+- `platform-control/admin` — operator control plane (Next.js, `ra-core` + Tailwind
+  primitives; ADR-0026 retired MUI from the v2 pages, so §6's older findings
+  describe a UI that no longer exists).
 
 This runbook is meant to be run every release milestone or before any
 externally-shared demo, and captures both the evidence-gathering workflow
@@ -23,24 +25,58 @@ and a concrete list of issues found so far.
   system (ADR-0016) or a shared primitive changes.
 - Two deliverables per run:
   1. An updated screenshot pack in `legal-search/frontend/screenshot-pack/`.
-  2. A review pass (markdown comment + Linear sync) recording findings and
-     severity.
+  2. **GitHub issues** — one per independently schedulable change, plus a meta
+     issue carrying the method, what was confirmed working, and what was
+     discarded. Findings do not go in `docs/`: a findings file goes stale exactly
+     the way §2 of this runbook did, whereas an issue gets closed.
 
 ## 2. Prerequisites
 
-- Local stack healthy: `legal-search` on port **3101**, `admin` on port **3100**.
-  The admin dev server requires:
+**Bring-up lives in [`.claude/skills/run-admin-panel/SKILL.md`](../../.claude/skills/run-admin-panel/SKILL.md),
+not here.** That file is maintained against the running stack; this section
+records only what a *reviewer* has to know, and defers to it for the commands.
 
-  ```bash
-  NEXT_PUBLIC_USER_ROLE=admin \
-  NEXT_PUBLIC_ADMIN_ALLOWED_ROLES=admin \
-  pnpm --filter admin dev
-  ```
+- **npm, per surface. Not pnpm.** There is no `pnpm-lock.yaml`; the repo is not a
+  workspace and each JS surface owns its own `node_modules` (AGENTS.md). CI
+  installs with `npm ci` inside each surface.
+- **Node 22 via nvm** — `source ~/.config/nvm/nvm.sh; nvm use`. System node breaks
+  the build and makes gates dishonest.
+- Ports: legal-search frontend **3101**, admin dev server **3000**. The compose
+  production build of the admin is **3100** — reading the stale one is the usual
+  reason "my change did not show up".
 
-- Playwright dependencies installed (`pnpm --filter frontend exec playwright install`).
-- Linear access via the `plugin-linear-linear` MCP (or CLI equivalent) for
-  sync. Note the workspace has been hitting free-tier `save_issue` limits —
-  fall back to a `save_comment` payload when that happens.
+### The two traps that produce a dishonest review
+
+Both fail *quietly*, into a panel that looks empty rather than broken. A review
+that hits either is reviewing nothing.
+
+1. **API auth fails closed.** Without
+   `PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1` every protected route
+   answers **503** and every list renders empty. `/health` stays 200 and will not
+   reveal it. Probe a protected route and require 200:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' \
+     'http://127.0.0.1:8000/v1/reference-data/jurisdictions?limit=1'
+   ```
+
+2. **Every locally-acquired run ends `completed`.** So `pending`, `running`,
+   `failed` and `cancelled` have never existed on a developer machine — the
+   attention chip, cancel, retry, the failure copy and four of five preset chips
+   render nothing. Seed them first:
+
+   ```bash
+   bash scripts/platform-control-demo.sh seed-demo-runs
+   ```
+
+   **A review that never saw the populated states is not a review.** Reviewing
+   empty states as though they were the product is how a UX pass produces
+   confident nonsense.
+
+- **Drive with Playwright, not the Chrome extension.** The Next 16 dev server
+  never reports `document_idle`, so extension-based automation times out. This is
+  about the extension, not automation generally — Playwright against `npm run dev`
+  is the fast path and needs no production build.
 
 ## 3. Evidence-gathering workflow
 
@@ -50,7 +86,7 @@ and a concrete list of issues found so far.
 cd legal-search/frontend
 NEXT_PUBLIC_USER_ROLE=admin \
 NEXT_PUBLIC_ADMIN_ALLOWED_ROLES=admin \
-pnpm exec playwright test e2e/screenshot-pack.spec.ts --reporter=list
+npm run e2e:screenshot-pack
 ```
 
 Produces 23 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
@@ -78,6 +114,13 @@ Produces 23 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
 The spec hides Next.js dev indicators and TanStack Query devtools by stripping
 the corresponding shadow-DOM hosts before each screenshot — confirm none bleed
 into the pack.
+
+**If you write your own capture driver, you must strip them too.** The 2026-09-07
+walkthrough used a custom driver, did not, and nearly filed the circular "N"
+badge as a misplaced avatar in the admin sidebar. It is `nextjs-portal` /
+`next-dev-overlay`, it lives in shadow DOM so CSS alone cannot reach it, and it
+does not exist in a production build. See M-3b in §6 — this was already known,
+and knowing it was in a runbook nobody read is the reason for §2's first line.
 
 ### 3.2 Live walkthrough (manual)
 
@@ -108,6 +151,43 @@ concrete findings:
 - **Dev-chrome hygiene.** No floating dev widgets, overlays, or fixed
   high-z-index elements in the screenshot pack.
 
+### 4.1 The operator questions
+
+The criteria above are about how a screen *looks*. These are about whether it
+*works*, and the 2026-09-07 pass found more with them than with anything else.
+Apply all six to every view so findings are comparable rather than a pile of
+opinions.
+
+1. **Does it answer the question the operator arrived with?** Or is the answer
+   only derivable by opening three accordions, or on page 30 of 44?
+2. **Is anything shown that cannot be acted on, or actionable but not shown?**
+   The dashboard leading with a *cancelled* run (#932) is the canonical case.
+3. **Empty vs unknown vs zero.** This repo's deepest rule. A blank cell that
+   means "unknown" is the defect the coverage ledger exists to prevent — and a
+   count that is really a page size is the same defect (#934).
+4. **Is every control reachable at 1280px** without knowing to scroll?
+5. **Does it contradict another screen — or itself?** A run detail stating
+   "Captured 944" and "50 rows" for one quantity is a contradiction inside one
+   viewport.
+6. **Light and dark, every view.** Dark mode shipped in #873 with almost no
+   coverage.
+
+### 4.2 What counts as a finding
+
+Two rules, both earned the hard way on 2026-09-07:
+
+- **Every finding carries a `file:line` or a measured value.** A finding with
+  neither does not get filed. Two candidates were discarded on this rule that
+  pass — one was the Next.js dev badge, one was the reviewer's own capture driver
+  using a path where the app uses a hash route.
+- **Every "X is missing" is resolved against
+  [`contracts/api/platform-control.openapi.yaml`](../../contracts/api/platform-control.openapi.yaml)
+  to *unrendered* (the data exists and the panel ignores it) or *unavailable* (no
+  server capability), never left ambiguous.** They have very different costs, and
+  conflating them produces work nobody can schedule. One finding in that pass
+  changed category *the same day*, because the endpoint it needed had just
+  merged.
+
 ## 5. Accessibility spot-check
 
 - Keyboard: tab through a full operator journey; focus ring visible and
@@ -118,7 +198,18 @@ concrete findings:
 - i18n: toggle DE ↔ FR on legal-search; no layout breakage, no untranslated
   keys.
 
-## 6. Findings log
+## 6. Findings log — historical
+
+**This is an archive, not a checklist.** Everything below is fixed, and the
+entries from Passes 1–4 describe the MUI-era admin that ADR-0026 retired — the
+component names in their resolutions largely no longer exist.
+
+It is kept because the *findings* still teach (M-3b in particular, which the
+2026-09-07 pass rediscovered the hard way), and deliberately separated from the
+method above, because the two age at different rates: that is why §2 of this
+runbook went stale for five months while §4 stayed usable.
+
+Current findings live in GitHub issues — see §1.
 
 Severity scale: **Critical** (blocks release) / **High** / **Medium** / **Low**.
 
@@ -157,7 +248,7 @@ Severity scale: **Critical** (blocks release) / **High** / **Medium** / **Low**.
 |----|-----|---------|--------|
 | UX-12 | Normal | Pass 4 spike ships six Tailwind + `ra-core` ports alongside the MUI versions: sources list (`/sources-v2`), sources show (`/sources-v2/:id`), runs list (`/runs-v2`), runs show (`/runs-v2/:id`), authority create (`/authorities-v2/create`), authority edit (`/authorities-v2/:id/edit`). The matrix covers list / detail / filter / create / edit + a large detail page (`RunShowV2`) with derived content (decision-support 2×2, duration compute), exercising `useListController`, `useShowController`, `useGetMany`, `useGetOne`, `Form`, `useInput`, `useCreateController`, `useEditController`, and `useNotify` with zero MUI primitives. Captures: `admin-sources-list-v2.png`, `admin-source-detail-v2.png`, `admin-runs-list-v2.png`, `admin-run-detail-v2.png`, `admin-authority-create-v2.png`, `admin-authority-edit-v2.png`. ADR-0026 P3 (2026-04-18) added `<Accordion>` and ported `RunDetailSections` to `RunDetailSectionsV2` (Pipeline Health banner + 5 collapsed accordion sections bound to `useGetList`); it now renders inside `RunShowV2` and is no longer deferred. | **Review** — diff the v1/v2 pairs, decide graduate-to-`@evidara/ui` vs. discard. Deferred from the spike (all intentional, all listed as follow-up increments): bulk selection, MUI `SelectInput` (jurisdiction dropdown), source-versions section, handoff panel, run mutations (`CancelRunButton`, `RunLaunchButton`), keyboard shortcuts, scope/slug-change alerts. See header comments in `SourceListV2.tsx`, `SourceShowV2.tsx`, `RunListV2.tsx`, `RunShowV2.tsx`, `AuthorityCreateV2.tsx`, `AuthorityEditV2.tsx`, `AuthorityFormV2.tsx`, and `src/ui/primitives/`. Notifications still render via the MUI shell's `<Notification>` — intentional coexistence until the shell ports. |
 
-_All Pass 3 findings were resolved in the previous batch._
+*All Pass 3 findings were resolved in the previous batch.*
 
 #### UX-12 — Pass 4 outcome (2026-04-18)
 
@@ -227,41 +318,26 @@ Pass 4 UX-12 entries above that reference `SourceListV2.tsx` / `SourceShowV2.tsx
 `SourceVersionsSection.tsx`. Runs + reference-data resources remain in the
 coexistence window at their `/*-v2` routes.
 
-## 7. Linear sync — roadmap and templates
+## 7. Where findings go
 
-Parent epic: **[TAR-243](https://linear.app/tart-baozi/issue/TAR-243)** — _Evidara — Design system & UX (ADR-0016)_.
+**GitHub issues.** Linear is no longer where this repo tracks work; the sections
+this replaced described a Linear epic (TAR-243), a free-tier `save_issue` limit,
+and six child-issue templates, none of which apply.
 
-Status: **In Progress**. Pass 3 sync comment: [`ddc0501b-f27e-4afd-976a-01cf814000ae`](https://linear.app/tart-baozi/issue/TAR-243).
+Shape that worked on 2026-09-07 (#928 / #929 / #930 / #931):
 
-> The workspace is on the Linear free tier and `save_issue` is currently
-> rejected with `Usage limit exceeded`. Until that's lifted, the six backlog
-> tickets below live as sub-sections of the Pass 3 sync comment and the
-> template block below. Promote to real child issues (parent = TAR-243) once
-> the workspace is upgraded.
-
-### 7.1 Child-issue templates
-
-All six Pass 3 child issues have been resolved in-process — see §6.1 Fixed for
-the resolution notes. The templates below are kept as **reference shape** for
-future review passes that may need to open new Linear children under TAR-243.
-
-Each template is structured for Linear's `save_issue`: `team=Tart-baozi`,
-`project="Evidara — Design system & UX (ADR-0016)"`, `parentId=TAR-243`,
-`labels=["Improvement"]`.
-
-- **UX-N (P#, Sev)** — _Short title._
-  One-line scope / acceptance criterion.
-
-### 7.2 Sync checklist per review pass
-
-1. Regenerate the screenshot pack (`playwright test e2e/screenshot-pack.spec.ts`).
-2. Diff findings vs the previous pass; update §6 (Findings log) in this file.
-3. Update the canvas (`ux-aesthetic-review.canvas.tsx`) if visual artifacts
-   need re-linking.
-4. Post a `save_comment` on TAR-243 summarising (a) fixed items, (b) still
-   open, (c) new findings for the pass.
-5. When a child issue closes, move its row from §6.2 Open to §6.1 Fixed with
-   a link to the fix PR.
+- **One issue per independently schedulable change.** Split along the lane lines
+  in the lane map, not along the order you happened to find things in.
+- **Bundle findings that share a lane** when that lane is serial inside itself —
+  four separate admin issues would be worked one after another anyway, and one PR
+  beats four contending on the same visual baseline.
+- **Record what you discarded**, in the issue, with the reason. Not filing
+  something is part of the evidence that the pass was careful, and it stops the
+  next reviewer re-finding it.
+- **Say what was NOT reviewed.** A view seen in one theme, or in an empty state
+  only, is *partially reviewed* — not passed. The 2026-09-07 pass could not
+  review Corrections beyond its empty state because the local stack had none,
+  and said so.
 
 ## 8. Related artifacts
 
