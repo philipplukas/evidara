@@ -48,6 +48,7 @@ evidara platform-control ris-bootstrap --max-pages 1
 evidara workflow mvp-acceptance
 
 # Coverage loop (ADR-0030) — see below
+evidara workflow coverage queue --actor agent
 evidara workflow coverage templates --blocker provider_awaiting_evidence
 evidara workflow coverage preflight --overlay ch --template <template_id>
 evidara workflow coverage watch --run-id <run_id> --until processed
@@ -106,6 +107,50 @@ create → approve → dispatch, the content gates and the evidence bundle. Thes
 bracket it.
 
 This is not ADR-0033 step 6 (the MCP server); see [ADR-0033](../../docs/adr/0033-agentic-legal-reasoning.md) §4.
+
+### `coverage queue` — what to work on, and who may do it
+
+```bash
+uv run evidara workflow coverage queue --human
+uv run evidara workflow coverage queue --actor agent      # what an agent may do itself
+uv run evidara workflow coverage queue --actor human      # what it must hand over
+```
+
+The step the loop was missing (#909). Every other command here acts on a template or a
+run you already chose; nothing read the denominator to *choose*. An agent without that
+onboards enthusiastically and cannot say afterwards whether coverage improved — which
+is why the coverage ledger (#907) was its hard dependency.
+
+It reads `GET /v1/acquisition-coverage/queue` and splits the result by **actor**:
+
+| Action | Actor | Why |
+|---|---|---|
+| `enumerate_denominator` | agent | Nothing states how much this jurisdiction publishes; every other answer is unstatable until it does. |
+| `run_acceptance` | agent | A denominator exists and we hold less. An acceptance run is the ADR-0030 evidence primitive. |
+| `await_pipeline` | agent | Captured, not yet processed. Re-running acquisition would lengthen the queue it is waiting on. |
+| `investigate_holdings` | **human** | We hold *more* than the source publishes — a dedup failure or a wrong denominator. No run fixes it. |
+| `resolve_refusal` | **human** | A refused run is a decision someone made. |
+
+Two things it deliberately does not do.
+
+**It does not re-rank.** The server states its ordering rule in the payload and this
+echoes it verbatim. A second ranking in the client is how one rule ends up enforced
+twice with the weaker copy winning.
+
+**It never retries a refusal.** #854 moved the ADR-0030 two-key guard server-side, so
+a key flip is refused where it cannot be bypassed — but the server cannot tell a
+legitimate retry from an agent grinding at a refusal until it succeeds; both arrive as
+ordinary requests. A closed config key is how an operator stops traffic at one portal
+when an authority complains about load, and retrying it would override a human by
+persistence rather than by permission. So `resolve_refusal` is always `human`, and
+`test_no_refusal_is_ever_agent_actionable` fails if that changes.
+
+Note `coverage enable` below is an **operator** command. No action this plan emits maps
+to it.
+
+A plan reports `complete: false` when the queue carried a reason this client does not
+know, or when the server could not speak about every jurisdiction. *"There is no work"*
+and *"there is work I do not understand"* are different answers.
 
 ### `coverage templates` — inventory by blocker, not by symptom
 
