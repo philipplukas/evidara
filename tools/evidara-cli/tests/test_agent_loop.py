@@ -224,3 +224,17 @@ def test_every_action_is_classified() -> None:
 
 def test_action_for_returns_none_rather_than_guessing() -> None:
     assert action_for([]) is None
+
+
+def test_a_sourceless_jurisdiction_is_a_human_action_not_an_agent_one() -> None:
+    """Registering a source is a repo edit and a deploy (#736).
+
+    The server reports these as a count rather than as rows (#928), so this should
+    not normally arrive — but the value is in the published contract enum, and a
+    client that cannot classify a value the contract can produce is fragile. This
+    pins that if it does arrive it is classified deliberately, and to the right side
+    of the autonomy boundary.
+    """
+    plan = plan_from_queue(_queue(_item("jur_bare", ["no_source"])))
+    assert plan[0].action is AgentAction.REGISTER_SOURCE
+    assert plan[0].actor == "human"

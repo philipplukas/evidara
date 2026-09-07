@@ -30,7 +30,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.schemas.coverage import CoverageWorkQueueResponse
-from platform_control.services.coverage_service import CoverageService
+from platform_control.services.coverage_service import MAX_PAGE_SIZE, CoverageService
 
 _NOW = datetime(2026, 7, 28, 9, 0, tzinfo=UTC)
 
@@ -615,3 +615,95 @@ async def test_every_queued_reason_survives_the_schema_validators(
     validated = CoverageWorkQueueResponse.model_validate(payload)
     assert validated.data
     assert all(item.reasons for item in validated.data)
+
+
+# ---------------------------------------------------------------------------
+# The queue must see the whole estate, and must not drown in it (#928)
+# ---------------------------------------------------------------------------
+
+
+async def _bare_jurisdiction(session: AsyncSession, jurisdiction_id: str, name: str) -> None:
+    """A jurisdiction with no source, no runs, no reconciliation — the 2,164 case."""
+    session.add(
+        Jurisdiction(
+            jurisdiction_id=jurisdiction_id,
+            name=name,
+            slug=jurisdiction_id.replace("_", "-"),
+            level=NormLevel.MUNICIPAL,
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_jurisdiction_with_no_source_is_counted_not_listed(session: AsyncSession) -> None:
+    """5 of 2,169 jurisdictions have a source (measured 2026-09-07).
+
+    Listing the rest returned 2,164 identical `no_denominator, never_acquired` rows
+    that buried the five real ones — the same alphabetical wall the ledger already
+    had. The work they imply is "register a source", a repo edit and a deploy (#736),
+    which none of this queue's actions express.
+    """
+    seeded = await _seed(session)
+    await _refused_run(session, seeded, "run_refused_estate")
+    for index in range(3):
+        await _bare_jurisdiction(session, f"jur_bare_{index}", f"Bare {index}")
+    await session.flush()
+
+    payload = await CoverageService(session).get_coverage_work_queue()
+
+    listed = {item["jurisdiction_id"] for item in payload["data"]}
+    assert listed == {"jur_ch_zh"}
+    assert payload["jurisdictions_without_a_source"] == 3
+    # Counted, not hidden: the fact survives even though the rows do not.
+    assert payload["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_sourceless_jurisdiction_reports_one_reason_not_three(
+    session: AsyncSession,
+) -> None:
+    """It trivially also has no denominator and has never been acquired.
+
+    Emitting all three would make one problem look like three, and would put it in
+    the same bucket as a jurisdiction that HAS a source and needs an enumeration run —
+    which is real, actionable work.
+    """
+    await _bare_jurisdiction(session, "jur_bare_solo", "Bare Solo")
+    await session.flush()
+
+    reasons = CoverageService._work_reasons(
+        {
+            "expected": None,
+            "acquired_distinct_urls": 0,
+            "acquired_gap": None,
+            "processed_gap": None,
+            "refused_runs": 0,
+        },
+        has_source=False,
+    )
+    assert reasons == [CoverageWorkReason.NO_SOURCE]
+
+
+@pytest.mark.asyncio
+async def test_the_queue_sees_past_the_ledger_page_size(session: AsyncSession) -> None:
+    """The #928 defect, pinned.
+
+    The queue used to read one `MAX_PAGE_SIZE` page of the ledger, so it was computed
+    over the first 500 jurisdictions ALPHABETICALLY and reported the rest as
+    `unqueued_unmeasurable`. A jurisdiction whose name sorts after the cut was
+    invisible to it however much work it needed.
+
+    `zzz_…` here is not decoration: alphabetical order is exactly what hid them.
+    """
+    seeded = await _seed(session, jurisdiction_id="jur_zzz_last")
+    await _refused_run(session, seeded, "run_refused_last")
+    for index in range(MAX_PAGE_SIZE + 5):
+        await _bare_jurisdiction(session, f"jur_pad_{index:04d}", f"Aaa Pad {index:04d}")
+    await session.flush()
+
+    payload = await CoverageService(session).get_coverage_work_queue()
+
+    assert [item["jurisdiction_id"] for item in payload["data"]] == ["jur_zzz_last"]
+    # And it no longer has to apologise for a window it could not see past.
+    assert payload["unqueued_unmeasurable"] == 0
+    assert payload["jurisdictions_without_a_source"] == MAX_PAGE_SIZE + 5

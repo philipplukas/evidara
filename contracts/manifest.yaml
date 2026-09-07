@@ -23,7 +23,11 @@
 # TypeScript and into the contract (#908), and pipeline stages gain
 # `not_applicable`. See the API note below: the stage-status change is a
 # CORRECTION, not merely an addition.
-version: "2.39.0"
+# 2.40.0: platform-control 0.29.0 — the coverage work queue reads the whole
+# estate instead of one 500-row page, and reports sourceless jurisdictions as a
+# count rather than as rows (#928). Additive on the response; a consumer that
+# ignores the new field sees a SHORTER and more useful `data`.
+version: "2.40.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -87,7 +91,7 @@ apis:
     # ordered by a stated convention returned as `ordering`, because a priority
     # number needs a denominator exactly as much as the completeness percentage
     # ADR-0042 rejected. A consumer that wants a ranking applies its own.
-    version: "0.28.0"
+    version: "0.29.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

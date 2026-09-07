@@ -2228,6 +2228,11 @@ export interface components {
              * @default 0
              */
             unqueued_unmeasurable: number;
+            /**
+             * Jurisdictions Without A Source
+             * @default 0
+             */
+            jurisdictions_without_a_source: number;
             /** Data */
             data: components["schemas"]["CoverageWorkItem"][];
             /** Total */
@@ -2249,9 +2254,15 @@ export interface components {
          *     reasons that are true of it, the counts behind them travel alongside, and the caller
          *     decides what matters.
          *
-         *     NO_DENOMINATOR    nothing has told us how much this jurisdiction publishes, so no
-         *                       claim about coverage is possible at all. This is the one reason
-         *                       that blocks every other answer, which is why it sorts first.
+         *     NO_SOURCE         no source exists for this jurisdiction at all, so there is
+         *                       nothing to act *through*. Every other reason presumes a source
+         *                       to enumerate or acquire with; this one does not, and the work it
+         *                       implies — registering a source — is a repo edit and a deploy
+         *                       (#736), not something this queue's actions can express.
+         *     NO_DENOMINATOR    a source exists but nothing has told us how much this
+         *                       jurisdiction publishes, so no claim about coverage is possible.
+         *                       It blocks every other answer *about that jurisdiction*, which is
+         *                       why it sorts ahead of the gaps.
          *     NEVER_ACQUIRED    a denominator may or may not exist; nothing has been captured.
          *     ACQUISITION_GAP   the source says there is more than we have captured.
          *     PROCESSING_GAP    we captured it and the pipeline has not turned it into documents.
@@ -2265,7 +2276,7 @@ export interface components {
          *                       a decision waiting for an operator, not a failure to retry.
          * @enum {string}
          */
-        CoverageWorkReason: "no_denominator" | "never_acquired" | "acquisition_gap" | "processing_gap" | "holdings_exceed_denominator" | "refusals_outstanding";
+        CoverageWorkReason: "no_source" | "no_denominator" | "never_acquired" | "acquisition_gap" | "processing_gap" | "holdings_exceed_denominator" | "refusals_outstanding";
         /** CreateAuthorityRequest */
         CreateAuthorityRequest: {
             /** Jurisdiction Id */

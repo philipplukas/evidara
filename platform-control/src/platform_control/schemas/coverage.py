@@ -211,7 +211,19 @@ class CoverageWorkQueueResponse(BaseModel):
     # Jurisdictions this read structurally cannot place in the queue. A jurisdiction
     # excluded for an unknown cause must not silently look like a jurisdiction with no
     # work — that is ADR-0042's four-causes-of-an-empty-result failure again.
+    #
+    # Structurally zero since #928 (the queue reads the whole estate), and kept for
+    # exactly that reason: the day it is not zero, it has to be able to say so.
     unqueued_unmeasurable: int = Field(default=0, ge=0)
+
+    # Jurisdictions with no source at all, reported as a count rather than as rows.
+    #
+    # Not a way of hiding them. 5 of 2,169 jurisdictions have a source (measured
+    # 2026-09-07), so listing the rest returned 2,164 identical rows that buried the
+    # five real ones. The work they imply — registering a source — is a repo edit and
+    # a deploy (#736), which none of this queue's actions can express. A caller that
+    # wants the list reads the ledger; a caller that wants the fact reads this.
+    jurisdictions_without_a_source: int = Field(default=0, ge=0)
 
     data: list[CoverageWorkItem]
     total: int | None = None

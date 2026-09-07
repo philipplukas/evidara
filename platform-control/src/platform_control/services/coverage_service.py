@@ -52,6 +52,7 @@ UNMEASURED_STAGES = ["indexed"]
 # reads position as "this convention" rather than as a priority score.
 _WORK_REASON_ORDER = (
     CoverageWorkReason.NO_DENOMINATOR,
+    CoverageWorkReason.NO_SOURCE,
     CoverageWorkReason.NEVER_ACQUIRED,
     CoverageWorkReason.HOLDINGS_EXCEED_DENOMINATOR,
     CoverageWorkReason.ACQUISITION_GAP,
@@ -69,10 +70,19 @@ class CoverageService:
         return {row[0]: int(row[1] or 0) for row in rows if row[0] is not None}
 
     async def get_acquisition_coverage(
-        self, *, limit: int = 100, offset: int = 0, level: str | None = None
+        self, *, limit: int | None = 100, offset: int = 0, level: str | None = None
     ) -> dict[str, Any]:
+        """Report `expected -> discovered -> acquired -> processed` per jurisdiction.
+
+        `limit=None` returns EVERY jurisdiction and is for internal callers only —
+        the work queue, which cannot answer "which jurisdictions need work" from a
+        page. It costs no extra database work: every aggregate below is already a
+        whole-table `GROUP BY`, and only the jurisdiction list was ever paginated.
+        The HTTP route never passes it.
+        """
         # Clamp rather than reject, matching the reference-data endpoints (#666).
-        limit = max(1, min(limit, MAX_PAGE_SIZE))
+        if limit is not None:
+            limit = max(1, min(limit, MAX_PAGE_SIZE))
         offset = max(0, offset)
 
         # --- acquired: two numbers in one pass -------------------------------------
@@ -157,15 +167,10 @@ class CoverageService:
             (await self.session.execute(select(func.count()).select_from(base.subquery()))).scalar()
             or 0
         )
-        page = (
-            (
-                await self.session.execute(
-                    base.order_by(Jurisdiction.name.asc()).limit(limit).offset(offset)
-                )
-            )
-            .scalars()
-            .all()
-        )
+        paged = base.order_by(Jurisdiction.name.asc()).offset(offset)
+        if limit is not None:
+            paged = paged.limit(limit)
+        page = (await self.session.execute(paged)).scalars().all()
 
         entries = [
             self._entry(
@@ -231,13 +236,19 @@ class CoverageService:
         """
         limit = max(1, min(limit, MAX_PAGE_SIZE))
 
-        # The whole ledger, unpaginated: the queue answers "which jurisdictions need
-        # work" and a page of the ledger cannot. MAX_PAGE_SIZE bounds the OUTPUT below.
-        ledger = await self.get_acquisition_coverage(limit=MAX_PAGE_SIZE, offset=0)
+        # EVERY jurisdiction, not one page.
+        #
+        # This used to read `limit=MAX_PAGE_SIZE`, which meant the queue was computed
+        # over the first 500 jurisdictions alphabetically and reported the other 1,669
+        # as `unqueued_unmeasurable`. It was honest — it never claimed completeness —
+        # but a worklist that cannot see 77% of the estate is not a worklist (#928).
+        # It costs no extra scans: the ledger's aggregates are already whole-table.
+        ledger = await self.get_acquisition_coverage(limit=None, offset=0)
         entries: list[dict[str, Any]] = ledger["data"]
 
-        # A jurisdiction the ledger could not include is not a jurisdiction with no
-        # work — it is one we cannot speak about. Counted, never silently dropped.
+        # Kept, and now structurally zero. A jurisdiction the ledger could not include
+        # would still be one we cannot speak about, so the field stays rather than
+        # being deleted as "always 0" — the day it is not, it must say so.
         unqueued = max(0, int(ledger.get("total") or 0) - len(entries))
 
         source_ids: dict[str, list[str]] = {}
@@ -249,10 +260,26 @@ class CoverageService:
             if jurisdiction_id:
                 source_ids.setdefault(jurisdiction_id, []).append(source_id)
 
-        items = []
+        items: list[dict[str, Any]] = []
+        without_a_source = 0
         for entry in entries:
-            reasons = self._work_reasons(entry)
+            sources = source_ids.get(entry["jurisdiction_id"], [])
+            reasons = self._work_reasons(entry, has_source=bool(sources))
             if not reasons:
+                continue
+            # A jurisdiction with no source is REPORTED AS A COUNT, not as a row.
+            #
+            # Measured 2026-09-07: 5 of 2,169 jurisdictions have any source, so
+            # listing the rest produced 2,164 identical rows that buried the five
+            # real ones — the same alphabetical wall the ledger already had. The work
+            # they imply is "register a source", which is a repo edit and a deploy
+            # (#736) and none of this queue's actions.
+            #
+            # Counted rather than dropped: `jurisdictions_without_a_source` is the
+            # honest form of the same fact, and a caller that wants the list has the
+            # ledger.
+            if CoverageWorkReason.NO_SOURCE in reasons:
+                without_a_source += 1
                 continue
             items.append(
                 {
@@ -269,7 +296,7 @@ class CoverageService:
                     "processed_gap": entry["processed_gap"],
                     "refused_runs": entry["refused_runs"],
                     "quarantined_documents": entry["quarantined_documents"],
-                    "source_ids": source_ids.get(entry["jurisdiction_id"], []),
+                    "source_ids": sources,
                 }
             )
 
@@ -281,19 +308,26 @@ class CoverageService:
             "as_of": datetime.now(UTC),
             "ordering": "reason_class_then_name",
             "unqueued_unmeasurable": unqueued,
+            "jurisdictions_without_a_source": without_a_source,
             "data": items[:limit],
             "total": len(items),
             "limit": limit,
         }
 
     @staticmethod
-    def _work_reasons(entry: dict[str, Any]) -> list[CoverageWorkReason]:
+    def _work_reasons(entry: dict[str, Any], *, has_source: bool) -> list[CoverageWorkReason]:
         """Every reason true of one ledger entry.
 
         Each test mirrors a validator on `CoverageWorkItem`, so a reason that this
         method emits without the counts to support it fails at serialisation rather
         than reaching a caller as an unbacked label.
         """
+        if not has_source:
+            # Short-circuit on purpose. A sourceless jurisdiction trivially also has
+            # no denominator and has never been acquired, and emitting all three
+            # would make it look like three problems when it is one.
+            return [CoverageWorkReason.NO_SOURCE]
+
         reasons: list[CoverageWorkReason] = []
         acquired_gap = entry["acquired_gap"]
         processed_gap = entry["processed_gap"]
