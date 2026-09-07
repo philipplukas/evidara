@@ -7,10 +7,9 @@
  * state copy, and the keyboard-shortcut resolver.
  */
 import type { RunRecord } from "../../lib/admin/dataProvider";
+import { ACTIONABLE_RUN_STATUSES } from "../shared/statusLevels";
 
 type RunQueueFilterValues = Partial<Pick<RunRecord, "mode" | "status" | "refused">>;
-
-const ACTIONABLE_STATUSES: RunRecord["status"][] = ["failed", "running", "pending"];
 
 /**
  * How much of the queue the loaded page actually accounts for.
@@ -244,7 +243,7 @@ export const summarizeRunFilters = (filterValues: RunQueueFilterValues): string 
  * copy that existed for exactly that reason is what let the two drift.
  */
 export const selectAttentionRun = <T extends Pick<RunRecord, "status">>(runs: T[]): T | null => {
-  for (const status of ACTIONABLE_STATUSES) {
+  for (const status of ACTIONABLE_RUN_STATUSES) {
     const candidate = runs.find((run) => run.status === status);
     if (candidate) {
       return candidate;

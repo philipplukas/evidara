@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { selectAttentionRun } from "../runs/RunList";
 import {
   describeAttentionTarget,
   formatDuration,
@@ -93,7 +94,10 @@ describe("Dashboard helpers", () => {
         [
           {
             run_id: "run-1",
-            health: { overall_status: "blocked" } as never,
+            // `run_status` is not optional in the real payload — every
+            // `/pipeline-health` response carries it — and this fixture used to
+            // omit it, describing a response the API cannot return.
+            health: { overall_status: "blocked", run_status: "running" } as never,
             error: null,
           },
         ],
@@ -107,6 +111,84 @@ describe("Dashboard helpers", () => {
     ).toEqual({
       kind: "run",
       run_id: "run-1",
+      reason: "blocked pipeline health",
+    });
+  });
+
+  it.each([
+    ["cancelled"],
+    ["completed"],
+  ])("never nominates a %s run, however bad its pipeline health", (runStatus) => {
+    // The defect this pins, measured on a seeded stack 2026-09-07: the card
+    // read "Open run_demo_cancelled first. It is the newest run with blocked
+    // pipeline health." A cancelled run is terminal — nothing an operator
+    // does advances it — so the landing screen's first click went somewhere
+    // they could not act, while the run queue on the same data correctly
+    // offered a failed run.
+    expect(
+      selectDashboardAttentionRun(
+        [
+          {
+            run_id: "run-terminal",
+            health: { overall_status: "blocked", run_status: runStatus } as never,
+            error: null,
+          },
+        ],
+        [] as never,
+        {},
+      ),
+    ).toBeNull();
+  });
+
+  it("skips a terminal run and nominates the actionable one behind it", () => {
+    // Stronger than the test above: it is not enough to reject the cancelled
+    // run, the card has to still find the work. Filtering that returned null
+    // here would trade a wrong answer for no answer.
+    expect(
+      selectDashboardAttentionRun(
+        [
+          {
+            run_id: "run-cancelled",
+            health: { overall_status: "blocked", run_status: "cancelled" } as never,
+            error: null,
+          },
+          {
+            run_id: "run-live",
+            health: { overall_status: "blocked", run_status: "running" } as never,
+            error: null,
+          },
+        ],
+        [] as never,
+        {},
+      ),
+    ).toEqual({
+      kind: "run",
+      run_id: "run-live",
+      reason: "blocked pipeline health",
+    });
+  });
+
+  it("agrees with the run queue about which run needs attention", () => {
+    // The two selectors are the two screens that contradicted each other. They
+    // now read one definition of "actionable" (`ACTIONABLE_RUN_STATUSES`), and
+    // this asserts the agreement rather than trusting the shared import.
+    const runs = [
+      { run_id: "run-cancelled", status: "cancelled" as const },
+      { run_id: "run-failed", status: "failed" as const },
+    ];
+    const health = runs.map((run) => ({
+      run_id: run.run_id,
+      health: { overall_status: "blocked", run_status: run.status } as never,
+      error: null,
+    }));
+
+    const dashboardPick = selectDashboardAttentionRun(health, runs as never, {});
+    const queuePick = selectAttentionRun(runs);
+
+    expect(queuePick?.run_id).toBe("run-failed");
+    expect(dashboardPick).toEqual({
+      kind: "run",
+      run_id: "run-failed",
       reason: "blocked pipeline health",
     });
   });
