@@ -209,6 +209,60 @@ export async function mockAdminRunFlowApi(page: Page) {
         ],
         processing_status_event_count: 2,
         document_lifecycle_event_count: 1,
+        // Required since #908: the four operator questions are computed by
+        // platform-control now, not by the browser. A mock without this describes a
+        // response the API cannot return — and because this baseline lives in
+        // `legal-search/frontend/e2e/`, the failure surfaces in a legal-search job
+        // that an admin change has no visible connection to (#895).
+        //
+        // The values mirror what the server produces for these stages, so the
+        // committed screenshot stays comparable: production run, still moving, DI
+        // most recently updated.
+        decision_support: {
+          overall_summary: {
+            code: "still_moving",
+            text: "At least one stage is still moving through the pipeline.",
+          },
+          why_it_matters: {
+            code: "production_run",
+            text: "This production run determines whether the source version can safely flow into the live operator surface.",
+          },
+          what_is_blocked: {
+            code: "moving_no_block",
+            text: "No stage is blocked, but the pipeline is still moving and may need operator attention soon.",
+          },
+          what_changed_recently: {
+            code: "latest_stage_update",
+            text: "Most recent stage update: document intelligence is in progress.",
+          },
+          what_happens_if_ignored: {
+            code: "continues_advancing",
+            text: "The pipeline continues to advance and may still require intervention if a later stage stops.",
+          },
+          blocked_stages: [],
+          never_running_stages: [],
+          next_actions: [
+            { stage: "acquisition", status: "ok", code: "none_required", text: "No action required." },
+            {
+              stage: "document_intelligence",
+              status: "in_progress",
+              code: "inspect_di_processing",
+              text: "Inspect DI processing status events and error summaries for remediation.",
+            },
+            {
+              stage: "projection",
+              status: "pending",
+              code: "confirm_lifecycle_events",
+              text: "Confirm document lifecycle events are being emitted for this run.",
+            },
+            {
+              stage: "search",
+              status: "pending",
+              code: "verify_search_visibility",
+              text: "Verify lifecycle search disposition and confirm indexed document visibility in legal-search.",
+            },
+          ],
+        },
       });
       return;
     }
