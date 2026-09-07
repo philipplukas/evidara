@@ -119,15 +119,53 @@ class CheckHetznerImagePinsTest(unittest.TestCase):
         )
         self.assertEqual(self._run(_kustomization(SHA_A), job), 1)
 
-    def test_an_unkustomized_workload_may_roll_on_its_own_sha(self) -> None:
-        """The marketing surface (ADR-0039) is deliberately outside apps/, so it is
-        NOT required to share the platform's SHA — only to have one."""
+    def test_fails_when_a_workload_writes_its_own_inline_tag(self) -> None:
+        """This test asserted the OPPOSITE until #884, and that is the point.
+
+        The old policy let a workload outside the kustomization roll on its own SHA —
+        "not required to share the platform's SHA, only to have one". Marketing did
+        exactly that, and served `32a13330` for the life of the deployment: a
+        syntactically perfect 40-hex commit that is a pre-squash branch commit, not
+        reachable from `main`. No tag-shaped rule can tell those apart, so the rule is
+        now structural — only migrate-job.yaml may write an inline tag.
+        """
         self.assertEqual(
             self._run(
                 _kustomization(SHA_A),
                 _migrate_job(SHA_A),
                 extra={"marketing/deployment.yaml": _marketing_deployment(SHA_B)},
             ),
+            1,
+        )
+
+    def test_fails_when_an_untagged_image_has_no_images_entry(self) -> None:
+        """An untagged image with no pin does not fail to deploy — it becomes `:latest`.
+
+        That is strictly worse than a wrong SHA: it moves under the cluster on someone
+        else's merge, at a time nobody chose.
+        """
+        untagged = _marketing_deployment(SHA_A).replace(f"evidara-marketing:{SHA_A}", "evidara-marketing")
+        self.assertEqual(
+            self._run(
+                _kustomization(SHA_A),
+                _migrate_job(SHA_A),
+                extra={"marketing/deployment.yaml": untagged},
+            ),
+            1,
+        )
+
+    def test_passes_when_an_untagged_image_is_pinned_by_the_transformer(self) -> None:
+        """The shape #884 moved marketing to, and the one every other workload uses.
+
+        Without this the two tests above could be satisfied by a checker that rejects
+        every marketing manifest.
+        """
+        untagged = _marketing_deployment(SHA_A).replace(f"evidara-marketing:{SHA_A}", "evidara-marketing")
+        kustomization = _kustomization(SHA_A) + (
+            f"  - name: ghcr.io/philipplukas/evidara-marketing\n    newTag: {SHA_A}\n"
+        )
+        self.assertEqual(
+            self._run(kustomization, _migrate_job(SHA_A), extra={"marketing/deployment.yaml": untagged}),
             0,
         )
 

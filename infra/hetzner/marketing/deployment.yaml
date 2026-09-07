@@ -31,7 +31,12 @@ spec:
           # apps/kustomization.yaml. No transformer reaches this file, so the tag
           # is maintained by hand; the SHA must be one whose `Build marketing
           # image` job in runtime-images.yml is green.
-          image: ghcr.io/philipplukas/evidara-marketing:32a13330873d67d57c3bdd0d1dd03a0f81e41b16
+          # Untagged on purpose, exactly like the other seven workloads: the tag
+          # comes from the `images:` transformer in infra/hetzner/apps/kustomization.yaml.
+          # It used to carry 32a13330 inline — a pre-squash branch commit that was not
+          # on `main` at all, which is precisely what a hand-written tag next to the
+          # workload buys you (#884).
+          image: ghcr.io/philipplukas/evidara-marketing
           ports:
             - name: http
               containerPort: 8080

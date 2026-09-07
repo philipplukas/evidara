@@ -32,13 +32,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 KUSTOMIZATION = Path("infra/hetzner/apps/kustomization.yaml")
 MIGRATE_JOB = Path("infra/hetzner/apps/migrate-job.yaml")
 
-# Every other Evidara image reference under infra/hetzner/ — today just the marketing
-# Deployment (ADR-0039), which is deliberately outside apps/kustomization.yaml so the
-# public surface is not coupled to a platform rollout it has no part in. Being outside
-# the kustomization also puts it outside the `images:` transformer, which is exactly the
-# condition that let the migrate Job drift 143 commits. These do NOT have to agree with
-# the app SHA — they roll on their own schedule — but they must still be pinned to a
-# commit, not to a tag that moves under the cluster.
+# Every other Evidara image reference under infra/hetzner/.
+#
+# This used to describe the marketing Deployment (ADR-0039) as deliberately outside
+# apps/kustomization.yaml, "so the public surface is not coupled to a platform rollout
+# it has no part in", and therefore exempt from agreeing with the app SHA. #884 undid
+# that: marketing is now a base under `resources:` with an `images:` entry, so it rolls
+# in lockstep like everything else.
+#
+# The exemption is what made #884 invisible here. This gate's rule was "pinned to a
+# commit", and marketing was pinned to 32a13330 — which IS a commit, just a pre-squash
+# branch one that is not reachable from `main`. A gate cannot tell those apart from the
+# tag alone, so the fix is structural rather than a smarter tag check: every Evidara
+# image under infra/hetzner must be transformer-managed (untagged, with a matching
+# `images:` entry), and migrate-job.yaml is the single, named exception.
 HETZNER_DIR = Path("infra/hetzner")
 EVIDARA_IMAGE_PREFIX = "ghcr.io/philipplukas/evidara-"
 
@@ -58,6 +65,10 @@ PLATFORM_CONTROL_IMAGE = "ghcr.io/philipplukas/evidara-platform-control"
 
 # `image: <repo>:<tag>` in the Job's pod spec.
 _IMAGE_RE = re.compile(r"^\s*image:\s*(?P<repo>[^\s:]+):(?P<tag>\S+)\s*$", re.MULTILINE)
+
+# `image: <repo>` with no tag at all — the transformer-managed form every workload
+# except the migrate Job uses.
+_UNTAGGED_IMAGE_RE = re.compile(r"^\s*image:\s*(?P<repo>[^\s:]+)\s*$", re.MULTILINE)
 
 # A full 40-hex commit SHA. The kustomization explains why a moving tag is not
 # acceptable here: `latest` moves under the cluster on every merge, and a branch
@@ -156,6 +167,46 @@ def main() -> int:
                     "not a full 40-character commit SHA.\n"
                     "    Nothing transforms this tag, so a moving one is rolled by whoever "
                     "merges next, not by whoever deploys."
+                )
+
+    # 4. Every Evidara image under infra/hetzner is transformer-managed, and the
+    #    migrate Job is the only exception.
+    #
+    #    This is the guard #884 needed and did not have. Checks 1-3 all reason about a
+    #    tag that is already there; none of them can notice a workload that opted OUT
+    #    of the transformer by writing its own. Marketing did exactly that for the
+    #    whole life of the deployment, and check 3 waved it through because the tag it
+    #    wrote was a syntactically perfect SHA.
+    #
+    #    Requiring an untagged reference plus a matching `images:` entry also closes a
+    #    second hole in the same place: an untagged image with NO entry does not fail
+    #    to deploy, it silently resolves to `:latest`.
+    pinned_names = set(tags)
+    for path in sorted((REPO_ROOT / HETZNER_DIR).rglob("*.yaml")):
+        if path.resolve() == migrate_path.resolve():
+            continue  # the one deliberate exception, enforced by check 2 instead
+        if path.relative_to(REPO_ROOT / HETZNER_DIR).parts[0] in EXCLUDED_DIRS:
+            continue
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(REPO_ROOT)
+        for match in _IMAGE_RE.finditer(text):
+            if match.group("repo").startswith(EVIDARA_IMAGE_PREFIX):
+                errors.append(
+                    f"{rel}: `{match.group('repo')}` carries an inline tag.\n"
+                    "    Only infra/hetzner/apps/migrate-job.yaml may do that. Everything else "
+                    "is pinned once, in the `images:` transformer.\n"
+                    "    An inline tag is how marketing came to serve a commit that was not on "
+                    "`main` while every pin bump rolled past it (#884)."
+                )
+        for match in _UNTAGGED_IMAGE_RE.finditer(text):
+            repo = match.group("repo")
+            if not repo.startswith(EVIDARA_IMAGE_PREFIX):
+                continue
+            if repo not in pinned_names:
+                errors.append(
+                    f"{rel}: `{repo}` has no tag and no entry in {KUSTOMIZATION}'s `images:`.\n"
+                    "    That does not fail to deploy — it resolves to `:latest`, which moves "
+                    "under the cluster on someone else's merge."
                 )
 
     if errors:

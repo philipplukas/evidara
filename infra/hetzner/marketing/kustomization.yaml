@@ -1,0 +1,20 @@
+# The marketing surface (ADR-0039) as a kustomize base.
+#
+# It exists so `infra/hetzner/apps` can reference this directory rather than the
+# two files inside it: kustomize's load restrictor refuses a `resources:` entry
+# that reaches outside the kustomization root by path, but a sibling *base* is
+# always allowed. Without this file, bringing marketing under the apps
+# kustomization (#884) does not render.
+#
+# Deliberately NO `images:` entry here. The tag is owned by the apps
+# kustomization's transformer, in one place with the other seven, which is the
+# whole point of #884 — a second pin here would recreate the drift by being the
+# nearer one to edit.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: evidara
+
+resources:
+  - deployment.yaml
+  - ingress-tls.yaml

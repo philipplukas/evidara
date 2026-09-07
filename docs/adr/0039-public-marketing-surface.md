@@ -185,6 +185,30 @@ It requires human review and an explicit `kubectl apply`, because:
 
 Nothing in this change deploys. The manifest is a reviewed artifact.
 
+> **Status of D4 as of 2026-09-07 (#884).** The decision stands; three of the
+> facts above no longer describe the cluster, and the gap between them is the
+> defect #884 records.
+>
+> - The Ingress **is** applied, declaratively — `infra/hetzner/marketing/` is a
+>   base under `infra/hetzner/apps/kustomization.yaml`, so Argo CD owns it. The
+>   "explicit `kubectl apply` after human review" gate was real but had no
+>   mechanism behind it: what actually happened is that the Deployment and Service
+>   were applied on 2026-09-04 and the Ingress never was.
+> - It does **not** omit the BasicAuth middleware. It carries it, as a deliberate
+>   and temporary decision by the repo owner (2026-09-04) — documented at length in
+>   the header of `ingress-tls.yaml`, which remains the authority. **The page is
+>   therefore not yet public, and D4's central commitment is not yet met.** Every
+>   day the annotation stays, the surface is deployed and cannot do the one job
+>   this ADR gave it.
+> - The DNS A record now exists (`evidara.veyo.dev` → `88.99.26.120`), created at
+>   the registrar on 2026-09-07. Until then the page was deployed and unreachable —
+>   healthy pod, no route, no name — and no signal in the repo or the cluster was
+>   red about it.
+>
+> Removing the BasicAuth annotation is the change that satisfies D4. Before making
+> it, re-read D3: a submission endpoint going live is the point at which the
+> Traefik rate-limit middleware stops being optional.
+
 ## Consequences
 
 ### Positive
