@@ -61,6 +61,16 @@ class AgentAction(StrEnum):
     """A run here was refused. The refusal is the answer, and a person decides what
     happens next."""
 
+    REGISTER_SOURCE = "register_source"
+    """There is no source for this jurisdiction, so there is nothing to act through.
+    Registering one is a repo edit and a deploy (#736), which no action here can do.
+
+    The server does not normally emit `no_source` in the queue's `data` — it reports
+    those as a count instead (#928) — but the value is in the published contract enum,
+    and a client that cannot classify a value the contract can produce is fragile.
+    Mapped so that if it ever arrives it is classified deliberately rather than
+    landing in `unplannable` as though this client were out of date."""
+
 
 #: Actions the agent may carry out on its own.
 AGENT_ACTIONABLE: frozenset[AgentAction] = frozenset(
@@ -79,6 +89,7 @@ HUMAN_ONLY: frozenset[AgentAction] = frozenset(
     {
         AgentAction.RESOLVE_REFUSAL,
         AgentAction.INVESTIGATE_HOLDINGS,
+        AgentAction.REGISTER_SOURCE,
     }
 )
 
@@ -92,6 +103,7 @@ FORBIDDEN_ENDPOINT = "/enablement"
 # through branches. Ordered most-blocking first, mirroring the server's own
 # `_WORK_REASON_ORDER`; the first reason that matches decides the action.
 _REASON_TO_ACTION: tuple[tuple[str, AgentAction], ...] = (
+    ("no_source", AgentAction.REGISTER_SOURCE),
     ("no_denominator", AgentAction.ENUMERATE_DENOMINATOR),
     ("refusals_outstanding", AgentAction.RESOLVE_REFUSAL),
     ("holdings_exceed_denominator", AgentAction.INVESTIGATE_HOLDINGS),
