@@ -21,10 +21,13 @@ npm run build    # static export into out/
 
 ## What makes this surface different
 
-**It is public.** Every other Evidara surface sits behind the shared BasicAuth
-password in `infra/hetzner/auth/ingress-tls.yaml`. This one deliberately does
-not, which makes it the only component whose threat model includes anonymous
-internet traffic.
+**It is built to be public, and is currently not.** Every Evidara surface sits
+behind the shared BasicAuth password, this one included — ADR-0039's D4 was
+amended on 2026-09-07 to say the page stays private until its waitlist has a
+store and this Ingress has a rate limit. So the threat model that makes this
+component different (anonymous internet traffic) is a *design* constraint it is
+already built for, not a live one. Everything below still applies: the code is
+written for the public case, because that is what it will be.
 
 **It is statically exported.** `output: "export"` — the build emits plain
 HTML/CSS/JS and the container is a static file server. There is no server
@@ -99,11 +102,11 @@ that were true when written and stopped being true without anyone noticing:
 - It said *"not deployed"*. The Deployment and Service had in fact been applied
   since 2026-09-04, running `32a13330` — a pre-squash branch commit not on `main`.
 - It said the ingress *"intentionally omits the BasicAuth middleware"*. It does
-  not; the middleware was added deliberately, and
+  not, and as of the 2026-09-07 amendment to ADR-0039 D4 it is not meant to.
   [`infra/hetzner/marketing/ingress-tls.yaml`](../infra/hetzner/marketing/ingress-tls.yaml)
-  is the authority on why and on what must be true before it comes off. **Removing
-  it is what makes the page public**, and that is a separate, deliberate decision —
-  not something a pin bump does.
+  is the authority on the three preconditions for removing it. **Removing it is
+  the decision to publish**, and it reverses an ADR — not something a pin bump or
+  a tidy-up does.
 - It said the ingress *"needs a DNS A record for `evidara.veyo.dev` to resolve
   first"*. Correct, and it did not exist. The record
   (`evidara.veyo.dev` → `88.99.26.120`, matching `search.`, `admin.` and `id.`)

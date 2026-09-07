@@ -91,41 +91,47 @@ resources:
 # package (Package settings → Manage Actions access → `philipplukas/evidara`,
 # Write). See #884.
 #
-# 206fa983 (#915) is `main`'s tip at the time of this pin. Run 34101242765 is green,
-# and all SEVEN tags below — the six apps plus marketing, which joins the transformer
-# in this change — were confirmed present in GHCR before this pin was written:
+# 40f80f4e (#926) is `main`'s tip at the time of this pin. Run 34123569560 is green,
+# and all SEVEN tags below were confirmed present in GHCR before this pin was written:
 #
 #   for i in platform-control platform-control-admin legal-search-api \
 #            legal-search-frontend document-intelligence-document-service \
 #            document-intelligence-consumer marketing; do ... done   # all returned 1
 #
-# What this pin adds over 4932ec2c (2026-09-06, 16 commits back). This is an operator
-# and observability roll; nothing in `search.evidara.veyo.dev` changes for a user:
-#   - the operator panel gets a shell, a nav and a workflows section that runs the
-#     wizard (#902), one timeline across the five run stages (#887), per-stage
-#     pipeline visibility from document-intelligence through to the run detail (#905),
-#     deep links from a run's rows to the systems they name (#885), and a readable
-#     raw-artifact payload (#897). All `platform-control-admin`.
-#   - every surface reports the commit it was built from (#889). Note the endpoint
-#     ships here but is NOT yet complete — #894 tracks the legal-search API health
-#     endpoint and the placeholder package versions.
-#   - `/ready` reports when the schema is behind the code (#898), backed by a test
-#     that checks the Alembic-built schema against the models (#900). Until this
-#     rolls, `/ready` answers only "the database is reachable" — which is why
-#     `scripts/check-production-online.sh` probes it explicitly.
-# In the pipeline and acquisition platform:
-#   - one map column was abandoning nested widening for all of them (#904) — the
-#     second, independent route through `persist_commentary_insights` that the
-#     4932ec2c pin explicitly did NOT fix. #871 may now be closable; verify against
-#     a real rebuild before claiming it.
-#   - the six enum columns tell the truth about their type (#903).
+# What this pin adds over 206fa983 (2026-09-07, 7 commits back). Read-model and
+# operator work; nothing in `search.evidara.veyo.dev` changes for a user:
+#   - the coverage ledger states what a jurisdiction REFUSED alongside what it holds,
+#     and `GET /v1/acquisition-coverage/queue` turns the ledger into a worklist
+#     (#907 / #921). `refused_runs` and `quarantined_documents` are two counts in two
+#     units and must never be summed or netted off coverage.
+#   - run decision support moves out of the admin's TypeScript and into the contract
+#     (#908 / #922). CAUTION, this one is a CORRECTION as well as an addition:
+#     `RunPipelineHealthStage.status` gains `not_applicable`, and a run that ended
+#     failed/cancelled no longer reports the stages it never reached as `pending`.
+#     Anything that consumed `pending` from this endpoint was being misled before.
+#     Run refusals also gain `refusal_code` beside their prose.
+#   - a source version's full `acquisition_spec` is readable in the panel (#920). It
+#     was previously visible only in the create wizard, before the source existed.
 #
-# NOT zero alembic delta. ONE forward revision applies on rollout, and the migrate
-# Job must complete before the API rolls:
-#   20260906_0027_document_lifecycle_stages   (down_revision 20260903_0026)
-# 0026 was applied by the 4932ec2c rollout, whose migrate Job completed.
-# migrate-job.yaml is bumped to this same SHA in this change; keep the two in
-# lockstep, since the `images:` transformer below deliberately does not reach it.
+# `scripts/check-production-online.sh` (#916 / #918) and the operator agent's
+# `evidara workflow coverage queue` (#909 / #925) are in this range but ship
+# outside the cluster — neither is an image.
+#
+# ZERO alembic delta:
+#
+#   $ git diff --name-only --diff-filter=AMD 206fa983 origin/main -- platform-control/alembic/
+#   (empty)
+#
+# The migrate Job still runs as a PreSync hook and will complete having applied
+# nothing, which is correct here and is exactly the outcome
+# `check_hetzner_image_pins.py` exists to stop being *silent* — a successful
+# migrate that applies nothing is only fine when it is nothing by construction, as
+# verified above, and not because the Job image drifted. migrate-job.yaml is bumped
+# to this same SHA in this change; keep the two in lockstep, since the `images:`
+# transformer below deliberately does not reach it.
+#
+# The contract moved 2.37.0 -> 2.39.0 (`apis.platform_control.version`
+# 0.26.0 -> 0.28.0). No locked path changed shape.
 #
 # ── PRECONDITION, SATISFIED AS OF THIS PIN ──
 #
@@ -213,16 +219,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
+    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
+    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
+    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
+    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
+    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
+    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
+    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
