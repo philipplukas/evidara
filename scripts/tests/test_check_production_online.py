@@ -53,7 +53,10 @@ UNREACHABLE_NS = "evidara-no-such-namespace-for-tests"
 DEPLOYS = ("platform-control-api", "legal-search-api")
 
 
-def _kubectl_stub(*, ready: str = "1", image_sha: str, ingress_hosts: str) -> str:
+def _kubectl_stub(*, ready: str = "1", image_sha: str, ingress_hosts: str,
+                  argo_repo: str = "git@github.com:philipplukas/evidara.git",
+                  argo_sync: str = "Synced", argo_health: str = "Healthy",
+                  extra_argo_app: str = "") -> str:
     """A kubectl that answers only the queries the script actually makes."""
     return textwrap.dedent(f"""\
         #!/usr/bin/env bash
@@ -63,7 +66,8 @@ def _kubectl_stub(*, ready: str = "1", image_sha: str, ingress_hosts: str) -> st
           *"get ns "*) exit 0 ;;
           *"applications.argoproj.io"*)
             if [[ "$args" == *jsonpath* ]]; then
-              echo "evidara-apps Synced Healthy {image_sha}"
+              echo "evidara-apps {argo_repo} {argo_sync} {argo_health} {image_sha}"
+              {extra_argo_app}
             fi
             exit 0 ;;
           *"get ingress"*) echo "{ingress_hosts}" ;;
@@ -195,6 +199,44 @@ class ProductionOnlineCheckTest(unittest.TestCase):
             self.assertIn("somewhere.invalid -> 401", ok.stdout)
             self.assertNotIn("somewhere.invalid ->", ok.stdout.replace(
                 "somewhere.invalid -> 401", ""))
+
+    # ── Argo CD scoping ──────────────────────────────────────────────────────
+
+    def test_an_unrelated_repos_argo_app_does_not_fail_this_check(self) -> None:
+        """This Argo instance is shared with `research-platform`.
+
+        Its `platform` Application was OutOfSync/Progressing right after an Evidara
+        deploy, and the check reported it as an Evidara failure. A check that goes
+        red for reasons outside its own subject teaches people to ignore it.
+        """
+        other = 'echo "platform git@github.com:philipplukas/research-platform.git OutOfSync Progressing ffffffffffffffffffffffffffffffffffffffff"'
+        res = self._run(
+            kubectl=_kubectl_stub(image_sha=_head_sha(), ingress_hosts="", extra_argo_app=other),
+            env_extra={"SKIP_EDGE": "1"},
+        )
+        self.assertEqual(res.returncode, 0, res.stdout)
+        # Not asserted, but not hidden either.
+        self.assertIn("not this repo, not asserted here", res.stdout)
+
+    def test_this_repos_argo_app_still_fails_when_unhealthy(self) -> None:
+        """Without this, the scoping above could be satisfied by asserting nothing."""
+        res = self._run(
+            kubectl=_kubectl_stub(image_sha=_head_sha(), ingress_hosts="",
+                                  argo_sync="OutOfSync", argo_health="Degraded"),
+            env_extra={"SKIP_EDGE": "1"},
+        )
+        self.assertEqual(res.returncode, 1, res.stdout)
+        self.assertIn("OutOfSync / Degraded", res.stdout)
+
+    def test_no_app_for_this_repo_is_did_not_run_not_pass(self) -> None:
+        """An Argo section that matched nothing measured nothing."""
+        res = self._run(
+            kubectl=_kubectl_stub(image_sha=_head_sha(), ingress_hosts="",
+                                  argo_repo="git@github.com:someone/else.git"),
+            env_extra={"SKIP_EDGE": "1"},
+        )
+        self.assertIn("no Argo CD Application", res.stdout)
+        self.assertIn("DID-NOT-RUN", res.stdout)
 
     # ── the three-outcome contract ───────────────────────────────────────────
 

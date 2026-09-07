@@ -238,8 +238,34 @@ if (( ! cluster_reachable )); then
 elif ! timeout 20 kubectl get applications.argoproj.io -n "$ARGOCD_NAMESPACE" >/dev/null 2>&1; then
   skip "no Argo CD Applications readable in namespace '$ARGOCD_NAMESPACE'."
 else
-  while read -r app sync health rev; do
+  # Only assert on Applications sourced from THIS repository.
+  #
+  # This Argo instance is shared. It also serves `research-platform`, whose
+  # `platform` Application was `OutOfSync/Progressing` at the moment this script
+  # first ran after a deploy — and reporting that as an Evidara failure is simply
+  # wrong. A check that fails for reasons outside its own subject teaches people
+  # to ignore it, which costs more than the check is worth.
+  #
+  # The repo identity is derived from `origin`, not hardcoded, and compared on the
+  # `owner/repo` tail so an `https://` remote and a `git@` Application URL match.
+  repo_id() {  # normalise a git URL to owner/repo
+    # Keeps the last two path segments, so both of these give philipplukas/evidara:
+    #   git@github.com:philipplukas/evidara.git
+    #   https://github.com/philipplukas/evidara
+    printf '%s' "${1%.git}" | sed 's#.*[:/]\([^/]*/[^/]*\)$#\1#'
+  }
+  mine="$(repo_id "$(git -C "$root" remote get-url origin 2>/dev/null || echo '')")"
+
+  matched=0
+  while read -r app repourl sync health rev; do
     [[ -z "$app" ]] && continue
+    if [[ -z "$mine" || "$(repo_id "$repourl")" != "$mine" ]]; then
+      # Named, not silent: an unasserted Application should still be visible, so
+      # nobody concludes this section covered something it did not.
+      info "$app is sourced from ${repourl:-<unknown>} — not this repo, not asserted here"
+      continue
+    fi
+    matched=$((matched + 1))
     if [[ "$sync" == "Synced" && "$health" == "Healthy" ]]; then
       pass "$app: $sync / $health @ ${rev:0:8}"
     else
@@ -253,7 +279,9 @@ else
       [[ "$b" == "0" ]] || info "manifests are $b commits behind $GIT_REMOTE_REF"
     fi
   done < <(timeout 30 kubectl get applications.argoproj.io -n "$ARGOCD_NAMESPACE" \
-             -o 'jsonpath={range .items[*]}{.metadata.name} {.status.sync.status} {.status.health.status} {.status.sync.revision}{"\n"}{end}' 2>/dev/null)
+             -o 'jsonpath={range .items[*]}{.metadata.name} {.spec.source.repoURL} {.status.sync.status} {.status.health.status} {.status.sync.revision}{"\n"}{end}' 2>/dev/null)
+
+  (( matched )) || skip "no Argo CD Application in '$ARGOCD_NAMESPACE' is sourced from this repo — GitOps state was NOT asserted."
 fi
 
 # ── 5. the edge: can a user actually reach it ────────────────────────────────
