@@ -30,6 +30,7 @@ from typing import Annotated, Any
 
 import typer
 
+from evidara_cli.agent_loop import summarize_plan
 from evidara_cli.client import (
     HttpJsonError,
     join_url,
@@ -1145,3 +1146,77 @@ def coverage_enable(
 
 
 __all__ = ["coverage_app", "acceptance_evidence_verdict"]
+
+
+# ---------------------------------------------------------------------------------
+# coverage queue — the loop's "what should I work on?" (#909)
+# ---------------------------------------------------------------------------------
+
+
+@coverage_app.command("queue")
+def coverage_queue(
+    limit: Annotated[
+        int,
+        typer.Option("--limit", min=1, max=500, help="Maximum jurisdictions to plan."),
+    ] = 50,
+    actor: Annotated[
+        str,
+        typer.Option(
+            "--actor",
+            help=(
+                "Filter the plan: 'agent' (what an operator agent may do itself), "
+                "'human' (what it must hand over), or 'all'."
+            ),
+        ),
+    ] = "all",
+    human: Annotated[bool, typer.Option("--human", help="Pretty-print JSON")] = False,
+    correlation_id: Annotated[str | None, typer.Option("--correlation-id")] = None,
+) -> None:
+    """Read the coverage ledger's worklist and say what to do about it.
+
+    This is the step the loop was missing (#909). Every other command here acts on a
+    template or a run you already chose; nothing read the denominator to choose. An
+    agent without that onboards enthusiastically and cannot say afterwards whether
+    coverage improved — which is why #907 was its hard dependency.
+
+    Two things this deliberately does NOT do.
+
+    It does not re-rank. The server states its ordering rule in the payload and this
+    echoes it, because a second ranking in the client is how one rule ends up enforced
+    twice with the weaker copy winning.
+
+    It does not act. The plan separates what an agent may do from what a person must,
+    and `resolve_refusal` is always the latter: a refused run is a decision someone
+    made — a closed config key is how an operator stops traffic when an authority
+    complains about load — and retrying it would override a human by persistence
+    rather than by permission. Note `coverage enable` exists in this same CLI and is
+    an OPERATOR command; no action this plan emits maps to it.
+    """
+    if actor not in ("agent", "human", "all"):
+        typer.echo("--actor must be 'agent', 'human' or 'all'.", err=True)
+        raise typer.Exit(code=2)
+
+    try:
+        payload = request_json(
+            "GET",
+            join_url(
+                platform_control_base_url(),
+                f"/v1/acquisition-coverage/queue?limit={limit}",
+            ),
+            headers=platform_control_headers(correlation_id=correlation_id),
+        )
+    except HttpJsonError as exc:
+        _fail(
+            "coverage_queue_unreachable",
+            "Could not read the coverage work queue.",
+            exc,
+            human=human,
+        )
+        return
+
+    summary = summarize_plan(payload if isinstance(payload, dict) else {})
+    if actor == "agent":
+        summary = {**summary, "human_only": []}
+    elif actor == "human":
+        summary = {**summary, "agent_actionable": []}
+    _emit(summary, human=human)
