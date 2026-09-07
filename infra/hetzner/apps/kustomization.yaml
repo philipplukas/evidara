@@ -20,6 +20,23 @@ resources:
   # DB has never had. `deploy-stage4.sh` still applies it directly first for
   # bootstrap; the hook annotations are inert to `kubectl apply`.
   - migrate-job.yaml
+  # The marketing surface (ADR-0039), brought in here by #884. It was the only
+  # workload in the namespace that no declarative config governed: outside
+  # `resources:`, outside the `images:` transformer, and pinned inline to
+  # 32a13330 — a pre-squash branch commit not reachable from `main`.
+  # `check_hetzner_image_pins.py` could not see that drift, because its rule was
+  # "pinned to a commit" and 32a13330 *is* a commit; it is simply not one of
+  # ours. That gate now requires marketing to agree with the app SHA below, so
+  # this entry and that rule hold each other up.
+  #
+  # This does couple the public page to a platform rollout it has no part in,
+  # which is why it was originally kept out. The trade was re-made knowingly: an
+  # unnecessary marketing restart is cheap, and a public surface that nothing
+  # governs is not. It is referenced as a sibling *base*, not as
+  # `../marketing/deployment.yaml` — kustomize's load restrictor rejects a
+  # `resources:` path that escapes the kustomization root, so the directory
+  # carries its own kustomization.yaml.
+  - ../marketing
 
 # Single place to pin the image tag.
 #
@@ -40,14 +57,22 @@ resources:
 # `gh run list --workflow=runtime-images.yml --commit <sha>`.
 #
 # Verify the tags, not just the run's conclusion. A green rollup is necessary but
-# it is not what this file depends on — these six tags existing in GHCR is:
+# it is not what this file depends on — these SEVEN tags existing in GHCR is
+# (marketing joined the list in #884; it is pinned here now, so it is no longer
+# optional to check):
 #
 #   for i in platform-control platform-control-admin legal-search-api \
 #            legal-search-frontend document-intelligence-document-service \
-#            document-intelligence-consumer; do
+#            document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
 #       --jq "[.[]|select(.metadata.container.tags[]? == \"<sha>\")]|length"
 #   done
+#
+# The bounded exception #883 wrote here — "a red rollup may still be a pinnable
+# SHA, because marketing cannot push" — is RETIRED. The package was linked, run
+# 34028538455 was the first green across all eight jobs, and "newest green `push`
+# run on `main`" is the correct rule again. Verifying the tags stays worthwhile
+# anyway: it costs one command and it is what the file actually depends on.
 #
 # Why that distinction is written down (2026-09-04 → 2026-09-06). `marketing`
 # joined `runtime-images.yml` as an eighth image, and its GHCR package was not
@@ -66,42 +91,39 @@ resources:
 # package (Package settings → Manage Actions access → `philipplukas/evidara`,
 # Write). See #884.
 #
-# 4932ec2c (#881) is `main`'s tip at the time of this pin. Run 34028538455 is green
-# across all eight image jobs — the first since the marketing package was linked —
-# and all six tags below were confirmed present in GHCR before this pin was written.
+# 206fa983 (#915) is `main`'s tip at the time of this pin. Run 34101242765 is green,
+# and all SEVEN tags below — the six apps plus marketing, which joins the transformer
+# in this change — were confirmed present in GHCR before this pin was written:
 #
-# What this pin adds over 4dddce3c (2026-09-04, 27 commits back). Almost none of it
-# is user-visible in `search.evidara.veyo.dev` — this is a correctness and operator
-# roll, not a feature roll:
-#   - the operator panel becomes usable under pressure (#M16 / #873), and a run now
-#     renders what it refused, discarded and cannot prove (#634 / #861). Both are
-#     `platform-control-admin`, not the public search UI.
-#   - the wizard human gate expires into a terminal state instead of hanging
-#     forever (#560 / #844).
+#   for i in platform-control platform-control-admin legal-search-api \
+#            legal-search-frontend document-intelligence-document-service \
+#            document-intelligence-consumer marketing; do ... done   # all returned 1
+#
+# What this pin adds over 4932ec2c (2026-09-06, 16 commits back). This is an operator
+# and observability roll; nothing in `search.evidara.veyo.dev` changes for a user:
+#   - the operator panel gets a shell, a nav and a workflows section that runs the
+#     wizard (#902), one timeline across the five run stages (#887), per-stage
+#     pipeline visibility from document-intelligence through to the run detail (#905),
+#     deep links from a run's rows to the systems they name (#885), and a readable
+#     raw-artifact payload (#897). All `platform-control-admin`.
+#   - every surface reports the commit it was built from (#889). Note the endpoint
+#     ships here but is NOT yet complete — #894 tracks the legal-search API health
+#     endpoint and the placeholder package versions.
+#   - `/ready` reports when the schema is behind the code (#898), backed by a test
+#     that checks the Alembic-built schema against the models (#900). Until this
+#     rolls, `/ready` answers only "the database is reachable" — which is why
+#     `scripts/check-production-online.sh` probes it explicitly.
 # In the pipeline and acquisition platform:
-#   - the nested-field loss is fixed across every struct column and sink
-#     (#871 / #876). Deployed canonical tables were silently dropping every
-#     metadata key their first batch lacked. NOTE: #871 remains OPEN for a second,
-#     independent route through `persist_commentary_insights`' hand-maintained
-#     `_COMMENTARY_INSIGHTS_ARROW_SCHEMA`, which this pin does NOT fix.
-#   - the rescore store reads canonical Delta with credentials (#847 / #860), and
-#     the backfill's exit code matches its summary (#825 / #840).
-#   - the projection can emit a regeste (#836 / #857).
-#   - `strict` means what robots.txt says, and `Retry-After` has two forms (#866).
-#   - the capture guard protects nine providers rather than one (M14 #6 / #862).
-#   - a cantonal source with no compliance policy is refused, not defaulted (#878).
-#   - one measured meaning for `in_force_until` at the boundary (#843 / #859).
-#   - platform-control can record ADR-0047's quarantine (#731 / #851).
-#   - learned-sparse embeddings on the GPU node (#882, first slice of ADR-0054).
-#     Ships the code and the `rank_features` mapping field; nothing serves it, and
-#     ADR-0054's D4 abstention gate does not exist yet. Sparse retrieval must not
-#     reach a user before it does — measured, an unrelated query returned every
-#     document in the index while BM25 correctly abstained.
+#   - one map column was abandoning nested widening for all of them (#904) — the
+#     second, independent route through `persist_commentary_insights` that the
+#     4932ec2c pin explicitly did NOT fix. #871 may now be closable; verify against
+#     a real rebuild before claiming it.
+#   - the six enum columns tell the truth about their type (#903).
 #
 # NOT zero alembic delta. ONE forward revision applies on rollout, and the migrate
 # Job must complete before the API rolls:
-#   20260903_0026_processing_status_quarantined   (down_revision 20260903_0025)
-# 0024 and 0025 were applied by the 4dddce3c rollout, whose migrate Job completed.
+#   20260906_0027_document_lifecycle_stages   (down_revision 20260903_0026)
+# 0026 was applied by the 4932ec2c rollout, whose migrate Job completed.
 # migrate-job.yaml is bumped to this same SHA in this change; keep the two in
 # lockstep, since the `images:` transformer below deliberately does not reach it.
 #
@@ -119,15 +141,40 @@ resources:
 # `deploy-stage4.sh` fails fast if they are absent.
 # Procedure: docs/runbooks/minio-least-privilege-cutover.md.
 #
-# ── NOT COVERED BY THIS PIN ──
+# ── MARKETING IS NOW COVERED (#884) ──
 #
-# `marketing` is not in `resources:` and has no entry under `images:`. Its manifest
-# `infra/hetzner/marketing/deployment.yaml` hardcodes its own tag, so bumping this
-# file does NOT roll the marketing site. That tag is currently
-# 32a13330873d67d57c3bdd0d1dd03a0f81e41b16 — a pre-squash branch commit that is not
-# on `main` at all. Tracked separately; do not assume this pin moved it.
+# The previous pin carried this section to say the opposite: `marketing` was in
+# neither `resources:` nor `images:`, `infra/hetzner/marketing/deployment.yaml`
+# hardcoded its own tag, and bumping this file did not roll the site. Both are fixed
+# here — it is a base under `resources:` and has an `images:` entry, and its
+# Deployment is untagged like every other workload.
+#
+# What that comment could not say, because nothing measured it: the site was not
+# merely stale, it was UNREACHABLE. `evidara.veyo.dev` had no DNS record and the
+# Ingress in `infra/hetzner/marketing/ingress-tls.yaml` had never been applied, so a
+# perfectly healthy pod served nobody for the entire life of the deployment. The A
+# record (-> 88.99.26.120, matching the other three) was created at the registrar on
+# 2026-09-07 and resolves; applying this pin is what puts the Ingress in the cluster.
+#
+# The page is still behind `basicauth` — see the header of ingress-tls.yaml, which
+# is the authority on why and on what must be true before it comes off. Rolling this
+# pin does NOT make the page public and is not the decision that should.
 #
 # ── prior pins, newest first ──
+#
+# 4932ec2c (#883, 2026-09-06) was the first pin taken after the marketing GHCR
+# package was linked, so `runtime-images.yml` could go green on `main` again. It was
+# a correctness and operator roll: the operator panel usable under pressure
+# (#M16 / #873), a run rendering what it refused and cannot prove (#634 / #861), the
+# wizard human gate expiring into a terminal state (#560 / #844), nested-field loss
+# fixed across struct columns and sinks (#871 / #876), the rescore store reading
+# canonical Delta with credentials (#847 / #860), a regeste on the projection
+# (#836 / #857), `strict` matching robots.txt (#866), the capture guard covering nine
+# providers (M14 #6 / #862), a policy-less cantonal source refused rather than
+# defaulted (#878), one measured `in_force_until` at the boundary (#843 / #859),
+# ADR-0047 quarantine recorded (#731 / #851), and learned-sparse embeddings shipped
+# but unserved (#882 — ADR-0054's D4 abstention gate still does not exist, and sparse
+# retrieval must not reach a user before it does). One alembic revision (0026).
 #
 # 4dddce3c (#858, 2026-09-04) brought six weeks of fixes to the deployed site after
 # production had sat at 8759bec5 for 35 commits. User-visible: the URL search-param
@@ -166,14 +213,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
+    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
+    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
+    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
+    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
+    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 4932ec2c29ee31ab591bd9dbb9caa3f59a1e0b13
+    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605
+  - name: ghcr.io/philipplukas/evidara-marketing
+    newTag: 206fa983077ff018f1f2953c3d7a36a1ac1f7605

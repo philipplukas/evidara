@@ -47,7 +47,22 @@ expected_names=(
   di-consumer
   document-service
   platform-control-migrate
+  # Joined the kustomization in #884. Until then it was the one workload in the
+  # namespace no declarative config governed, and this list not naming it is part
+  # of why that went unnoticed for as long as it did.
+  marketing
 )
+
+# The marketing Ingress is the other half of #884 and the half nothing checked: the
+# Deployment and Service were applied, the Ingress never was, and a healthy pod with
+# no route reads as green in every workload-shaped signal there is. Assert the route
+# renders, not just the workload.
+if ! grep -q '^[[:space:]]*name: marketing-tls$' <<<"$rendered"; then
+  echo "FAIL: infra/hetzner/apps renders the marketing workload without its Ingress." >&2
+  echo "      A Deployment with no Ingress is perfectly healthy and reaches nobody —" >&2
+  echo "      which is exactly how evidara.veyo.dev served no one for the life of #884." >&2
+  exit 1
+fi
 missing=()
 for name in "${expected_names[@]}"; do
   grep -qE "^[[:space:]]*name: ${name}$" <<<"$rendered" || missing+=("$name")

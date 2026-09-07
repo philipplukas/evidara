@@ -88,8 +88,28 @@ endpoint on platform-control — that service is the operator control plane and
 
 ## Deployment
 
-Not deployed. The proposed ingress is
-[`infra/hetzner/marketing/ingress-tls.yaml`](../infra/hetzner/marketing/ingress-tls.yaml),
-which requires human review before `kubectl apply` — it is the first Ingress in
-the cluster that intentionally omits the BasicAuth middleware, and it needs a
-DNS A record for `evidara.veyo.dev` to resolve first.
+Deployed to `evidara.veyo.dev`, **behind BasicAuth**, and governed by
+[`infra/hetzner/apps/kustomization.yaml`](../infra/hetzner/apps/kustomization.yaml)
+like every other workload (#884). Argo CD syncs it; the image tag comes from that
+file's `images:` transformer, not from the Deployment.
+
+Three corrections to what this section said before 2026-09-07, all of them things
+that were true when written and stopped being true without anyone noticing:
+
+- It said *"not deployed"*. The Deployment and Service had in fact been applied
+  since 2026-09-04, running `32a13330` — a pre-squash branch commit not on `main`.
+- It said the ingress *"intentionally omits the BasicAuth middleware"*. It does
+  not; the middleware was added deliberately, and
+  [`infra/hetzner/marketing/ingress-tls.yaml`](../infra/hetzner/marketing/ingress-tls.yaml)
+  is the authority on why and on what must be true before it comes off. **Removing
+  it is what makes the page public**, and that is a separate, deliberate decision —
+  not something a pin bump does.
+- It said the ingress *"needs a DNS A record for `evidara.veyo.dev` to resolve
+  first"*. Correct, and it did not exist. The record
+  (`evidara.veyo.dev` → `88.99.26.120`, matching `search.`, `admin.` and `id.`)
+  was created at the Infomaniak registrar on 2026-09-07 and resolves. DNS for this
+  umbrella is registrar-managed by hand and is **not** in Terraform.
+
+Until 2026-09-07 the page was therefore *deployed and unreachable*: a healthy pod,
+a Service, no Ingress in the cluster, and no DNS record. Nothing was red.
+`bash scripts/check-production-online.sh` is the check that now says so.
