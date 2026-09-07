@@ -109,6 +109,16 @@ export function DataTable<T>({
    */
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [overflow, setOverflow] = useState<TableOverflow>(NO_TABLE_OVERFLOW);
+  /**
+   * Width of the pinned column, so the right-hand edge fade can sit beside it.
+   *
+   * Measured 2026-09-07 on the run queue at 1280px: the fade rendered at
+   * x=1191..1231 with `z-index: auto`, entirely inside the sticky column's
+   * x=1124..1231 at `z-index: 10` — so the "there is more to the right" cue was
+   * painted BEHIND the very column M16 pinned, on the only table that has one.
+   * Both were added in the same PR (#873) and never seen together.
+   */
+  const [stickyWidth, setStickyWidth] = useState(0);
 
   const measure = useCallback(() => {
     const element = scrollerRef.current;
@@ -120,6 +130,11 @@ export function DataTable<T>({
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
     });
+    // How wide the pinned column is, so the right-hand fade can sit BESIDE it
+    // rather than under it. Read from the DOM rather than assumed: the Actions
+    // column's width depends on which buttons that row set renders.
+    const stickyCell = element.querySelector<HTMLElement>("thead th[data-sticky-right='true']");
+    setStickyWidth(stickyCell ? Math.round(stickyCell.getBoundingClientRect().width) : 0);
     // Identity-stable when nothing changed, so the render-time measurement
     // below settles instead of looping.
     setOverflow((prev) => (sameTableOverflow(prev, next) ? prev : next));
@@ -237,6 +252,7 @@ export function DataTable<T>({
                     <th
                       key={col.key}
                       scope="col"
+                      data-sticky-right={col.stickyRight ? "true" : undefined}
                       className={cn(
                         "text-left px-4 py-3 border-b border-[var(--border)]",
                         "text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-meta)]",
@@ -412,7 +428,13 @@ export function DataTable<T>({
           <div
             aria-hidden
             data-testid="datatable-fade-right"
-            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[var(--surface-panel)] to-transparent"
+            // Offset by the pinned column's width so the fade sits immediately
+            // to its LEFT, over the content that is actually being cut. At
+            // `right-0` it rendered underneath the pinned column (which carries
+            // `z-10` and an opaque ground) and was never visible on the one
+            // table that has one.
+            style={{ right: stickyWidth }}
+            className="pointer-events-none absolute inset-y-0 w-10 bg-gradient-to-l from-[var(--surface-panel)] to-transparent"
           />
         ) : null}
       </div>

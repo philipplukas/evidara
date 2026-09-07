@@ -191,6 +191,7 @@ export default function RunDetailSectionsV2({
           title="Provider Jobs"
           description="Provider-level crawl job state and webhook progression for this run."
           rows={providerJobs.data}
+          total={providerJobs.total}
           isPending={providerJobs.isPending}
           error={providerJobs.error}
           emptyMessage="No provider jobs were recorded for this run."
@@ -202,6 +203,7 @@ export default function RunDetailSectionsV2({
           title="Captured Resources"
           description="Pages and files captured from the source during this run."
           rows={capturedResources.data}
+          total={capturedResources.total}
           isPending={capturedResources.isPending}
           error={capturedResources.error}
           emptyMessage="No captured resources were recorded for this run."
@@ -213,6 +215,7 @@ export default function RunDetailSectionsV2({
           title="Raw Artifacts"
           description="Stored raw artifacts published by the acquisition provider for this run."
           rows={rawArtifacts.data}
+          total={rawArtifacts.total}
           isPending={rawArtifacts.isPending}
           error={rawArtifacts.error}
           emptyMessage="No raw artifacts were recorded for this run."
@@ -244,6 +247,7 @@ export default function RunDetailSectionsV2({
             </div>
           }
           rows={processingStatus.data}
+          total={processingStatus.total}
           isPending={processingStatus.isPending}
           error={processingStatus.error}
           emptyMessage="No DI processing status updates have been received for this run. That is not the same as “nothing was withheld” — see the note above."
@@ -256,6 +260,7 @@ export default function RunDetailSectionsV2({
           title="Document Lifecycle"
           description="Published or withdrawn document lifecycle events emitted by document-intelligence."
           rows={documentLifecycle.data}
+          total={documentLifecycle.total}
           isPending={documentLifecycle.isPending}
           error={documentLifecycle.error}
           emptyMessage="No document lifecycle events have been received for this run."

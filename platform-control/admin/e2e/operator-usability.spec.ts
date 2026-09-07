@@ -132,6 +132,43 @@ test.describe("Run queue — the operator's levers survive the fold (M16 #1)", (
     await expect(cancel).toBeInViewport();
   });
 
+  test("the overflow fade is beside the pinned column, not underneath it", async ({ page }) => {
+    /**
+     * M16 added the edge fade and the sticky Actions column in the same PR, and
+     * they were never seen together. Measured on the live panel at 1280px:
+     *
+     *   fade          x=1191..1231  z-index: auto
+     *   sticky ACTIONS x=1124..1231  z-index: 10
+     *
+     * The fade sat entirely inside the pinned column, behind it, so the "there
+     * is more to the right" cue never rendered on the ONE table that has a
+     * pinned column — the table the cue was written for.
+     *
+     * jsdom reports every dimension as 0 (`tableOverflow.ts`), so this can only
+     * be asserted here.
+     */
+    await mockApi(page, [RUNNING_RUN, COMPLETED_RUN]);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/#/runs");
+
+    const sticky = page.getByRole("columnheader", { name: "Actions" });
+    await expect(sticky).toHaveCSS("position", "sticky");
+
+    const fade = page.getByTestId("datatable-fade-right");
+    await expect(fade).toBeAttached();
+
+    const fadeBox = await fade.boundingBox();
+    const stickyBox = await sticky.boundingBox();
+    expect(fadeBox, "the right fade should render when the table overflows").not.toBeNull();
+    expect(stickyBox).not.toBeNull();
+
+    // The whole assertion: the fade ends where the pinned column begins.
+    expect(
+      Math.round(fadeBox!.x + fadeBox!.width),
+      "the fade must not extend under the pinned column",
+    ).toBeLessThanOrEqual(Math.round(stickyBox!.x) + 1);
+  });
+
   test("at 390px the cancel action is still reachable", async ({ page }) => {
     // At this width the table used to lose everything but RUN and a sliver of
     // SOURCE — a mobile run queue of opaque ULIDs with no controls.

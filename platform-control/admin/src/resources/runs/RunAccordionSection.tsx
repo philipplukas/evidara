@@ -32,6 +32,19 @@ export interface RunSectionProps<TRecord extends { id: Identifier }> {
    */
   caveat?: ReactNode;
   rows: TRecord[] | undefined;
+  /**
+   * How many rows exist on the server, when that differs from how many were
+   * fetched.
+   *
+   * The pill used to report `rows.length` alone, which is the PAGE SIZE
+   * (`LIST_PARAMS.perPage` is 50). On a run with 944 captured resources the
+   * metric band read "Captured 944" and the section header, immediately below
+   * it, read "50 rows" — one screen stating two numbers for one quantity.
+   *
+   * `Pipeline Stages` in the same file already got this right ("1 of 887
+   * documents timed"); this brings the rest into line.
+   */
+  total?: number;
   isPending: boolean;
   error: unknown;
   emptyMessage: string;
@@ -46,6 +59,7 @@ export function RunAccordionSection<TRecord extends { id: Identifier }>({
   description,
   caveat,
   rows,
+  total,
   isPending,
   error,
   emptyMessage,
@@ -53,6 +67,12 @@ export function RunAccordionSection<TRecord extends { id: Identifier }>({
   getRowId,
 }: RunSectionProps<TRecord>) {
   const count = rows?.length ?? 0;
+  // Only says "of N" when N is genuinely larger. A section that fetched
+  // everything should read "3 rows", not "3 of 3 rows".
+  const label =
+    total != null && total > count
+      ? `${count} of ${total} rows`
+      : `${count} ${count === 1 ? "row" : "rows"}`;
   return (
     <AccordionItem value={value} id={sectionId}>
       <AccordionTrigger>
@@ -62,7 +82,7 @@ export function RunAccordionSection<TRecord extends { id: Identifier }>({
         ) : error ? (
           <Pill level="critical">Error</Pill>
         ) : (
-          <Pill variant="meta">{`${count} ${count === 1 ? "row" : "rows"}`}</Pill>
+          <Pill variant="meta">{label}</Pill>
         )}
       </AccordionTrigger>
       <AccordionContent>
