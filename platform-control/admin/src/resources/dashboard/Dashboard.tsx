@@ -18,7 +18,11 @@ import {
 import { CorrectionMetricsCard } from "../corrections/CorrectionMetricsCard";
 import { RunLaunchButton } from "../runs/RunLaunchDialog";
 import { StatCard, type StatTone, statToneBorder, successRateTone } from "../shared/Stat";
-import { pipelineHealthToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
+import {
+  isActionableRunStatus,
+  pipelineHealthToLevel,
+  runRecordStatusToLevel,
+} from "../shared/statusLevels";
 import { SourceHealthCard } from "./SourceHealthCard";
 
 type DashboardStats = {
@@ -177,7 +181,20 @@ export const selectDashboardAttentionRun = (
   recentRuns: DashboardStats["recent_runs"],
   runByStatus: Record<string, number> = {},
 ): AttentionTarget | null => {
-  const blockedRun = recentHealth.find((entry) => entry.health?.overall_status === "blocked");
+  // Health alone is not enough to nominate a run. A `cancelled` or `completed`
+  // run can carry blocked or failed pipeline health for the rest of time —
+  // nothing advances it — so pointing the operator's first click at one sends
+  // them somewhere they cannot act. Measured on a seeded stack: this card read
+  // "Open run_demo_cancelled first" while the run queue, on the same data,
+  // correctly offered a failed run.
+  //
+  // The third branch below has always filtered on exactly this set. It never
+  // ran, because these two matched first.
+  const actionable = recentHealth.filter((entry) =>
+    isActionableRunStatus(entry.health?.run_status),
+  );
+
+  const blockedRun = actionable.find((entry) => entry.health?.overall_status === "blocked");
   if (blockedRun) {
     return {
       kind: "run",
@@ -186,7 +203,7 @@ export const selectDashboardAttentionRun = (
     };
   }
 
-  const failedRun = recentHealth.find((entry) => entry.health?.overall_status === "failed");
+  const failedRun = actionable.find((entry) => entry.health?.overall_status === "failed");
   if (failedRun) {
     return {
       kind: "run",
@@ -195,9 +212,7 @@ export const selectDashboardAttentionRun = (
     };
   }
 
-  const blockedStatusRun = recentRuns.find((run) =>
-    ["failed", "pending", "running"].includes(run.status),
-  );
+  const blockedStatusRun = recentRuns.find((run) => isActionableRunStatus(run.status));
   if (blockedStatusRun) {
     return {
       kind: "run",

@@ -15,6 +15,27 @@ export function adminLevelBorder(level: AdminStatusLevel): string {
   return LEVEL_BORDER[level];
 }
 
+/**
+ * The run statuses an operator can still do something about.
+ *
+ * `completed` and `cancelled` are terminal: nothing an operator does advances
+ * either, so a screen that nominates one as the thing to look at first has sent
+ * them somewhere they cannot act.
+ *
+ * Lives here, imported by every selector that needs it, because it was defined
+ * once in `resources/runs/RunList.tsx` and NOT applied by the dashboard's own
+ * selector — which is how the landing page came to lead with a cancelled run
+ * while the run queue, on the same data, correctly led with a failed one. That
+ * is AGENTS.md's "same rule enforced in two clients": there was only ever one
+ * rule, and the copy that did not have it was the one operators saw first.
+ */
+export const ACTIONABLE_RUN_STATUSES: readonly string[] = ["failed", "running", "pending"];
+
+/** True when a run can still be acted on. See `ACTIONABLE_RUN_STATUSES`. */
+export function isActionableRunStatus(status: string | null | undefined): boolean {
+  return status != null && ACTIONABLE_RUN_STATUSES.includes(status);
+}
+
 export function runRecordStatusToLevel(status: string): AdminStatusLevel {
   switch (status) {
     case "completed":
