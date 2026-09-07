@@ -1,26 +1,40 @@
 # Ingress for the Evidara marketing page (ADR-0039).
 #
-# ── IT IS BEHIND BASICAUTH, AND THAT IS A DEVIATION FROM ADR-0039 ──
+# ── IT IS BEHIND BASICAUTH, BY DECISION — NOT BY DEVIATION ──
 #
-# ADR-0039 says, in this file's own earlier words, that "a marketing page behind
-# a password is not a marketing page". That remains true. The `basicauth`
-# middleware below is a deliberate, temporary decision by the repo owner
-# (2026-09-04) to bring the surface up and look at it on a real domain with a
-# real certificate before anyone anonymous can reach it — not a reversal of
-# ADR-0039 and not an oversight of the kind the annotation's absence used to be.
+# This header used to call the middleware below "a deviation from ADR-0039" and
+# "temporary". As of 2026-09-07 it is neither: ADR-0039's D4 is formally amended
+# to say the page stays private, and this annotation is what implements that.
 #
-# It is worth being precise about what this costs, because a password makes the
-# page *invisible*, not *safe*: while this annotation is here the page cannot do
-# the one job ADR-0039 gave it — someone who hears about Evidara still has
-# nothing to read. Every day this stays on, the surface is deployed and useless.
+# Do not remove it as tidy-up. Removing it is the decision to publish, and it
+# reverses an ADR.
 #
-# TO GO ACTUALLY PUBLIC: delete the `router.middlewares` annotation and re-apply.
-# That is the whole change. Before doing it, confirm the two things ADR-0039
-# gates on — the page still links to no live product demo, and the waitlist form
-# still posts nowhere (`NEXT_PUBLIC_WAITLIST_ENDPOINT` unset) or posts to a
-# backend that has been reviewed. Then re-read D3: a submission endpoint going
-# live is the point at which the Traefik rate-limit middleware stops being
-# optional.
+# ── what it costs, so nobody has to rediscover it ──
+#
+# A password makes the page INVISIBLE, not SAFE. While this line is here the
+# surface cannot do the one job ADR-0039 gave it: someone who hears about
+# Evidara still has nothing to read. That was true when this file first said it
+# and it is still true.
+#
+# ── what must be true before removing it ──
+#
+# All three are currently unmet, and two are outside this surface:
+#
+#   1. The waitlist posts somewhere. `NEXT_PUBLIC_WAITLIST_ENDPOINT` is unset,
+#      so a public page would collect nothing. ADR-0039 D3 chose Listmonk on the
+#      existing CNPG cluster, with its own database AND its own role, double
+#      opt-in, and a server-side honeypot re-check. Unimplemented.
+#   2. A Traefik rate-limit middleware exists on this Ingress. D3 is explicit
+#      that this stops being optional the moment a submission endpoint is live.
+#   3. The page still links to no product — search has no end-user
+#      authentication (ADR-0038). `marketing/src/__tests__/page.test.tsx` fails
+#      if a product link appears, deliberately.
+#
+# A public page with a dead form and no rate limiting is a worse artifact than
+# no public page.
+#
+# When you do remove it: update ADR-0039's D4 amendment and this header in the
+# SAME commit, so the next reader finds a decision rather than an absence.
 #
 # ── the hazard this file used to be the only warning about ──
 #
@@ -32,7 +46,8 @@
 #
 # ── What must be true before applying ──
 #
-#   1. DNS A record exists AND RESOLVES:
+#   1. DNS A record exists AND RESOLVES — SATISFIED 2026-09-07, created at the
+#      Infomaniak registrar; the certificate issued 52 seconds later:
 #        evidara.veyo.dev   A   88.99.26.120
 #      (AAAA -> 2a01:4f8:10a:284::2 optional.)
 #      Applying before the record resolves fails the cert-manager HTTP-01
@@ -51,7 +66,9 @@ metadata:
   name: marketing-tls
   namespace: evidara
   annotations:
-    # Temporary — see the header. Remove this line to make the page public.
+    # Deliberate — ADR-0039 D4, amended 2026-09-07. Removing this line publishes
+    # the page and reverses that decision; see this file's header for the three
+    # preconditions, all currently unmet.
     traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:

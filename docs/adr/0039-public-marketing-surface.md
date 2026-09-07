@@ -2,11 +2,17 @@
 
 ## Status
 
-Proposed
+Accepted, with **D4 amended on 2026-09-07: the page stays private.**
+
+The surface, the copy rules, the static-export posture and the waitlist seam are
+all accepted and deployed. The one decision that changed is reachability — see
+the amendment inside D4. The title of this ADR still says "Public", which is now
+aspirational rather than descriptive; it is left alone because renaming an ADR
+breaks every inbound reference, and the Status line above is the authority.
 
 ## Date
 
-2026-07-19
+2026-07-19 (D4 amended 2026-09-07)
 
 ## Context
 
@@ -185,29 +191,57 @@ It requires human review and an explicit `kubectl apply`, because:
 
 Nothing in this change deploys. The manifest is a reviewed artifact.
 
-> **Status of D4 as of 2026-09-07 (#884).** The decision stands; three of the
-> facts above no longer describe the cluster, and the gap between them is the
-> defect #884 records.
+> ### D4 AMENDED — 2026-09-07: the page stays private, deliberately
+>
+> **The decision is reversed for now.** `evidara.veyo.dev` is deployed, resolves,
+> holds a Let's Encrypt certificate — and stays behind the shared BasicAuth
+> middleware until someone decides otherwise. It is not an oversight, not a
+> pending task, and not something a later infrastructure change should quietly
+> undo.
+>
+> **What this costs, stated plainly.** A password makes the page *invisible*, not
+> *safe*. While the annotation is there the surface cannot do the one job this
+> ADR gave it: someone who hears about Evidara still has nothing to read. The
+> original text of this section called that out and it remains true. Deploying it
+> privately buys the ability to look at it on a real domain with a real
+> certificate, and nothing else.
+>
+> **Why that trade is currently the right one.** Everything D4 gated on going
+> public is still unmet, and two of the three are outside the marketing surface
+> entirely:
+>
+> - The waitlist posts nowhere (`NEXT_PUBLIC_WAITLIST_ENDPOINT` is unset), so a
+>   public page would collect nothing. D3's Listmonk decision is unimplemented.
+> - There is no rate-limit middleware on this Ingress. D3 says that stops being
+>   optional the moment a submission endpoint goes live.
+> - The page still links to no product, because search has no end-user
+>   authentication. That is ADR-0038's territory, not this ADR's.
+>
+> A public page with a dead form and no rate limiting is a worse artifact than no
+> public page.
+>
+> **How to reverse the amendment.** Delete the
+> `traefik.ingress.kubernetes.io/router.middlewares` annotation from
+> `infra/hetzner/marketing/ingress-tls.yaml` and re-apply. That is the whole
+> change — which is precisely why it needs a decision recorded against it rather
+> than being left as a line anyone might tidy away. Update this section in the
+> same commit.
+>
+> ### What #884 corrected in the surrounding text
+>
+> Three statements above were true when written and had stopped being true:
 >
 > - The Ingress **is** applied, declaratively — `infra/hetzner/marketing/` is a
 >   base under `infra/hetzner/apps/kustomization.yaml`, so Argo CD owns it. The
 >   "explicit `kubectl apply` after human review" gate was real but had no
->   mechanism behind it: what actually happened is that the Deployment and Service
->   were applied on 2026-09-04 and the Ingress never was.
-> - It does **not** omit the BasicAuth middleware. It carries it, as a deliberate
->   and temporary decision by the repo owner (2026-09-04) — documented at length in
->   the header of `ingress-tls.yaml`, which remains the authority. **The page is
->   therefore not yet public, and D4's central commitment is not yet met.** Every
->   day the annotation stays, the surface is deployed and cannot do the one job
->   this ADR gave it.
-> - The DNS A record now exists (`evidara.veyo.dev` → `88.99.26.120`), created at
->   the registrar on 2026-09-07. Until then the page was deployed and unreachable —
->   healthy pod, no route, no name — and no signal in the repo or the cluster was
->   red about it.
->
-> Removing the BasicAuth annotation is the change that satisfies D4. Before making
-> it, re-read D3: a submission endpoint going live is the point at which the
-> Traefik rate-limit middleware stops being optional.
+>   mechanism behind it: what actually happened is that the Deployment and
+>   Service were applied on 2026-09-04 and the Ingress never was.
+> - It does **not** omit the BasicAuth middleware. It carries it, per the
+>   amendment above.
+> - The DNS A record now exists (`evidara.veyo.dev` -> `88.99.26.120`), created
+>   at the registrar on 2026-09-07. Until then the page was deployed and
+>   unreachable — healthy pod, no route, no name — and no signal in the repo or
+>   the cluster was red about it.
 
 ## Consequences
 
