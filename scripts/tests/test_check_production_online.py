@@ -31,13 +31,23 @@ from tempfile import TemporaryDirectory
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check-production-online.sh"
 
-# A commit that is genuinely an ancestor of origin/main is needed for the healthy
-# scenario. HEAD's own parent is the one thing guaranteed to exist in any clone.
-def _ancestor_sha() -> str:
+# The healthy scenario needs an image SHA that IS an ancestor of the ref the script
+# compares against. Both are pinned to HEAD here rather than to `origin/main`: a CI
+# checkout of a pull request has HEAD at the *merge* commit, which is by construction
+# not an ancestor of `origin/main`, and `origin/main` may not be fetched at all at
+# the configured depth. Comparing HEAD to HEAD is hermetic and tests the same logic.
+def _head_sha() -> str:
     return subprocess.run(
         ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
         capture_output=True, text=True, check=True,
     ).stdout.strip()
+
+
+# Deliberately cannot exist. Some of these tests run without a kubectl stub, and CI
+# runs on ARC runners INSIDE the target cluster — where a bare `kubectl` has working
+# in-cluster credentials. Without this, a test meant to exercise the "no cluster"
+# path instead queried live production and asserted against whatever it found there.
+UNREACHABLE_NS = "evidara-no-such-namespace-for-tests"
 
 
 DEPLOYS = ("platform-control-api", "legal-search-api")
@@ -96,7 +106,10 @@ class ProductionOnlineCheckTest(unittest.TestCase):
             env = {
                 "PATH": f"{bindir}:{os.environ['PATH']}",
                 "HOME": os.environ.get("HOME", tmp),
-                "NAMESPACE": "evidara",
+                # Never a real namespace: see UNREACHABLE_NS. Stubbed runs are
+                # unaffected — the stub answers `get ns` for any name.
+                "NAMESPACE": UNREACHABLE_NS,
+                "GIT_REMOTE_REF": "HEAD",
             }
             env.update(env_extra or {})
             script = SCRIPT
@@ -116,7 +129,7 @@ class ProductionOnlineCheckTest(unittest.TestCase):
         always fails.
         """
         res = self._run(
-            kubectl=_kubectl_stub(image_sha=_ancestor_sha(), ingress_hosts=""),
+            kubectl=_kubectl_stub(image_sha=_head_sha(), ingress_hosts=""),
             env_extra={"SKIP_EDGE": "1"},
         )
         self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
@@ -127,7 +140,7 @@ class ProductionOnlineCheckTest(unittest.TestCase):
     def test_unready_deployment_fails(self):
         """Guard: readiness. `Running` is not `Ready`."""
         res = self._run(
-            kubectl=_kubectl_stub(ready="0", image_sha=_ancestor_sha(), ingress_hosts=""),
+            kubectl=_kubectl_stub(ready="0", image_sha=_head_sha(), ingress_hosts=""),
             env_extra={"SKIP_EDGE": "1"},
         )
         self.assertEqual(res.returncode, 1, res.stdout)
