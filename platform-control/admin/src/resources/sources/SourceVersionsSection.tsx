@@ -39,6 +39,7 @@ import {
   Pill,
 } from "../../ui/primitives";
 import { sourceVersionStatusToLevel } from "../shared/statusLevels";
+import { AcquisitionSpecPanel } from "./AcquisitionSpecPanel";
 import { SourceVersionDiffPanel } from "./SourceVersionDiffPanel";
 import {
   describeSourceVersionStatus,
@@ -590,6 +591,9 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
   const [isSaving, setIsSaving] = useState(false);
   const [actionVersionId, setActionVersionId] = useState<string | null>(null);
   const [diffVersionId, setDiffVersionId] = useState<string | null>(null);
+  // Which version's full acquisition_spec is expanded. Independent of the diff
+  // row: comparing two versions and reading one in full are different questions.
+  const [specVersionId, setSpecVersionId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
   const versions = useGetList<SourceVersionRecord>("source-versions", {
@@ -871,6 +875,7 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                   const statusMeta = describeSourceVersionStatus(version.status);
                   const previousVersion = index < rows.length - 1 ? rows[index + 1] : null;
                   const isDiffOpen = diffVersionId === version.source_version_id;
+                  const isSpecOpen = specVersionId === version.source_version_id;
 
                   return (
                     <Fragment key={version.id}>
@@ -928,6 +933,24 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                             >
                               Edit
                             </VersionActionButton>
+                            {/*
+                              The table cell shows `summarizeAcquisitionSpec`,
+                              which omits every identity/scope field and has
+                              renderers for four of eleven providers. This is how
+                              an operator reaches the config that will actually
+                              run — previously visible only in the create wizard,
+                              before the version existed.
+                            */}
+                            <Button
+                              size="sm"
+                              variant={isSpecOpen ? "primary" : "ghost"}
+                              data-testid="version-config-toggle"
+                              onClick={() =>
+                                setSpecVersionId(isSpecOpen ? null : version.source_version_id)
+                              }
+                            >
+                              {isSpecOpen ? "Hide config" : "Config"}
+                            </Button>
                             {previousVersion ? (
                               <Button
                                 size="sm"
@@ -986,6 +1009,13 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                           </div>
                         </td>
                       </tr>
+                      {isSpecOpen ? (
+                        <tr className="border-t border-[var(--border-faint)] bg-[var(--surface-input)]">
+                          <td colSpan={6} className="px-4 py-3">
+                            <AcquisitionSpecPanel spec={version.acquisition_spec} />
+                          </td>
+                        </tr>
+                      ) : null}
                       {isDiffOpen && previousVersion ? (
                         <tr className="border-t border-[var(--border-faint)] bg-[var(--surface-input)]">
                           <td colSpan={6} className="px-4 py-3">
