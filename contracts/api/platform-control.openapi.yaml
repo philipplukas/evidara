@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.26.0
+  version: 0.27.0
 paths:
   /health:
     get:
@@ -2875,6 +2875,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/acquisition-coverage/queue:
+    get:
+      tags:
+      - acquisition-coverage
+      - agent-discovery
+      summary: Jurisdictions that need coverage work, and why
+      description: |-
+        The denominator read, turned into a worklist.
+
+        Population at scale is a loop over *"what should we hold that we don't"*, and
+        without this an agent onboards enthusiastically while nobody can say whether
+        coverage improved (#907).
+
+        Carries no priority score and never will. Ordering is a stated convention —
+        returned as `ordering` — because a priority number needs a denominator exactly as
+        much as the completeness percentage ADR-0042 rejected, and this read has no basis
+        for one. Every reason true of a jurisdiction is returned, not a chosen "primary"
+        one, so a caller ranks by its own policy rather than inheriting ours.
+      operationId: getCoverageWorkQueue
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverageWorkQueueResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/commentary-insights:
     get:
       tags:
@@ -3275,6 +3319,16 @@ components:
           minimum: 0.0
           title: Withdrawn Documents
           default: 0
+        refused_runs:
+          type: integer
+          minimum: 0.0
+          title: Refused Runs
+          default: 0
+        quarantined_documents:
+          type: integer
+          minimum: 0.0
+          title: Quarantined Documents
+          default: 0
         acquired_gap:
           anyOf:
           - type: integer
@@ -3360,6 +3414,11 @@ components:
           type: integer
           minimum: 0.0
           title: Processed Documents Unattributable
+        quarantined_events_unattributable:
+          type: integer
+          minimum: 0.0
+          title: Quarantined Events Unattributable
+          default: 0
         reconciliations_recorded_since:
           anyOf:
           - type: string
@@ -4727,6 +4786,164 @@ components:
       - reject
       - rescore_request
       title: CorrectionType
+    CoverageWorkItem:
+      properties:
+        jurisdiction_id:
+          type: string
+          title: Jurisdiction Id
+        name:
+          type: string
+          title: Name
+        slug:
+          type: string
+          title: Slug
+        level:
+          $ref: '#/components/schemas/NormLevel'
+        reasons:
+          items:
+            $ref: '#/components/schemas/CoverageWorkReason'
+          type: array
+          minItems: 1
+          title: Reasons
+        expected:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Expected
+        denominator_tier:
+          $ref: '#/components/schemas/DenominatorTier'
+          default: none
+        acquired_distinct_urls:
+          type: integer
+          minimum: 0.0
+          title: Acquired Distinct Urls
+          default: 0
+        processed_documents:
+          type: integer
+          minimum: 0.0
+          title: Processed Documents
+          default: 0
+        acquired_gap:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Acquired Gap
+        processed_gap:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Processed Gap
+        refused_runs:
+          type: integer
+          minimum: 0.0
+          title: Refused Runs
+          default: 0
+        quarantined_documents:
+          type: integer
+          minimum: 0.0
+          title: Quarantined Documents
+          default: 0
+        source_ids:
+          items:
+            type: string
+          type: array
+          title: Source Ids
+      type: object
+      required:
+      - jurisdiction_id
+      - name
+      - slug
+      - level
+      - reasons
+      title: CoverageWorkItem
+      description: |-
+        One jurisdiction that needs work, and why.
+
+        The unit is a JURISDICTION, not a source, even though #907 phrases the queue as
+        "the next N sources". That is deliberate: the denominator this queue reasons about
+        is stated per jurisdiction, and the most common reason to appear here —
+        `no_denominator` — is true of jurisdictions that have no source at all. Keying on
+        sources would make the largest category of work invisible, which is the exact
+        failure the ledger exists to prevent.
+
+        `sources` names what already exists to act through, and is empty precisely when the
+        action is "create one".
+    CoverageWorkQueueResponse:
+      properties:
+        basis:
+          type: string
+          title: Basis
+          default: platform_control_runs
+        as_of:
+          type: string
+          format: date-time
+          title: As Of
+        ordering:
+          type: string
+          title: Ordering
+          default: reason_class_then_name
+        unqueued_unmeasurable:
+          type: integer
+          minimum: 0.0
+          title: Unqueued Unmeasurable
+          default: 0
+        data:
+          items:
+            $ref: '#/components/schemas/CoverageWorkItem'
+          type: array
+          title: Data
+        total:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Total
+        limit:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Limit
+      type: object
+      required:
+      - as_of
+      - data
+      title: CoverageWorkQueueResponse
+    CoverageWorkReason:
+      type: string
+      enum:
+      - no_denominator
+      - never_acquired
+      - acquisition_gap
+      - processing_gap
+      - holdings_exceed_denominator
+      - refusals_outstanding
+      title: CoverageWorkReason
+      description: |-
+        Why a jurisdiction appears in the coverage work queue.
+
+        The queue exists because population at scale is a loop over *"what should we hold
+        that we don't"* — and without a stated reason a queue is just a list, which an
+        operator or an agent has to re-derive the meaning of every time.
+
+        Deliberately NOT a priority score. ADR-0042 rejected a completeness percentage
+        because "every such number needs a denominator", and a priority number has exactly
+        the same defect: it reads as measured and is invented. A jurisdiction carries the
+        reasons that are true of it, the counts behind them travel alongside, and the caller
+        decides what matters.
+
+        NO_DENOMINATOR    nothing has told us how much this jurisdiction publishes, so no
+                          claim about coverage is possible at all. This is the one reason
+                          that blocks every other answer, which is why it sorts first.
+        NEVER_ACQUIRED    a denominator may or may not exist; nothing has been captured.
+        ACQUISITION_GAP   the source says there is more than we have captured.
+        PROCESSING_GAP    we captured it and the pipeline has not turned it into documents.
+        HOLDINGS_EXCEED_DENOMINATOR
+                          we hold MORE than the source claims to publish. Not "done" — a
+                          finding: a dedup failure, or a denominator counting something
+                          else. The schema already refuses to clamp a negative gap for the
+                          same reason.
+        REFUSALS_OUTSTANDING
+                          runs were refused here and nobody has resolved them. A refusal is
+                          a decision waiting for an operator, not a failure to retry.
     CreateAuthorityRequest:
       properties:
         jurisdiction_id:

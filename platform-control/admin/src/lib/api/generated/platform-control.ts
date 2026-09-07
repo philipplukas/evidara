@@ -1053,6 +1053,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/acquisition-coverage/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jurisdictions that need coverage work, and why
+         * @description The denominator read, turned into a worklist.
+         *
+         *     Population at scale is a loop over *"what should we hold that we don't"*, and
+         *     without this an agent onboards enthusiastically while nobody can say whether
+         *     coverage improved (#907).
+         *
+         *     Carries no priority score and never will. Ordering is a stated convention —
+         *     returned as `ordering` — because a priority number needs a denominator exactly as
+         *     much as the completeness percentage ADR-0042 rejected, and this read has no basis
+         *     for one. Every reason true of a jurisdiction is returned, not a chosen "primary"
+         *     one, so a caller ranks by its own policy rather than inheriting ours.
+         */
+        get: operations["getCoverageWorkQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/commentary-insights": {
         parameters: {
             query?: never;
@@ -1293,6 +1323,16 @@ export interface components {
              * @default 0
              */
             withdrawn_documents: number;
+            /**
+             * Refused Runs
+             * @default 0
+             */
+            refused_runs: number;
+            /**
+             * Quarantined Documents
+             * @default 0
+             */
+            quarantined_documents: number;
             /** Acquired Gap */
             acquired_gap?: number | null;
             /** Processed Gap */
@@ -1336,6 +1376,11 @@ export interface components {
             reconciliations_unattributed: number;
             /** Processed Documents Unattributable */
             processed_documents_unattributable: number;
+            /**
+             * Quarantined Events Unattributable
+             * @default 0
+             */
+            quarantined_events_unattributable: number;
             /** Reconciliations Recorded Since */
             reconciliations_recorded_since?: string | null;
             /** Unmeasured Stages */
@@ -2106,6 +2151,121 @@ export interface components {
          * @enum {string}
          */
         CorrectionType: "field_edit" | "annotation" | "reject" | "rescore_request";
+        /**
+         * CoverageWorkItem
+         * @description One jurisdiction that needs work, and why.
+         *
+         *     The unit is a JURISDICTION, not a source, even though #907 phrases the queue as
+         *     "the next N sources". That is deliberate: the denominator this queue reasons about
+         *     is stated per jurisdiction, and the most common reason to appear here —
+         *     `no_denominator` — is true of jurisdictions that have no source at all. Keying on
+         *     sources would make the largest category of work invisible, which is the exact
+         *     failure the ledger exists to prevent.
+         *
+         *     `sources` names what already exists to act through, and is empty precisely when the
+         *     action is "create one".
+         */
+        CoverageWorkItem: {
+            /** Jurisdiction Id */
+            jurisdiction_id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            level: components["schemas"]["NormLevel"];
+            /** Reasons */
+            reasons: components["schemas"]["CoverageWorkReason"][];
+            /** Expected */
+            expected?: number | null;
+            /** @default none */
+            denominator_tier: components["schemas"]["DenominatorTier"];
+            /**
+             * Acquired Distinct Urls
+             * @default 0
+             */
+            acquired_distinct_urls: number;
+            /**
+             * Processed Documents
+             * @default 0
+             */
+            processed_documents: number;
+            /** Acquired Gap */
+            acquired_gap?: number | null;
+            /** Processed Gap */
+            processed_gap?: number | null;
+            /**
+             * Refused Runs
+             * @default 0
+             */
+            refused_runs: number;
+            /**
+             * Quarantined Documents
+             * @default 0
+             */
+            quarantined_documents: number;
+            /** Source Ids */
+            source_ids?: string[];
+        };
+        /** CoverageWorkQueueResponse */
+        CoverageWorkQueueResponse: {
+            /**
+             * Basis
+             * @default platform_control_runs
+             */
+            basis: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /**
+             * Ordering
+             * @default reason_class_then_name
+             */
+            ordering: string;
+            /**
+             * Unqueued Unmeasurable
+             * @default 0
+             */
+            unqueued_unmeasurable: number;
+            /** Data */
+            data: components["schemas"]["CoverageWorkItem"][];
+            /** Total */
+            total?: number | null;
+            /** Limit */
+            limit?: number | null;
+        };
+        /**
+         * CoverageWorkReason
+         * @description Why a jurisdiction appears in the coverage work queue.
+         *
+         *     The queue exists because population at scale is a loop over *"what should we hold
+         *     that we don't"* — and without a stated reason a queue is just a list, which an
+         *     operator or an agent has to re-derive the meaning of every time.
+         *
+         *     Deliberately NOT a priority score. ADR-0042 rejected a completeness percentage
+         *     because "every such number needs a denominator", and a priority number has exactly
+         *     the same defect: it reads as measured and is invented. A jurisdiction carries the
+         *     reasons that are true of it, the counts behind them travel alongside, and the caller
+         *     decides what matters.
+         *
+         *     NO_DENOMINATOR    nothing has told us how much this jurisdiction publishes, so no
+         *                       claim about coverage is possible at all. This is the one reason
+         *                       that blocks every other answer, which is why it sorts first.
+         *     NEVER_ACQUIRED    a denominator may or may not exist; nothing has been captured.
+         *     ACQUISITION_GAP   the source says there is more than we have captured.
+         *     PROCESSING_GAP    we captured it and the pipeline has not turned it into documents.
+         *     HOLDINGS_EXCEED_DENOMINATOR
+         *                       we hold MORE than the source claims to publish. Not "done" — a
+         *                       finding: a dedup failure, or a denominator counting something
+         *                       else. The schema already refuses to clamp a negative gap for the
+         *                       same reason.
+         *     REFUSALS_OUTSTANDING
+         *                       runs were refused here and nobody has resolved them. A refusal is
+         *                       a decision waiting for an operator, not a failure to retry.
+         * @enum {string}
+         */
+        CoverageWorkReason: "no_denominator" | "never_acquired" | "acquisition_gap" | "processing_gap" | "holdings_exceed_denominator" | "refusals_outstanding";
         /** CreateAuthorityRequest */
         CreateAuthorityRequest: {
             /** Jurisdiction Id */
@@ -7302,6 +7462,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AcquisitionCoverageListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getCoverageWorkQueue: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageWorkQueueResponse"];
                 };
             };
             /** @description Validation Error */

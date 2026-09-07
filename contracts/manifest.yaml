@@ -16,7 +16,10 @@
 # control plane can render them without reading the lakehouse. Additive and
 # optional: a consumer that ignores it is unaffected, and an absent array means
 # "not recorded", never "no stages ran".
-version: "2.37.0"
+# 2.38.0: platform-control 0.27.0 — the coverage ledger gains refusal counts, and
+# a work-queue read on top of it (#907). Additive throughout; no locked path
+# changed shape.
+version: "2.38.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -66,7 +69,21 @@ apis:
     # before this, and it means "document-intelligence recorded no ledger", NOT
     # "the pipeline ran no stages". A reader that ignores the field is unaffected;
     # a reader that renders it must render `null` as unrecorded, never as zero.
-    version: "0.26.0"
+    # 0.27.0: the acquisition-coverage ledger states what a jurisdiction REFUSED
+    # alongside what it holds, and a new `GET /v1/acquisition-coverage/queue`
+    # turns the ledger into a worklist (#907). Additive on an unlocked path.
+    #
+    # `refused_runs` and `quarantined_documents` are two fields in two units and
+    # must never be summed or netted off coverage: a refused run and a
+    # quarantined document are different things, and this contract already
+    # refuses to subtract a unit count from a document count. A refusal is a
+    # decision the platform made, not a hole in the numerator.
+    #
+    # The queue carries NO score and no chosen "primary" reason. Position is
+    # ordered by a stated convention returned as `ordering`, because a priority
+    # number needs a denominator exactly as much as the completeness percentage
+    # ADR-0042 rejected. A consumer that wants a ranking applies its own.
+    version: "0.27.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

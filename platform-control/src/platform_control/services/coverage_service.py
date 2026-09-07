@@ -21,11 +21,18 @@ from typing import Any
 from sqlalchemy import Select, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from platform_control.domain import CoverageAttributionStatus, DenominatorTier
+from platform_control.domain import (
+    CoverageAttributionStatus,
+    CoverageWorkReason,
+    DenominatorTier,
+    ProcessingStatus,
+    RunStatus,
+)
 from platform_control.models.authority import Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.coverage_reconciliation import CoverageReconciliation
 from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
+from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 
@@ -37,6 +44,20 @@ _WITHDRAWN_EVENT = "document.withdrawn"
 
 # The stage this service structurally cannot see. Named, not omitted.
 UNMEASURED_STAGES = ["indexed"]
+
+# Queue ordering, most-blocking first. This is a stated convention, not a measurement:
+# `no_denominator` sorts first because it is the one reason that makes every other
+# answer unstatable, and a jurisdiction that has never been acquired is a bigger hole
+# than one that is merely behind. The payload names the rule (`ordering`) so a caller
+# reads position as "this convention" rather than as a priority score.
+_WORK_REASON_ORDER = (
+    CoverageWorkReason.NO_DENOMINATOR,
+    CoverageWorkReason.NEVER_ACQUIRED,
+    CoverageWorkReason.HOLDINGS_EXCEED_DENOMINATOR,
+    CoverageWorkReason.ACQUISITION_GAP,
+    CoverageWorkReason.PROCESSING_GAP,
+    CoverageWorkReason.REFUSALS_OUTSTANDING,
+)
 
 
 class CoverageService:
@@ -95,6 +116,10 @@ class CoverageService:
             or 0
         )
 
+        # --- refusals ---------------------------------------------------------------
+        refused_runs = await self._refused_runs_by_jurisdiction()
+        quarantined, quarantine_unattributable = await self._quarantined_by_jurisdiction()
+
         # --- denominators -----------------------------------------------------------
         recs = (
             (
@@ -151,6 +176,8 @@ class CoverageService:
                 acquired_urls=acquired_urls.get(jurisdiction.jurisdiction_id, 0),
                 processed=processed.get(jurisdiction.jurisdiction_id, 0),
                 withdrawn=withdrawn.get(jurisdiction.jurisdiction_id, 0),
+                refused_runs=refused_runs.get(jurisdiction.jurisdiction_id, 0),
+                quarantined_documents=quarantined.get(jurisdiction.jurisdiction_id, 0),
             )
             for jurisdiction in page
         ]
@@ -180,12 +207,203 @@ class CoverageService:
                 ),
                 "reconciliations_unattributed": unattributed_total,
                 "processed_documents_unattributable": unattributable,
+                "quarantined_events_unattributable": quarantine_unattributable,
                 # The ledger's own horizon. Without it an empty table reads as "we
                 # measured and found nothing" rather than "nothing has been measured yet".
                 "reconciliations_recorded_since": earliest_recorded,
                 "unmeasured_stages": list(UNMEASURED_STAGES),
             },
         }
+
+    async def get_coverage_work_queue(self, *, limit: int = 50) -> dict[str, Any]:
+        """The jurisdictions that need work, and why — #907's queue read.
+
+        Built on top of the ledger rather than beside it. Deriving the same counts a
+        second way is how a second producer starts, and this repo has paid for that
+        twice already (#675, #713); a queue that disagreed with the ledger it is a view
+        of would be worse than no queue.
+
+        NO SCORE, and no single "primary" reason. Ordering is by reason class then name
+        — stated in the payload as `ordering` so a caller never reads position as
+        priority — and every reason true of a jurisdiction travels with it. A priority
+        number needs a denominator exactly as much as a completeness percentage does,
+        and this read has no basis for one (ADR-0042).
+        """
+        limit = max(1, min(limit, MAX_PAGE_SIZE))
+
+        # The whole ledger, unpaginated: the queue answers "which jurisdictions need
+        # work" and a page of the ledger cannot. MAX_PAGE_SIZE bounds the OUTPUT below.
+        ledger = await self.get_acquisition_coverage(limit=MAX_PAGE_SIZE, offset=0)
+        entries: list[dict[str, Any]] = ledger["data"]
+
+        # A jurisdiction the ledger could not include is not a jurisdiction with no
+        # work — it is one we cannot speak about. Counted, never silently dropped.
+        unqueued = max(0, int(ledger.get("total") or 0) - len(entries))
+
+        source_ids: dict[str, list[str]] = {}
+        for jurisdiction_id, source_id in (
+            await self.session.execute(
+                select(Source.jurisdiction_id, Source.source_id).order_by(Source.source_id.asc())
+            )
+        ).all():
+            if jurisdiction_id:
+                source_ids.setdefault(jurisdiction_id, []).append(source_id)
+
+        items = []
+        for entry in entries:
+            reasons = self._work_reasons(entry)
+            if not reasons:
+                continue
+            items.append(
+                {
+                    "jurisdiction_id": entry["jurisdiction_id"],
+                    "name": entry["name"],
+                    "slug": entry["slug"],
+                    "level": entry["level"],
+                    "reasons": reasons,
+                    "expected": entry["expected"],
+                    "denominator_tier": entry["denominator_tier"],
+                    "acquired_distinct_urls": entry["acquired_distinct_urls"],
+                    "processed_documents": entry["processed_documents"],
+                    "acquired_gap": entry["acquired_gap"],
+                    "processed_gap": entry["processed_gap"],
+                    "refused_runs": entry["refused_runs"],
+                    "quarantined_documents": entry["quarantined_documents"],
+                    "source_ids": source_ids.get(entry["jurisdiction_id"], []),
+                }
+            )
+
+        rank = {reason: index for index, reason in enumerate(_WORK_REASON_ORDER)}
+        items.sort(key=lambda item: (min(rank[r] for r in item["reasons"]), item["name"]))
+
+        return {
+            "basis": "platform_control_runs",
+            "as_of": datetime.now(UTC),
+            "ordering": "reason_class_then_name",
+            "unqueued_unmeasurable": unqueued,
+            "data": items[:limit],
+            "total": len(items),
+            "limit": limit,
+        }
+
+    @staticmethod
+    def _work_reasons(entry: dict[str, Any]) -> list[CoverageWorkReason]:
+        """Every reason true of one ledger entry.
+
+        Each test mirrors a validator on `CoverageWorkItem`, so a reason that this
+        method emits without the counts to support it fails at serialisation rather
+        than reaching a caller as an unbacked label.
+        """
+        reasons: list[CoverageWorkReason] = []
+        acquired_gap = entry["acquired_gap"]
+        processed_gap = entry["processed_gap"]
+
+        if entry["expected"] is None:
+            reasons.append(CoverageWorkReason.NO_DENOMINATOR)
+        if entry["acquired_distinct_urls"] == 0:
+            reasons.append(CoverageWorkReason.NEVER_ACQUIRED)
+        if acquired_gap is not None and acquired_gap > 0:
+            reasons.append(CoverageWorkReason.ACQUISITION_GAP)
+        if processed_gap is not None and processed_gap > 0:
+            reasons.append(CoverageWorkReason.PROCESSING_GAP)
+        if (acquired_gap is not None and acquired_gap < 0) or (
+            processed_gap is not None and processed_gap < 0
+        ):
+            reasons.append(CoverageWorkReason.HOLDINGS_EXCEED_DENOMINATOR)
+        if entry["refused_runs"] > 0:
+            reasons.append(CoverageWorkReason.REFUSALS_OUTSTANDING)
+        return reasons
+
+    async def _refused_runs_by_jurisdiction(self) -> dict[str, int]:
+        """Count runs that are refusal records, per jurisdiction.
+
+        `Run.refused` reads `run_metadata["refused"]`, and `run_metadata` is a JSON
+        column. Filtering it in SQL needs `->>` on Postgres and `json_extract` on
+        SQLite, and this module's own docstring already states the position on
+        dialect-specific SQL: aggregate in Python after one narrow fetch, so the same
+        code runs on the SQLite test schema and production Postgres.
+
+        The fetch is narrowed to FAILED runs because that is the only status
+        `_record_refused_run` writes. It is deliberately NOT narrowed by time: a
+        `WHERE created_at >= now() - 90d` would make "never refused" and "refused
+        before the window" indistinguishable, which is the failure
+        `coverage_reconciliation`'s docstring calls disqualifying.
+        """
+        rows = (
+            await self.session.execute(
+                select(Source.jurisdiction_id, Run.run_metadata)
+                .join(Source, Source.source_id == Run.source_id)
+                .where(Run.status == RunStatus.FAILED)
+            )
+        ).all()
+
+        counts: dict[str, int] = {}
+        for jurisdiction_id, metadata in rows:
+            if not jurisdiction_id:
+                continue
+            if (metadata or {}).get("refused") is True:
+                counts[jurisdiction_id] = counts.get(jurisdiction_id, 0) + 1
+        return counts
+
+    async def _quarantined_by_jurisdiction(self) -> tuple[dict[str, int], int]:
+        """Distinct quarantined documents per jurisdiction, and what could not be placed.
+
+        Returns `(counts, unattributable)`. A quarantine event is unattributable when
+        its `run_id` matches no `Run`, or when it carries no `document_id` and so
+        cannot be counted as a document at all. Both are counted rather than dropped:
+        `quarantined_documents == 0` must not be able to mean "we could not say where".
+
+        DISTINCT `document_id`, not `COUNT(*)`, for the same reason the lifecycle
+        counts use it — a document quarantined twice is one refused document, not two.
+        """
+        attributed = (
+            await self.session.execute(
+                select(
+                    Source.jurisdiction_id,
+                    func.count(distinct(ProcessingStatusUpdate.document_id)),
+                )
+                .join(Run, Run.run_id == ProcessingStatusUpdate.run_id)
+                .join(Source, Source.source_id == Run.source_id)
+                .where(
+                    ProcessingStatusUpdate.status == ProcessingStatus.QUARANTINED,
+                    ProcessingStatusUpdate.document_id.is_not(None),
+                )
+                .group_by(Source.jurisdiction_id)
+            )
+        ).all()
+
+        orphaned = int(
+            (
+                await self.session.execute(
+                    select(func.count())
+                    .select_from(ProcessingStatusUpdate)
+                    .outerjoin(Run, Run.run_id == ProcessingStatusUpdate.run_id)
+                    .where(
+                        ProcessingStatusUpdate.status == ProcessingStatus.QUARANTINED,
+                        Run.run_id.is_(None),
+                    )
+                )
+            ).scalar()
+            or 0
+        )
+        documentless = int(
+            (
+                await self.session.execute(
+                    select(func.count())
+                    .select_from(ProcessingStatusUpdate)
+                    .outerjoin(Run, Run.run_id == ProcessingStatusUpdate.run_id)
+                    .where(
+                        ProcessingStatusUpdate.status == ProcessingStatus.QUARANTINED,
+                        ProcessingStatusUpdate.document_id.is_(None),
+                        Run.run_id.is_not(None),
+                    )
+                )
+            ).scalar()
+            or 0
+        )
+
+        counts = {row[0]: int(row[1] or 0) for row in attributed if row[0]}
+        return counts, orphaned + documentless
 
     @staticmethod
     def _lifecycle_statement(event_type: str) -> Select:
@@ -210,6 +428,8 @@ class CoverageService:
         acquired_urls: int,
         processed: int,
         withdrawn: int,
+        refused_runs: int = 0,
+        quarantined_documents: int = 0,
     ) -> dict[str, Any]:
         tier = reconciliation.denominator_tier if reconciliation else DenominatorTier.NONE
         expected = reconciliation.expected if reconciliation else None
@@ -248,6 +468,8 @@ class CoverageService:
             "acquired_distinct_urls": acquired_urls,
             "processed_documents": processed,
             "withdrawn_documents": withdrawn,
+            "refused_runs": refused_runs,
+            "quarantined_documents": quarantined_documents,
             "acquired_gap": (expected - acquired_urls) if gaps_are_meaningful else None,
             "processed_gap": (expected - processed) if gaps_are_meaningful else None,
         }

@@ -20,7 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from platform_control.database import get_session
 from platform_control.domain import NormLevel
 from platform_control.openapi import AGENT_DISCOVERY_TAG
-from platform_control.schemas.coverage import AcquisitionCoverageListResponse
+from platform_control.schemas.coverage import (
+    AcquisitionCoverageListResponse,
+    CoverageWorkQueueResponse,
+)
 from platform_control.services.coverage_service import MAX_PAGE_SIZE, CoverageService
 
 router = APIRouter(prefix="/v1/acquisition-coverage", tags=["acquisition-coverage"])
@@ -53,3 +56,33 @@ async def get_acquisition_coverage(
         limit=limit, offset=offset, level=level.value if level else None
     )
     return AcquisitionCoverageListResponse.model_validate(payload)
+
+
+@router.get(
+    "/queue",
+    response_model=CoverageWorkQueueResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+    summary="Jurisdictions that need coverage work, and why",
+    # As above: a collection cannot 404, and the route-error test asserts exact set
+    # equality, so declaring an error this handler cannot return fails as hard as
+    # omitting one.
+)
+async def get_coverage_work_queue(
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = 50,
+) -> CoverageWorkQueueResponse:
+    """The denominator read, turned into a worklist.
+
+    Population at scale is a loop over *"what should we hold that we don't"*, and
+    without this an agent onboards enthusiastically while nobody can say whether
+    coverage improved (#907).
+
+    Carries no priority score and never will. Ordering is a stated convention —
+    returned as `ordering` — because a priority number needs a denominator exactly as
+    much as the completeness percentage ADR-0042 rejected, and this read has no basis
+    for one. Every reason true of a jurisdiction is returned, not a chosen "primary"
+    one, so a caller ranks by its own policy rather than inheriting ours.
+    """
+    service = CoverageService(session)
+    payload = await service.get_coverage_work_queue(limit=limit)
+    return CoverageWorkQueueResponse.model_validate(payload)
