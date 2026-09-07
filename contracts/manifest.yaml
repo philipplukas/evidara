@@ -19,7 +19,11 @@
 # 2.38.0: platform-control 0.27.0 — the coverage ledger gains refusal counts, and
 # a work-queue read on top of it (#907). Additive throughout; no locked path
 # changed shape.
-version: "2.38.0"
+# 2.39.0: platform-control 0.28.0 — run decision support moves out of the admin's
+# TypeScript and into the contract (#908), and pipeline stages gain
+# `not_applicable`. See the API note below: the stage-status change is a
+# CORRECTION, not merely an addition.
+version: "2.39.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -83,7 +87,7 @@ apis:
     # ordered by a stated convention returned as `ordering`, because a priority
     # number needs a denominator exactly as much as the completeness percentage
     # ADR-0042 rejected. A consumer that wants a ranking applies its own.
-    version: "0.27.0"
+    version: "0.28.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

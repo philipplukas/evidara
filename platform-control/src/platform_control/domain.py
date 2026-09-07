@@ -228,6 +228,49 @@ class ReviewTaskStatus(StrEnum):
     FAILED = "failed"
 
 
+class RunRefusalCode(StrEnum):
+    """Why a run dispatch was refused, as a code rather than a sentence.
+
+    `_record_refused_run` has always written the reason as `str(exc)` — English
+    prose, in `failure_reason`. A human reads that fine; an agent has to pattern-match
+    it, and a message reworded in a later PR silently breaks every matcher. The
+    ADR-0030 enablement guard already returns machine-readable `refusals[].code`
+    (#854); run refusals now match it, so both refusal surfaces can be branched on
+    the same way (#908).
+
+    The prose is kept, not replaced: `failure_reason` still carries the exception's
+    own message, which is the part that says *which* template or policy.
+    """
+
+    BLUEPRINT_TEMPLATE_NOT_ENABLED = "blueprint_template_not_enabled"
+    COMPLIANCE_POLICY_MISSING = "compliance_policy_missing"
+    PROVIDER_NOT_LIVE_READY = "provider_not_live_ready"
+
+
+class PipelineStageStatus(StrEnum):
+    """The status of one pipeline stage, including the one the API used to omit.
+
+    `NOT_APPLICABLE` is the value this enum exists for. A run that ended `failed` or
+    `cancelled` will never advance, but `get_pipeline_health` reported the stages it
+    never reached as `pending` — with copy like "Awaiting DI processing signal before
+    projection stage starts", which reads as *work is still coming* over a run that is
+    dead. The admin had been re-labelling those in the browser since #649. That is a
+    correctness fix applied in one client, so every other consumer — the CLI, an
+    agent, alerting — still saw the misleading answer (#908).
+    """
+
+    OK = "ok"
+    PENDING = "pending"
+    # `in_progress`, not `running`: this is the value the stage resolvers have always
+    # emitted, and `test_run_pipeline_health_endpoint_returns_stage_summary` caught the
+    # guess. Enumerating the set is how a wrong assumption becomes a failing test
+    # instead of a field consumers quietly mis-handle.
+    IN_PROGRESS = "in_progress"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+    NOT_APPLICABLE = "not_applicable"
+
+
 class CoverageWorkReason(StrEnum):
     """Why a jurisdiction appears in the coverage work queue.
 

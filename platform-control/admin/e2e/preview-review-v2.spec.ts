@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { pipelineHealth } from "./fixtures/pipelineHealth";
 
 // ---------------------------------------------------------------------------
 // Smoke coverage for the ADR-0026 Tailwind port of the preview-approval queue
@@ -49,17 +50,7 @@ const PREVIEW_RUNS = { data: [PREVIEW_RUNNING, PREVIEW_DONE] };
 // Minimal-but-valid RunPipelineHealth so RunDetailSectionsV2's banner renders
 // (an empty `{ data: [] }` from the catch-all lacks `stages`, which the
 // decision-support builder reads → crash).
-const PIPELINE_HEALTH = {
-  run_id: "preview_running",
-  source_id: "src_1",
-  source_version_id: "sv_1",
-  mode: "preview",
-  run_status: "running",
-  overall_status: "in_progress",
-  stages: [],
-  processing_status_event_count: 0,
-  document_lifecycle_event_count: 0,
-};
+const PIPELINE_HEALTH = pipelineHealth("preview_running");
 
 async function mockPreviewReviewApi(page: Page) {
   // Benign catch-all first (lowest priority) — sub-resource read models the
