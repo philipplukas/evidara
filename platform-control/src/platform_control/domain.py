@@ -228,6 +228,43 @@ class ReviewTaskStatus(StrEnum):
     FAILED = "failed"
 
 
+class CoverageWorkReason(StrEnum):
+    """Why a jurisdiction appears in the coverage work queue.
+
+    The queue exists because population at scale is a loop over *"what should we hold
+    that we don't"* — and without a stated reason a queue is just a list, which an
+    operator or an agent has to re-derive the meaning of every time.
+
+    Deliberately NOT a priority score. ADR-0042 rejected a completeness percentage
+    because "every such number needs a denominator", and a priority number has exactly
+    the same defect: it reads as measured and is invented. A jurisdiction carries the
+    reasons that are true of it, the counts behind them travel alongside, and the caller
+    decides what matters.
+
+    NO_DENOMINATOR    nothing has told us how much this jurisdiction publishes, so no
+                      claim about coverage is possible at all. This is the one reason
+                      that blocks every other answer, which is why it sorts first.
+    NEVER_ACQUIRED    a denominator may or may not exist; nothing has been captured.
+    ACQUISITION_GAP   the source says there is more than we have captured.
+    PROCESSING_GAP    we captured it and the pipeline has not turned it into documents.
+    HOLDINGS_EXCEED_DENOMINATOR
+                      we hold MORE than the source claims to publish. Not "done" — a
+                      finding: a dedup failure, or a denominator counting something
+                      else. The schema already refuses to clamp a negative gap for the
+                      same reason.
+    REFUSALS_OUTSTANDING
+                      runs were refused here and nobody has resolved them. A refusal is
+                      a decision waiting for an operator, not a failure to retry.
+    """
+
+    NO_DENOMINATOR = "no_denominator"
+    NEVER_ACQUIRED = "never_acquired"
+    ACQUISITION_GAP = "acquisition_gap"
+    PROCESSING_GAP = "processing_gap"
+    HOLDINGS_EXCEED_DENOMINATOR = "holdings_exceed_denominator"
+    REFUSALS_OUTSTANDING = "refusals_outstanding"
+
+
 class DenominatorTier(StrEnum):
     """How trustworthy a coverage denominator is — and therefore what may be claimed.
 
