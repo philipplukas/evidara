@@ -6,8 +6,10 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from platform_control.domain import (
+    PipelineStageStatus,
     ProviderJobStatus,
     RunMode,
+    RunRefusalCode,
     RunReplayMode,
     RunScopeKind,
     RunStatus,
@@ -106,6 +108,18 @@ class RunResponse(BaseModel):
             "ask what was attempted and why it was refused (#634)."
         ),
     )
+    refusal_code: RunRefusalCode | None = Field(
+        default=None,
+        description=(
+            "Why the dispatch was refused, as a code rather than a sentence (#908). "
+            "`None` for a run that was not refused, and also for refusals recorded "
+            "before this field existed — an absent code means 'not classified', never "
+            "'not refused'; read `refused` for that. `failure_reason` keeps the prose, "
+            "which is the part naming WHICH template or policy. Same shape as the "
+            "ADR-0030 enablement guard's `refusals[].code` (#854), so both refusal "
+            "surfaces branch the same way."
+        ),
+    )
     published_artifacts_count: int = Field(
         default=0,
         description=(
@@ -146,6 +160,18 @@ class RunListItemResponse(BaseModel):
         description=(
             "True when the ADR-0030 two-key lock blocked this dispatch (#634). "
             "Filter the collection with `?refused=true` to audit refusals."
+        ),
+    )
+    refusal_code: RunRefusalCode | None = Field(
+        default=None,
+        description=(
+            "Why the dispatch was refused, as a code rather than a sentence (#908). "
+            "`None` for a run that was not refused, and also for refusals recorded "
+            "before this field existed — an absent code means 'not classified', never "
+            "'not refused'; read `refused` for that. `failure_reason` keeps the prose, "
+            "which is the part naming WHICH template or policy. Same shape as the "
+            "ADR-0030 enablement guard's `refusals[].code` (#854), so both refusal "
+            "surfaces branch the same way."
         ),
     )
     published_artifacts_count: int = Field(
@@ -302,9 +328,72 @@ class RunPreviewSummaryResponse(BaseModel):
 
 class RunPipelineHealthStage(BaseModel):
     stage: str
-    status: str
+    # Now an enum, and it can be `not_applicable`. See `PipelineStageStatus`: the
+    # admin invented that value in the browser because the API reported the stages a
+    # dead run never reached as `pending`. The API says it itself now.
+    status: PipelineStageStatus
     detail: str
     updated_at: datetime | None
+
+
+class RunDecisionNote(BaseModel):
+    """One operator question, answered as a code AND as text.
+
+    The code is what an agent branches on; the text is what a person reads. Both,
+    not either: prose alone forces a consumer to pattern-match English that a later
+    PR may reword, and a bare code forces every client to carry its own copy of the
+    sentences — which is how the same rule ends up enforced in two places with the
+    weaker one winning (AGENTS.md).
+    """
+
+    code: str
+    text: str
+
+
+class RunStageAction(BaseModel):
+    """The next action for one stage, keyed by a code.
+
+    `stage` and `status` travel with it so a caller never has to re-join this against
+    the stage list to know what it refers to.
+    """
+
+    stage: str
+    status: PipelineStageStatus
+    code: str
+    text: str
+
+
+class RunDecisionSupport(BaseModel):
+    """The four questions an operator actually asks, answered server-side (#908).
+
+    These were computed in `platform-control/admin/src/resources/runs/
+    run-decision-support.ts` — in TypeScript, in the browser — so an agent, the CLI
+    and alerting could reach none of it, and anything that wanted to would have to
+    re-derive the same judgements in a second implementation.
+
+    Deliberately NOT including the admin's "health has not loaded yet" branch: that
+    is a client loading state, not a judgement about a run, and the server always has
+    the health it is describing.
+    """
+
+    # The one-line reading of `overall_status`. Here rather than in the client for
+    # the same reason as the rest: it is a judgement about the run, and a second
+    # copy of the sentences is a second place for them to diverge.
+    overall_summary: RunDecisionNote
+    why_it_matters: RunDecisionNote
+    what_is_blocked: RunDecisionNote
+    what_changed_recently: RunDecisionNote
+    what_happens_if_ignored: RunDecisionNote
+
+    # The stage lists behind `what_is_blocked`, so a caller can act on them without
+    # parsing the sentence they were rendered into.
+    # Required, not defaulted: an absent list and an empty list must not be the
+    # same wire value here. "No stage is blocked" is an answer; "the server did not
+    # say" is not, and a consumer cannot tell them apart from an omitted field.
+    blocked_stages: list[str]
+    never_running_stages: list[str]
+
+    next_actions: list[RunStageAction]
 
 
 class RunPipelineHealthResponse(BaseModel):
@@ -317,3 +406,4 @@ class RunPipelineHealthResponse(BaseModel):
     stages: list[RunPipelineHealthStage]
     processing_status_event_count: int
     document_lifecycle_event_count: int
+    decision_support: RunDecisionSupport

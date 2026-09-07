@@ -28,6 +28,19 @@ const healthyPipeline: RunPipelineHealth = {
   stages: [],
   processing_status_event_count: 1,
   document_lifecycle_event_count: 1,
+  // Required since #908: the judgement travels with the health payload rather
+  // than being recomputed here. A fixture that omitted it would describe a
+  // response the API cannot return.
+  decision_support: {
+    overall_summary: { code: "stages_healthy", text: "Pipeline stages are healthy." },
+    why_it_matters: { code: "production_run", text: "" },
+    what_is_blocked: { code: "no_stage_blocked", text: "No stage is blocked right now." },
+    what_changed_recently: { code: "no_stage_updates", text: "" },
+    what_happens_if_ignored: { code: "nothing_urgent", text: "" },
+    blocked_stages: [],
+    never_running_stages: [],
+    next_actions: [],
+  },
 };
 
 describe("deriveOperatorChecklist", () => {

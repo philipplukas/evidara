@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.27.0
+  version: 0.28.0
 paths:
   /health:
     get:
@@ -6538,6 +6538,26 @@ components:
         `items_in` / `items_out` are `None` when the stage did not measure them, and
         a renderer must show that as "not recorded" rather than as `0`: absence and
         zero are different facts, and only one of them is a claim about the work.
+    PipelineStageStatus:
+      type: string
+      enum:
+      - ok
+      - pending
+      - in_progress
+      - blocked
+      - failed
+      - not_applicable
+      title: PipelineStageStatus
+      description: |-
+        The status of one pipeline stage, including the one the API used to omit.
+
+        `NOT_APPLICABLE` is the value this enum exists for. A run that ended `failed` or
+        `cancelled` will never advance, but `get_pipeline_health` reported the stages it
+        never reached as `pending` — with copy like "Awaiting DI processing signal before
+        projection stage starts", which reads as *work is still coming* over a run that is
+        dead. The admin had been re-labelling those in the browser since #649. That is a
+        correctness fix applied in one client, so every other consumer — the CLI, an
+        agent, alerting — still saw the misleading answer (#908).
     ProcessingStatus:
       type: string
       enum:
@@ -7167,6 +7187,76 @@ components:
         ``STRICT`` (default) means the crawler must refuse any URL robots.txt
         disallows. ``IGNORE`` is reserved for sources where we have an explicit
         open-data licence that supersedes robots (e.g. Fedlex, RIS OGD).
+    RunDecisionNote:
+      properties:
+        code:
+          type: string
+          title: Code
+        text:
+          type: string
+          title: Text
+      type: object
+      required:
+      - code
+      - text
+      title: RunDecisionNote
+      description: |-
+        One operator question, answered as a code AND as text.
+
+        The code is what an agent branches on; the text is what a person reads. Both,
+        not either: prose alone forces a consumer to pattern-match English that a later
+        PR may reword, and a bare code forces every client to carry its own copy of the
+        sentences — which is how the same rule ends up enforced in two places with the
+        weaker one winning (AGENTS.md).
+    RunDecisionSupport:
+      properties:
+        overall_summary:
+          $ref: '#/components/schemas/RunDecisionNote'
+        why_it_matters:
+          $ref: '#/components/schemas/RunDecisionNote'
+        what_is_blocked:
+          $ref: '#/components/schemas/RunDecisionNote'
+        what_changed_recently:
+          $ref: '#/components/schemas/RunDecisionNote'
+        what_happens_if_ignored:
+          $ref: '#/components/schemas/RunDecisionNote'
+        blocked_stages:
+          items:
+            type: string
+          type: array
+          title: Blocked Stages
+        never_running_stages:
+          items:
+            type: string
+          type: array
+          title: Never Running Stages
+        next_actions:
+          items:
+            $ref: '#/components/schemas/RunStageAction'
+          type: array
+          title: Next Actions
+      type: object
+      required:
+      - overall_summary
+      - why_it_matters
+      - what_is_blocked
+      - what_changed_recently
+      - what_happens_if_ignored
+      - blocked_stages
+      - never_running_stages
+      - next_actions
+      title: RunDecisionSupport
+      description: |-
+        The four questions an operator actually asks, answered server-side (#908).
+
+        These were computed in `platform-control/admin/src/resources/runs/
+        run-decision-support.ts` — in TypeScript, in the browser — so an agent, the CLI
+        and alerting could reach none of it, and anything that wanted to would have to
+        re-derive the same judgements in a second implementation.
+
+        Deliberately NOT including the admin's "health has not loaded yet" branch: that
+        is a client loading state, not a judgement about a run, and the server always has
+        the health it is describing.
     RunLifecycleCounts:
       properties:
         processing_status_updates:
@@ -7269,6 +7359,15 @@ components:
           description: True when the ADR-0030 two-key lock blocked this dispatch (#634). Filter the collection
             with `?refused=true` to audit refusals.
           default: false
+        refusal_code:
+          anyOf:
+          - $ref: '#/components/schemas/RunRefusalCode'
+          - type: 'null'
+          description: Why the dispatch was refused, as a code rather than a sentence (#908). `None` for
+            a run that was not refused, and also for refusals recorded before this field existed — an
+            absent code means 'not classified', never 'not refused'; read `refused` for that. `failure_reason`
+            keeps the prose, which is the part naming WHICH template or policy. Same shape as the ADR-0030
+            enablement guard's `refusals[].code` (#854), so both refusal surfaces branch the same way.
         published_artifacts_count:
           type: integer
           title: Published Artifacts Count
@@ -7383,6 +7482,8 @@ components:
         document_lifecycle_event_count:
           type: integer
           title: Document Lifecycle Event Count
+        decision_support:
+          $ref: '#/components/schemas/RunDecisionSupport'
       type: object
       required:
       - run_id
@@ -7394,6 +7495,7 @@ components:
       - stages
       - processing_status_event_count
       - document_lifecycle_event_count
+      - decision_support
       title: RunPipelineHealthResponse
     RunPipelineHealthStage:
       properties:
@@ -7401,8 +7503,7 @@ components:
           type: string
           title: Stage
         status:
-          type: string
-          title: Status
+          $ref: '#/components/schemas/PipelineStageStatus'
         detail:
           type: string
           title: Detail
@@ -7594,6 +7695,25 @@ components:
       - ready
       - checks
       title: RunReadinessResponse
+    RunRefusalCode:
+      type: string
+      enum:
+      - blueprint_template_not_enabled
+      - compliance_policy_missing
+      - provider_not_live_ready
+      title: RunRefusalCode
+      description: |-
+        Why a run dispatch was refused, as a code rather than a sentence.
+
+        `_record_refused_run` has always written the reason as `str(exc)` — English
+        prose, in `failure_reason`. A human reads that fine; an agent has to pattern-match
+        it, and a message reworded in a later PR silently breaks every matcher. The
+        ADR-0030 enablement guard already returns machine-readable `refusals[].code`
+        (#854); run refusals now match it, so both refusal surfaces can be branched on
+        the same way (#908).
+
+        The prose is kept, not replaced: `failure_reason` still carries the exception's
+        own message, which is the part that says *which* template or policy.
     RunReplayMode:
       type: string
       enum:
@@ -7680,6 +7800,15 @@ components:
             record — terminal FAILED, never dispatched — kept so an operator can ask what was attempted
             and why it was refused (#634).
           default: false
+        refusal_code:
+          anyOf:
+          - $ref: '#/components/schemas/RunRefusalCode'
+          - type: 'null'
+          description: Why the dispatch was refused, as a code rather than a sentence (#908). `None` for
+            a run that was not refused, and also for refusals recorded before this field existed — an
+            absent code means 'not classified', never 'not refused'; read `refused` for that. `failure_reason`
+            keeps the prose, which is the part naming WHICH template or policy. Same shape as the ADR-0030
+            enablement guard's `refusals[].code` (#854), so both refusal surfaces branch the same way.
         published_artifacts_count:
           type: integer
           title: Published Artifacts Count
@@ -7774,6 +7903,31 @@ components:
       additionalProperties: false
       type: object
       title: RunScopeRequest
+    RunStageAction:
+      properties:
+        stage:
+          type: string
+          title: Stage
+        status:
+          $ref: '#/components/schemas/PipelineStageStatus'
+        code:
+          type: string
+          title: Code
+        text:
+          type: string
+          title: Text
+      type: object
+      required:
+      - stage
+      - status
+      - code
+      - text
+      title: RunStageAction
+      description: |-
+        The next action for one stage, keyed by a code.
+
+        `stage` and `status` travel with it so a caller never has to re-join this against
+        the stage list to know what it refers to.
     RunStatus:
       type: string
       enum:

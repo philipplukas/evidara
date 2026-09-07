@@ -119,6 +119,18 @@ class Run(TimestampMixin, Base):
         return (self.run_metadata or {}).get("refused") is True
 
     @property
+    def refusal_code(self) -> str | None:
+        """The refusal's machine-readable kind, or None if it has none.
+
+        None covers two different situations and deliberately does not distinguish
+        them here: a run that was not refused at all, and a refusal recorded before
+        #908 added the code. `refused` is the field that answers "was this refused";
+        this one answers "what kind", and an absent value means *not classified*.
+        """
+        code = (self.run_metadata or {}).get("refusal_code")
+        return code if isinstance(code, str) else None
+
+    @property
     def publication_withheld(self) -> bool:
         """True when this run captured artifacts that were deliberately not published.
 

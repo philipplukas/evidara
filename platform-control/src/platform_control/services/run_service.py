@@ -22,8 +22,10 @@ from platform_control.config import get_settings
 from platform_control.domain import (
     CoverageAttributionStatus,
     ExecutionMode,
+    PipelineStageStatus,
     ProviderJobStatus,
     RunMode,
+    RunRefusalCode,
     RunStatus,
     SourceVersionStatus,
 )
@@ -68,6 +70,8 @@ from platform_control.schemas.run import (
     ProviderJobResponse,
     RawArtifactListResponse,
     RawArtifactResponse,
+    RunDecisionNote,
+    RunDecisionSupport,
     RunListItemResponse,
     RunPipelineHealthResponse,
     RunPipelineHealthStage,
@@ -77,6 +81,7 @@ from platform_control.schemas.run import (
     RunPreviewSummarySample,
     RunReadinessCheck,
     RunReadinessResponse,
+    RunStageAction,
 )
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
@@ -112,6 +117,133 @@ class PendingDispatchPublications:
 _QUERY_DISCOVERY_KEY_BY_PROVIDER: dict[str, str] = {
     "lexfind_api": "search_text",
 }
+
+
+# ---------------------------------------------------------------------------------
+# Decision support (#908) — moved here from the admin's TypeScript.
+#
+# The copy is carried over verbatim from
+# `platform-control/admin/src/resources/runs/run-decision-support.ts` rather than
+# rewritten. This change is about WHERE the judgement lives; rewriting the wording in
+# the same commit would make "the admin renders exactly what it rendered before"
+# impossible to check from the diff.
+#
+# Every answer carries a CODE as well as its sentence. An agent branches on the code;
+# a person reads the text. Prose alone would force a consumer to pattern-match English
+# that a later PR may reword — which is the defect this issue names in run refusals.
+# ---------------------------------------------------------------------------------
+
+# The refusal each guard exception represents. A dict rather than a chain of
+# `isinstance` checks so that adding an exception to the `except` clause without
+# giving it a code fails with a KeyError here, loudly, instead of silently writing a
+# refusal an agent cannot classify.
+_REFUSAL_CODES: dict[type[Exception], RunRefusalCode] = {
+    BlueprintTemplateNotEnabledError: RunRefusalCode.BLUEPRINT_TEMPLATE_NOT_ENABLED,
+    CompliancePolicyMissingError: RunRefusalCode.COMPLIANCE_POLICY_MISSING,
+    ProviderNotLiveReadyError: RunRefusalCode.PROVIDER_NOT_LIVE_READY,
+}
+
+_TERMINAL_FAILURE_RUN_STATUSES: frozenset[RunStatus] = frozenset(
+    {RunStatus.FAILED, RunStatus.CANCELLED}
+)
+
+
+def _label(value: str) -> str:
+    return value.replace("_", " ")
+
+
+_WHY_IT_MATTERS: dict[RunMode, RunDecisionNote] = {
+    RunMode.PRODUCTION: RunDecisionNote(
+        code="production_run",
+        text=(
+            "This production run determines whether the source version can safely flow "
+            "into the live operator surface."
+        ),
+    ),
+    RunMode.ACCEPTANCE: RunDecisionNote(
+        code="acceptance_run",
+        text=(
+            "This acceptance run reaches the live source to produce ADR-0030 evidence. "
+            "A pass is the justification for enabling the template - it does not by "
+            "itself turn either key."
+        ),
+    ),
+    RunMode.PREVIEW: RunDecisionNote(
+        code="preview_run",
+        text=(
+            "This preview run is the gate before promotion, so the result tells "
+            "operators whether the version is ready."
+        ),
+    ),
+}
+
+_OVERALL_SUMMARY: dict[str, RunDecisionNote] = {
+    "ok": RunDecisionNote(code="stages_healthy", text="Pipeline stages are healthy."),
+    "blocked": RunDecisionNote(
+        code="needs_remediation",
+        text="One or more stages need remediation before the run can progress.",
+    ),
+    "failed": RunDecisionNote(
+        code="downstream_failed",
+        text="A downstream stage failed and needs operator attention.",
+    ),
+}
+_OVERALL_SUMMARY_FALLBACK = RunDecisionNote(
+    code="still_moving",
+    text="At least one stage is still moving through the pipeline.",
+)
+
+_IF_IGNORED: dict[str, RunDecisionNote] = {
+    "ok": RunDecisionNote(
+        code="nothing_urgent",
+        text=(
+            "Nothing urgent happens; the run remains a completed audit trail unless "
+            "someone investigates it later."
+        ),
+    ),
+    "blocked": RunDecisionNote(
+        code="stays_blocked",
+        text="The run stays blocked until the relevant stage is remediated.",
+    ),
+    "failed": RunDecisionNote(
+        code="failure_unresolved",
+        text=("The failure remains unresolved and downstream progress will not clear itself."),
+    ),
+}
+
+# Per-stage remediation. Keyed on the stage name, with the two status-driven answers
+# handled first — an `ok` or dead stage needs nothing regardless of which stage it is.
+_STAGE_ACTIONS: dict[str, tuple[str, str]] = {
+    "acquisition": (
+        "inspect_provider_jobs",
+        "Check provider jobs for dispatch/crawl status and retry or cancel when stuck.",
+    ),
+    "document_intelligence": (
+        "inspect_di_processing",
+        "Inspect DI processing status events and error summaries for remediation.",
+    ),
+    "projection": (
+        "confirm_lifecycle_events",
+        "Confirm document lifecycle events are being emitted for this run.",
+    ),
+}
+_STAGE_ACTION_FALLBACK = (
+    "verify_search_visibility",
+    "Verify lifecycle search disposition and confirm indexed document visibility in legal-search.",
+)
+
+
+def _stage_action(stage: RunPipelineHealthStage) -> RunStageAction:
+    if stage.status is PipelineStageStatus.OK:
+        code, text = "none_required", "No action required."
+    elif stage.status is PipelineStageStatus.NOT_APPLICABLE:
+        code, text = (
+            "stage_will_not_run",
+            "No action - this stage will not run for this run.",
+        )
+    else:
+        code, text = _STAGE_ACTIONS.get(stage.stage, _STAGE_ACTION_FALLBACK)
+    return RunStageAction(stage=stage.stage, status=stage.status, code=code, text=text)
 
 
 class RunService:
@@ -247,6 +379,7 @@ class RunService:
         source_version: SourceVersion,
         request: CreateRunRequest,
         reason: str,
+        refusal_code: RunRefusalCode,
     ) -> None:
         """Persist a terminal FAILED run when the two-key lock refuses a dispatch.
 
@@ -267,6 +400,13 @@ class RunService:
             run_metadata={
                 "scope": request.scope.model_dump(mode="json"),
                 "refused": True,
+                # The code, beside the prose (#908). `failure_reason` keeps the
+                # exception's own message — the part that says WHICH template or
+                # policy — and this says what kind of refusal it was, so an agent
+                # branches on a value instead of pattern-matching a sentence that a
+                # later PR may reword. Matches the shape the ADR-0030 enablement
+                # guard already returns as `refusals[].code` (#854).
+                "refusal_code": refusal_code.value,
             },
         )
         self.session.add(run)
@@ -342,6 +482,7 @@ class RunService:
                         row._mapping["artifacts_count"],
                     ),
                     "refused": (row._mapping["run_metadata"] or {}).get("refused") is True,
+                    "refusal_code": (row._mapping["run_metadata"] or {}).get("refusal_code"),
                 }
             )
             for row in rows
@@ -413,7 +554,9 @@ class RunService:
                 CompliancePolicyMissingError,
                 ProviderNotLiveReadyError,
             ) as exc:
-                await self._record_refused_run(source, source_version, request, str(exc))
+                await self._record_refused_run(
+                    source, source_version, request, str(exc), _REFUSAL_CODES[type(exc)]
+                )
                 raise
 
         run_metadata: dict[str, Any] = {
@@ -944,6 +1087,12 @@ class RunService:
         search_stage = self._resolve_search_stage(latest_lifecycle)
 
         stages = [acquisition_stage, di_stage, projection_stage, search_stage]
+        # Applied HERE, not in a client. A run that ended `failed`/`cancelled` never
+        # advances, so the stages it never reached are dead, not queued — and
+        # reporting them as `pending` made a dead run look like it needed watching.
+        # The admin had been re-labelling them in the browser since #649, which meant
+        # the CLI, alerting and any agent still got the misleading answer (#908).
+        stages = self._project_unreachable_stages(stages, run.status)
         overall_status = self._resolve_overall_pipeline_status(stages)
 
         return RunPipelineHealthResponse(
@@ -956,6 +1105,13 @@ class RunService:
             stages=stages,
             processing_status_event_count=len(processing_updates),
             document_lifecycle_event_count=len(lifecycle_events),
+            decision_support=self._build_decision_support(
+                run=run,
+                stages=stages,
+                overall_status=overall_status,
+                processing_status_event_count=len(processing_updates),
+                document_lifecycle_event_count=len(lifecycle_events),
+            ),
         )
 
     async def get_provider_job_by_external_id(self, external_job_id: str) -> ProviderJob | None:
@@ -1320,6 +1476,135 @@ class RunService:
             status="ok",
             detail=detail,
             updated_at=latest_lifecycle.occurred_at,
+        )
+
+    @staticmethod
+    def _project_unreachable_stages(
+        stages: list[RunPipelineHealthStage], run_status: RunStatus
+    ) -> list[RunPipelineHealthStage]:
+        """Re-label the stages a terminally-ended run will never reach.
+
+        Only `pending` stages are touched, and only for `failed`/`cancelled` runs. A
+        run still progressing legitimately has pending stages, and a completed run
+        legitimately reports every stage `ok`.
+        """
+        if run_status not in _TERMINAL_FAILURE_RUN_STATUSES:
+            return stages
+        detail = (
+            "Not applicable — the run was cancelled before this stage could start."
+            if run_status is RunStatus.CANCELLED
+            else "Not applicable — the run failed before this stage could start."
+        )
+        return [
+            stage.model_copy(
+                update={"status": PipelineStageStatus.NOT_APPLICABLE, "detail": detail}
+            )
+            if stage.status is PipelineStageStatus.PENDING
+            else stage
+            for stage in stages
+        ]
+
+    @staticmethod
+    def _build_decision_support(
+        *,
+        run: Run,
+        stages: list[RunPipelineHealthStage],
+        overall_status: str,
+        processing_status_event_count: int,
+        document_lifecycle_event_count: int,
+    ) -> RunDecisionSupport:
+        """Answer the four operator questions, with a code beside every sentence.
+
+        Moved from `platform-control/admin/src/resources/runs/run-decision-support.ts`
+        (#908). The wording is carried over deliberately rather than rewritten: this
+        change is about WHERE the judgement lives, and a rewrite would make "the admin
+        renders the same thing" impossible to verify from the diff.
+        """
+        blocked = [
+            s.stage
+            for s in stages
+            if s.status in (PipelineStageStatus.BLOCKED, PipelineStageStatus.FAILED)
+        ]
+        never_running = [s.stage for s in stages if s.status is PipelineStageStatus.NOT_APPLICABLE]
+        # Three modes, not two. The ternary this replaces called an acceptance run
+        # "this preview run" — the mislabelling #743 fixed at the badge sites.
+        why = _WHY_IT_MATTERS[run.mode]
+
+        if overall_status == "ok":
+            blocked_note = RunDecisionNote(
+                code="no_stage_blocked", text="No stage is blocked right now."
+            )
+        elif blocked:
+            blocked_note = RunDecisionNote(
+                code="stages_blocked",
+                text=f"Blocked stages: {', '.join(_label(s) for s in blocked)}.",
+            )
+        else:
+            blocked_note = RunDecisionNote(
+                code="moving_no_block",
+                text=(
+                    "No stage is blocked, but the pipeline is still moving and may need "
+                    "operator attention soon."
+                ),
+            )
+        if never_running:
+            blocked_note = RunDecisionNote(
+                code=blocked_note.code,
+                text=(
+                    f"{blocked_note.text} Downstream stages that will never run: "
+                    f"{', '.join(_label(s) for s in never_running)}."
+                ),
+            )
+
+        dated = [s for s in stages if s.updated_at is not None]
+        if dated:
+            latest = max(dated, key=lambda s: s.updated_at)  # type: ignore[arg-type,return-value]
+            changed = RunDecisionNote(
+                code="latest_stage_update",
+                text=(
+                    f"Most recent stage update: {_label(latest.stage)} is "
+                    f"{_label(latest.status.value)}."
+                ),
+            )
+        else:
+            changed = RunDecisionNote(
+                code="no_stage_updates",
+                text=(
+                    f"Health snapshot recorded {processing_status_event_count} processing "
+                    f"events and {document_lifecycle_event_count} lifecycle events."
+                ),
+            )
+
+        if run.status in _TERMINAL_FAILURE_RUN_STATUSES:
+            ignored = RunDecisionNote(
+                code="terminal_needs_relaunch",
+                text=(
+                    f"The run already ended as {run.status.value}; the stages it never "
+                    "reached will not start on their own, so remediate and relaunch to "
+                    "make progress."
+                ),
+            )
+        else:
+            ignored = _IF_IGNORED.get(
+                overall_status,
+                RunDecisionNote(
+                    code="continues_advancing",
+                    text=(
+                        "The pipeline continues to advance and may still require "
+                        "intervention if a later stage stops."
+                    ),
+                ),
+            )
+
+        return RunDecisionSupport(
+            overall_summary=_OVERALL_SUMMARY.get(overall_status, _OVERALL_SUMMARY_FALLBACK),
+            why_it_matters=why,
+            what_is_blocked=blocked_note,
+            what_changed_recently=changed,
+            what_happens_if_ignored=ignored,
+            blocked_stages=blocked,
+            never_running_stages=never_running,
+            next_actions=[_stage_action(stage) for stage in stages],
         )
 
     @staticmethod

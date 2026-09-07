@@ -9,30 +9,25 @@
  */
 "use client";
 
-import { useMemo } from "react";
 import { publicConfig } from "../../config/publicConfig";
-import type { RunPipelineHealth, RunRecord } from "../../lib/admin/dataProvider";
+import type { RunPipelineHealth } from "../../lib/admin/dataProvider";
 import { Pill } from "../../ui/primitives";
 import { pipelineHealthToLevel } from "../shared/statusLevels";
 import { PrimaryDecisionCell } from "./PrimaryDecisionCell";
-import {
-  buildPipelineDecisionSupport,
-  overallSummaryByStatus,
-  projectPipelineStages,
-  stageActionTarget,
-  stageNeedsAction,
-  stageNextAction,
-} from "./run-decision-support";
+import { stageActionTarget } from "./run-decision-support";
 import { formatDateTime } from "./runCells";
 
 export function PipelineHealthBanner({
-  run,
   health,
   isPending,
   error,
   onJumpToSection,
 }: {
-  run: RunRecord;
+  // The run itself is no longer a prop: the decision support that needed it —
+  // "why this run matters", which is mode-dependent — is computed server-side and
+  // arrives on `health.decision_support` (#908). Keeping the prop would invite
+  // someone to derive from it again.
+  //
   // Fetched once by `RunShowV2` via `useRunPipelineHealth` and handed down. This
   // banner used to own the fetch, which was fine while it was the only reader;
   // the stall diagnosis on the overview is a second one, and two fetches of one
@@ -48,11 +43,6 @@ export function PipelineHealthBanner({
   const legalSearchUrl = publicConfig.legalSearchBaseUrlOrUndefined;
   const evidenceRunbookPath =
     "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
-
-  const decisionSupport = useMemo(
-    () => buildPipelineDecisionSupport({ run, health }),
-    [health, run],
-  );
 
   return (
     <section className="space-y-4 rounded-[18px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-5 shadow-[var(--shadow-card)] backdrop-blur-[12px] sm:p-6">
@@ -90,7 +80,7 @@ export function PipelineHealthBanner({
           </div>
 
           <p className="text-[13px] font-semibold text-[var(--foreground)]">
-            {overallSummaryByStatus(health.overall_status)}
+            {health.decision_support.overall_summary.text}
           </p>
 
           <div className="rounded-[14px] border border-[var(--border-faint)] bg-[var(--brand-wash-3)] p-4">
@@ -103,30 +93,48 @@ export function PipelineHealthBanner({
               </p>
             </div>
             <div className="space-y-3">
-              <PrimaryDecisionCell label="Why this matters" value={decisionSupport.whyItMatters} />
+              <PrimaryDecisionCell
+                label="Why this matters"
+                value={health.decision_support.why_it_matters.text}
+              />
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <DecisionCell label="What is blocked" value={decisionSupport.whatIsBlocked} />
+                <DecisionCell
+                  label="What is blocked"
+                  value={health.decision_support.what_is_blocked.text}
+                />
                 <DecisionCell
                   label="What changed recently"
-                  value={decisionSupport.whatChangedRecently}
+                  value={health.decision_support.what_changed_recently.text}
                 />
                 <DecisionCell
                   label="If you do nothing"
-                  value={decisionSupport.whatHappensIfIgnored}
+                  value={health.decision_support.what_happens_if_ignored.text}
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-2">
-            {projectPipelineStages(health).map((stage) => {
+            {health.stages.map((stage) => {
+              // `not_applicable` arrives from the API now (#908). This component used
+              // to re-label it here, which meant every other consumer of
+              // pipeline-health kept seeing a dead run's stages as `pending`.
+              const nextAction = health.decision_support.next_actions.find(
+                (candidate) => candidate.stage === stage.stage,
+              );
               const level = pipelineHealthToLevel(stage.status);
               const action = stageActionTarget(stage, {
                 legalSearchUrl,
                 evidenceRunbookPath,
               });
               const isInPageAnchor = action.href.startsWith("#");
-              const needsAction = stageNeedsAction(stage.status);
+              // The server decides whether a stage needs attention: it answers
+              // `none_required` / `stage_will_not_run` when it does not. Re-deriving
+              // that from the status here is the second implementation #908 removes.
+              const needsAction =
+                nextAction !== undefined &&
+                nextAction.code !== "none_required" &&
+                nextAction.code !== "stage_will_not_run";
               return (
                 <div
                   key={stage.stage}
@@ -149,7 +157,7 @@ export function PipelineHealthBanner({
                   {needsAction ? (
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[var(--status-degraded)]/20 bg-[var(--status-degraded-subtle)] p-2.5">
                       <p className="text-[12px] font-semibold text-[var(--foreground)]">
-                        Next action: {stageNextAction(stage)}
+                        Next action: {nextAction?.text}
                       </p>
                       {isInPageAnchor ? (
                         // A raw `<a href="#...">` would drive the HashRouter to

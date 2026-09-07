@@ -3242,6 +3242,20 @@ export interface components {
             } | null;
         };
         /**
+         * PipelineStageStatus
+         * @description The status of one pipeline stage, including the one the API used to omit.
+         *
+         *     `NOT_APPLICABLE` is the value this enum exists for. A run that ended `failed` or
+         *     `cancelled` will never advance, but `get_pipeline_health` reported the stages it
+         *     never reached as `pending` — with copy like "Awaiting DI processing signal before
+         *     projection stage starts", which reads as *work is still coming* over a run that is
+         *     dead. The admin had been re-labelling those in the browser since #649. That is a
+         *     correctness fix applied in one client, so every other consumer — the CLI, an
+         *     agent, alerting — still saw the misleading answer (#908).
+         * @enum {string}
+         */
+        PipelineStageStatus: "ok" | "pending" | "in_progress" | "blocked" | "failed" | "not_applicable";
+        /**
          * ProcessingStatus
          * @enum {string}
          */
@@ -3618,6 +3632,48 @@ export interface components {
          * @enum {string}
          */
         RobotsMode: "strict" | "ignore";
+        /**
+         * RunDecisionNote
+         * @description One operator question, answered as a code AND as text.
+         *
+         *     The code is what an agent branches on; the text is what a person reads. Both,
+         *     not either: prose alone forces a consumer to pattern-match English that a later
+         *     PR may reword, and a bare code forces every client to carry its own copy of the
+         *     sentences — which is how the same rule ends up enforced in two places with the
+         *     weaker one winning (AGENTS.md).
+         */
+        RunDecisionNote: {
+            /** Code */
+            code: string;
+            /** Text */
+            text: string;
+        };
+        /**
+         * RunDecisionSupport
+         * @description The four questions an operator actually asks, answered server-side (#908).
+         *
+         *     These were computed in `platform-control/admin/src/resources/runs/
+         *     run-decision-support.ts` — in TypeScript, in the browser — so an agent, the CLI
+         *     and alerting could reach none of it, and anything that wanted to would have to
+         *     re-derive the same judgements in a second implementation.
+         *
+         *     Deliberately NOT including the admin's "health has not loaded yet" branch: that
+         *     is a client loading state, not a judgement about a run, and the server always has
+         *     the health it is describing.
+         */
+        RunDecisionSupport: {
+            overall_summary: components["schemas"]["RunDecisionNote"];
+            why_it_matters: components["schemas"]["RunDecisionNote"];
+            what_is_blocked: components["schemas"]["RunDecisionNote"];
+            what_changed_recently: components["schemas"]["RunDecisionNote"];
+            what_happens_if_ignored: components["schemas"]["RunDecisionNote"];
+            /** Blocked Stages */
+            blocked_stages: string[];
+            /** Never Running Stages */
+            never_running_stages: string[];
+            /** Next Actions */
+            next_actions: components["schemas"]["RunStageAction"][];
+        };
         /** RunLifecycleCounts */
         RunLifecycleCounts: {
             /** Processing Status Updates */
@@ -3672,6 +3728,8 @@ export interface components {
              * @default false
              */
             refused: boolean;
+            /** @description Why the dispatch was refused, as a code rather than a sentence (#908). `None` for a run that was not refused, and also for refusals recorded before this field existed — an absent code means 'not classified', never 'not refused'; read `refused` for that. `failure_reason` keeps the prose, which is the part naming WHICH template or policy. Same shape as the ADR-0030 enablement guard's `refusals[].code` (#854), so both refusal surfaces branch the same way. */
+            refusal_code?: components["schemas"]["RunRefusalCode"] | null;
             /**
              * Published Artifacts Count
              * @description How many of `artifacts_count` reached the broker. Lower than `artifacts_count` when the dispatch was withheld or the handoff failed partway (#853, #707).
@@ -3742,13 +3800,13 @@ export interface components {
             processing_status_event_count: number;
             /** Document Lifecycle Event Count */
             document_lifecycle_event_count: number;
+            decision_support: components["schemas"]["RunDecisionSupport"];
         };
         /** RunPipelineHealthStage */
         RunPipelineHealthStage: {
             /** Stage */
             stage: string;
-            /** Status */
-            status: string;
+            status: components["schemas"]["PipelineStageStatus"];
             /** Detail */
             detail: string;
             /** Updated At */
@@ -3836,6 +3894,22 @@ export interface components {
             checks: components["schemas"]["RunReadinessCheck"][];
         };
         /**
+         * RunRefusalCode
+         * @description Why a run dispatch was refused, as a code rather than a sentence.
+         *
+         *     `_record_refused_run` has always written the reason as `str(exc)` — English
+         *     prose, in `failure_reason`. A human reads that fine; an agent has to pattern-match
+         *     it, and a message reworded in a later PR silently breaks every matcher. The
+         *     ADR-0030 enablement guard already returns machine-readable `refusals[].code`
+         *     (#854); run refusals now match it, so both refusal surfaces can be branched on
+         *     the same way (#908).
+         *
+         *     The prose is kept, not replaced: `failure_reason` still carries the exception's
+         *     own message, which is the part that says *which* template or policy.
+         * @enum {string}
+         */
+        RunRefusalCode: "blueprint_template_not_enabled" | "compliance_policy_missing" | "provider_not_live_ready";
+        /**
          * RunReplayMode
          * @enum {string}
          */
@@ -3883,6 +3957,8 @@ export interface components {
              * @default false
              */
             refused: boolean;
+            /** @description Why the dispatch was refused, as a code rather than a sentence (#908). `None` for a run that was not refused, and also for refusals recorded before this field existed — an absent code means 'not classified', never 'not refused'; read `refused` for that. `failure_reason` keeps the prose, which is the part naming WHICH template or policy. Same shape as the ADR-0030 enablement guard's `refusals[].code` (#854), so both refusal surfaces branch the same way. */
+            refusal_code?: components["schemas"]["RunRefusalCode"] | null;
             /**
              * Published Artifacts Count
              * @description How many of `artifacts_count` actually reached the broker. Equal to `artifacts_count` for an ordinary run; lower when the dispatch was withheld (`publication_withheld`) or the handoff failed partway (#707). Render it beside `artifacts_count`, never instead of it — a discard is not an empty run (#853).
@@ -3927,6 +4003,22 @@ export interface components {
             until?: string | null;
             /** Max Resources */
             max_resources?: number | null;
+        };
+        /**
+         * RunStageAction
+         * @description The next action for one stage, keyed by a code.
+         *
+         *     `stage` and `status` travel with it so a caller never has to re-join this against
+         *     the stage list to know what it refers to.
+         */
+        RunStageAction: {
+            /** Stage */
+            stage: string;
+            status: components["schemas"]["PipelineStageStatus"];
+            /** Code */
+            code: string;
+            /** Text */
+            text: string;
         };
         /**
          * RunStatus

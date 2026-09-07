@@ -1,127 +1,65 @@
+/**
+ * The guard AGENTS.md asks for: this fails if the TypeScript derivation returns.
+ *
+ * #908 moved the run decision support — the four operator questions, the
+ * `not_applicable` stage projection, per-stage next actions, the overall summary —
+ * into `platform-control`, so an agent, the CLI and alerting can reach the same
+ * judgement the admin renders. The risk is not that someone reverts the move in one
+ * commit; it is that a later change quietly re-adds "just this one" derivation here,
+ * and the browser drifts back into being the place the real policy lives.
+ *
+ * AGENTS.md: *"the same rule enforced in two clients rather than once behind them —
+ * the easier path becomes the real policy, and it is usually the weaker one."*
+ *
+ * This reads the source rather than the exports on purpose. A re-added helper that
+ * is not exported is still a second implementation.
+ */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildRunRecord } from "../../lib/admin/__fixtures__/runs";
-import type { RunPipelineHealth, RunPipelineHealthStage } from "../../lib/admin/dataProvider";
-import { buildRunDecisionSupport } from "./RunShow";
-import { buildPipelineDecisionSupport } from "./run-decision-support";
 
-const baseRun = buildRunRecord({
-  id: "run-123",
-  run_id: "run-123",
-  mode: "preview",
-  status: "running",
-  started_at: "2026-04-10T09:00:00Z",
-  completed_at: null,
-  artifacts_count: 3,
-  created_at: "2026-04-10T08:59:00Z",
-  updated_at: "2026-04-10T09:15:00Z",
-});
+const read = (relative: string) => readFileSync(join(__dirname, relative), "utf8");
 
-const stage = (overrides: Partial<RunPipelineHealthStage>): RunPipelineHealthStage => ({
-  stage: "acquisition",
-  status: "in_progress",
-  detail: "Working through provider jobs.",
-  updated_at: "2026-04-10T09:12:00Z",
-  ...overrides,
-});
+/** Names the derivation had before it moved server-side. */
+const REMOVED_DERIVATION = [
+  "buildPipelineDecisionSupport",
+  "projectPipelineStages",
+  "overallSummaryByStatus",
+  "stageNextAction",
+  "stageNeedsAction",
+  "isTerminalFailureRunStatus",
+];
 
-describe("run decision support helpers", () => {
-  it("explains run overview decisions for failed production runs", () => {
-    const support = buildRunDecisionSupport({
-      ...baseRun,
-      mode: "production",
-      status: "failed",
-      failure_reason: "DI processing halted on schema mismatch.",
-      completed_at: "2026-04-10T09:20:00Z",
-    });
-
-    expect(support.whyItMatters).toContain("production run");
-    expect(support.whatIsBlocked).toContain("schema mismatch");
-    expect(support.whatChangedRecently).toContain("failure outcome");
-    expect(support.whatHappensIfIgnored).toContain("remains failed");
+describe("the decision-support derivation stays server-side", () => {
+  it.each(REMOVED_DERIVATION)("run-decision-support.ts does not define %s", (name) => {
+    expect(read("./run-decision-support.ts")).not.toContain(`function ${name}`);
   });
 
-  it("summarizes pipeline blockers and recent stage movement", () => {
-    const health: RunPipelineHealth = {
-      run_id: baseRun.run_id,
-      source_id: baseRun.source_id,
-      source_version_id: baseRun.source_version_id,
-      mode: baseRun.mode,
-      run_status: "running",
-      overall_status: "blocked",
-      stages: [
-        stage({ stage: "acquisition", status: "blocked", detail: "Waiting on provider retry." }),
-        stage({
-          stage: "document_intelligence",
-          status: "in_progress",
-          updated_at: "2026-04-10T09:18:00Z",
-          detail: "DI is still processing captured resources.",
-        }),
-      ],
-      processing_status_event_count: 4,
-      document_lifecycle_event_count: 2,
-    };
-
-    const support = buildPipelineDecisionSupport({ run: baseRun, health });
-
-    expect(support.whyItMatters).toContain("preview run");
-    expect(support.whatIsBlocked).toContain("acquisition");
-    expect(support.whatChangedRecently).toContain("document intelligence");
-    expect(support.whatHappensIfIgnored).toContain("stays blocked");
+  it("run-decision-support.ts keeps only the DOM helpers a server cannot answer", () => {
+    const source = read("./run-decision-support.ts");
+    // These stay: an in-page anchor and a HashRouter-safe scroll are this page's
+    // DOM, not a judgement about a run.
+    expect(source).toContain("export function stageActionTarget");
+    expect(source).toContain("export function scrollToInPageSection");
   });
 
-  it("tells the operator downstream stages are dead once the run terminally failed", () => {
-    const health: RunPipelineHealth = {
-      run_id: baseRun.run_id,
-      source_id: baseRun.source_id,
-      source_version_id: baseRun.source_version_id,
-      mode: baseRun.mode,
-      run_status: "failed",
-      overall_status: "failed",
-      stages: [
-        stage({ stage: "acquisition", status: "failed", detail: "Provider dispatch failed." }),
-        stage({
-          stage: "projection",
-          status: "pending",
-          updated_at: null,
-          detail: "Awaiting DI processing signal before projection stage starts.",
-        }),
-      ],
-      processing_status_event_count: 0,
-      document_lifecycle_event_count: 0,
-    };
-
-    const support = buildPipelineDecisionSupport({ run: { ...baseRun, status: "failed" }, health });
-
-    expect(support.whatIsBlocked).toContain("will never run: projection");
-    expect(support.whatHappensIfIgnored).toContain("already ended as failed");
-    // ...and it must not imply the run will move on its own.
-    expect(support.whatHappensIfIgnored).not.toContain("stays blocked");
-  });
-});
-
-describe("acceptance runs are not described as previews", () => {
-  it("names the acceptance mode and what a pass does and does not justify", () => {
-    // #743 fixed the `production ? … : "Preview"` mislabelling at the badge
-    // sites and missed this one, so the run detail called an acceptance run
-    // "this preview run" 400px below a section that named it correctly.
-    const support = buildPipelineDecisionSupport({
-      run: { ...baseRun, mode: "acceptance" },
-      health: null,
-    });
-
-    expect(support.whyItMatters).toContain("acceptance run");
-    expect(support.whyItMatters).toContain("does not by itself turn either key");
-    expect(support.whyItMatters).not.toContain("preview run");
+  it("the banner reads the judgement from the payload instead of computing it", () => {
+    const banner = read("./PipelineHealthBanner.tsx");
+    expect(banner).toContain("health.decision_support");
+    // The projection in particular: re-labelling stages here is what left every
+    // other consumer of pipeline-health seeing a dead run's stages as `pending`.
+    expect(banner).not.toContain("projectPipelineStages");
   });
 
-  it("still describes preview and production in their own terms", () => {
-    expect(
-      buildPipelineDecisionSupport({ run: { ...baseRun, mode: "preview" }, health: null })
-        .whyItMatters,
-    ).toContain("preview run");
-    expect(
-      buildPipelineDecisionSupport({ run: { ...baseRun, mode: "production" }, health: null })
-        .whyItMatters,
-    ).toContain("production run");
+  it("no other admin file re-implements the four questions", () => {
+    // A cheap, honest scope: the run resource is where this lived and where it
+    // would come back. Widening to the whole tree would make the test slow and
+    // no more true.
+    const banner = read("./PipelineHealthBanner.tsx");
+    const detail = read("./RunDetailSectionsV2.tsx");
+    for (const name of REMOVED_DERIVATION) {
+      expect(banner).not.toContain(name);
+      expect(detail).not.toContain(name);
+    }
   });
 });

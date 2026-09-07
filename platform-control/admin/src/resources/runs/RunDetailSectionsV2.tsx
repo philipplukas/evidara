@@ -158,7 +158,6 @@ export default function RunDetailSectionsV2({
   return (
     <div className="space-y-4">
       <PipelineHealthBanner
-        run={run}
         health={health}
         isPending={healthIsPending}
         error={healthError}

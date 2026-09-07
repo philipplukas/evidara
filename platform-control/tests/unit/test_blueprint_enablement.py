@@ -11,11 +11,18 @@ from __future__ import annotations
 
 import pytest
 from conftest import dispatchable_compliance_policy
+from sqlalchemy import select
 
 from acquisition_core.providers import AcquisitionReadiness, ProviderNotLiveReadyError
-from platform_control.domain import RunMode, RunStatus, SourceVersionStatus
+from platform_control.domain import (
+    RunMode,
+    RunRefusalCode,
+    RunStatus,
+    SourceVersionStatus,
+)
 from platform_control.errors import BlueprintTemplateNotEnabledError, NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.run import Run
 from platform_control.schemas.run import CreateRunRequest
 from platform_control.schemas.source import (
     CreateSourceRequest,
@@ -647,3 +654,38 @@ async def test_a_waived_config_key_never_admits_a_scaffold(session) -> None:
     assert lock.ok is False
     assert "code key closed" in lock.detail.lower()
     assert "needs engineering" in lock.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_a_refused_run_records_a_code_beside_its_prose(session) -> None:
+    """#908: an agent must be able to branch on a refusal without parsing English.
+
+    `_record_refused_run` has always written `str(exc)` into `failure_reason` — good
+    for a human, and a trap for anything else: a message reworded in a later PR
+    silently breaks every matcher. The ADR-0030 enablement guard already returns
+    machine-readable `refusals[].code` (#854); run refusals now match it.
+
+    The prose is kept, not replaced — it is the part naming WHICH template.
+    """
+    source, version = await _approved_version_from_template(session, LIVE_TEMPLATE)
+    await BlueprintEnablementService(session).set_enabled(
+        *LIVE_TEMPLATE, enabled=False, note="closed for this test", actor="op_x"
+    )
+    await session.commit()
+
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+    with pytest.raises(BlueprintTemplateNotEnabledError):
+        await run_service.create_run(
+            CreateRunRequest(
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                mode=RunMode.ACCEPTANCE,
+            )
+        )
+
+    run = await session.scalar(select(Run).where(Run.source_id == source.source_id))
+    assert run is not None
+    assert run.refused is True
+    assert run.refusal_code == RunRefusalCode.BLUEPRINT_TEMPLATE_NOT_ENABLED.value
+    # The sentence survives: it is what says which template was refused.
+    assert run.failure_reason
