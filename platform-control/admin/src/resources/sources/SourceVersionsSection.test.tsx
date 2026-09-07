@@ -92,3 +92,47 @@ describe("SourceVersionsSection — unknown acquisition provider", () => {
     expect(queryByLabelText("Version label")).not.toBeNull();
   });
 });
+
+describe("SourceVersionsSection — the config an operator can actually see", () => {
+  /**
+   * Until this existed, the complete `acquisition_spec` was rendered in exactly
+   * one place: the create wizard, before the source existed. Afterwards the table
+   * showed a summary that omits every identity/scope field. So the configuration
+   * was legible at the moment it did not matter and filtered once it did.
+   */
+  it("expands the full acquisition spec, including fields the summary omits", async () => {
+    const { container, getAllByTestId, findByTestId } = renderSection();
+
+    await waitFor(() => {
+      expect(container.textContent).toContain("v1");
+    });
+
+    // The summary in the cell does not carry these — that is the whole point.
+    expect(container.textContent).not.toContain("corpus_id");
+
+    fireEvent.click(getAllByTestId("version-config-toggle")[0]);
+    const panel = await findByTestId("acquisition-spec-panel");
+
+    expect(panel.textContent).toContain("corpus_id");
+    expect(panel.textContent).toContain("trust_tier");
+    expect(panel.textContent).toContain("canton_code");
+  });
+
+  it("keeps the raw JSON one click away rather than on screen by default", async () => {
+    const { container, getAllByTestId, findByTestId, queryByText } = renderSection();
+
+    await waitFor(() => {
+      expect(container.textContent).toContain("v1");
+    });
+    fireEvent.click(getAllByTestId("version-config-toggle")[0]);
+    await findByTestId("acquisition-spec-panel");
+
+    expect(queryByText("Show raw JSON")).not.toBeNull();
+    // Not rendered until asked for: the rows are for reading, the JSON is for
+    // copying, and a wall of JSON by default is what this replaces.
+    expect(container.querySelector("pre.overflow-x-auto")).toBeNull();
+
+    fireEvent.click(getAllByTestId("acquisition-spec-raw-toggle")[0]);
+    expect(container.querySelector("pre.overflow-x-auto")).not.toBeNull();
+  });
+});

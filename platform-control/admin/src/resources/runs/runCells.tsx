@@ -10,10 +10,12 @@
 import { formatSwissDateTime } from "../../lib/format/date";
 import type { PillLevel } from "../../ui/primitives";
 
+// Re-exported so the run sections keep importing these from here. They live in
+// `ui/primitives` now because `resources/sources` needs them too.
+export { CodeBlock, formatJson } from "../../ui/primitives";
+
 export const formatDateTime = (value: string | null | undefined): string =>
   formatSwissDateTime(value) || "—";
-
-export const formatJson = (value: unknown): string => JSON.stringify(value, null, 2);
 
 export const renderInlineValue = (value: string | number | null | undefined) =>
   value ?? <span className="text-[var(--foreground-faint)]">—</span>;
@@ -45,13 +47,5 @@ export function ExternalValueLink({ href, label }: { href: string | null; label:
     >
       {label}
     </a>
-  );
-}
-
-export function CodeBlock({ value }: { value: unknown }) {
-  return (
-    <pre className="mt-1 overflow-x-auto rounded-[8px] bg-[var(--brand-wash-6)] px-3 py-2 text-[12px] leading-[1.4] text-[var(--foreground)]">
-      {formatJson(value)}
-    </pre>
   );
 }

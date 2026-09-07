@@ -55,7 +55,7 @@ const specProvider = (spec: AcquisitionSpec): string => spec.provider;
  * (`platform_control/schemas/source.py`). The form renders none of them, so
  * they survive an edit only by being copied off the spec that was loaded.
  */
-const BASE_SPEC_FIELDS = [
+export const BASE_SPEC_FIELDS = [
   "tenant_id",
   "corpus_id",
   "scope_type",

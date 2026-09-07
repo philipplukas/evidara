@@ -41,7 +41,6 @@ import {
   AccordionTrigger,
   Pill,
 } from "../../ui/primitives";
-import { ArtifactPayloadPanel } from "./ArtifactPayloadPanel";
 import { PipelineHealthBanner } from "./PipelineHealthBanner";
 import { RunAccordionSection } from "./RunAccordionSection";
 import { scrollToInPageSection, sectionIdFromAnchor } from "./run-decision-support";
