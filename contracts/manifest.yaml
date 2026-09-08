@@ -27,7 +27,12 @@
 # estate instead of one 500-row page, and reports sourceless jurisdictions as a
 # count rather than as rows (#928). Additive on the response; a consumer that
 # ignores the new field sees a SHORTER and more useful `data`.
-version: "2.40.0"
+# 2.41.0: platform-control 0.30.0 — REMOVES `POST /webhooks/slack/interactions`
+# and the `slack` tag (#852). The route was mounted unauthenticated and never
+# signature-verified; it signalled approve/reject to a `workflow_id` taken from the
+# request body, bypassing `WizardService`. It had no sender and, with the in-memory
+# orchestrator, no effect. A removal, so not additive — but no client existed.
+version: "2.41.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -91,7 +96,7 @@ apis:
     # ordered by a stated convention returned as `ordering`, because a priority
     # number needs a denominator exactly as much as the completeness percentage
     # ADR-0042 rejected. A consumer that wants a ranking applies its own.
-    version: "0.29.0"
+    version: "0.30.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

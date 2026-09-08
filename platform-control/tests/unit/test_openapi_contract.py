@@ -220,7 +220,6 @@ EXPECTED_ERROR_RESPONSES = {
     "saveWizardDiscoveryPlan": {"404", "409"},
     "saveWizardScope": {"404", "409"},
     "setBlueprintTemplateEnablement": {"404", "409"},
-    "slackInteraction": {"400"},
     "startWizardPilotRun": {"400", "404", "409"},
     "triggerRescoreFromCorrection": {"404", "409"},
     "updateAuthority": {"404"},

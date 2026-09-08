@@ -1242,29 +1242,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/webhooks/slack/interactions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Slack Interaction
-         * @description Handle Slack interactive message payloads.
-         *
-         *     Slack sends interaction payloads as application/x-www-form-urlencoded
-         *     with a `payload` field containing JSON.
-         */
-        post: operations["slackInteraction"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7884,37 +7861,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    slackInteraction: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description A domain rule rejected the request (misconfigured provider, orchestration failure, or a blueprint template that is not enabled for live acquisition). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

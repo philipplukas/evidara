@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
+import json
+from urllib.parse import urlencode
+
 import httpx
 import pytest
+from fastapi.routing import APIRoute
 
+from platform_control.auth import (
+    require_api_key,
+    require_control_plane_operator,
+    require_control_plane_service,
+)
 from platform_control.config import get_settings
 from platform_control.database import get_session
 from platform_control.main import create_app
@@ -289,3 +298,95 @@ async def test_dev_optin_is_ignored_once_a_key_is_configured(
             assert authed.status_code == 200
     finally:
         app.dependency_overrides.clear()
+
+
+# --- #852: nothing but the health surface may be mounted unauthenticated -------------
+
+#: Paths deliberately served without a key. Everything else must carry an auth
+#: dependency. Adding a path here is a security decision, not a formality.
+_UNAUTHENTICATED_ALLOWLIST = frozenset(
+    {
+        "/health",
+        "/ready",
+        "/metrics",
+        "/stats",
+        "/openapi.json",
+        "/docs",
+        "/docs/oauth2-redirect",
+        "/redoc",
+    }
+)
+
+_AUTH_DEPENDENCIES = frozenset(
+    {require_control_plane_operator, require_control_plane_service, require_api_key}
+)
+
+
+def _route_is_authenticated(route: APIRoute) -> bool:
+    return any(dep.call in _AUTH_DEPENDENCIES for dep in route.dependant.dependencies)
+
+
+def test_no_unauthenticated_routes_beyond_health() -> None:
+    """No route outside the health surface may be reachable without a key (#852).
+
+    `POST /webhooks/slack/interactions` was mounted unauthenticated and, despite a
+    comment claiming otherwise, unverified: it read `workflow_id` out of the request
+    body and signalled approve/reject to it. This asserts the *class* of defect is
+    gone, not just the one instance — a new `app.include_router(x.router)` with no
+    `dependencies=` fails here.
+    """
+    app = create_app()
+    unauthenticated = sorted(
+        f"{sorted(route.methods)[0]} {route.path}"
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        and route.path not in _UNAUTHENTICATED_ALLOWLIST
+        and not _route_is_authenticated(route)
+    )
+    assert unauthenticated == [], (
+        f"routes reachable without an API key: {unauthenticated}. Mount them with "
+        "`dependencies=_operator_auth` or `_service_auth`, or justify an allowlist entry."
+    )
+
+
+@pytest.mark.asyncio
+async def test_slack_interaction_webhook_is_gone(session_maker) -> None:
+    """The unverified Slack approve/reject receiver answers 404, not 200 (#852).
+
+    The gate's only path is `POST /v1/wizard/runs/{run_id}/approve|reject`, which is
+    operator-authenticated and goes through `WizardService`. The body below is the
+    exact forgery the old handler honoured: a fabricated `workflow_id`, no signature.
+    """
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            forged = await client.post(
+                "/webhooks/slack/interactions",
+                content=urlencode(
+                    {
+                        "payload": json.dumps(
+                            {
+                                "user": {"name": "attacker"},
+                                "actions": [
+                                    {
+                                        "action_id": "gate_approve",
+                                        "value": json.dumps({"workflow_id": "wizard-run-victim"}),
+                                    }
+                                ],
+                            }
+                        )
+                    }
+                ),
+                headers={"content-type": "application/x-www-form-urlencoded"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert forged.status_code == 404

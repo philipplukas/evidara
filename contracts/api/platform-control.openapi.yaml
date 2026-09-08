@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.29.0
+  version: 0.30.0
 paths:
   /health:
     get:
@@ -3209,33 +3209,6 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - APIKeyHeader: []
-  /webhooks/slack/interactions:
-    post:
-      tags:
-      - slack
-      summary: Slack Interaction
-      description: |-
-        Handle Slack interactive message payloads.
-
-        Slack sends interaction payloads as application/x-www-form-urlencoded
-        with a `payload` field containing JSON.
-      operationId: slackInteraction
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                additionalProperties: true
-                type: object
-                title: Response Slackinteraction
-        '400':
-          description: A domain rule rejected the request (misconfigured provider, orchestration failure,
-            or a blueprint template that is not enabled for live acquisition).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     AcquisitionCoverageEntry:
@@ -9023,7 +8996,6 @@ tags:
 - name: compliance-policies
 - name: di-events
 - name: firecrawl
-- name: slack
 - name: corrections
   description: |
     Human-in-the-loop corrections raised against upstream domain entities (source,

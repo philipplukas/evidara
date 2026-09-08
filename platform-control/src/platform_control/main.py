@@ -46,7 +46,6 @@ from platform_control.routers import (
     reviews,
     runs,
     schedules,
-    slack_interactions,
     sources,
     versions,
     wizard,
@@ -145,15 +144,18 @@ def create_app() -> FastAPI:
     app.include_router(firecrawl.router, dependencies=_service_auth)
     app.include_router(di_events.router, dependencies=_service_auth)
 
-    # Slack interactions — unauthenticated, and NOT signature-verified. This comment
-    # used to claim "Slack signature verification handled in-route"; the route does no
-    # such check (compare `firecrawl.py`, which verifies an HMAC). The endpoint is inert
-    # today because it only signals when `wizard_orchestrator_backend == "temporal"`,
-    # which is nowhere (ADR-0031) — but it must not be reachable in a deployment that
-    # turns Temporal on. Verify the `X-Slack-Signature` header, or delete the route,
-    # before that happens. Found while fixing #560; not fixed there because removing a
-    # published endpoint is a contract change that deserves its own review.
-    app.include_router(slack_interactions.router)
+    # `POST /webhooks/slack/interactions` used to be mounted here — unauthenticated and,
+    # despite a comment that claimed otherwise, not signature-verified. It was deleted in
+    # #852. It read `workflow_id` straight out of the attacker-controlled payload and
+    # signalled approve/reject to it, bypassing `WizardService` entirely — so a Slack
+    # "approve" scaled a crawl of live government portals without ever writing DB state.
+    # The gate's real, authenticated path is `POST /v1/wizard/runs/{run_id}/approve` and
+    # `.../reject` (`routers/wizard.py`), which go through `WizardService` and its state
+    # guards. Nothing in this service ever posted those Slack buttons: the only sender in
+    # the repo is `infra/coordinator`, which owns the Slack signing secret
+    # (`docs/setup/scoped-credentials.md`) and receives its own buttons at its own
+    # signature-verified `POST /webhooks/slack`. Do not re-add an unauthenticated router
+    # here: `test_auth_scopes.py::test_no_unauthenticated_routes_beyond_health` fails.
 
     @app.exception_handler(NotFoundError)
     async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
