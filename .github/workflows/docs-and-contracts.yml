@@ -128,6 +128,20 @@ jobs:
         # no per-workload policy may be wider than the scope its account declares.
         run: python scripts/check_hetzner_minio_credentials.py
 
+      - name: Check platform-owned infra is frozen
+        # The shared cluster layer moved to `research-platform` (#936) and the
+        # copies under `infra/hetzner/` are frozen by hash. This guard shipped
+        # wired into pre-commit ONLY — the single Hetzner check not running
+        # beside its four siblings here, in a repo whose AGENTS.md requires both
+        # ("If you add a check to one, add it to the other").
+        #
+        # Pre-commit alone is not enough for the thing this guards: anyone
+        # without the hooks installed — including every agent that commits
+        # without invoking them — can edit a frozen file, push, and see green,
+        # silently re-forking the estate. That is the exact condition the
+        # extraction existed to end.
+        run: python scripts/check_platform_ownership.py
+
       - name: Validate country overlay blueprint templates
         run: |
           python scripts/check_country_overlay.py --country AT
