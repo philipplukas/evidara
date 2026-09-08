@@ -23,6 +23,8 @@ import { ResourceName } from "../../domain/resourceNames";
 import {
   type AcquisitionCoverageRecord,
   type AcquisitionCoverageSummary,
+  type CoverageWorkItem,
+  type CoverageWorkQueueResponse,
   controlPlaneActions,
 } from "../../lib/admin/dataProvider";
 import { DataTable, type DataTableColumn, Panel, Pill, type PillLevel } from "../../ui/primitives";
@@ -172,6 +174,108 @@ function SummaryPanel({ summary }: { summary: AcquisitionCoverageSummary | null 
   );
 }
 
+/**
+ * What each queue reason means, in the operator's words.
+ *
+ * The codes come from the server (`CoverageWorkReason`) and are the thing to
+ * branch on; these are only the rendering. `no_source` is absent on purpose —
+ * the server reports those as a count rather than as rows (#928), so it cannot
+ * appear here.
+ */
+const REASON_COPY: Record<string, { label: string; level: PillLevel; hint: string }> = {
+  no_denominator: {
+    label: "No denominator",
+    level: "neutral",
+    hint: "Nothing has told us how much this jurisdiction publishes, so coverage is unstatable. Run an enumeration.",
+  },
+  never_acquired: {
+    label: "Never acquired",
+    level: "degraded",
+    hint: "A source exists and nothing has been captured through it yet.",
+  },
+  acquisition_gap: {
+    label: "Acquisition gap",
+    level: "degraded",
+    hint: "The source says there is more than we have captured.",
+  },
+  processing_gap: {
+    label: "Processing gap",
+    level: "info",
+    hint: "Captured, not yet turned into documents. Waiting, not re-acquiring.",
+  },
+  holdings_exceed_denominator: {
+    label: "Holds more than published",
+    level: "critical",
+    hint: "Not progress: a dedup failure, or a denominator counting something else. No run fixes it.",
+  },
+  refusals_outstanding: {
+    label: "Refusals outstanding",
+    level: "critical",
+    hint: "A run here was refused. A person decides what happens next.",
+  },
+};
+
+const queueColumns: DataTableColumn<CoverageWorkItem & { id: string }>[] = [
+  {
+    key: "jurisdiction",
+    header: "Jurisdiction",
+    render: (item) => (
+      <div>
+        <span className="font-semibold text-[var(--foreground)]">{item.name}</span>
+        <span className="ml-2 font-mono text-[11px] text-[var(--foreground-subtle)]">
+          {item.jurisdiction_id}
+        </span>
+      </div>
+    ),
+  },
+  {
+    key: "level",
+    header: "Level",
+    render: (item) => (
+      <span className="text-[13px] text-[var(--foreground-muted)]">{item.level}</span>
+    ),
+  },
+  {
+    key: "why",
+    header: "Why",
+    render: (item) => (
+      // EVERY reason, not a chosen "primary" one. The server deliberately does
+      // not rank them (no score — ADR-0042), and picking one here would be the
+      // client inventing the ranking the API refused to.
+      <div className="flex flex-wrap gap-1">
+        {item.reasons.map((reason) => {
+          const copy = REASON_COPY[reason];
+          return (
+            <span key={reason} title={copy?.hint ?? reason}>
+              <Pill level={copy?.level ?? "neutral"}>{copy?.label ?? reason}</Pill>
+            </span>
+          );
+        })}
+      </div>
+    ),
+  },
+  { key: "expected", header: "Expected", render: (item) => <Count value={item.expected} /> },
+  {
+    key: "acquired",
+    header: "Acquired",
+    render: (item) => <Count value={item.acquired_distinct_urls} />,
+  },
+  {
+    key: "processed",
+    header: "Processed",
+    render: (item) => <Count value={item.processed_documents} />,
+  },
+  {
+    key: "sources",
+    header: "Sources",
+    render: (item) => (
+      <span className="tabular-nums text-[var(--foreground-muted)]">
+        {item.source_ids?.length ?? 0}
+      </span>
+    ),
+  },
+];
+
 export function AcquisitionCoverageList() {
   const controller = useListController<AcquisitionCoverageRecord>({
     resource: ResourceName.AcquisitionCoverage,
@@ -179,6 +283,20 @@ export function AcquisitionCoverageList() {
     sort: { field: "jurisdiction_id", order: "ASC" },
   });
   const [summary, setSummary] = useState<AcquisitionCoverageSummary | null>(null);
+  /**
+   * Which question this page answers.
+   *
+   * `work` is the default because it is the one an operator arrives with. The
+   * ledger view opened on page 1 of 44 — fifty municipal rows reading
+   * `expected —, acquired 0` — while its own header said four jurisdictions had
+   * any acquisition, and offered no way to reach them (#930).
+   *
+   * `all` keeps the full ledger, unchanged. The work queue is a VIEW of it, not
+   * a replacement: looking a specific jurisdiction up is still a real question.
+   */
+  const [view, setView] = useState<"work" | "all">("work");
+  const [queue, setQueue] = useState<CoverageWorkQueueResponse | null>(null);
+  const [queueError, setQueueError] = useState<unknown>(null);
 
   const activeLevel =
     typeof controller.filterValues?.level === "string"
@@ -198,10 +316,29 @@ export function AcquisitionCoverageList() {
       })
       // The table is still useful without the summary; a failed header must not blank it.
       .catch(() => undefined);
+    controlPlaneActions
+      .getCoverageWorkQueue(50)
+      .then((value) => {
+        if (!cancelled) {
+          setQueue(value);
+        }
+      })
+      // Surfaced, not swallowed: an empty work view and a failed work view are
+      // different answers, and the table below says which.
+      .catch((error) => {
+        if (!cancelled) {
+          setQueueError(error);
+        }
+      });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const queueRows = useMemo(
+    () => (queue?.data ?? []).map((item) => ({ ...item, id: item.jurisdiction_id })),
+    [queue],
+  );
 
   const columns: DataTableColumn<AcquisitionCoverageRecord>[] = useMemo(
     () => [
@@ -319,53 +456,109 @@ export function AcquisitionCoverageList() {
 
           <section className="rounded-[18px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-4 space-y-2 shadow-[var(--shadow-card)] backdrop-blur-[12px]">
             <div className="flex flex-wrap items-center gap-1.5">
-              <PresetButton isActive={!activeLevel} onClick={() => setLevel(undefined)}>
-                All levels
+              <PresetButton isActive={view === "work"} onClick={() => setView("work")}>
+                Needs work
+                {queue?.total !== undefined ? (
+                  <span className="ml-1.5 tabular-nums opacity-70">{queue.total}</span>
+                ) : null}
               </PresetButton>
-              {LEVEL_PRESETS.map((preset) => (
-                <PresetButton
-                  key={preset.key}
-                  isActive={activeLevel === preset.key}
-                  onClick={() => setLevel(preset.key)}
-                >
-                  {preset.label}
-                </PresetButton>
-              ))}
+              <PresetButton isActive={view === "all"} onClick={() => setView("all")}>
+                All jurisdictions
+              </PresetButton>
             </div>
-            <p className="text-[12px] text-[var(--foreground-subtle)]">
-              {/*
-               * Says what the operator cannot do here, rather than leaving them
-               * to discover it by clicking headers that do not sort. The
-               * endpoint takes `level` and pagination and nothing else: no
-               * ordering parameter, no "has acquisition" predicate. Ordering is
-               * the server's (alphabetical), so a client-side sort control
-               * would reorder 50 of 2,169 rows and look like it had sorted the
-               * table.
-               */}
-              Filtered on the server, so the count and pager below describe the whole level — not
-              this page. Rows are ordered by the API (alphabetical) and this endpoint offers no
-              other ordering; most municipal rows carry no acquisition yet, which is what the header
-              counts say.
-            </p>
+            {view === "work" ? (
+              <p className="text-[12px] text-[var(--foreground-subtle)]">
+                {/*
+                 * Ordering is the SERVER's and is echoed from the payload rather
+                 * than restated, so this line cannot drift from what the rows
+                 * actually do. There is no score and no chosen primary reason:
+                 * a priority number needs a denominator exactly as much as a
+                 * completeness percentage does (ADR-0042).
+                 */}
+                Jurisdictions with a source and something to act on, ordered by{" "}
+                <code className="font-mono text-[11px]">{queue?.ordering ?? "the server"}</code>.
+                Every reason true of a row is shown — there is no ranking and no score.
+                {queue?.jurisdictions_without_a_source ? (
+                  <>
+                    {" "}
+                    A further{" "}
+                    <strong>
+                      {queue.jurisdictions_without_a_source} jurisdictions have no source at all
+                    </strong>{" "}
+                    and are counted rather than listed: registering one is a repo edit and a deploy,
+                    which is not work this queue can hand anyone.
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+            {view === "all" ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <PresetButton isActive={!activeLevel} onClick={() => setLevel(undefined)}>
+                  All levels
+                </PresetButton>
+                {LEVEL_PRESETS.map((preset) => (
+                  <PresetButton
+                    key={preset.key}
+                    isActive={activeLevel === preset.key}
+                    onClick={() => setLevel(preset.key)}
+                  >
+                    {preset.label}
+                  </PresetButton>
+                ))}
+              </div>
+            ) : null}
+            {view === "all" ? (
+              <p className="text-[12px] text-[var(--foreground-subtle)]">
+                {/*
+                 * Says what the operator cannot do here, rather than leaving them
+                 * to discover it by clicking headers that do not sort. The
+                 * endpoint takes `level` and pagination and nothing else: no
+                 * ordering parameter, no "has acquisition" predicate. Ordering is
+                 * the server's (alphabetical), so a client-side sort control
+                 * would reorder 50 of 2,169 rows and look like it had sorted the
+                 * table.
+                 */}
+                Filtered on the server, so the count and pager below describe the whole level — not
+                this page. Rows are ordered by the API (alphabetical) and this endpoint offers no
+                other ordering; most municipal rows carry no acquisition yet, which is what the
+                header counts say.
+              </p>
+            ) : null}
           </section>
 
-          <DataTable<AcquisitionCoverageRecord>
-            records={controller.data}
-            columns={columns}
-            getRowId={(r) => String(r.id)}
-            isLoading={controller.isPending}
-            error={controller.error}
-            total={controller.total}
-            page={controller.page}
-            perPage={controller.perPage}
-            onPageChange={controller.setPage}
-            empty="No jurisdictions."
-            caption={
-              controller.total !== undefined
-                ? `${controller.total} jurisdiction${controller.total === 1 ? "" : "s"}`
-                : null
-            }
-          />
+          {view === "work" ? (
+            <DataTable<CoverageWorkItem & { id: string }>
+              records={queueRows}
+              columns={queueColumns}
+              getRowId={(item) => item.id}
+              isLoading={queue === null && queueError === null}
+              error={queueError}
+              empty="Nothing needs work: every jurisdiction with a source is measured and current."
+              caption={
+                queue
+                  ? `${queue.total} jurisdiction${queue.total === 1 ? "" : "s"} need work`
+                  : null
+              }
+            />
+          ) : (
+            <DataTable<AcquisitionCoverageRecord>
+              records={controller.data}
+              columns={columns}
+              getRowId={(r) => String(r.id)}
+              isLoading={controller.isPending}
+              error={controller.error}
+              total={controller.total}
+              page={controller.page}
+              perPage={controller.perPage}
+              onPageChange={controller.setPage}
+              empty="No jurisdictions."
+              caption={
+                controller.total !== undefined
+                  ? `${controller.total} jurisdiction${controller.total === 1 ? "" : "s"}`
+                  : null
+              }
+            />
+          )}
         </div>
       </ListContextProvider>
     </ResourceContextProvider>
