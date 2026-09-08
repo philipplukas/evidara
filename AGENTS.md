@@ -9,7 +9,15 @@ This is the Evidara monorepo — a document intelligence platform for legal rese
 - **platform-control** — Source lifecycle, runs, approvals, reference data (Cloud Run)
 - **document-intelligence** — Raw-to-canonical processing pipelines (containerized NATS JetStream consumer; Spark/Databricks is opt-in only — see ADR-0029)
 - **contracts** — OpenAPI specs, JSON Schemas, event schemas (build-time only)
-- **infra** — Terraform, deployment configs, environment definitions
+- **infra** — what *this repo* still deploys: `hetzner/apps/` (the app workloads and
+  their image pin), the `evidara-apps` Argo Application, `marketing/`, `auth/`,
+  `observability/`, `postgres-cluster.yaml`, `deploy-stage{4,5}.sh`, and
+  `terraform/`. **The shared cluster layer is no longer here** — it moved to
+  [`research-platform`](https://github.com/philipplukas/research-platform) on
+  2026-09-07 and is reconciled by its own Argo `platform` Application. The files
+  that moved are still present but **frozen by hash**; editing one does not reach
+  the cluster. `infra/hetzner/OWNERSHIP.md` records the mapping and the two
+  dependencies that cross the boundary.
 - **docs** — Architecture, ADRs, runbooks, testing strategy, component docs
 - **tools/evidara-cli** — Typer CLI for agent/operator smoke against platform-control + legal-search (`evidara --help`); optional `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` when both APIs are reachable; against **private Cloud Run** use [`scripts/mint-cloud-run-tokens.sh`](scripts/mint-cloud-run-tokens.sh) and [docs/setup/gcp-local-cloud-run-auth.md](docs/setup/gcp-local-cloud-run-auth.md)
 
@@ -35,7 +43,9 @@ Every change should be classified as one or more of:
 - `internal-refactor` — restructuring without behavior change
 - `user-visible-behavior` — changes what users see or experience
 - `contract-change` — API specs, event schemas, shared entity shapes
-- `infra-change` — Terraform, deployment, cloud resources
+- `infra-change` — Terraform, deployment, cloud resources. **Check which repo owns
+  the file first**: the shared cluster layer lives in `research-platform`, and the
+  frozen copies here cannot deliver a change (see **infra** above).
 - `pipeline-change` — document-intelligence processing, data quality
 - `architecture-change` — domain boundaries, storage decisions, communication patterns
 - `docs-only` — documentation without code
@@ -210,7 +220,8 @@ A gate must also run the same **dependency set** as the artifact it claims to co
 | API interfaces | `contracts/api/*.openapi.yaml` — hand-authored, except `platform-control.openapi.yaml`, which is **generated** from the FastAPI app by `scripts/generate_platform_control_contract.py` and drift-gated (ADR-0034) |
 | Entity shapes | `contracts/schemas/*.json` |
 | Event payloads | `contracts/events/*.json` |
-| Infra resources | `infra/terraform/` |
+| Infra resources — **this repo's** | `infra/terraform/`, `infra/hetzner/apps/`, and the other paths named under **infra** above |
+| Infra resources — **the shared cluster** | [`research-platform`](https://github.com/philipplukas/research-platform), not this repo. The copies under `infra/hetzner/` are frozen fallbacks; `scripts/check_platform_ownership.py` refuses an edit and names where it belongs. |
 | Design tokens | `styles/tokens/tokens.css` (shared; see ADR-0027 — "two products, shared brand"). Workspace-local extensions: `legal-search/frontend/src/app/globals.css`; admin-local: `platform-control/admin/src/app/globals.css`; marketing-local: `marketing/src/app/globals.css`. |
 | Public marketing copy | `marketing/src/lib/content.ts` — every claim carries an `evidence` code path; `content.test.ts` fails the build on a claim without one (ADR-0039) |
 | Tests | Test files adjacent to code |
