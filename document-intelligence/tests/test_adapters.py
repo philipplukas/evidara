@@ -341,6 +341,45 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
         # And no top-level column was invented.
         self.assertEqual(set(widened.names), set(_COMMENTARY_INSIGHTS_ARROW_SCHEMA.names))
 
+    def test_the_unify_fallback_survives_debug_logging(self) -> None:
+        """The conservative fallback must not be fatal at DEBUG (#871).
+
+        The per-field fallback logged `field=declared.name` as a keyword, structlog-style,
+        against a stdlib logger. `Logger.debug` only forwards its kwargs when the level is
+        enabled, so at INFO — every test, and the shipped consumers, which
+        `basicConfig(level=logging.INFO)` — nothing happens; at DEBUG `Logger._log()` raises
+        `TypeError: unexpected keyword argument 'field'`.
+
+        That raise leaves `_widen_for_new_nested_fields` (it is *in* the `except` branch) and
+        lands in `_write_rows`' outer handler, so it does not read as a logging bug: it
+        becomes `ProcessingError("delta_write_failed")`. `published_commentary_insights`
+        takes this branch on every write — its `metadata` is a declared map, which never
+        unifies with the inferred struct — so raising the log level to investigate a
+        widening question would have taken that surface's publish path down entirely.
+
+        Asserted through `assertLogs`, which both enables DEBUG (the condition that fires it)
+        and requires the record to actually be emitted: a diagnostic nobody can turn on is
+        how this survived.
+        """
+        import pyarrow as pa
+
+        from document_intelligence.persist.sinks import _widen_for_new_nested_fields
+
+        declared = pa.schema([pa.field("metadata", pa.map_(pa.string(), pa.string()))])
+        rows = [{"metadata": {"extractive": "yes"}}]
+
+        with self.assertLogs("document_intelligence.persist.sinks", level="DEBUG") as captured:
+            widened = _widen_for_new_nested_fields(declared, rows)
+
+        self.assertEqual(widened.field("metadata").type, pa.map_(pa.string(), pa.string()))
+        self.assertTrue(
+            any("delta_schema_field_unify_skipped" in message for message in captured.output),
+            captured.output,
+        )
+        # The field that could not be unified is named in the record — the reason the
+        # kwarg was there in the first place; it just has to travel as a format arg.
+        self.assertTrue(any("metadata" in message for message in captured.output), captured.output)
+
     def test_an_optional_provenance_field_survives_append_to_an_existing_table(self) -> None:
         """The loss is not about `metadata` — it is about every struct column (#871).
 

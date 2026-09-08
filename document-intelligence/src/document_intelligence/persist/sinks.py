@@ -1037,7 +1037,18 @@ def _widen_for_new_nested_fields(schema: pa.Schema, rows: list[dict[str, object]
         except Exception:
             # A genuine type conflict between batch and table is not something to
             # paper over here; the cast then behaves exactly as it did before.
-            logger.debug("delta_schema_field_unify_skipped", field=declared.name, exc_info=True)
+            #
+            # `%s`, not a `field=` kwarg: this is a stdlib logger, and a stray keyword
+            # makes `Logger._log()` raise `TypeError` — but only once someone turns the
+            # level up to DEBUG, which is precisely what you do to find out why a field
+            # was not widened. The raise happens inside `_write_rows`' outer `except`,
+            # so it does not surface as a logging fault: it becomes
+            # `delta_write_failed`, and the whole publish of
+            # `published_commentary_insights` — the one surface that takes this branch
+            # on *every* write, because its `metadata` is a declared map — goes down.
+            # A conservative fallback that is fatal under debug logging is not a
+            # fallback. See `test_the_unify_fallback_survives_debug_logging`.
+            logger.debug("delta_schema_field_unify_skipped field=%s", declared.name, exc_info=True)
             merged_fields.append(declared)
             continue
         merged_fields.append(unified_field)
