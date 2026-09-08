@@ -53,6 +53,8 @@ type Jurisdiction = Schemas["JurisdictionResponse"];
 type AcquisitionCoverageEntry = Schemas["AcquisitionCoverageEntry"];
 type AcquisitionCoverageListResponse = Schemas["AcquisitionCoverageListResponse"];
 export type AcquisitionCoverageSummary = Schemas["AcquisitionCoverageSummary"];
+export type CoverageWorkQueueResponse = Schemas["CoverageWorkQueueResponse"];
+export type CoverageWorkItem = Schemas["CoverageWorkItem"];
 
 type Authority = Schemas["AuthorityResponse"];
 
@@ -1231,6 +1233,24 @@ export const controlPlaneActions = {
       "/v1/acquisition-coverage?limit=1",
     );
     return normalizeAcquisitionCoverageSummary(response?.summary);
+  },
+
+  /**
+   * Fetch the coverage work queue — the ledger, as a worklist (#907, #930).
+   *
+   * Separate from `getList` for the same reason as the summary above: the
+   * response carries `jurisdictions_without_a_source` and `ordering` alongside
+   * the rows, and a react-admin list result has nowhere to put them.
+   *
+   * The ordering is the SERVER'S and is echoed back in the payload. Do not
+   * re-sort it here — a second ranking in a client is how one rule ends up
+   * enforced twice with the weaker copy winning.
+   */
+  async getCoverageWorkQueue(limit = 50): Promise<CoverageWorkQueueResponse | null> {
+    const response = await requestJson<CoverageWorkQueueResponse>(
+      `/v1/acquisition-coverage/queue?limit=${encodeURIComponent(String(limit))}`,
+    );
+    return response ?? null;
   },
 
   /**
