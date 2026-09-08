@@ -28,7 +28,7 @@ jobs:
   validate-workspace-dsl:
     # GitHub-hosted, NOT the self-hosted pools: the Hetzner ARC runners are plain
     # k8s pods with no Docker daemon (no containerMode: dind in
-    # infra/hetzner/runners/values-*.yaml), so the validator cannot run there.
+    # research-platform ci/runners/values-*.yaml), so the validator cannot run there.
     # `--strict` surfaces that as a failure rather than a silent skip — which is
     # exactly how this was caught. This job is paths-filtered to structurizr/**,
     # so it runs only when the DSL actually changes. ubuntu-latest is already used

@@ -230,16 +230,26 @@ There is no repo-wide command. Each surface has its own gate — see the table i
 (`kubectl`, `helm`, `terraform`, `jq`, `shellcheck`, `uv`) are workstation-managed; the repo ships
 no shell.
 
-## MacConfig platform contract
+## Platform contract
 
-Evidara vendors a pinned copy of the MacConfig cluster platform contract from
-`clusters/prod/platform-contract.yaml` in the [MacConfig](https://github.com/philipplukas/MacConfig)
-repository (`vendor/platform-contract.yaml` here). To refresh: in a MacConfig checkout run
-`make platform-contract-path` (prints the absolute path), copy that file here, then set the pin
-below to the same value as `contractVersion` in the YAML; CI enforces they stay in sync.
-Operator playbooks: [`docs/migration/`](docs/migration/README.md).
+Evidara vendors a pinned copy of the cluster platform contract from
+[research-platform](https://github.com/philipplukas/research-platform)
+(`contracts/platform.yaml` there, `vendor/platform-contract.yaml` here). It declares what this
+repository may rely on: ingress classes and ClusterIssuer names, S3 and Postgres endpoints, the
+lakehouse and MLflow URLs, the GPU scheduling triple and the runner pools.
 
-**Pinned MacConfig platform contract:** `0.1.0`
+To refresh: copy the upstream file over `vendor/platform-contract.yaml`, then set the pin below
+to its `contractVersion`; CI enforces they stay in sync.
+
+Until 2026-09-08 this section pinned `0.1.0` of a contract that named **MacConfig** as the
+platform owner and described a cluster that never existed — ingress class `nginx`, an
+`evidare-*` namespace pattern (the misspelling [ADR-0055](docs/adr/0055-argocd-syncs-hetzner-apps.md)
+called out) and a `shared-vault` `ClusterSecretStore` that was never installed. ADR-0055 retired
+the manifest tree written for that platform; the contract describing it survived and stayed
+CI-gated, so the build enforced a pin on a fiction. The replacement is measured against the live
+cluster by `contracts/check-platform-contract.py` upstream.
+
+**Pinned platform contract:** `1.1.0`
 
 ## Contributing
 

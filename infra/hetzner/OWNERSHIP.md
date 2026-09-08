@@ -81,3 +81,25 @@ When `research-platform/scripts/platform-watch.sh --report` shows roughly 14 cle
 delete the frozen files, `infra/PLATFORM-OWNED.txt`, `scripts/check_platform_ownership.py`
 and its pre-commit hook in one commit. Do not edit the manifest to match a change — that
 defeats the guard rather than satisfying it.
+
+## Deletion blockers — what must move before the frozen files can go
+
+Three things in this repository still read frozen copies. They pass today, because a
+duplicate is not wrong until it diverges, but each breaks the day the files are deleted.
+
+| What | Reads | Fix at deletion |
+|---|---|---|
+| `scripts/check_hetzner_minio_credentials.py` | `minio-policies/accounts.json`, `values/` | Move the policy validation to research-platform. The half that checks *this repo's* manifests is already replaced by `check_platform_contract_usage.py`, which reads the vendored contract. |
+| `scripts/check_hetzner_zitadel.py` | `values/zitadel.yaml`, `auth/letsencrypt-issuer.yaml` | Both inputs are platform-owned; move the guard upstream. Its chart-render half already moved as `zitadel-values.yml`. |
+| `.github/workflows/runner-image.yml` | `runners/Dockerfile.heavy` | Builds and pushes `ghcr.io/philipplukas/evidara-runner-heavy` from a frozen Dockerfile. Moving it changes which repository publishes that package, so it needs GHCR permissions set up deliberately — **not** on the same day as the deletion. |
+
+`runner-image.yml` is the one with real risk: it publishes the image the heavy ARC pool
+runs on, so a broken move takes CI down for the pool rather than just failing a lint.
+
+## What already reads the contract instead
+
+`scripts/check_platform_contract_usage.py` asserts that this repository's manifests use
+only S3 Secrets, ClusterIssuers and ingress classes declared by
+`vendor/platform-contract.yaml`. It reads the contract, not the frozen copies, so it keeps
+working after deletion — and it catches the class of error that caused a 36-day outage here:
+an Ingress annotated with an issuer name that does not exist.

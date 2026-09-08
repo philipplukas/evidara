@@ -1,54 +1,209 @@
-# Machine-readable platform contract (MacConfig owns this file).
-# Evidare repos should vendor a pinned copy and assert contractVersion in CI.
+# VENDORED — do not edit. Pinned copy of research-platform contracts/platform.yaml.
+# Source: https://github.com/philipplukas/research-platform/blob/main/contracts/platform.yaml
+# Refresh: copy the upstream file here, then update the pin in README.md to match contractVersion.
 #
-# Version semantics (intent):
-#   patch — docs/clarifications, no behavioral change for consumers
-#   minor — additive capability (new allowed kind, optional new field)
-#   major — breaking change (tightened rules, renamed stores, ingress class change)
+# It replaces a contract that claimed MacConfig owned the platform and described
+# ingress class nginx, an evidare-* namespace pattern and a shared-vault
+# ClusterSecretStore — none of which existed. See ADR-0055.
 
-contractVersion: "0.1.0"
+# The platform contract: what consumers may rely on, stated once.
+#
+# WHY THIS FILE EXISTS. Every value below was, until now, a string copied between
+# repositories. That is how the estate acquired dependencies nobody declared:
+#
+#   * `mlops/mlops-api-tls` is issued by `letsencrypt-prod`. mlops-api belongs to
+#     from-sign-to-signal; that ClusterIssuer was defined in evidara. Neither repo
+#     said so, and a 36-day outage is already on record from an Ingress annotated
+#     with the *staging* issuer -- a failure whose only symptom is an untrusted
+#     certificate.
+#   * The Traefik `Middleware` evidara-basicauth lives in this repo; the Secret it
+#     references is created by evidara's deploy-stage5.sh. Applying one without the
+#     other yields a 500 on two public hostnames.
+#   * Both repos independently discovered that tailnet Ingresses must list `tls:`
+#     hosts with NO secretName, because a TLSStore supplies the certificate.
+#
+# A consumer that reads this file depends on a name it can see. A consumer that
+# copies a string depends on one it cannot.
+#
+# EVERY VALUE HERE WAS MEASURED against the live cluster on 2026-09-08, not
+# transcribed from documentation. `PLATFORMS.md` records what a hand-copied
+# inventory costs: it went stale twice in one week.
+#
+# STABILITY. Treat these as the platform's public interface. Renaming anything
+# below is a breaking change for at least one consumer, and the two lists most
+# expensive to change are `ingress.issuers` (referenced as strings by Certificate
+# objects and Ingress annotations) and `ci.runners` (referenced by `runs-on:` in
+# GitHub workflows).
+
+apiVersion: platform.veyo.dev/v1
+kind: PlatformContract
+
+# Consumers vendor a pinned copy and assert this version in CI. Semantics:
+#   patch — wording, no behavioural change for consumers
+#   minor — additive (a new endpoint, a new optional field)
+#   major — breaking (a renamed store, issuer or runner pool; an ingress class change)
+#
+# The 1.x line starts fresh rather than continuing 0.x: this REPLACES
+# vendor/platform-contract.yaml
+# in evidara, which declared contractVersion 0.1.0, said "MacConfig owns this
+# file", and described a cluster that never existed — ingress class nginx, an
+# `evidare-*` namespace pattern (the misspelling ADR-0055 called out), and a
+# `shared-vault` ClusterSecretStore that was never installed. ADR-0055 retired the
+# manifest tree built for that platform; the contract describing it survived and
+# stayed CI-gated. It is not an ancestor of this file, so the version line does
+# not continue from it.
+contractVersion: "1.1.0"
 
 metadata:
-  description: MacConfig platform contract (prod template — adjust per environment)
-  cluster: prod
+  name: evidara-k3s
+  measuredAt: "2026-09-08"
+  source: https://github.com/philipplukas/research-platform
 
-namespaces:
-  # Namespaces Evidare workloads may use (Evidare must not create Namespace objects).
-  allowedPattern: "^evidare-(dev|staging|prod)$"
+cluster:
+  name: evidara-k3s
+  # k3s built-in. The ONLY storage class, and it is node-local: a PVC binds to the
+  # node it was first scheduled on and does not move. This is why the database and
+  # its backups share /dev/md2 -- see data/cnpg/RECOVERY.md, which treats that as
+  # the estate's largest open risk rather than a detail.
+  storageClass: local-path
+  nodes:
+    controlPlane: evidara-k3s          # public 88.99.26.120, tailnet 100.122.182.54
+    gpu: philipp-workstation           # tainted; see `gpu` below
+
+# Scheduling onto the GPU node needs all three. The taint means a Pod that sets
+# only the nodeSelector stays Pending forever, which reads like a capacity problem
+# and is not.
+gpu:
+  nodeSelector: {gpu: "true"}
+  runtimeClassName: nvidia
+  toleration: {key: gpu, value: "true", effect: NoSchedule}
 
 ingress:
-  class: nginx
-  tlsIssuer: letsencrypt-prod
+  # Two Traefiks. Which one answers a hostname IS that hostname's exposure -- the
+  # separation is a controller argument and nothing else, because both register the
+  # same controller string and an IngressClass alone separates nothing.
+  classes:
+    public: traefik                    # 88.99.26.120, the public internet
+    tailnet: tailnet-ingress           # 100.80.73.86, tailnet device `ingress`
+    tailscaleOperator: tailscale       # per-Service proxies, not route-based
+  # FOUR issuers, all live, all load-bearing over disjoint name families. They are
+  # not duplicates of each other and must not be merged -- Let's Encrypt will not
+  # issue a wildcard over HTTP-01, and *.ts.veyo.dev resolves to a tailnet address
+  # the ACME servers cannot reach. See ingress/certs/CLUSTERISSUERS.md.
+  issuers:
+    publicProd: letsencrypt-prod              # HTTP-01 via Traefik
+    publicStaging: letsencrypt-staging
+    wildcardProd: letsencrypt-dns01           # DNS-01 via the Infomaniak webhook
+    wildcardStaging: letsencrypt-dns01-staging
+  wildcard:
+    # Apex deliberately absent: both names collapse to one _acme-challenge TXT and
+    # Infomaniak's API replaces rather than appends.
+    domain: "*.ts.veyo.dev"
+    secret: tailnet-ingress/ts-veyo-wildcard-tls
+    # Served through a Traefik TLSStore named `default`, which is why every tailnet
+    # Ingress lists hosts under `tls:` with NO secretName. Setting one is the bug.
+    tlsStore: default
+  middlewares:
+    basicAuth: evidara-evidara-basicauth@kubernetescrd
+
+s3:
+  # Two MinIO instances, deliberately separate. Unifying them is a data migration,
+  # not a refactor. Neither is reachable with root by any workload: each consumer
+  # has an IAM user scoped by secrets/minio-policies/accounts.json.
+  evidara:
+    endpoint: http://minio.evidara.svc:9000
+    buckets: [evidara-lakehouse, evidara-raw-artifacts, evidara-pg-backups]
+  research:
+    endpoint: http://ml-minio.mlops.svc:9000
+    buckets: [mlflow-artifacts, argo-artifacts, gha-artifacts, ml-datasets]
+  # Per-workload IAM accounts (ADR-0049, #813). Root is administrative only and no
+  # workload authenticates with it: running Trino as root also handed both pods the
+  # raw-artifacts bucket and the Postgres PITR backups.
+  #
+  # A consumer manifest may reference ONLY these Secrets. The source of truth is
+  # secrets/minio-policies/accounts.json here; this is the consumer-facing subset,
+  # so a product repo can check its own manifests without vendoring the policies.
+  accounts:
+    platform-control:
+      secret: evidara-s3-platform-control
+      allow: {evidara-raw-artifacts: wo}          # write+delete, deliberately NOT read
+    di-consumer:
+      secret: evidara-s3-di-consumer
+      allow: {evidara-raw-artifacts: ro, evidara-lakehouse: "rw:canonical/"}
+    document-service:
+      secret: evidara-s3-document-service
+      allow: {evidara-lakehouse: "ro:canonical/"}
+    trino:
+      secret: evidara-s3-trino
+      allow: {evidara-lakehouse: rw}
+    cnpg-backup:
+      secret: cnpg-minio-backup
+      allow: {evidara-pg-backups: rw}
+  # projection-bridge deliberately holds no object-store credential at all.
+
+postgres:
+  # The CNPG operator is platform; each Cluster CR belongs to whoever owns the data.
+  operatorVersion: 1.25.4
+  clusters:
+    evidara: {rw: evidara-pg-rw.evidara.svc:5432, ownedBy: evidara}
+    mlops: {rw: mlflow-pg-rw.mlops.svc:5432, ownedBy: research-platform}
+
+lakehouse:
+  nessie: http://nessie.evidara.svc:19120/api/v2
+  trino: trino.evidara.svc:8080
+  warehouse: s3://evidara-lakehouse
+  nessieRef: main
+
+search:
+  opensearch: http://opensearch-cluster-master.evidara.svc:9200
+
+messaging:
+  nats: nats://nats.evidara.svc:4222
+  stream: EVIDARA
+  subjects: "evidara.>"
+
+experimentTracking:
+  # Runs with --serve-artifacts, so clients need no MinIO credential of their own.
+  mlflow: http://mlflow.mlops.svc:5000
+
+identity:
+  issuer: https://id.evidara.veyo.dev
+  provider: zitadel
+
+ci:
+  # ONE ARC controller, SEVEN scale sets, SIX tenant repositories. Four of these
+  # were live with no definition in any repository until 2026-09-07; the tenant
+  # list was knowable only by running `helm list -n arc-runners`. That is the
+  # clearest argument for this file existing.
+  controller: {namespace: arc-systems, release: arc, chartVersion: 0.14.2}
+  runners:
+    evidara-light: {repo: evidara, maxRunners: 3}
+    evidara-heavy-v2: {repo: evidara, maxRunners: 2}
+    speech-gan-gpu: {repo: speech-embeddings-gan, maxRunners: 1}   # 1 by physics: one GPU
+    speech-embeddings-gan-light: {repo: speech-embeddings-gan, maxRunners: 3}
+    career-ops-light: {repo: career-ops, maxRunners: 2}
+    macconfig-light: {repo: MacConfig, maxRunners: 2}
+    rocky-agents-light: {repo: rocky-agents, maxRunners: 2}
+  registry: ghcr.io/philipplukas
+  # NOTE: there is no pool for research-platform itself. The repository that owns
+  # all seven runs its own CI on GitHub-hosted runners. Adding a pool is a cluster
+  # change and a deliberate decision, not an oversight to fix in passing.
+
+observability:
+  prometheus: http://kps-prometheus.monitoring.svc:9090
+  alertmanager: http://kps-alertmanager.monitoring.svc:9093
+  grafana: http://kube-prometheus-stack-grafana.monitoring.svc
+  # Alerts page over Telegram. If the secret is wrong, alerts stop arriving and
+  # nothing announces it.
+  paging: telegram
 
 secrets:
-  externalSecrets:
-    enabled: true
-    # Product manifests must reference this ClusterSecretStore name only.
-    clusterSecretStore: shared-vault
-
-networkPolicy:
-  default: deny-all
-  profiles:
-    - restricted
-    - internal-only
-
-# Kinds Evidare may submit in allowed namespaces (subset; extend via minor bump).
-allowedResources:
-  - Deployment
-  - Service
-  - Ingress
-  - ExternalSecret
-  - HorizontalPodAutoscaler
-  - PodDisruptionBudget
-  - ConfigMap
-  - Secret
-
-forbiddenResources:
-  - Namespace
-  - ClusterRole
-  - ClusterRoleBinding
-  - CustomResourceDefinition
-  - ValidatingWebhookConfiguration
-  - MutatingWebhookConfiguration
-  - ClusterSecretStore
-  - SecretStore
+  # No sealed-secrets, no SOPS, no external-secrets, no Vault -- confirmed by grep,
+  # and the aspirational ExternalSecret tree that referenced a ClusterSecretStore
+  # nobody installed was retired in evidara's ADR-0055.
+  mechanism: 1password
+  vaults: [Infrastructure, Evidara, Research, Workloads, Irreplaceable]
+  map: secrets/credentials/credentials.sh
+  # One credential cannot be backfilled: evidara-basicauth holds a bcrypt hash, not
+  # a password. Rotating is the only closing move.
+  unbackfillable: [evidara/evidara-basicauth]
