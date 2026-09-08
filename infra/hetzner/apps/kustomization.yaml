@@ -91,35 +91,41 @@ resources:
 # package (Package settings → Manage Actions access → `philipplukas/evidara`,
 # Write). See #884.
 #
-# 40f80f4e (#926) is `main`'s tip at the time of this pin. Run 34123569560 is green,
+# 2ce8c720 (#937) is `main`'s tip at the time of this pin. Run 34211402824 is green,
 # and all SEVEN tags below were confirmed present in GHCR before this pin was written:
 #
 #   for i in platform-control platform-control-admin legal-search-api \
 #            legal-search-frontend document-intelligence-document-service \
 #            document-intelligence-consumer marketing; do ... done   # all returned 1
 #
-# What this pin adds over 206fa983 (2026-09-07, 7 commits back). Read-model and
-# operator work; nothing in `search.evidara.veyo.dev` changes for a user:
-#   - the coverage ledger states what a jurisdiction REFUSED alongside what it holds,
-#     and `GET /v1/acquisition-coverage/queue` turns the ledger into a worklist
-#     (#907 / #921). `refused_runs` and `quarantined_documents` are two counts in two
-#     units and must never be summed or netted off coverage.
-#   - run decision support moves out of the admin's TypeScript and into the contract
-#     (#908 / #922). CAUTION, this one is a CORRECTION as well as an addition:
-#     `RunPipelineHealthStage.status` gains `not_applicable`, and a run that ended
-#     failed/cancelled no longer reports the stages it never reached as `pending`.
-#     Anything that consumed `pending` from this endpoint was being misled before.
-#     Run refusals also gain `refusal_code` beside their prose.
-#   - a source version's full `acquisition_spec` is readable in the panel (#920). It
-#     was previously visible only in the create wizard, before the source existed.
+# What this pin adds over 40f80f4e (2026-09-07, 5 commits back). Every one of these
+# came from DRIVING the operator panel against a seeded stack rather than reading it,
+# which is why they had survived their own unit tests:
+#   - the dashboard no longer opens by pointing at a CANCELLED run (#932). Its
+#     attention card matched on pipeline health alone while the run queue, on the
+#     same data, correctly filtered to actionable statuses. One rule, two
+#     implementations, and the losing copy was the landing page.
+#   - the coverage work queue reads the whole estate instead of one 500-row
+#     alphabetical page, and reports sourceless jurisdictions as a count rather than
+#     as 2,164 identical rows (#933). It was blind to 77% of the estate.
+#   - Coverage opens on the jurisdictions that need work (#937). It used to open on
+#     page 1 of 44 of empty communes while its own header said four of 2,169 had any
+#     acquisition.
+#   - three smaller ones (#934): a section pill that reported a page size as a total,
+#     three reachable views with no header while a PARKED one had one, and the
+#     overflow fade that was painted behind the very column it warns about.
 #
-# `scripts/check-production-online.sh` (#916 / #918) and the operator agent's
-# `evidara workflow coverage queue` (#909 / #925) are in this range but ship
-# outside the cluster — neither is an image.
+# CONTRACT: `apis.platform_control.version` moved 0.28.0 -> 0.29.0 in this range.
+# `GET /v1/acquisition-coverage/queue` gains `jurisdictions_without_a_source` and a
+# `no_source` reason, and its `data` gets SHORTER — consumers should expect `total`
+# to fall, which is the surprising direction for a queue.
+#
+# The marketing page stays private (#927 amended ADR-0039 D4). Rolling this pin does
+# not change that and must not be read as doing so.
 #
 # ZERO alembic delta:
 #
-#   $ git diff --name-only --diff-filter=AMD 206fa983 origin/main -- platform-control/alembic/
+#   $ git diff --name-only --diff-filter=AMD 40f80f4e origin/main -- platform-control/alembic/
 #   (empty)
 #
 # The migrate Job still runs as a PreSync hook and will complete having applied
@@ -219,16 +225,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
+    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
+    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
+    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
+    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
+    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
+    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: 40f80f4ee67eade3c7ab3710ecf542933825c4c3
+    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
