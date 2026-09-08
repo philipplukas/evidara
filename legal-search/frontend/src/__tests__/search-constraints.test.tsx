@@ -31,6 +31,7 @@ import type { ReactNode } from "react";
 import {
   countActiveSearchConstraints,
   SearchConstraintsProvider,
+  selectEffectiveSourceType,
   useSearchConstraints,
 } from "@/lib/search-constraints-store";
 import { DEFAULT_JURISDICTIONS, DEFAULT_LANGUAGES } from "@/lib/search-params";
@@ -311,5 +312,132 @@ describe("countActiveSearchConstraints", () => {
     });
 
     expect(countActiveSearchConstraints(result.current.state)).toBe(0);
+  });
+});
+
+/**
+ * Document type has two entry points — the ContextBar tab strip
+ * (`SET_SOURCE_TYPE` → `context.sourceType`) and the FilterPanel facet
+ * (`SET_REFINEMENT{field:"document_type"}` → `refinements`) — which used to
+ * land in two slots that nothing reconciled. Measured against the running app:
+ * clicking the sidebar's "Gesetze (5)" narrowed 24 results to 5 while the tab
+ * strip still rendered "Alle" as the active tab.
+ */
+describe("document type has exactly one effective value", () => {
+  const lawRefinement: SearchRefinement = {
+    field: "document_type",
+    type: "terms",
+    values: ["law"],
+  };
+
+  it("reports the facet's document type as effective when the tab strip is unset", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "document_type",
+        refinement: lawRefinement,
+      });
+    });
+
+    // Guard: selectEffectiveSourceType falling back to the refinement. Revert it
+    // to `state.context.sourceType` and this goes red — which is the tab strip
+    // rendering "Alle" over a law-only result set.
+    expect(selectEffectiveSourceType(result.current.state)).toBe("law");
+  });
+
+  it("clears the facet refinement when the tab strip sets a document type", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "document_type",
+        refinement: lawRefinement,
+      });
+    });
+    act(() => {
+      result.current.dispatch({ type: "SET_SOURCE_TYPE", sourceType: "decision" });
+    });
+
+    // Only one slot may be populated, so the request carries one document-type
+    // parameter rather than `document_types=decision` AND a `law` refinement,
+    // which the server would AND together into an empty result set.
+    expect(result.current.state.context.sourceType).toBe("decision");
+    expect(
+      result.current.state.refinements.find((r) => r.field === "document_type"),
+    ).toBeUndefined();
+  });
+
+  it("clears the tab strip's slot when the facet sets a document type", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({ type: "SET_SOURCE_TYPE", sourceType: "decision" });
+    });
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "document_type",
+        refinement: lawRefinement,
+      });
+    });
+
+    expect(result.current.state.context.sourceType).toBeNull();
+    expect(selectEffectiveSourceType(result.current.state)).toBe("law");
+  });
+
+  it("leaves other refinements alone when the tab strip changes", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "court_level",
+        refinement: { field: "court_level", type: "terms", values: ["supreme"] },
+      });
+    });
+    act(() => {
+      result.current.dispatch({ type: "SET_SOURCE_TYPE", sourceType: "law" });
+    });
+
+    expect(result.current.state.refinements.map((r) => r.field)).toEqual(["court_level"]);
+    expect(result.current.state.context.sourceType).toBe("law");
+  });
+
+  it("falls back to Alle for a multi-value facet selection, rather than picking one", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "document_type",
+        refinement: { field: "document_type", type: "terms", values: ["law", "decision"] },
+      });
+    });
+
+    expect(selectEffectiveSourceType(result.current.state)).toBeNull();
+  });
+
+  it("counts the document type once, whichever slot holds it", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({ type: "SET_SOURCE_TYPE", sourceType: "law" });
+    });
+    const viaTabStrip = countActiveSearchConstraints(result.current.state);
+
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "document_type",
+        refinement: lawRefinement,
+      });
+    });
+    const viaFacet = countActiveSearchConstraints(result.current.state);
+
+    expect(viaTabStrip).toBe(1);
+    expect(viaFacet).toBe(1);
   });
 });

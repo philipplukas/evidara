@@ -168,6 +168,32 @@ export function hasActiveSearchConstraints(state: SearchConstraintsState): boole
  * affordance, and the reset telemetry cannot disagree about what "active"
  * means.
  */
+/**
+ * The one field that document type is expressed through in a refinement.
+ *
+ * Document type reaches the store by two routes — `SET_SOURCE_TYPE` from the
+ * ContextBar tab strip, and a `document_type` refinement from the FilterPanel
+ * facet — which land in two different slots and are sent as two different query
+ * parameters (`document_types=law` vs `refinements=[{field:"document_type"…}]`).
+ * Nothing made them agree, so selecting "Gesetze" in the sidebar narrowed the
+ * results to 5 while the tab strip 250px above still read "Alle".
+ */
+export const DOCUMENT_TYPE_FIELD = "document_type";
+
+/**
+ * The document type actually in force, from whichever of the two slots holds
+ * it. `null` means unconstrained ("Alle") — which is not the same as a slot
+ * being empty while the other one narrows the result set.
+ */
+export function selectEffectiveSourceType(state: SearchConstraintsState): string | null {
+  if (state.context.sourceType !== null) return state.context.sourceType;
+  const refinement = state.refinements.find((r) => r.field === DOCUMENT_TYPE_FIELD);
+  // A multi-value facet selection has no single tab to light up, so the strip
+  // correctly falls back to "Alle" rather than picking one arbitrarily.
+  if (refinement && refinement.values.length === 1) return refinement.values[0] ?? null;
+  return null;
+}
+
 export function countActiveSearchConstraints(state: SearchConstraintsState): number {
   const { context, refinements } = state;
   const jurisdictionsChanged = context.jurisdictions.join(",") !== DEFAULT_JURISDICTIONS.join(",");
@@ -271,10 +297,20 @@ export function SearchConstraintsProvider({ children }: SearchConstraintsProvide
           });
           break;
 
-        case "SET_SOURCE_TYPE":
+        case "SET_SOURCE_TYPE": {
           clearSnapshot();
-          void setUrlState({ sourceType: action.sourceType });
+          // Setting the tab strip drops any facet-set document type, so exactly
+          // one slot is ever populated and the two surfaces cannot disagree.
+          const withoutDocumentType = state.refinements.filter(
+            (r) => r.field !== DOCUMENT_TYPE_FIELD,
+          );
+          void setUrlState({
+            sourceType: action.sourceType,
+            refinements:
+              withoutDocumentType.length > 0 ? serializeRefinements(withoutDocumentType) : null,
+          });
           break;
+        }
 
         case "SET_OFFICIAL_ONLY":
           clearSnapshot();
@@ -286,6 +322,10 @@ export function SearchConstraintsProvider({ children }: SearchConstraintsProvide
           const existing = state.refinements.filter((r) => r.field !== action.field);
           void setUrlState({
             refinements: serializeRefinements([...existing, action.refinement]),
+            // The mirror of SET_SOURCE_TYPE: a facet-set document type clears
+            // the tab strip's slot, so the request carries one parameter for
+            // document type rather than two that the server would AND together.
+            ...(action.field === DOCUMENT_TYPE_FIELD ? { sourceType: null } : {}),
           });
           break;
         }
