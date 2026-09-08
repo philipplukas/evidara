@@ -57,6 +57,7 @@ Run the narrowest gate for the surface you touched before pushing:
 | `scripts/` | `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` — see note below; without pyyaml only 144 of 201 tests run |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `for c in AT CH DE FR IT EU; do python scripts/check_country_overlay_files.py --country $c; done` — `--country` is required; the bare command exits 2 on argparse |
 | `contracts/api/` or `contracts/events/` | `python3 scripts/check_contract_version_bump.py --base origin/main` — the manifest version bump. **Not** covered by `check-platform-control.sh`, which only checks that the generated spec still matches the app. |
+| `infra/hetzner/` | `python3 scripts/check_platform_ownership.py` — the shared cluster layer moved to [`research-platform`](https://github.com/philipplukas/research-platform) and the copies here are **frozen by hash**. An edit to a frozen file does not reach the cluster; the guard refuses it and names where the change belongs. Also run `bash scripts/validate_hetzner_apps_kustomize.sh` and `python3 scripts/check_hetzner_image_pins.py` — the two that cover what this repo still owns. |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
 
 Rows here must not be narrower than what CI runs: a clean local run against a
@@ -68,6 +69,13 @@ point — the gate must not depend on ambient state. Without it eleven test modu
 import and the runner reports `Ran 144 tests ... FAILED (errors=11)` — which reads as eleven
 broken tests and is really **fifty-seven that never ran**. `uv` is already required by this
 repo, so the command above needs no venv and no system package.
+
+`infra/hetzner/` is a trap of its own kind, and the opposite one: the guard exists and
+is correct, but a **frozen file is not obviously frozen from the file itself**. Nothing
+in `infra/hetzner/values/minio.yaml` says another repo owns it — you find out from the
+guard, or from `infra/hetzner/OWNERSHIP.md`, or not at all. Verified 2026-09-08:
+tampering with that file fails the check, restoring it passes, and editing
+`infra/hetzner/apps/kustomization.yaml` is correctly permitted because `apps/` stayed.
 
 The `contracts/` row above is the same trap in a second place: `check_contract_version_bump.py`
 compares the manifest's **top-level `version`** (`:47`, `:62`) — not `apis.<name>.version` — and fires on
