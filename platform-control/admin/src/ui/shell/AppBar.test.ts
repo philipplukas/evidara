@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NAV_GROUPS } from "../../domain/navGroups";
 import { DEFAULT_SUBTITLE, subtitleForPath, titleForPath } from "./AppBar";
 
 describe("titleForPath", () => {
@@ -9,13 +10,44 @@ describe("titleForPath", () => {
     expect(titleForPath("/runs/run_01/show")).toBe("Run detail");
   });
 
-  it("gives Corrections and Commentary insights their own titles, not 'Control plane'", () => {
-    // Bug #4: these two list pages previously fell through to the generic
-    // default while every other list page showed its own name.
+  it("gives Corrections its own title, not 'Control plane'", () => {
+    // Bug #4: this list page previously fell through to the generic default
+    // while every other list page showed its own name.
     expect(titleForPath("/corrections")).toBe("Corrections");
     expect(titleForPath("/corrections/cor_01/show")).toBe("Correction detail");
-    expect(titleForPath("/commentary-insights")).toBe("Commentary insights");
-    expect(titleForPath("/commentary-insights/ins_01/show")).toBe("Commentary insight");
+  });
+
+  it("names every entry the sidebar can reach", () => {
+    /**
+     * Derived from NAV_GROUPS, not hand-listed, so it cannot drift.
+     *
+     * Coverage, Blueprints and the onboarding wizard were all missing from the
+     * map and showed the generic "Control plane / Source lifecycle, approval
+     * state, and run operations." — three of eight nav entries, measured on the
+     * live app. A hand-written list of expectations would have gone stale the
+     * same way the map did.
+     */
+    const reachable = NAV_GROUPS.flatMap((group) => group.resources);
+    for (const resource of reachable) {
+      expect(titleForPath(`/${resource}`), `no title mapped for /${resource}`).not.toBe(
+        "Control plane",
+      );
+      expect(subtitleForPath(`/${resource}`), `no subtitle mapped for /${resource}`).not.toBe(
+        DEFAULT_SUBTITLE,
+      );
+    }
+    // The wizard is a CustomRoute rather than a resource, so it is not in
+    // NAV_GROUPS — but the sidebar renders it, so it is named here explicitly.
+    expect(titleForPath("/workflows/onboard")).toBe("Onboard a source");
+    expect(subtitleForPath("/workflows/onboard")).not.toBe(DEFAULT_SUBTITLE);
+  });
+
+  it("does not name a route the app cannot reach", () => {
+    // `commentary-insights` is PARKED (`AdminApp.tsx`): its <Resource> is
+    // removed, so nothing navigates there. It had a mapping while three
+    // reachable views did not — a map that describes what the app used to have
+    // is how you stop noticing what it does have.
+    expect(titleForPath("/commentary-insights")).toBe("Control plane");
   });
 
   it("keeps the existing list pages naming themselves", () => {

@@ -54,11 +54,9 @@ export function titleForPath(pathname: string): string {
     return /\/jurisdictions\/[^/]+/.test(pathname) ? "Edit jurisdiction" : "Jurisdictions";
   }
   if (pathname.startsWith("/preview-review")) return "Preview approvals";
-  if (pathname.startsWith("/commentary-insights")) {
-    return /\/commentary-insights\/[^/]+/.test(pathname)
-      ? "Commentary insight"
-      : "Commentary insights";
-  }
+  if (pathname.startsWith("/acquisition-coverage")) return "Coverage";
+  if (pathname.startsWith("/blueprint-templates")) return "Blueprints";
+  if (pathname.startsWith("/workflows/onboard")) return "Onboard a source";
   if (pathname.startsWith("/corrections")) {
     return /\/corrections\/[^/]+/.test(pathname) ? "Correction detail" : "Corrections";
   }
@@ -73,6 +71,13 @@ export function titleForPath(pathname: string): string {
  * The header previously hardcoded the runs-flavoured "Source lifecycle,
  * approval state, and run operations." on every route, so Jurisdictions,
  * Sources and Corrections all described work they do not do. Mirrors
+ * Three reachable views were missing here — Coverage, Blueprints and the
+ * onboarding wizard — so all three showed the generic fallback, while
+ * `commentary-insights`, which is PARKED out of the app (`AdminApp.tsx`) and
+ * cannot be navigated to, had a mapping of its own. The map now covers what the
+ * app has and nothing it does not; `navGroups.test.ts` is the companion guard
+ * for the sidebar, and `AppBar.test.ts` is now the one for this.
+ *
  * `titleForPath`: each mapped area names itself, everything else falls back to
  * the (accurate at the whole-app level) default.
  */
@@ -96,8 +101,14 @@ export function subtitleForPath(pathname: string): string {
   if (pathname.startsWith("/preview-review")) {
     return "Review preview runs before promoting a source version to production.";
   }
-  if (pathname.startsWith("/commentary-insights")) {
-    return "Extracted commentary signals awaiting operator review.";
+  if (pathname.startsWith("/acquisition-coverage")) {
+    return "What each jurisdiction's source says exists, against what we hold.";
+  }
+  if (pathname.startsWith("/blueprint-templates")) {
+    return "Every shipped template and the state of its ADR-0030 two-key lock.";
+  }
+  if (pathname.startsWith("/workflows/onboard")) {
+    return "Scope, plan, pilot, decide, scale — the loop that crosses every section.";
   }
   if (pathname.startsWith("/corrections")) {
     return "Operator corrections raised against canonical documents.";
