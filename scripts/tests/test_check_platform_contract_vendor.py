@@ -43,7 +43,7 @@ class PlatformContractVendorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "README.md").write_text(
-                "**Pinned MacConfig platform contract:** `0.1.0`\n",
+                "**Pinned platform contract:** `0.1.0`\n",
                 encoding="utf-8",
             )
             try:

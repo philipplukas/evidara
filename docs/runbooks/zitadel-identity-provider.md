@@ -1,4 +1,5 @@
 # Zitadel (identity provider) — operations, restore, break-glass
+
 > **Platform commands here have moved.** `deploy-stage{1,2,3,8}.sh`,
 > `deploy-observability.sh`, `deploy-runners.sh` and the `values/` files now live in
 > [research-platform](https://github.com/philipplukas/research-platform) (`scripts/`, `data/`,
