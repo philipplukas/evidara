@@ -26,6 +26,8 @@ export {
   type DataTableColumn,
   type DataTableProps,
   type SortOrder,
+  STICKY_RIGHT_CELL_CLASS,
+  STICKY_RIGHT_HEADER_CLASS,
 } from "./DataTable";
 export { DetailGrid, FieldCell } from "./DetailGrid";
 export { Dialog } from "./Dialog";

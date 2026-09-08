@@ -50,6 +50,25 @@ export interface DataTableColumn<T> {
   stickyRight?: boolean;
 }
 
+/**
+ * Classes that pin a column to the right edge of a horizontal scroller.
+ *
+ * Exported because not every table in the panel can be a `DataTable` — the
+ * source-versions table renders expandable diff and spec sub-rows this
+ * primitive has no notion of. That table hand-rolled its own scroller and so
+ * inherited none of this, which put Approve and Reject 20px past the visible
+ * edge at 1280px with no cue (measured: scroller visible to x=1207, every
+ * button at x=1227). Sharing the strings keeps one definition of "pinned"
+ * rather than a second that drifts.
+ *
+ * A pinned cell needs its own opaque ground, or the columns it floats over
+ * show straight through it — hence the differing backgrounds for head and body.
+ */
+export const STICKY_RIGHT_HEADER_CLASS =
+  "sticky right-0 z-10 bg-[var(--surface-input)] border-l border-[var(--border)]";
+export const STICKY_RIGHT_CELL_CLASS =
+  "sticky right-0 z-10 bg-[var(--surface-panel)] border-l border-[var(--border)]";
+
 export interface DataTableProps<T> {
   records: T[] | undefined;
   columns: DataTableColumn<T>[];
@@ -258,8 +277,7 @@ export function DataTable<T>({
                         "text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-meta)]",
                         // A pinned header needs its own opaque ground, or the
                         // columns it floats over show straight through it.
-                        col.stickyRight &&
-                          "sticky right-0 z-10 bg-[var(--surface-input)] border-l border-[var(--border)]",
+                        col.stickyRight && STICKY_RIGHT_HEADER_CLASS,
                         col.headerClassName,
                       )}
                       aria-sort={
@@ -396,8 +414,7 @@ export function DataTable<T>({
                         key={col.key}
                         className={cn(
                           "px-4 py-3.5",
-                          col.stickyRight &&
-                            "sticky right-0 z-10 bg-[var(--surface-panel)] border-l border-[var(--border)]",
+                          col.stickyRight && STICKY_RIGHT_CELL_CLASS,
                           col.className,
                         )}
                       >
