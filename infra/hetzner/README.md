@@ -1,5 +1,12 @@
 # Evidara on self-hosted Hetzner k3s
 
+> **Much of this directory is frozen.** The shared cluster layer moved to
+> [research-platform](https://github.com/philipplukas/research-platform) on 2026-09-07 and is
+> reconciled from there by an Argo CD Application. The 31 files listed in
+> [`OWNERSHIP.md`](OWNERSHIP.md) still exist here as a fallback but **must not be edited** —
+> a change here does not reach the cluster. Stages 1, 2, 3, 6, 7, 8 and 9 below are now
+> documented in `research-platform/docs/deploy-stages.md`; stages 4 and 5 are still ours.
+
 Deploy guide for the single-node k3s cluster (`evidara-k3s`, dedicated server) that
 replaces GCP — see [ADR-0029](../../docs/adr/0029-self-hosted-hetzner-runtime.md).
 This tree is **self-contained**: it deploys the stores in-cluster too, because we own the

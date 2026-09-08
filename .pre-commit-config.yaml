@@ -125,6 +125,12 @@ repos:
         pass_filenames: false
         files: ^(docker-compose.*\.yml|scripts/.*\.sh|docs/.*\.md|\.github/workflows/.*\.yml|justfile|README\.md)$
 
+      - id: check-platform-ownership
+        name: Platform-owned infra is frozen (reconciled from research-platform)
+        entry: python3 scripts/check_platform_ownership.py
+        language: system
+        files: ^(infra/(hetzner/.*|PLATFORM-OWNED\.txt)|scripts/check_platform_ownership\.py)$
+        pass_filenames: false
       - id: check-hetzner-image-pins
         name: Check Hetzner image pins roll together
         entry: python scripts/check_hetzner_image_pins.py

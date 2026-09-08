@@ -1,0 +1,41 @@
+# Platform-owned files, frozen here on 2026-09-08.
+#
+# These moved to philipplukas/research-platform and are reconciled from there.
+# This copy is a fallback kept until the platform Application has run unattended
+# long enough to trust; see infra/hetzner/OWNERSHIP.md. Editing one here changes
+# nothing in the cluster and silently forks the estate again, which is how it got
+# two half-owners in the first place.
+#
+# <sha256>  <path>   -- checked by scripts/check_platform_ownership.py
+
+b2e44cbe016b2a21f90dfe02e5c0b1782d00f1965b98c384e9fe556c4a0ef108  infra/hetzner/00-namespace.yaml
+51429b4723c0b9591d77d3e11c33b1002b813afcf4370c7f23fa6a0a5aa27ef7  infra/hetzner/auth/basicauth-middleware.yaml
+1fd0c363e6dcda37eda7c3c01b009243e9e77d1e01e2a48d9adec9f6a2cb51ed  infra/hetzner/auth/letsencrypt-issuer.yaml
+fffac9698f492fcd5f26e57bae51d44b0545225ff0726213483c6b22644fd1da  infra/hetzner/deploy-argocd.sh
+8baa23ae82841f8aec3f7f16f87acae53126089cf8e47d58164606e980081620  infra/hetzner/deploy-observability.sh
+500770c95b1bbac190ba37f1aca6cbc84e9584bdd1eacacb401a24a6b7600f80  infra/hetzner/deploy-runners.sh
+7c410be3a15e08a6ad8bebc9ecf0c17789f19332c44ede21124ef79e495de53f  infra/hetzner/deploy-stage1.sh
+001591fca860c77ee9c6c57090abba10ea193e5175ec7838bc5e0d26b1173b41  infra/hetzner/deploy-stage2.sh
+5862aece06cf150893f98b43cc25d70fb90d90056c5c1b7b8ab6752d95744453  infra/hetzner/deploy-stage3.sh
+379c4aaf12d09b03a7fd6a01f3269c597248818fd157979e20312f03aed6e32f  infra/hetzner/deploy-stage8.sh
+289add7cf1cd13dd8b6ae162bca36c9ff4c263134a8ec4578bb6b1ff4b185b03  infra/hetzner/minio-policies/accounts.json
+ad985128119a9240fda9b09a40c33c2e4c926c314ee6e48fddc66c71c76be582  infra/hetzner/minio-policies/cnpg-backup.json
+f4f4b76406a6144148c07f0abe1fb0569c96da84d69a587f7d98c8c1119a20e2  infra/hetzner/minio-policies/di-consumer.json
+def2a57ce0466f95223bdb14457b0da54de1e8dca01afb37265649ae4ebba9be  infra/hetzner/minio-policies/document-service.json
+063da1e9001d018d950206be5b7bb372c0d45898c333fce3076f3881c723d935  infra/hetzner/minio-policies/platform-control.json
+d4c54d2733d70346c5f631c51f97755eca53522ebc5dd58a3aa5bd5036f9a26c  infra/hetzner/minio-policies/scoping_matrix.py
+55a796ffe4bbf14c045c946c8b0a04818b74f2ca4a8c879cadc97c70a472c351  infra/hetzner/minio-policies/trino.json
+42b9d945163148b46ed8bcc011b7d17da69769d4cb9b487d4e570d759bc70922  infra/hetzner/nats-stream-init.job.yaml
+5b01da9da443c20eae01cbc62d2fbccc54e555a1ce5ecb01501218677b327adf  infra/hetzner/provision-minio-users.sh
+d1bb5300a81a40b3e7e1cb34875daaebcc8a5402e58de8bdce3124c33680dec4  infra/hetzner/runners/Dockerfile.heavy
+f3557d8d3f82c177759d669e33f41e61fae9ed016d9555e00a52f35bb4e1de1f  infra/hetzner/runners/values-heavy.yaml
+42b5a137a6c86a604447be401f6a01fc4d3091502dd5dd268eeb7b4e9b47a1e1  infra/hetzner/runners/values-light.yaml
+a097cb89c5988c330e56634780c6e617c097eeed6dec25d8624cd4cd5917f058  infra/hetzner/values/argocd.yaml
+b043bad34de251595d50615a0689ec8f79ea687b8b059432f338a572955cd309  infra/hetzner/values/kube-prometheus-stack.yaml
+0dd8c7186f0292d06d7b67613b2715667d57b65591ad571bfdf331711dbb7a76  infra/hetzner/values/minio.yaml
+2da94e347839490a6ee270d82e05584e02bb64f874b0463179cbd510b5a996b5  infra/hetzner/values/nats.yaml
+9a75081251329b483354ae8f6473daefb07526745c4035262058c0dbf49fbff4  infra/hetzner/values/nessie.yaml
+93d5ef39101e11a50edbeba3975037608ff44edb6ec4e972ea796ba993ca10d2  infra/hetzner/values/opensearch.yaml
+ebc55c51facd79840ecf592d0b0204d14ae617f6bb90a641b3ae3730424ab9bd  infra/hetzner/values/trino.yaml
+fb2d89798d4182edef4471a64461de164a433471d5f68c235e8e638c6ef8adbc  infra/hetzner/values/zitadel.yaml
+9d70a1b915ab80bb4cb0b3e3797ffaecf00b10a5704d08f47642eccc58f0c7ed  infra/hetzner/verify-minio-scoping.sh
