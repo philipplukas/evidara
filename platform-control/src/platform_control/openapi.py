@@ -94,7 +94,17 @@ API_TITLE = "Platform Control API"
 # `applied` / `needs_human` / `evidence_binding` on success. Additive on the wire, but
 # a caller that sent `{enabled, note}` alone can no longer arm a key — which is the
 # point: the admin panel was the soft path around the guard the CLI enforced.
-API_VERSION = "0.29.0"
+# 0.30.0: BREAKING for anyone who called it -- `POST /webhooks/slack/interactions`
+# and the `slack` tag are removed (#852). The route was mounted unauthenticated and
+# was never signature-verified: it read `workflow_id` out of the request body and
+# signalled approve/reject to it, bypassing `WizardService` and its state guards.
+# Nothing in this service ever posted the Slack buttons it claimed to receive -- the
+# only sender in the repo is `infra/coordinator`, which owns the Slack signing secret
+# and receives its own buttons at its own verified endpoint. Minor rather than major
+# because the endpoint had no caller and, with `wizard_orchestrator_backend` at
+# `in_memory` everywhere (ADR-0031), no effect. The gate's real path is unchanged:
+# `POST /v1/wizard/runs/{run_id}/approve` and `.../reject`.
+API_VERSION = "0.30.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks
@@ -141,7 +151,6 @@ OPENAPI_TAGS: list[dict[str, Any]] = [
     {"name": "compliance-policies"},
     {"name": "di-events"},
     {"name": "firecrawl"},
-    {"name": "slack"},
     {
         "name": "corrections",
         "description": (
