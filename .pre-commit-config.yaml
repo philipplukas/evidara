@@ -125,6 +125,12 @@ repos:
         pass_filenames: false
         files: ^(docker-compose.*\.yml|scripts/.*\.sh|docs/.*\.md|\.github/workflows/.*\.yml|justfile|README\.md)$
 
+      - id: check-platform-contract-usage
+        name: Platform resources used here are declared by the vendored contract
+        entry: python3 scripts/check_platform_contract_usage.py
+        language: system
+        files: ^(infra/hetzner/(apps|marketing|observability)/.*\.yaml|infra/hetzner/(auth/ingress-tls|postgres-cluster)\.yaml|vendor/platform-contract\.yaml|scripts/check_platform_contract_usage\.py)$
+        pass_filenames: false
       - id: check-platform-ownership
         name: Platform-owned infra is frozen (reconciled from research-platform)
         entry: python3 scripts/check_platform_ownership.py

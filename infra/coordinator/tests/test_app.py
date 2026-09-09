@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from contextlib import asynccontextmanager
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -37,6 +38,18 @@ def _make_test_app() -> tuple[FastAPI, MagicMock, MagicMock]:
         test_app.routes.append(route)
 
     return test_app, temporal_mock, slack_mock
+
+
+@asynccontextmanager
+async def _parked_lifespan(app: FastAPI):
+    """Lifespan for a coordinator with no Slack credentials configured."""
+    import coordinator.app as app_module
+    from coordinator.gates import GateRegistry
+
+    app_module._temporal_client = MagicMock()
+    app_module._slack_service = None
+    app_module._gate_registry = GateRegistry()
+    yield
 
 
 @pytest.fixture
@@ -131,3 +144,93 @@ class TestSlackInteraction:
         )
         assert resp.status_code == 200
         assert resp.json()["decision"] == "approved"
+
+    def test_refuses_when_slack_is_parked(self):
+        """With no Slack credentials the webhook refuses, rather than falling
+        through to act on an unverified payload.
+
+        Guard: `if _slack_service is None: raise 503` in app.slack_interaction.
+        Delete it and this test goes red — the handler proceeds to dispatch the
+        decision on a request nobody authenticated.
+        """
+        import coordinator.app as app_module
+
+        test_app = FastAPI(title="test", lifespan=_parked_lifespan)
+        for route in app_module.app.routes:
+            test_app.routes.append(route)
+
+        payload = json.dumps({
+            "actions": [{
+                "action_id": "gate_approve",
+                "value": json.dumps({
+                    "workflow_id": "wf_123",
+                    "run_id": "TAR-100",
+                    "gate": "merge_to_main",
+                }),
+            }],
+            "user": {"name": "philipp"},
+            "channel": {"id": "C123"},
+            "message": {"ts": "1234567890.123"},
+        })
+
+        with TestClient(test_app) as c:
+            resp = c.post(
+                "/webhooks/slack",
+                content=f"payload={payload}",
+                headers={"content-type": "application/x-www-form-urlencoded"},
+            )
+
+        assert resp.status_code == 503
+        assert "not enabled" in resp.json()["detail"]
+
+
+class TestSlackSignatureVerification:
+    """`verify_signature` must never accept a request on an unconfigured secret.
+
+    HMAC-SHA256 keyed on the empty string is publicly computable, so without the
+    empty-secret refusal any caller can mint a signature that verifies.
+    """
+
+    def _service(self, secret: str) -> Any:
+        from coordinator.slack_service import SlackService
+
+        return SlackService(bot_token="xoxb-unused", signing_secret=secret)
+
+    def test_refuses_empty_signing_secret(self):
+        import hashlib
+        import hmac
+        import time
+
+        service = self._service("")
+        timestamp = str(int(time.time()))
+        body = b"payload=%7B%7D"
+        # What an attacker computes, knowing only that the secret is empty.
+        forged = "v0=" + hmac.new(
+            b"", f"v0:{timestamp}:{body.decode()}".encode(), hashlib.sha256
+        ).hexdigest()
+
+        assert service.verify_signature(
+            body=body, timestamp=timestamp, signature=forged
+        ) is False
+
+    def test_accepts_a_real_signature(self):
+        import hashlib
+        import hmac
+        import time
+
+        service = self._service("s3cret")
+        timestamp = str(int(time.time()))
+        body = b"payload=%7B%7D"
+        signature = "v0=" + hmac.new(
+            b"s3cret", f"v0:{timestamp}:{body.decode()}".encode(), hashlib.sha256
+        ).hexdigest()
+
+        assert service.verify_signature(
+            body=body, timestamp=timestamp, signature=signature
+        ) is True
+
+    def test_refuses_a_non_numeric_timestamp(self):
+        service = self._service("s3cret")
+        assert service.verify_signature(
+            body=b"", timestamp="not-a-number", signature="v0=whatever"
+        ) is False

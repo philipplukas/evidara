@@ -78,14 +78,28 @@ class SlackService:
 
     def verify_signature(self, *, body: bytes, timestamp: str, signature: str) -> bool:
         """Verify a Slack request signature."""
+        # Defence in depth: `app.py` no longer constructs this without a secret,
+        # but if it ever did, an empty key is a PUBLIC key. HMAC-SHA256 keyed on
+        # "" is computable by anyone who has the body and timestamp, so every
+        # signature would verify. Refuse rather than compute.
+        if not self._signing_secret:
+            return False
+
+        # Slack sends the timestamp as a header; a non-numeric one used to raise
+        # ValueError out of `float()` and surface as a 500 instead of a refusal.
+        try:
+            age = abs(time.time() - float(timestamp))
+        except (TypeError, ValueError):
+            return False
+        if age > 300:
+            return False
+
         basestring = f"v0:{timestamp}:{body.decode('utf-8')}"
         expected = "v0=" + hmac.new(
             self._signing_secret.encode(),
             basestring.encode(),
             hashlib.sha256,
         ).hexdigest()
-        if abs(time.time() - float(timestamp)) > 300:
-            return False
         return hmac.compare_digest(expected, signature)
 
     async def close(self) -> None:

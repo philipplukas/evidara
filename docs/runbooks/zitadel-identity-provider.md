@@ -5,6 +5,13 @@ Last reviewed: 2026-07-23
 Last verified: **never — see [Status](#status-not-yet-verified-against-a-live-cluster)**
 Applies to: prod (self-hosted Hetzner k3s, ADR-0029)
 
+> **Platform commands here have moved.** `deploy-stage{1,2,3,8}.sh`,
+> `deploy-observability.sh`, `deploy-runners.sh` and the `values/` files now live in
+> [research-platform](https://github.com/philipplukas/research-platform) (`scripts/`, `data/`,
+> `identity/`, `observability/`). The copies under `infra/hetzner/` are frozen duplicates
+> awaiting deletion — see [`infra/hetzner/OWNERSHIP.md`](../../infra/hetzner/OWNERSHIP.md).
+> Stages 4 and 5 are still run from this repository.
+
 ## Status: not yet verified against a live cluster
 
 Everything below was written against the chart and the cluster manifests, not against

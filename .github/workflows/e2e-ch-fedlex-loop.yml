@@ -27,7 +27,7 @@ jobs:
     # therefore never been able to pass. It is nightly + on-demand, so the
     # GitHub-hosted minutes are infrequent; platform-control.yml and legal-search.yml
     # already run on ubuntu-latest on every PR. If this ever needs to move back to
-    # the self-hosted pool, enable DinD in infra/hetzner/runners/values-heavy.yaml first.
+    # the self-hosted pool, enable DinD in research-platform ci/runners/values-heavy.yaml first.
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

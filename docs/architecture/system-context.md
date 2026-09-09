@@ -1,5 +1,12 @@
 # System Context
 
+> **Platform commands here have moved.** `deploy-stage{1,2,3,8}.sh`,
+> `deploy-observability.sh`, `deploy-runners.sh` and the `values/` files now live in
+> [research-platform](https://github.com/philipplukas/research-platform) (`scripts/`, `data/`,
+> `identity/`, `observability/`). The copies under `infra/hetzner/` are frozen duplicates
+> awaiting deletion — see [`infra/hetzner/OWNERSHIP.md`](../../infra/hetzner/OWNERSHIP.md).
+> Stages 4 and 5 are still run from this repository.
+
 ## Overview
 
 Evidara is a document intelligence platform organized around three main runtime domains, supported by shared contracts, infrastructure, and documentation.

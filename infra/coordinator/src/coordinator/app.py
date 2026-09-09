@@ -10,17 +10,20 @@ Endpoints:
 from __future__ import annotations
 
 import json
+import logging
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import parse_qs
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from temporalio.client import Client as TemporalClient
 
-from coordinator.config import Settings, get_settings
+from coordinator.config import get_settings
 from coordinator.gates import GateRegistry, load_gate_config
 from coordinator.slack_service import SlackService
 from coordinator.workflows import AgentTaskWorkflow, HumanGateWorkflow
+
+logger = logging.getLogger(__name__)
 
 _temporal_client: TemporalClient | None = None
 _slack_service: SlackService | None = None
@@ -36,10 +39,25 @@ async def lifespan(app: FastAPI):
         settings.temporal_target, namespace=settings.temporal_namespace
     )
 
-    _slack_service = SlackService(
-        bot_token=settings.slack_bot_token,
-        signing_secret=settings.slack_signing_secret,
-    )
+    # Slack is PARKED (2026-09-08) — constructed only when it is actually
+    # configured, and the route below refuses when it is not.
+    #
+    # It used to be built unconditionally. With no signing secret that is worse
+    # than off: `verify_signature` then keys its HMAC on the EMPTY STRING, which
+    # anyone can compute, so every "verified" request was forgeable. Measured —
+    # an attacker who knows the body and timestamp derives a signature that
+    # passes `compare_digest`.
+    #
+    # Leaving the credentials blank is therefore NOT how you turn Slack off.
+    # This is.
+    if settings.slack_bot_token and settings.slack_signing_secret:
+        _slack_service = SlackService(
+            bot_token=settings.slack_bot_token,
+            signing_secret=settings.slack_signing_secret,
+        )
+    else:
+        _slack_service = None
+        logger.info("slack_integration_parked reason=no_credentials_configured")
 
     if settings.gate_config_path.exists():
         _gate_registry = load_gate_config(settings.gate_config_path)
@@ -108,12 +126,21 @@ async def slack_interaction(request: Request) -> dict[str, Any]:
     Slack sends interaction payloads as application/x-www-form-urlencoded with
     a `payload` field containing JSON.
     """
-    settings = get_settings()
     raw_body = await request.body()
+
+    # Refuse when Slack is parked, rather than falling through unverified.
+    #
+    # This read `if _slack_service and not verify(...)`, so an absent service did
+    # not close the route — it REMOVED the check and let the body through. That
+    # is the same class of defect as #852 (platform-control's Slack webhook,
+    # which verified nothing and signalled attacker-named workflows), in a second
+    # copy. An absent verifier must be a closed door, never an open one.
+    if _slack_service is None:
+        raise HTTPException(status_code=503, detail="Slack integration is not enabled.")
 
     timestamp = request.headers.get("x-slack-request-timestamp", "")
     signature = request.headers.get("x-slack-signature", "")
-    if _slack_service and not _slack_service.verify_signature(
+    if not _slack_service.verify_signature(
         body=raw_body, timestamp=timestamp, signature=signature
     ):
         raise HTTPException(status_code=401, detail="Invalid signature")
