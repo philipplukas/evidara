@@ -6,10 +6,9 @@ Repo-wide conventions live in `AGENTS.md` (imported above). This file only adds 
 
 ### Planning anchor
 
-**#628 (M13) closed 2026-07-19** and has no successor planning issue. Do not scope work against
-it — read its closing comments for what iterations 1 and 2 measured, then work the live issues
-below. (This file pointed at #628 as "the current anchor" until 2026-07-22, three days after it
-closed; if you were briefed from a stale pointer, that is why.)
+**#628 (M13) closed 2026-07-19.** Its successor is **#958**, below. Do not scope work against #628
+— read its closing comments for what iterations 1 and 2 measured, then work #958 and the live issues
+it names.
 
 The programme is unchanged and still executes
 [ADR-0033](docs/adr/0033-agentic-legal-reasoning.md) (Accepted): the bet is that a thorough data
@@ -23,16 +22,43 @@ Acceptance test: ADR-0033's dog question, answered over a corpus **assembled thr
 ADR-0033 §4 is a standing guardrail: **do not build the MCP server first.** Its build order is
 dependency-forced; #628's closing comments track which steps were done.
 
-**Current lead: #731 — the LexFind provider** (26 cantons + Bund behind one unauthenticated JSON
-API). It carries the cantonal rung of the dog question — `tol/22871` is the ZH Hundegesetz, md5-identical
-to the canton's own PDF — and its `version_inactive_since` field models repeal separately from
-consolidation date, which is what the #661 trap needed.
+**Current anchor: #958 — the corpus states what is true, or refuses.** Opened 2026-09-09 as the
+successor to both closed anchors below.
 
-It was prioritised above the municipal rung (#736, #584) on measured evidence, not preference: the
-2026-07-22 full survey of all 2,110 Swiss communes found platform clustering covers only ~5% of the
-registry, and that share did not improve as coverage went from 61% to 100%. #736's premise — that
-clustering turns ~2,110 units into ~15 — is not currently supported. #731 is the same scaling
-question an order of magnitude cheaper, against a homogeneous source.
+The milestone is the **refusal half** of the acceptance test above, which has had almost no
+attention: answering the dog question is one passing answer, and refusing correctly for a norm the
+corpus does not hold is the other. We cannot currently do the second, because five open issues share
+one defect — nothing in the stack reliably distinguishes *absent* from *broken*: #850 (a new
+`document_id` per version), #806 (a known-wrong record in the production index), #871 (metadata keys
+silently dropped), #891 (sparse retrieval returning the whole index when BM25 abstains), #953 (a 500
+rendered as "no version"). That is ADR-0052's *unknown ≠ zero* promoted from a per-screen discipline
+to a system property. #958 carries the build order.
+
+**Where agents fit, because it is easy to get backwards.** ADR-0022 already decided it:
+`tools/evidara-cli` is the bounded surface agents act through, `platform-control` is the durable
+system of record for runs, step history and approvals. **Agents do not get a UI.** The admin panel is
+the evidence-and-approval surface — where a human sees what an agent did, on what basis, and grants
+or withholds permission. That surface is currently the weakest part of the panel (#949: the approval
+screen can neither approve nor show its evidence), which makes it milestone work, not polish.
+
+ADR-0022 is partially built: the `workflow` verb tree exists in the CLI and
+`WizardRunLedger.state_transitions` is the journal, but the ADR's `inspect`/`propose`/`apply`/
+`verify`/`compensate` family exists only as `proposal.py:46`. Finish it rather than re-litigate it.
+
+**Two closed anchors, kept because their evidence is still load-bearing:**
+
+- **#731 — the LexFind provider** (26 cantons + Bund behind one unauthenticated JSON API), closed
+  COMPLETED 2026-09-03. It landed the cantonal rung of the dog question — `tol/22871` is the ZH
+  Hundegesetz, md5-identical to the canton's own PDF — and its `version_inactive_since` field models
+  repeal separately from consolidation date, which is what the #661 trap needed.
+- It was prioritised above the municipal rung (#736, #584) on measured evidence, not preference: the
+  2026-07-22 full survey of all 2,110 Swiss communes found platform clustering covers only ~5% of the
+  registry, and that share did not improve as coverage went from 61% to 100%. #736's premise — that
+  clustering turns ~2,110 units into ~15 — is **still** not supported, and those two stay parked
+  until #958's steps 3–5 are done. Breadth is cheap now and expensive to trust.
+
+**This pointer has gone stale twice** — it named #628 for three days after it closed, then #731 for
+six days after that. If you are briefed from an anchor, check its state before scoping against it.
 
 The predecessor M1–M6 roadmap (#279) closed 2026-04-20. When opening new work, prefer
 `/issue-execute <number>` if a ticket exists; otherwise scope inline against ADR-0033's build order.
