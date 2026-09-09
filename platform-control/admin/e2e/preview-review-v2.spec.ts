@@ -45,7 +45,23 @@ const PREVIEW_DONE = {
   updated_at: "2026-04-14T09:30:00Z",
 };
 
-const PREVIEW_RUNS = { data: [PREVIEW_RUNNING, PREVIEW_DONE] };
+/**
+ * A failed preview run. Before this existed the list was only ever exercised
+ * with running and completed runs, which is why it shipped with no Retry: no
+ * fixture ever reached the state that needs one.
+ */
+const PREVIEW_FAILED = {
+  ...PREVIEW_DONE,
+  run_id: "preview_failed",
+  status: "failed",
+  completed_at: null,
+  failure_reason:
+    "Provider returned HTTP 503 for 2 of 2 captured resources, after 3 retries against the upstream host.",
+  created_at: "2026-04-15T09:40:00Z",
+  updated_at: "2026-04-15T09:41:00Z",
+};
+
+const PREVIEW_RUNS = { data: [PREVIEW_RUNNING, PREVIEW_DONE, PREVIEW_FAILED] };
 
 // Minimal-but-valid RunPipelineHealth so RunDetailSectionsV2's banner renders
 // (an empty `{ data: [] }` from the catch-all lacks `stages`, which the
@@ -134,5 +150,88 @@ test.describe("Preview review v2 (ADR-0026 Tailwind port)", () => {
     await expect(page.getByRole("heading", { name: /Run\s+preview_running/ })).toBeVisible();
     await expect(page.getByText("Operator actions")).toBeVisible();
     await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+  });
+});
+
+/**
+ * The list's ACTIONS column, which shipped off-screen at every width tested.
+ *
+ * This is the M16 finding (#873) in a third table. The run queue pins its own
+ * Actions column; this one did not, and its header was `sr-only` —
+ * `position: absolute`, which cannot also be `position: sticky`.
+ *
+ * Measured before the fix: scrollWidth 1324 against clientWidth 1054 at 1440
+ * and 894 at 1280, so the column sat past the right edge of a scroller with no
+ * cue. No Vitest layer can see this: jsdom has no layout engine.
+ */
+test.describe("Preview approvals — the operator's levers survive the fold", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("evidara_user_role", "admin");
+    });
+  });
+
+  test("the Actions column is pinned and no action is cut off at 1280", async ({ page }) => {
+    await mockPreviewReviewApi(page);
+    await page.setViewportSize({ width: 1280, height: 950 });
+    await page.goto("/#/preview-review");
+
+    const header = page.getByRole("columnheader", { name: "Actions" });
+    await expect(header).toBeVisible({ timeout: 90_000 });
+    // Computed style, not a class name — the assertion jsdom cannot make.
+    await expect(header).toHaveCSS("position", "sticky");
+
+    // Measured inside the page, NOT via `locator.boundingBox()`, which scrolls
+    // the element into view before measuring and so reveals the very clipping
+    // it is asked about.
+    const geometry = await page.evaluate(() => {
+      const table = document.querySelector("table");
+      if (!table) return null;
+      const scroller = table.parentElement as HTMLElement;
+      const buttons = [...table.querySelectorAll("tbody tr td:last-child button")].map((b) => ({
+        label: (b.textContent ?? "").trim(),
+        right: Math.round(b.getBoundingClientRect().right),
+      }));
+      return {
+        scrollLeft: scroller.scrollLeft,
+        overflows: scroller.scrollWidth > scroller.clientWidth + 1,
+        visibleRight: Math.min(
+          Math.round(scroller.getBoundingClientRect().right),
+          window.innerWidth,
+        ),
+        buttons,
+      };
+    });
+
+    expect(geometry, "the preview list table did not render").not.toBeNull();
+    // Guard against the guard: without overflow there is nothing to measure and
+    // the assertions below would pass vacuously. Fail loudly instead.
+    expect(geometry!.overflows, "table no longer overflows at 1280 — retune this test").toBe(true);
+    expect(geometry!.scrollLeft, "test scrolled the table before measuring").toBe(0);
+    expect(geometry!.buttons.length).toBeGreaterThan(0);
+
+    for (const button of geometry!.buttons) {
+      expect(
+        button.right,
+        `"${button.label}" is cut off at x=${button.right}, past the visible edge x=${geometry!.visibleRight}`,
+      ).toBeLessThanOrEqual(geometry!.visibleRight);
+    }
+  });
+
+  test("a failed preview run offers Retry from the list, as the run queue does", async ({
+    page,
+  }) => {
+    await mockPreviewReviewApi(page);
+    await page.goto("/#/preview-review");
+
+    // The same run in `#/runs` offers Retry. Offering it there and not here
+    // makes the two screens disagree about what the operator can do.
+    const failedRow = page.getByRole("row", { name: /preview_failed/ });
+    await expect(failedRow).toBeVisible({ timeout: 90_000 });
+    await expect(failedRow.getByRole("button", { name: /retry/i })).toBeVisible();
+
+    // Cancel is for pending/running, so a failed run must not offer it — no
+    // state offers both levers.
+    await expect(failedRow.getByRole("button", { name: /cancel/i })).toHaveCount(0);
   });
 });
