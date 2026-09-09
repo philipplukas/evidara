@@ -27,6 +27,8 @@ from platform_control.domain import (
     DenominatorTier,
     ProcessingStatus,
     RunStatus,
+    resolve_work_action,
+    resolve_work_actor,
 )
 from platform_control.models.authority import Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
@@ -297,9 +299,17 @@ class CoverageService:
                     "refused_runs": entry["refused_runs"],
                     "quarantined_documents": entry["quarantined_documents"],
                     "source_ids": sources,
+                    # Derived here, not in each client. Before #964 the mapping lived
+                    # only in `tools/evidara-cli`, and the panel would have needed a
+                    # third copy of it (ADR-0056 constraint 1).
+                    "proposed_action": resolve_work_action(reasons),
+                    "actor": resolve_work_actor(reasons),
                 }
             )
 
+        # SORT order — how the queue reads, most blocking first. Deliberately NOT the
+        # order that decides what may be DONE: see `REASON_ACTION_PRIORITY` in
+        # `domain.py`. #964 was these two being assumed to be one thing.
         rank = {reason: index for index, reason in enumerate(_WORK_REASON_ORDER)}
         items.sort(key=lambda item: (min(rank[r] for r in item["reasons"]), item["name"]))
 

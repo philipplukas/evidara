@@ -32,7 +32,13 @@
 # signature-verified; it signalled approve/reject to a `workflow_id` taken from the
 # request body, bypassing `WizardService`. It had no sender and, with the in-memory
 # orchestrator, no effect. A removal, so not additive — but no client existed.
-version: "2.41.0"
+# 2.42.0: platform-control 0.31.0 — the coverage work queue states `proposed_action`
+# and `actor` per item (#964). The reason->action mapping and the agent/human split
+# lived only in `tools/evidara-cli`, so a second client had to copy or re-derive
+# them — and derived from the queue's own SORT order, `refusals_outstanding` +
+# `never_acquired` (the normal shape of a refusal) classified as agent-actionable.
+# Additive: a consumer ignoring both fields behaves exactly as before.
+version: "2.42.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -96,7 +102,7 @@ apis:
     # ordered by a stated convention returned as `ordering`, because a priority
     # number needs a denominator exactly as much as the completeness percentage
     # ADR-0042 rejected. A consumer that wants a ranking applies its own.
-    version: "0.30.0"
+    version: "0.31.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

@@ -16,7 +16,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
-from platform_control.domain import CoverageWorkReason, DenominatorTier, NormLevel, RunMode
+from platform_control.domain import (
+    CoverageWorkAction,
+    CoverageWorkActor,
+    CoverageWorkReason,
+    DenominatorTier,
+    NormLevel,
+    RunMode,
+)
 
 
 class AcquisitionCoverageEntry(BaseModel):
@@ -167,6 +174,20 @@ class CoverageWorkItem(BaseModel):
     quarantined_documents: int = Field(default=0, ge=0)
 
     source_ids: list[str] = Field(default_factory=list)
+
+    # What to do, and who may do it. Derived from `reasons` server-side so every
+    # client reads one answer (ADR-0056 constraint 1). Before #964 this mapping
+    # existed only in `tools/evidara-cli`'s `agent_loop.py`, and a second client
+    # deriving it from the queue's own sort order got `refusals_outstanding` +
+    # `never_acquired` — the normal shape of a refusal — classified as work the
+    # agent may do.
+    #
+    # This does NOT reintroduce the ranking `CoverageWorkReason` refuses to ship:
+    # `reasons` is still the unranked truth and the counts still travel with it.
+    # `proposed_action` names the most constraining response; `actor` is folded over
+    # every reason, so it does not depend on which one is named.
+    proposed_action: CoverageWorkAction
+    actor: CoverageWorkActor
 
     @model_validator(mode="after")
     def _reasons_must_be_earned(self) -> CoverageWorkItem:

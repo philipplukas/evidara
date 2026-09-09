@@ -238,3 +238,68 @@ def test_a_sourceless_jurisdiction_is_a_human_action_not_an_agent_one() -> None:
     plan = plan_from_queue(_queue(_item("jur_bare", ["no_source"])))
     assert plan[0].action is AgentAction.REGISTER_SOURCE
     assert plan[0].actor == "human"
+
+
+class TestServerOwnsTheMapping:
+    """#964: the reason -> action mapping belongs to the server, not to each client.
+
+    It lived only here, in Python, so the operator panel would have needed a third
+    copy (ADR-0056 constraint 1). Two already disagreed: read off the queue's own
+    sort order, `refusals_outstanding` + `never_acquired` — the NORMAL shape of a
+    refusal, every run refused so nothing acquired — resolved to `run_acceptance`,
+    an agent retrying work a person had refused.
+    """
+
+    def _item(self, **overrides):
+        item = {
+            "jurisdiction_id": "jur_ch_zh",
+            "name": "Zürich",
+            "reasons": ["refusals_outstanding", "never_acquired"],
+            "source_ids": ["src_x"],
+            "expected": 120,
+            "acquired_distinct_urls": 0,
+            "refused_runs": 3,
+        }
+        item.update(overrides)
+        return {"data": [item], "ordering": "reason_class_then_name"}
+
+    def test_the_servers_action_wins_over_the_local_mapping(self):
+        # The server says await_pipeline; the local mapping would say resolve_refusal.
+        # Delete the `_server_action` call in `plan_from_queue` and this goes red.
+        payload = self._item(proposed_action="await_pipeline", actor="agent")
+        plan = agent_loop.plan_from_queue(payload)
+        assert [p.action for p in plan] == [agent_loop.AgentAction.AWAIT_PIPELINE]
+
+    def test_the_servers_actor_wins_over_the_local_classification(self):
+        # Local classification of resolve_refusal is "human". The server saying
+        # "human" for an action the client would call agent-actionable must also hold.
+        payload = self._item(proposed_action="run_acceptance", actor="human")
+        plan = agent_loop.plan_from_queue(payload)
+        assert [p.actor for p in plan] == ["human"]
+
+    def test_an_unknown_actor_is_never_read_as_permission(self):
+        # This is the autonomy boundary. An unrecognised string must fall through to
+        # the local classification, never be trusted, and never mean "agent".
+        payload = self._item(proposed_action="resolve_refusal", actor="supervisor")
+        plan = agent_loop.plan_from_queue(payload)
+        assert [p.actor for p in plan] == ["human"]
+
+    def test_an_unknown_action_falls_back_rather_than_crashing(self):
+        payload = self._item(proposed_action="teleport", actor=None)
+        plan = agent_loop.plan_from_queue(payload)
+        assert [p.action for p in plan] == [agent_loop.AgentAction.RESOLVE_REFUSAL]
+
+    def test_a_server_without_the_field_still_plans(self):
+        # Backwards compatible: an older server states neither field.
+        plan = agent_loop.plan_from_queue(self._item())
+        assert [p.action for p in plan] == [agent_loop.AgentAction.RESOLVE_REFUSAL]
+        assert [p.actor for p in plan] == ["human"]
+
+    def test_the_964_case_is_human_under_the_local_fallback_too(self):
+        """The fallback must not be the unsafe ordering.
+
+        If someone ever reorders `_REASON_TO_ACTION` so a gap outranks a refusal,
+        this fails — which is the whole defect, reproduced at its smallest.
+        """
+        action = agent_loop.action_for(["never_acquired", "refusals_outstanding"])
+        assert agent_loop.actor_for(action) == "human"
