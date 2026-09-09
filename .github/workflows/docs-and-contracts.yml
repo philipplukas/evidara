@@ -98,7 +98,12 @@ jobs:
       - name: Check Hetzner image pins roll together
         run: python scripts/check_hetzner_image_pins.py
 
-      - name: Enforce contract manifest version bump
+      - name: Enforce contract changeset on locked contract changes
+        # Was "enforce a manifest version bump" until #913. A per-PR edit of one
+        # shared scalar serialised every contract PR; each PR now declares itself
+        # in its own file under contracts/changes/ and the number is computed at
+        # release. The verdict depends on the branch alone, so a PR cannot be
+        # invalidated by an unrelated one merging first.
         run: |
           python scripts/check_contract_version_bump.py \
             --base "${{ steps.contract_guard_range.outputs.base_ref }}" \

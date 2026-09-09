@@ -76,14 +76,23 @@ MVP ingest-to-search product flow:
 
 CI validates this file via `scripts/check_contract_manifest.py`.
 
-### Version Bump Guard
+### Changeset Guard
 
-CI also enforces a manifest bump rule via `scripts/check_contract_version_bump.py`:
+CI enforces a declaration rule via `scripts/check_contract_version_bump.py`:
 
-- If any file under `contracts/api/` or `contracts/events/` changes, `contracts/manifest.yaml` must be updated in the same PR.
-- The `version` value in `contracts/manifest.yaml` must change relative to the base branch.
+- If any file under `contracts/api/` or `contracts/events/` changes, the PR must add a
+  changeset under [`contracts/changes/`](changes/README.md) — write it with
+  `python3 scripts/bump_contract_version.py --minor --summary "..."`.
+- Every changeset in the tree is validated on every run of the gate, not only the ones a PR touched.
+- The top-level `version` here is **not** hand-edited. `scripts/release_contract_version.py`
+  computes it from the pending changesets and is its only writer.
 
-Use this as the release signal that locked cross-service contract surfaces changed.
+Until 2026-09-09 the rule was instead "bump the top-level `version`", which made every contract PR
+contend for one line and is what #913 named as a blocker to parallel work. See
+[`contracts/changes/README.md`](changes/README.md) for the two measured failure modes.
+
+The released version is still the signal that locked cross-service contract surfaces changed; it now
+moves per release rather than per PR.
 
 ## Field Suffix Conventions
 

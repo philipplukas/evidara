@@ -68,12 +68,20 @@ Update as applicable:
 - JSON Schema in `contracts/schemas/` or `contracts/events/`
 - Generated clients (`npm run openapi:generate` in `legal-search/frontend/`)
 - Contract tests and schema validation
-- **`contracts/manifest.yaml`'s top-level `version`**, whenever anything under `contracts/api/` or
-  `contracts/events/` changes. `scripts/check_contract_version_bump.py` enforces it and reads
-  **only** that key — not `apis.<name>.version`, which `check_contract_manifest.py` separately
-  requires to equal the app's `API_VERSION`. Both move together. Neither
-  `check-platform-control.sh` nor any other surface script runs the bump gate, so a PR that misses
-  it is green locally and red in CI (three PRs, 2026-09-03).
+- **A changeset under `contracts/changes/`**, whenever anything under `contracts/api/` or
+  `contracts/events/` changes. Write it with
+  `python3 scripts/bump_contract_version.py --minor --summary "..."` (add `--api` when the
+  platform-control OpenAPI surface changed). `scripts/check_contract_version_bump.py` enforces it.
+  Neither `check-platform-control.sh` nor any other surface script runs that gate, so a PR that
+  misses it is green locally and red in CI (three PRs, 2026-09-03).
+- **Do NOT hand-edit `contracts/manifest.yaml`'s top-level `version`.** It is computed from the
+  pending changesets by `scripts/release_contract_version.py`, which is its only writer. Editing it
+  per PR is what serialised contract work on one scalar (#913): two PRs picking different successors
+  conflict textually, and two picking the *same* successor merge cleanly and then fail the old gate,
+  because it compared against the tip of the base branch rather than the merge base.
+- `apis.platform_control.version` is the exception and still moves in the PR — it must equal the
+  **generated** spec's `info.version`, which `check_contract_manifest.py` asserts, so it is pinned to
+  the app and cannot be deferred to a release. `--api` moves it and `API_VERSION` together.
 
 ### infra-change
 

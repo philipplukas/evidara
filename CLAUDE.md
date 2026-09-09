@@ -56,7 +56,7 @@ Run the narrowest gate for the surface you touched before pushing:
 | `eval/` | see `.github/workflows/eval-ris.yml` — two `-k`-filtered pytest selections |
 | `scripts/` | `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` — see note below; without pyyaml only 144 of 201 tests run |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `for c in AT CH DE FR IT EU; do python scripts/check_country_overlay_files.py --country $c; done` — `--country` is required; the bare command exits 2 on argparse |
-| `contracts/api/` or `contracts/events/` | `python3 scripts/check_contract_version_bump.py --base origin/main` — the manifest version bump. **Not** covered by `check-platform-control.sh`, which only checks that the generated spec still matches the app. |
+| `contracts/api/` or `contracts/events/` | `python3 scripts/check_contract_version_bump.py --base origin/main` — the contract **changeset** gate. **Not** covered by `check-platform-control.sh`, which only checks that the generated spec still matches the app. |
 | `infra/hetzner/` | `python3 scripts/check_platform_ownership.py` — the shared cluster layer moved to [`research-platform`](https://github.com/philipplukas/research-platform) and the copies here are **frozen by hash**. An edit to a frozen file does not reach the cluster; the guard refuses it and names where the change belongs. Also run `bash scripts/validate_hetzner_apps_kustomize.sh` and `python3 scripts/check_hetzner_image_pins.py` — the two that cover what this repo still owns. |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
 
@@ -78,11 +78,22 @@ tampering with that file fails the check, restoring it passes, and editing
 `infra/hetzner/apps/kustomization.yaml` is correctly permitted because `apps/` stayed.
 
 The `contracts/` row above is the same trap in a second place: `check_contract_version_bump.py`
-compares the manifest's **top-level `version`** (`:47`, `:62`) — not `apis.<name>.version` — and fires on
-any change under `contracts/api/` or `contracts/events/` (`:14`). Two PRs from one lane hit it in a
-single day (2026-09-03) because the `platform-control/` row reads as exhaustive and is not. Note both
-numbers still move together: `check_contract_manifest.py` separately requires
-`apis.platform_control.version` to equal `platform_control.openapi.API_VERSION`.
+fires on any change under `contracts/api/` or `contracts/events/` (`:42`) and is run by no surface
+script. Two PRs from one lane hit it in a single day (2026-09-03) because the `platform-control/`
+row reads as exhaustive and is not.
+
+**What it requires changed on 2026-09-09 (#913).** It used to demand a hand-edit of
+`contracts/manifest.yaml`'s **top-level `version`**, which serialised every contract PR on one
+scalar. It now demands a **changeset** under `contracts/changes/` —
+`python3 scripts/bump_contract_version.py --minor --summary "..."`, plus `--api` when the
+platform-control surface changed. Two PRs write two different files, so neither the textual conflict
+(different successors) nor the semantic one (the same successor, which merges cleanly and then failed
+the old tip-of-main comparison) can happen. The number is computed once, at release, by
+`scripts/release_contract_version.py --check` / (no flag) — the **only** writer of that key; a test
+in `scripts/tests/test_contract_changesets.py` fails if a second script grows one.
+`apis.platform_control.version` is unaffected and still moves in the PR:
+`check_contract_manifest.py` requires it to equal the generated spec's `info.version`, so it is
+pinned to the app.
 
 **`CI=true` is not optional either, on any suite that registers the CI-skip guard** —
 `document-intelligence/tests/conftest.py`, `platform-control/tests/conftest.py` and
