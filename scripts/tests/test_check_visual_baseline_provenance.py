@@ -36,6 +36,9 @@ spec.loader.exec_module(guard)
 SNAPS = "legal-search/frontend/e2e/visual.spec.ts-snapshots"
 PROVENANCE = f"{SNAPS}/PROVENANCE.md"
 
+ADMIN_SNAPS = "platform-control/admin/e2e/visual.spec.ts-snapshots"
+ADMIN_PROVENANCE = f"{ADMIN_SNAPS}/PROVENANCE.md"
+
 GOOD_ENTRY = """# Visual baseline provenance
 
 ## 2026-07-19 — PR #999 — refresh
@@ -103,6 +106,64 @@ class VisualBaselineProvenanceGuardTests(unittest.TestCase):
     def test_ignores_non_png_files_in_the_snapshot_dir(self) -> None:
         changed = [PROVENANCE]
         self.assertEqual(guard.evaluate(changed, GOOD_ENTRY), [])
+
+    # ------------------------------------------------------------------
+    # Per-surface ledgers (#913)
+    # ------------------------------------------------------------------
+    #
+    # The admin baseline used to live under `legal-search/frontend/`. Moving it
+    # is only half the fix: if the guard still watched one directory, an admin
+    # baseline could be re-blessed with no record at all — strictly weaker than
+    # before the move. These four drive that directly, and every one of them goes
+    # red if `platform-control/admin/...` is dropped from `SNAPSHOT_DIRS`.
+
+    def test_admin_snapshot_dir_is_guarded(self) -> None:
+        self.assertIn(
+            ADMIN_SNAPS,
+            [d.as_posix() for d in guard.SNAPSHOT_DIRS],
+            "the admin surface owns visual baselines; dropping it here disarms the guard",
+        )
+
+    def test_admin_baseline_without_its_own_ledger_fails(self) -> None:
+        """The legal-search ledger must NOT satisfy an admin baseline change."""
+        changed = [f"{ADMIN_SNAPS}/run-detail-v2-linux.png", PROVENANCE]
+        errors = guard.evaluate(changed, {SNAPS: GOOD_ENTRY, ADMIN_SNAPS: ""})
+        self.assertTrue(errors, "an admin baseline bless must be recorded in the admin ledger")
+        self.assertTrue(any(ADMIN_PROVENANCE in e for e in errors))
+
+    def test_admin_baseline_passes_with_its_own_ledger(self) -> None:
+        changed = [f"{ADMIN_SNAPS}/run-detail-v2-linux.png", ADMIN_PROVENANCE]
+        entry = GOOD_ENTRY.replace("app-header-linux.png", "run-detail-v2-linux.png")
+        self.assertEqual(guard.evaluate(changed, {ADMIN_SNAPS: entry}), [])
+
+    def test_every_snapshot_dir_on_disk_is_guarded(self) -> None:
+        """A new surface that grows baselines cannot quietly go unguarded.
+
+        Discovering the directories rather than listing them is what makes this fail
+        for a surface nobody remembered to add — the failure mode the whole guard is
+        about, one level up.
+        """
+        guarded = {d.as_posix() for d in guard.SNAPSHOT_DIRS}
+        on_disk = {
+            path.relative_to(REPO_ROOT).as_posix()
+            for path in REPO_ROOT.glob("*/*/e2e/visual.spec.ts-snapshots")
+            if path.is_dir()
+        }
+        self.assertTrue(on_disk, "found no snapshot directories at all — glob is wrong")
+        self.assertEqual(
+            on_disk - guarded,
+            set(),
+            "snapshot directory on disk is not listed in SNAPSHOT_DIRS",
+        )
+
+    def test_real_admin_ledger_satisfies_its_own_required_fields(self) -> None:
+        text = (REPO_ROOT / ADMIN_PROVENANCE).read_text(encoding="utf-8")
+        newest = guard._newest_entry(text)
+        self.assertIsNotNone(newest, "admin ledger has no entries")
+        for field in guard.REQUIRED_ENTRY_FIELDS:
+            self.assertIn(field, newest, f"committed admin ledger's newest entry lacks {field}")
+        for m in guard.PLACEHOLDER_MARKERS:
+            self.assertNotIn(m, newest, "admin ledger's newest entry carries the placeholder")
 
     def test_real_repo_ledger_satisfies_its_own_required_fields(self) -> None:
         """The committed ledger must itself pass the shape the guard demands."""

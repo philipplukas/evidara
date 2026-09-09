@@ -167,8 +167,11 @@ between machines and zero tolerance does not forgive it.
 
 **Every baseline change needs a recorded reason.**
 `scripts/check_visual_baseline_provenance.py` fails CI and pre-commit if a
-`*.png` under the snapshot directory changes without a matching `PROVENANCE.md`
-entry. "The tests were red" is not a reason — re-blessing to restore green is
+`*.png` under a guarded snapshot directory changes without a matching
+`PROVENANCE.md` entry **in that same directory**. It guards two surfaces —
+this one and `platform-control/admin/` — because each owns its own baselines
+since #913; the admin capture that used to sit in this directory now lives with
+the app it photographs. "The tests were red" is not a reason — re-blessing to restore green is
 precisely how three baselines came to certify live bugs.
 
 **Pixels are the wrong tool for geometry.** A collapsed panel or a 1px drag

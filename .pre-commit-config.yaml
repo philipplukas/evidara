@@ -188,7 +188,10 @@ repos:
         entry: python3 scripts/check_visual_baseline_provenance.py
         language: system
         pass_filenames: false
-        files: ^legal-search/frontend/e2e/visual\.spec\.ts-snapshots/.*$
+        # Both guarded surfaces (#913). Each owns its baselines and its ledger;
+        # the hook must fire from whichever one changed, or an admin re-bless is
+        # unrecorded — strictly weaker than before the baseline moved.
+        files: ^(legal-search/frontend|platform-control/admin)/e2e/visual\.spec\.ts-snapshots/.*$
 
       - id: js-workspace-hygiene
         name: JS workspace hygiene (no root node_modules symlink, react deduped)
