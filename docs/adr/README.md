@@ -23,7 +23,7 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0016 | [Cloud Run services vs jobs](0016-cloud-run-services-vs-jobs.md) |
 | ADR-0020 | [API authentication](adr-0020-api-authentication.md) |
 | ADR-0021 | [Wizard orchestration abstraction](adr-0021-wizard-orchestration-abstraction.md) |
-| ADR-0022 | [Agentic CLI workflow control surface](adr-0022-agentic-cli-workflow-control-surface.md) |
+| ADR-0022 | [Agentic CLI workflow control surface](adr-0022-agentic-cli-workflow-control-surface.md) (amended by ADR-0056) |
 | ADR-0023 | [DSPy extraction acceleration](adr-0023-dspy-extraction-acceleration.md) |
 | ADR-0024 | [Phased CI runner strategy for Evidara](adr-0024-ci-runner-strategy.md) |
 | ADR-0025 | [Portal HTTP provider strategy](adr-0025-portal-http-provider-strategy.md) |
@@ -56,6 +56,8 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0052 | [Declared means produced](0052-declared-means-produced.md) (Proposed) |
 | ADR-0053 | [Effects follow the verdict](0053-effects-follow-the-verdict.md) (Proposed) |
 | ADR-0054 | [Semantic retrieval as a measured cascade](0054-semantic-retrieval-as-a-measured-cascade.md) (Proposed) |
+| ADR-0055 | [GitOps with Argo CD](0055-gitops-argocd-over-imperative-apply.md) |
+| ADR-0056 | [Agentic flows are visible in the panel](0056-agentic-flows-are-visible-in-the-panel.md) (amends ADR-0022) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.

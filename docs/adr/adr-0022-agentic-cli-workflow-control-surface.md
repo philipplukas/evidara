@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted — **amended by [ADR-0056](0056-agentic-flows-are-visible-in-the-panel.md)** (2026-09-09),
+which permits the operator panel to initiate and stream agent runs. ADR-0056 carries every
+constraint below forward unchanged; what it changes is that "agents act through the CLI" no longer
+implies "agents are invisible in the product".
 
 ## Date
 
