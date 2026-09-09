@@ -46,13 +46,45 @@ const VERSION = {
   id: "sv_e2e_1",
   source_version_id: "sv_e2e_1",
   source_id: SOURCE_ID,
-  version_label: "v1",
+  // A realistic label and spec, copied in shape from a live version. This is
+  // load-bearing: a thin fixture does not make the table overflow at 1280, and
+  // the test would then pass by having nothing to measure. The `overflows`
+  // assertion below fails loudly if that ever becomes true again.
+  version_label: "ch-zh-lexfind-full-canton-20260905T113904Z",
   status: "approved",
-  extractor_profile_id: "xp_lexfind_law",
-  acquisition_spec: { provider: "lexfind", cantons: ["zh"], enabled: true },
+  extractor_profile_id: "exp_legislation_v1",
+  acquisition_spec: {
+    tenant_id: "tenant_public",
+    corpus_id: "corpus_public_ch_canton_zh_legislation",
+    scope_type: "global_public",
+    source_origin_kind: "official_primary",
+    trust_tier: "authoritative",
+    language_codes: ["de"],
+    document_type_hint: "legislation",
+    request_timeout_seconds: 20.0,
+    max_content_bytes: 2000000,
+    provider: "lexfind_api",
+    enumeration: "systematic_digit_union",
+    entity_ids: [26],
+    language: "de",
+    results_per_page: 100,
+    max_pages: 40,
+    min_pdf_bytes: 2000,
+  },
   created_at: "2026-09-05T11:39:04Z",
   updated_at: "2026-09-05T11:40:00Z",
 };
+
+/**
+ * The panel is served by a dev server this run starts cold, so the first
+ * navigation waits on a Turbopack compile that outruns Playwright's default 5s
+ * assertion timeout. Waiting on the shell explicitly keeps a slow compile from
+ * reading as a missing column.
+ */
+async function gotoSourceDetail(page: Page) {
+  await page.goto(`/#/sources/${SOURCE_ID}/show`);
+  await expect(page.getByTestId("source-versions-section")).toBeVisible({ timeout: 90_000 });
+}
 
 async function mockApi(page: Page) {
   const json = (body: unknown) => ({
@@ -67,8 +99,20 @@ async function mockApi(page: Page) {
   await page.route("**/api/platform-control/v1/reference-data/authorities*", (route) =>
     route.fulfill(json({ data: [{ authority_id: "auth_zh_sk", name: "Staatskanzlei ZH" }], total: 1 })),
   );
+  // Readiness is NOT a list envelope — it returns `{ready, checks:[...]}` and the
+  // panel filters `checks`. Mocking it as `{data,total}` crashed the whole route
+  // with "Cannot read properties of undefined (reading 'filter')", which renders
+  // as react-admin's generic error page and looks exactly like a missing column.
   await page.route("**/api/platform-control/v1/runs/readiness*", (route) =>
-    route.fulfill(json({ data: [], total: 0 })),
+    route.fulfill(
+      json({
+        source_id: SOURCE_ID,
+        source_version_id: VERSION.source_version_id,
+        mode: "production",
+        ready: true,
+        checks: [{ code: "source_exists", ok: true, detail: "Source exists." }],
+      }),
+    ),
   );
   await page.route(`**/api/platform-control/v1/sources/${SOURCE_ID}/versions*`, (route) =>
     route.fulfill(json({ data: [VERSION], total: 1 })),
@@ -87,18 +131,55 @@ test.describe("Source versions — the operator's levers survive the fold", () =
     // overflow at all (scrollWidth == clientWidth == 1004), so a test run only
     // at 1440 would have passed over the defect.
     await page.setViewportSize({ width: 1280, height: 950 });
-    await page.goto(`/#/sources/${SOURCE_ID}/show`);
+    await gotoSourceDetail(page);
 
     const header = page.getByRole("columnheader", { name: "Actions" });
     await expect(header).toBeVisible();
     // Computed style, not a class name — this is the assertion jsdom cannot make.
     await expect(header).toHaveCSS("position", "sticky");
 
-    // Approve and Reject are the ADR-0033 gate. If any single one of these is
-    // outside the viewport the operator cannot act without discovering a scroll
-    // they were never told about, which is the whole finding.
-    for (const name of ["Edit", "Config", "Preview run", "Production run", "Approve", "Reject"]) {
-      await expect(page.getByRole("button", { name, exact: true })).toBeInViewport();
+    // Approve and Reject are the ADR-0033 gate. The defect is HORIZONTAL: the
+    // buttons sat past the right edge of a scroller nothing said was scrollable.
+    //
+    // Measured through `page.evaluate`, NOT through Playwright locators.
+    // `locator.boundingBox()` scrolls the element into view before it measures,
+    // so it reveals the very clipping it is being asked about — an earlier
+    // version of this test used it and passed with the pin removed. Reading
+    // `getBoundingClientRect()` in the page, with the scroller left where it
+    // loads, is the only way to see what the operator sees.
+    const geometry = await page.evaluate(() => {
+      const table = [...document.querySelectorAll("table")].find((t) =>
+        /Actions/.test(t.textContent ?? ""),
+      );
+      if (!table) return null;
+      const scroller = table.parentElement as HTMLElement;
+      const scrollerRect = scroller.getBoundingClientRect();
+      const actionCell = table.querySelector("tbody tr td:last-child") as HTMLElement | null;
+      const buttons = [...(actionCell?.querySelectorAll("button") ?? [])].map((b) => ({
+        label: (b.textContent ?? "").trim(),
+        right: Math.round(b.getBoundingClientRect().right),
+      }));
+      return {
+        scrollLeft: scroller.scrollLeft,
+        overflows: scroller.scrollWidth > scroller.clientWidth + 1,
+        // Where the operator can actually see up to.
+        visibleRight: Math.min(Math.round(scrollerRect.right), window.innerWidth),
+        buttons,
+      };
+    });
+
+    expect(geometry, "the versions table did not render").not.toBeNull();
+    // Guard against the guard: if the table stopped overflowing at 1280 this
+    // assertion would be vacuously true, so fail loudly instead of abstaining.
+    expect(geometry!.overflows, "table no longer overflows at 1280 — retune this test").toBe(true);
+    expect(geometry!.scrollLeft, "test scrolled the table before measuring").toBe(0);
+    expect(geometry!.buttons.length).toBeGreaterThanOrEqual(6);
+
+    for (const button of geometry!.buttons) {
+      expect(
+        button.right,
+        `"${button.label}" is cut off at x=${button.right}, past the visible edge x=${geometry!.visibleRight}`,
+      ).toBeLessThanOrEqual(geometry!.visibleRight);
     }
   });
 
@@ -107,7 +188,7 @@ test.describe("Source versions — the operator's levers survive the fold", () =
   }) => {
     await mockApi(page);
     await page.setViewportSize({ width: 1280, height: 950 });
-    await page.goto(`/#/sources/${SOURCE_ID}/show`);
+    await gotoSourceDetail(page);
 
     const cell = page.getByRole("button", { name: "Approve", exact: true }).locator("xpath=ancestor::td[1]");
     await expect(cell).toHaveCSS("position", "sticky");
