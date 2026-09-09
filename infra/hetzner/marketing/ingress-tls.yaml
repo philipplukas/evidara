@@ -71,6 +71,40 @@ metadata:
     # preconditions, all currently unmet.
     traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    # ── Indexed on the operator dashboard, and why the annotations live HERE ──
+    #
+    # home.ts.veyo.dev DISCOVERS every published surface from these annotations
+    # rather than listing them in its own config, so a service published
+    # tomorrow appears without anyone editing the dashboard. Fifteen Ingresses
+    # carry them; this was the only published one that did not, so the public
+    # marketing page was the single surface the dashboard could not see
+    # (measured 2026-09-09: Public showed four rows, not five).
+    #
+    # The platform's `annotate.sh` applies these imperatively everywhere else,
+    # and that DOES survive Argo. Measured 2026-09-09: `grafana-tailnet` is owned
+    # by the `platform` Application with selfHeal on, carries eleven
+    # gethomepage.dev keys that appear in no manifest, and both the resource and
+    # the app report Synced. Argo CD diffs against last-applied-configuration and
+    # does not prune annotations written by another field manager.
+    #
+    # They are in git here anyway, for a weaker but real reason: an imperative
+    # annotation exists only until someone reapplies the object from scratch, and
+    # it is invisible to anyone reading this file. Declaring it means the
+    # dashboard row is reproducible from the repository rather than from
+    # remembering to run a script.
+    #
+    # siteMonitor is the in-cluster Service, not evidara.veyo.dev — a monitor on
+    # the ingress host measures the ingress, so one broken proxy would turn
+    # every dot on the page red at once. It also sidesteps the BasicAuth above,
+    # which would otherwise make this row permanently 401.
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: Public
+    gethomepage.dev/name: Marketing
+    gethomepage.dev/icon: si-nextdotjs
+    gethomepage.dev/siteMonitor: http://marketing.evidara.svc.cluster.local:8080
+    gethomepage.dev/description: >-
+      The waitlist page (ADR-0039). Behind BasicAuth by decision, not oversight —
+      D4 was amended 2026-09-07 to keep it private until the form posts somewhere.
 spec:
   ingressClassName: traefik
   tls:
