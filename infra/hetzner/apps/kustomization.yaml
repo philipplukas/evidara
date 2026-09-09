@@ -20,6 +20,7 @@ resources:
   # DB has never had. `deploy-stage4.sh` still applies it directly first for
   # bootstrap; the hook annotations are inert to `kubectl apply`.
   - migrate-job.yaml
+  - tailnet-ingress.yaml
   # The marketing surface (ADR-0039), brought in here by #884. It was the only
   # workload in the namespace that no declarative config governed: outside
   # `resources:`, outside the `images:` transformer, and pinned inline to

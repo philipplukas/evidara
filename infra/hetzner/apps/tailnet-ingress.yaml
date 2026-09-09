@@ -1,0 +1,128 @@
+# Evidara's three application APIs, on the tailnet.
+#
+# WHY THESE THREE AND NOT THE LAKEHOUSE. `research-platform`'s dashboard had a
+# "Cluster only" tier of six services reachable solely through a port-forward.
+# Three of them — Trino, Nessie, OpenSearch — stay there, because Trino runs
+# allow-all and holds MinIO's credentials in its catalog file, so it acts on any
+# caller's behalf; publishing it behind a password guards a door beside an open
+# wall. These three are a different case and are published here.
+#
+# WHY THE INGRESSES LIVE IN THIS REPOSITORY. The tailnet Traefik and its
+# IngressClass are platform and live in research-platform. An Ingress for an
+# application is the application's, the same way `auth/ingress-tls.yaml` holds
+# Evidara's public hostnames. The class name is the contract between them, and it
+# is declared in `vendor/platform-contract.yaml` — `ingress.classes.tailnet` —
+# so `scripts/check_platform_contract_usage.py` fails if it is ever mistyped.
+#
+# WHY HERE RATHER THAN auth/. `auth/ingress-tls.yaml` is applied imperatively by
+# deploy-stage5.sh. These are in `apps/`, so the evidara-apps Argo Application
+# reconciles them and self-heals drift — the direction ADR-0055 set, and the
+# reason a 27-commit gap stopped being possible.
+#
+# AUTHENTICATION, WHICH IS THE WHOLE REASON THESE THREE COULD GO OUT:
+#
+#   platform-control-api   X-API-Key, fail-closed. A keyless process returns 503
+#                          on protected routes rather than serving them.
+#   legal-search-api       X-API-Key from the same `evidara-auth` Secret.
+#   document-service       NOTHING of its own — so it, and only it, carries the
+#                          BasicAuth middleware below.
+#
+# The middleware reference is same-namespace (`evidara-evidara-basicauth` lives in
+# `evidara`), which matters because the tailnet Traefik runs with
+# `--providers.kubernetescrd.allowcrossnamespace=false` and would silently ignore
+# a cross-namespace one.
+#
+# NO secretName UNDER tls: BY DESIGN. The wildcard `*.ts.veyo.dev` is served from
+# a Traefik TLSStore named `default` in the tailnet-ingress namespace. Naming a
+# secret here would look more explicit and would break TLS, because the
+# certificate does not live in this namespace. Same as every other tailnet
+# Ingress in the estate.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-control-api-tailnet
+  namespace: evidara
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: Tailnet
+    gethomepage.dev/name: Platform control API
+    gethomepage.dev/icon: fastapi.png
+    gethomepage.dev/description: >-
+      Source lifecycle, runs and approvals. Enforces X-API-Key
+      (PLATFORM_CONTROL_OPERATOR_API_KEY in secret evidara-auth) — the tailnet is
+      not its authentication.
+    # In-cluster, like every siteMonitor in this estate: a monitor pointed at the
+    # ingress host measures the ingress, so one broken proxy reds out every row
+    # at once and the page stops saying which service actually died.
+    gethomepage.dev/siteMonitor: http://platform-control-api.evidara.svc.cluster.local:8080/health
+spec:
+  ingressClassName: tailnet-ingress
+  tls:
+    - hosts: [platform-control-api.ts.veyo.dev]
+  rules:
+    - host: platform-control-api.ts.veyo.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: platform-control-api, port: {number: 8080}}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: legal-search-api-tailnet
+  namespace: evidara
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: Tailnet
+    gethomepage.dev/name: Legal search API
+    gethomepage.dev/icon: si-nestjs
+    gethomepage.dev/description: >-
+      The OpenSearch-backed BFF behind search.evidara.veyo.dev. Enforces
+      X-API-Key (LEGAL_SEARCH_API_KEY in secret evidara-auth).
+    gethomepage.dev/siteMonitor: http://legal-search-api.evidara.svc.cluster.local:8080/health
+spec:
+  ingressClassName: tailnet-ingress
+  tls:
+    - hosts: [legal-search-api.ts.veyo.dev]
+  rules:
+    - host: legal-search-api.ts.veyo.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: legal-search-api, port: {number: 8080}}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: document-service-tailnet
+  namespace: evidara
+  annotations:
+    # THE ONE OF THE THREE WITH NO AUTHENTICATION OF ITS OWN. It has no API-key
+    # env var and no login; its only credentials are read-only S3 ones for the
+    # canonical Iceberg surfaces. The tailnet is a flat network — every device
+    # reaches every other — so without this middleware publishing it would hand
+    # every tailnet device the corpus. Removing this line is a decision to do
+    # exactly that.
+    traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: Tailnet
+    gethomepage.dev/name: Document service
+    gethomepage.dev/icon: si-python
+    gethomepage.dev/description: >-
+      Serves canonical documents from s3://evidara-lakehouse/canonical/. Behind
+      Traefik basic auth, user admin — it has no authentication of its own.
+    gethomepage.dev/siteMonitor: http://document-service.evidara.svc.cluster.local:8090/health
+spec:
+  ingressClassName: tailnet-ingress
+  tls:
+    - hosts: [document-service.ts.veyo.dev]
+  rules:
+    - host: document-service.ts.veyo.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: document-service, port: {number: 8090}}}
