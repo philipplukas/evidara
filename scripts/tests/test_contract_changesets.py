@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
@@ -20,6 +21,12 @@ def _load(name: str):
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load {name}")
     module = importlib.util.module_from_spec(spec)
+    # Registered BEFORE exec: `@dataclass` resolves `cls.__module__` through
+    # sys.modules on 3.13 and raises AttributeError without this. Omitting it
+    # made the file pass only when some earlier test had already imported
+    # `contract_changesets` by name — green under discovery, red when run alone,
+    # which is precisely the state a mutation test cannot see through.
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -165,6 +172,14 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("# 2.42.0:", text, "the changelog note must be written")
         self.assertIn("coverage ledger", text, "the summary prose must survive into the manifest")
         self.assertEqual(CS.discover(self.root), [], "consumed changesets must be deleted")
+
+    def test_top_level_pattern_matches_only_the_unindented_key(self) -> None:
+        """Guard: the `^` anchor in `_TOP_LEVEL_VERSION`.
+
+        Both keys are spelled `version:` in one file. Weaken the anchor and this
+        finds two.
+        """
+        self.assertEqual(RELEASE._TOP_LEVEL_VERSION.findall(self.MANIFEST), ["2.41.0"])
 
     def test_release_leaves_the_nested_api_version_alone(self) -> None:
         """Guard: `_TOP_LEVEL_VERSION`'s `^` anchor.
