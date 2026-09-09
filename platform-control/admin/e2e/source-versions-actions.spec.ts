@@ -97,7 +97,9 @@ async function mockApi(page: Page) {
     route.fulfill(json({ data: [{ jurisdiction_id: "jur_ch_zh", name: "Zürich" }], total: 1 })),
   );
   await page.route("**/api/platform-control/v1/reference-data/authorities*", (route) =>
-    route.fulfill(json({ data: [{ authority_id: "auth_zh_sk", name: "Staatskanzlei ZH" }], total: 1 })),
+    route.fulfill(
+      json({ data: [{ authority_id: "auth_zh_sk", name: "Staatskanzlei ZH" }], total: 1 }),
+    ),
   );
   // Readiness is NOT a list envelope — it returns `{ready, checks:[...]}` and the
   // panel filters `checks`. Mocking it as `{data,total}` crashed the whole route
@@ -190,7 +192,9 @@ test.describe("Source versions — the operator's levers survive the fold", () =
     await page.setViewportSize({ width: 1280, height: 950 });
     await gotoSourceDetail(page);
 
-    const cell = page.getByRole("button", { name: "Approve", exact: true }).locator("xpath=ancestor::td[1]");
+    const cell = page
+      .getByRole("button", { name: "Approve", exact: true })
+      .locator("xpath=ancestor::td[1]");
     await expect(cell).toHaveCSS("position", "sticky");
     // A transparent pinned cell is worse than no pin: the columns it floats
     // over render straight through the buttons.
