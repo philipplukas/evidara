@@ -8,6 +8,7 @@ import { AnalyticsEvent, track } from "@/lib/analytics";
 import {
   countActiveSearchConstraints,
   hasActiveSearchConstraints,
+  selectEffectiveSourceType,
   useSearchConstraints,
 } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
@@ -26,6 +27,7 @@ const SOURCE_TYPE_I18N_KEYS = new Set(["all", "law", "decision", "rechtssatz", "
  */
 export function ContextBar({ context }: ContextBarProps) {
   const { state: constraints, dispatch } = useSearchConstraints();
+  const effectiveSourceType = selectEffectiveSourceType(constraints);
   const t = useTranslations();
   const tSourceTypes = useTranslations("results.sourceTypes");
   const [mobileExpanded, setMobileExpanded] = useState(false);
@@ -66,9 +68,12 @@ export function ContextBar({ context }: ContextBarProps) {
         <TabGroup
           items={translatedSourceTypes.map((st) => ({
             ...st,
+            // Reads the EFFECTIVE document type, not just this control's own
+            // slot: the sidebar facet writes a `document_type` refinement, and
+            // reading `context.sourceType` alone left this strip showing "Alle"
+            // over a result set the facet had narrowed to laws.
             active:
-              constraints.context.sourceType === st.key ||
-              (constraints.context.sourceType === null && st.key === "all"),
+              effectiveSourceType === st.key || (effectiveSourceType === null && st.key === "all"),
           }))}
           onSelect={(key) =>
             dispatch({
