@@ -26,7 +26,9 @@ overlay here would be a second source of truth, which is the thing that broke.
 `info.version` comes from `platform_control.openapi.API_VERSION` and is pinned to
 `contracts/manifest.yaml` by scripts/check_contract_manifest.py; a spec change
 therefore also trips scripts/check_contract_version_bump.py, which is correct —
-a contract change should be a versioned event.
+a contract change should be a declared event. Since #913 that gate wants a
+changeset under `contracts/changes/`, not a manifest version edit:
+`python3 scripts/bump_contract_version.py --minor --api --summary "..."`.
 
 Usage:
     # from the repo root, needs the platform-control venv:
