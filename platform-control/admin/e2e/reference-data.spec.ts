@@ -48,6 +48,30 @@ const AUTHORITIES = {
 type Captured = { method: string; body: Record<string, unknown> | null };
 
 async function mockReferenceApi(page: Page) {
+  /*
+   * Benign catch-all, registered FIRST so it has the lowest priority — Playwright
+   * matches handlers in reverse registration order, so every specific route below
+   * still wins.
+   *
+   * It is not belt-and-braces. `src/middleware.ts` REWRITES
+   * `/api/platform-control/*` to `PLATFORM_CONTROL_API_URL`, defaulting to
+   * `http://127.0.0.1:8000` — and the `Admin e2e (Playwright)` CI job starts no
+   * backend, because the specs are supposed to mock everything. So a single
+   * request these specs do not name does not fail politely: it escapes to a dead
+   * port, comes back `ECONNREFUSED` → 500, and the view never renders. The test
+   * then reports "element(s) not found", which reads as a missing element rather
+   * than a failed fetch.
+   *
+   * Six of the nine admin specs already do this. These three did not.
+   */
+  await page.route("**/api/platform-control/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ data: [] }),
+    }),
+  );
+
   const captured: { authority: Captured | null; jurisdiction: Captured | null } = {
     authority: null,
     jurisdiction: null,
