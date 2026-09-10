@@ -6,6 +6,7 @@ from hashlib import sha256
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from acquisition_core.identity import IDENTITY_LOCATOR_KEY
 from acquisition_core.providers import ProviderResource
 
 
@@ -65,6 +66,14 @@ class ArtifactPipeline:
                     "inline_body": resource.body,
                     "inline_body_encoding": "utf-8",
                 }
+            # A declared identity locator is carried verbatim so
+            # `acquisition_core.identity.upstream_locator` can prefer it over the
+            # URL fallback (#850). The key is written ONLY when the provider
+            # declared one: a present-but-empty key would read as "this provider
+            # states the law has no identity", which is not what silence means.
+            identity_fields: dict[str, Any] = {}
+            if resource.identity_locator:
+                identity_fields[IDENTITY_LOCATOR_KEY] = resource.identity_locator
             raw_artifact = RawArtifactRecord(
                 storage_path=f"inline://{run_id}/{idx}",
                 content_type=resource.content_type,
@@ -72,6 +81,7 @@ class ArtifactPipeline:
                     "provider_metadata": resource.metadata,
                     "source_url": resource.source_url,
                     "final_url": resource.final_url,
+                    **identity_fields,
                     **inline_body_fields,
                 },
             )

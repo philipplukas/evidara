@@ -34,6 +34,18 @@ flowchart LR
   ordinance). It is therefore stable across acquisition runs, so re-fetching a law resolves to
   the *same* document. Sources publishing no stable locator fall back to the artifact id, which
   keeps genuinely distinct documents apart at the cost of not collapsing their re-acquisitions.
+- **Which URI that is, is a per-provider decision (#850).** It is resolved in exactly one place,
+  `acquisition_core/identity.py` (`upstream_locator`), called by `RunService` and
+  `FirecrawlWebhookService`. A provider that knows which of its URIs identifies *the law* states
+  it by setting `ProviderResource.identity_locator`; that declaration wins over any URL heuristic,
+  and providers that declare nothing keep the historical `source_url`-then-`final_url` fallback.
+  There is no global rule that could serve every provider: `fedlex_sparql`'s stable URI is its
+  `source_url` (the act-level ELI) while its `final_url` embeds the consolidation date, and
+  `lexfind_api` is the exact mirror image — its `source_url` is the canton's page, whose path
+  embeds the version dates, and `/tol/{id}/{lang}` is the stable one. Getting it backwards for
+  either provider mints a fresh `document_id` per version, which is the #652 duplicate mechanism.
+  Provenance is a separate question from identity and keeps its own answer: `lexfind_api` still
+  records the canton as `source_url`, because a mirrored capture may not cite the mirror.
 - **Supersession** — New `document_revision` via `document.processed`. The pipeline reads the
   highest revision already published for that `document_id` and publishes `N+1`, so successive
   acquisitions are ordered rather than all pinned at 1. `_pick_latest_row` orders on

@@ -200,6 +200,11 @@ async def test_gdpr_end_to_end_flow_emits_eli_uri_and_celex(
     assert payload.metadata["celex"] == "32016R0679"
     assert payload.metadata["language"] == "en"
     assert payload.metadata["expression_uri"] == "http://data.europa.eu/eli/reg/2016/679/oj/eng"
+    # Document identity is STATED, not inferred from a URL-preference order (#850).
+    # The work/ELI URI identifies the act; `final_url` is one manifestation of one
+    # expression and moves with every consolidation.
+    assert payload.identity_locator == "http://data.europa.eu/eli/reg/2016/679/oj"
+    assert payload.identity_locator != payload.final_url
 
 
 @pytest.mark.asyncio

@@ -6,6 +6,8 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
+from acquisition_core.identity import upstream_locator
+from acquisition_core.normalization import ArtifactPipeline
 from platform_control.services.fedlex_sparql_provider import (
     FedlexSparqlProvider,
     _ConsolidationMember,
@@ -737,3 +739,88 @@ async def test_a_genuine_act_passes_the_gate_and_carries_its_verdict(
     metadata = result.inline_resources[0].metadata
     assert metadata["legal_text_assessment"] == "passed"
     assert metadata["legal_text_evidence"]["legal_marker_count"] >= 3
+
+
+# --------------------------------------------------------------------------
+# Document identity — one act, one document, across consolidations (#850)
+# --------------------------------------------------------------------------
+
+
+class AnyConsolidationAsyncClient(DatedMemberAsyncClient):
+    """Serves the filestore HTML for *any* consolidation, not just 20240303.
+
+    `FakeAsyncClient` hard-codes the 2024 manifestation URL, which is enough for the
+    single-capture tests but cannot express "the same act, fetched at two different
+    consolidations" — the case #850 is about.
+    """
+
+    async def get(self, url: str, *, params=None, headers=None):
+        if "/filestore/" in url:
+            return httpx.Response(
+                200,
+                text=(
+                    "<html><body><h1>Bundesverfassung der Schweizerischen Eidgenossenschaft</h1>"
+                    "<article><h2>Art. 1</h2><p>Das Schweizervolk und die Kantone ...</p></article>"
+                    "<article><h2>Art. 2 Abs. 1</h2><p>Die Schweizerische Eidgenossenschaft "
+                    "schützt die Freiheit ...</p></article>"
+                    "<article><h2>Art. 3</h2><p>Die Kantone sind souverän ...</p></article>"
+                    "</body></html>"
+                ),
+                headers={"content-type": "text/html; charset=utf-8"},
+                request=httpx.Request("GET", url, params=params),
+            )
+        return await super().get(url, params=params, headers=headers)
+
+
+async def _capture_at(monkeypatch: pytest.MonkeyPatch, as_of: str):
+    monkeypatch.setattr(httpx, "AsyncClient", AnyConsolidationAsyncClient)
+    provider = FedlexSparqlProvider()
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(
+            acquisition_spec={
+                "seed_url": "https://fedlex.data.admin.ch/eli/cc/1999/404",
+                "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+                "preferred_languages": ["de"],
+                "max_expressions": 1,
+                "as_of_date": as_of,
+            }
+        ),
+        SimpleNamespace(run_id=f"run_{as_of}"),
+    )
+    return result.inline_resources[0]
+
+
+@pytest.mark.asyncio
+async def test_two_consolidations_of_one_act_acquire_to_one_document_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fedlex's counterpart to the LexFind case, and the reason #850 is per-provider.
+
+    Here the *stable* URI is `source_url` (the act-level ELI) and the moving one is
+    `final_url` (the filestore manifestation, whose path embeds the consolidation date).
+    That is the exact opposite of `lexfind_api`, which is why no single global URL
+    preference can serve both — the identity has to be stated by the provider.
+    """
+    earlier = await _capture_at(monkeypatch, "2023-01-01")
+    later = await _capture_at(monkeypatch, "2025-01-01")
+
+    # Non-vacuity: the two runs really did select different consolidations, so the URL
+    # a `final_url`-first rule would key on genuinely moved.
+    assert earlier.metadata["concrete_work_uri"].endswith("20220213")
+    assert later.metadata["concrete_work_uri"].endswith("20240303")
+    assert earlier.final_url != later.final_url
+    assert "20220213" in earlier.final_url
+    assert "20240303" in later.final_url
+
+    assert (
+        earlier.identity_locator
+        == later.identity_locator
+        == "https://fedlex.data.admin.ch/eli/cc/1999/404"
+    )
+
+    ((raw_earlier, _),) = ArtifactPipeline().normalize(run_id="run_a", resources=[earlier])
+    ((raw_later, _),) = ArtifactPipeline().normalize(run_id="run_b", resources=[later])
+    assert upstream_locator(raw_earlier.metadata) == upstream_locator(raw_later.metadata)
+    assert "20220213" not in upstream_locator(raw_earlier.metadata)
+    assert "20240303" not in upstream_locator(raw_later.metadata)
