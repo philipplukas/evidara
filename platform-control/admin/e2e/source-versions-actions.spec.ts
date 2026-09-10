@@ -87,6 +87,20 @@ async function gotoSourceDetail(page: Page) {
 }
 
 async function mockApi(page: Page) {
+  /*
+   * The operator role, set in localStorage BEFORE the app boots.
+   *
+   * Not optional, and the reason it was missed is worth recording: a local dev
+   * server reads `NEXT_PUBLIC_USER_ROLE` from `.env.local` and bakes it in at
+   * BUILD time, so these specs passed on a workstation while setting no role at
+   * all. CI builds without that file, the role falls back to localStorage, and
+   * every protected view renders empty — which surfaces as
+   * "element(s) not found", indistinguishable from the column being missing.
+   */
+  await page.addInitScript(() => {
+    window.localStorage.setItem("evidara_user_role", "admin");
+  });
+
   const json = (body: unknown) => ({
     status: 200,
     contentType: "application/json",
