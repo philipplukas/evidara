@@ -58,6 +58,7 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0054 | [Semantic retrieval as a measured cascade](0054-semantic-retrieval-as-a-measured-cascade.md) (Proposed) |
 | ADR-0055 | [GitOps with Argo CD](0055-gitops-argocd-over-imperative-apply.md) |
 | ADR-0056 | [Agentic flows are visible in the panel](0056-agentic-flows-are-visible-in-the-panel.md) (amends ADR-0022) |
+| ADR-0057 | [Retraction is a record, not a deletion — and never a legal claim](0057-retraction-is-a-record-not-a-deletion.md) (Proposed) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.

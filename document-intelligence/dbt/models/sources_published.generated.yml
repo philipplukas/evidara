@@ -321,3 +321,52 @@ sources:
               - not_null
           - name: metadata
             description: "Additional non-canonical metadata."
+      - name: canonical_retractions
+        description: "Append-only ledger of canonical rows removed by an operator (ADR-0057). Every removal from published_documents / published_sections writes one row here first."
+        tests:
+          - dbt_expectations.expect_table_columns_to_match_set:
+              column_list:
+                - retraction_id
+                - document_id
+                - retracted_revisions
+                - reason_code
+                - reason
+                - superseded_by_document_id
+                - retracted_by
+                - retracted_at
+                - surfaces
+        columns:
+          - name: retraction_id
+            description: "Stable retraction ID."
+            tests:
+              - not_null
+          - name: document_id
+            description: "Document identity whose rows were removed."
+            tests:
+              - not_null
+          - name: retracted_revisions
+            description: "Document revisions removed by this retraction."
+            tests:
+              - not_null
+          - name: reason_code
+            description: "Closed-vocabulary retraction reason."
+            tests:
+              - not_null
+          - name: reason
+            description: "Operator narrative: why this row is not truth."
+            tests:
+              - not_null
+          - name: superseded_by_document_id
+            description: "Surviving document identity this row duplicated, when the reason is duplicate_identity."
+          - name: retracted_by
+            description: "Operator attribution for the retraction (ADR-0038)."
+            tests:
+              - not_null
+          - name: retracted_at
+            description: "When the retraction was committed."
+            tests:
+              - not_null
+          - name: surfaces
+            description: "Per-surface rows matched and the pre-delete Delta version to restore to."
+            tests:
+              - not_null

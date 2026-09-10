@@ -12,6 +12,7 @@ from document_intelligence.normalize.quarantine import (
 )
 from document_intelligence.persist.sinks import DeltaSinkConfig
 from document_intelligence.persist.surfaces import (
+    CANONICAL_RETRACTIONS,
     PROCESSING_MANIFESTS,
     PUBLISHED_COMMENTARY_INSIGHTS,
     PUBLISHED_DOCUMENTS,
@@ -25,6 +26,10 @@ class SurfaceUris:
     published_sections_uri: str
     processing_manifests_uri: str
     published_commentary_insights_uri: str | None = None
+    # The retraction ledger (ADR-0057). Optional for the same reason the commentary
+    # surface is: a runtime configured with explicit per-surface URIs predates it, and
+    # the *write* path never touches it — only the operator retraction job does.
+    canonical_retractions_uri: str | None = None
 
     def to_delta_sink_config(self) -> DeltaSinkConfig:
         return DeltaSinkConfig(
@@ -45,6 +50,7 @@ class SurfaceUris:
                 normalized_root,
                 PUBLISHED_COMMENTARY_INSIGHTS.surface_name,
             ),
+            canonical_retractions_uri=_join_uri(normalized_root, CANONICAL_RETRACTIONS.surface_name),
         )
 
 
@@ -171,6 +177,7 @@ class RuntimeSettings:
         direct_sections_uri = published_sections_uri or mapping.get("DI_PUBLISHED_SECTIONS_URI")
         direct_manifests_uri = processing_manifests_uri or mapping.get("DI_PROCESSING_MANIFESTS_URI")
         direct_commentary_insights_uri = mapping.get("DI_PUBLISHED_COMMENTARY_INSIGHTS_URI")
+        direct_canonical_retractions_uri = mapping.get("DI_CANONICAL_RETRACTIONS_URI")
         root_uri = surfaces_root_uri or mapping.get("DI_SURFACES_ROOT_URI")
 
         if any([direct_documents_uri, direct_sections_uri, direct_manifests_uri]):
@@ -181,6 +188,7 @@ class RuntimeSettings:
                 published_sections_uri=direct_sections_uri or "",
                 processing_manifests_uri=direct_manifests_uri or "",
                 published_commentary_insights_uri=direct_commentary_insights_uri,
+                canonical_retractions_uri=direct_canonical_retractions_uri,
             )
         elif root_uri:
             surface_uris = SurfaceUris.from_root_uri(root_uri)

@@ -227,6 +227,28 @@ def _stringify_mapping_values(value: object) -> dict[str, str]:
     return {str(key): str(inner) for key, inner in value.items() if inner is not None}
 
 
+def delta_string_equals(field_name: str, value: str) -> pa.compute.Expression:
+    """Build a ``field_name == value`` scan filter that survives a Delta ``DELETE``.
+
+    Once a table carries a deletion vector, delta-rs materialises its string columns as
+    ``string_view`` even though the dataset schema still reports ``string``. A bare Python
+    ``str`` on the right-hand side is inferred as ``string_view`` too, and pyarrow has no
+    ``equal(string_view, string_view)`` kernel — so ``pc.field(name) == value``, which is
+    what every canonical read used to build, raises ``ArrowNotImplementedError`` the
+    moment a row has been retracted from that table (ADR-0057).  Pinning the literal to
+    ``string`` matches the ``(string_view, string)`` kernel and works either way.
+
+    **Both** sides must be pinned. Pinning only one is not enough: whether the remaining
+    side is materialised as ``string`` or ``string_view`` depends on the projected column
+    set, so a fix verified against one ``columns=[...]`` scan silently fails on another —
+    selecting ``["document_id"]`` alone raises where ``["document_id", "title"]`` passes.
+
+    Every canonical read that filters on a string column must go through this. The defect
+    was unreachable before canonical gained a delete path.
+    """
+    return pc.field(field_name).cast(pa.string()) == pa.scalar(value, pa.string())
+
+
 def delta_storage_options(environ: Mapping[str, str] | None = None) -> dict[str, str] | None:
     """Build ``deltalake`` ``storage_options`` for a MinIO / S3 endpoint from ``DI_S3_*`` env vars.
 
@@ -528,7 +550,7 @@ class DeltaCanonicalSink(CanonicalSink):
                 return None
             table = dataset.to_table(
                 columns=["document_revision"],
-                filter=pc.field("document_id") == document_id,
+                filter=delta_string_equals("document_id", document_id),
             )
         except Exception as error:
             # The surface not existing yet is the ordinary first-publication case, not a

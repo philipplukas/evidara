@@ -354,8 +354,10 @@ the canonical side:
 
 1. Decide which `document_id` the **current** identity key mints (`_document_identity_key`
    in `document_intelligence/pipeline.py` — it keys on the bundle's `upstream_locator`).
-2. Delete the stale document's rows from canonical Delta (`published_documents` **and**
-   `published_sections`).
+2. **Retract** the stale document's canonical rows — see
+   [Procedure: Retract a canonical document](#procedure-retract-a-canonical-document-adr-0057)
+   below. Do **not** delete the object-store files by hand: that leaves no record, no
+   attribution and no undo, which is the failure ADR-0057 exists to design out.
 3. Reconcile — the stale id is now index-minus-canonical, so it becomes removable.
 4. Re-acquire the document through the platform if the surviving copy is not the one you
    want to keep.
@@ -460,6 +462,114 @@ curl -s "$LS_URL/v1/projections/events/history?status=applied&limit=50" \
 
 If the count is still high, re-run the dry run: a document re-projected by live traffic
 between enumeration and withdrawal is dropped as `stale` by design.
+
+## Procedure: Retract a canonical document (ADR-0057)
+
+**Use this when a `published_documents` row should never have existed** — a duplicate
+minted by a pre-#652 identity key, an erroneous publication, or a compelled takedown.
+It is the only supported way to remove canonical truth, and it is the *canonical* half of
+the pair whose derived half is reconcile above: retract truth first, then re-derive the
+view.
+
+Nothing in this procedure touches OpenSearch. The index is a derived view (ADR-0005), so
+the order is **retract → reconcile**, never the reverse.
+
+### What it guarantees
+
+| Property | How |
+|---|---|
+| Nothing is removed unrecorded | A `canonical_retractions` ledger row is appended **before** any delete. If the append fails, nothing is deleted and the run reports failure. |
+| It is undoable | No `VACUUM` is ever issued. The ledger row carries `version_before` per surface; `DeltaTable(uri).restore(version_before)` rolls it back. |
+| It makes no legal claim | `lifecycle_status` is never written. A data-quality retraction must not assert that the *norm* was withdrawn. |
+| Run history stays true | `processing_manifests` is never touched. A manifest whose `published_document_ref` no longer resolves is the intended signal, and the ledger explains it. |
+| It is resumable | A document canonical no longer has is reported `not_found` and the run succeeds. |
+
+### Step 0: Preconditions
+
+```bash
+# The retractor derives all three surfaces from the root, including the ledger.
+export DI_SURFACES_ROOT_URI=s3://evidara-canonical/surfaces
+# ...plus the usual DI_S3_* credentials for that bucket.
+
+# Confirm canonical is readable and non-empty before planning anything: an enumerated
+# count of 0 is a refusal, not an empty corpus.
+```
+
+### Step 1: Dry run (this is the default)
+
+```bash
+document_intelligence_canonical_retract \
+  doc_01jq7bdptzqv3xs0c41xpw1ybg \
+  --reason-code duplicate_identity \
+  --reason "pre-#652 ULID-keyed duplicate of the Bundesverfassung; the locator-keyed row survives" \
+  --retracted-by "ops@evidara.example" \
+  --superseded-by doc_01jq7bdptzqv3xs0c41xpw1ybh
+```
+
+It prints the resolved plan — rows, revisions and titles per target, the canonical
+document count, and `would_refuse`. **Read `would_refuse` before reaching for
+`--retract`**: it is the same guardrail the mutating run applies, surfaced early.
+
+Common refusals and what they mean:
+
+| `would_refuse` | Meaning |
+|---|---|
+| `canonical Delta enumerated 0 documents` | `DI_SURFACES_ROOT_URI` / `DI_S3_*` are wrong. This is not an empty corpus. |
+| `--superseded-by ... has no canonical published_documents row` | The survivor is not there. Retracting would delete the corpus's only copy. |
+| `N/M canonical documents (X%) would be retracted, above --max-retraction-fraction` | Default bound is **0.10**. Raise it only deliberately, and only after reading the plan. |
+| `unknown --reason-code` | The vocabulary is closed on purpose (ADR-0057). |
+
+A target the plan reports as **not found** is not a refusal — that is the second run of a
+completed retraction, and it must succeed as a no-op.
+
+### Step 2: Retract
+
+```bash
+document_intelligence_canonical_retract \
+  doc_01jq7bdptzqv3xs0c41xpw1ybg \
+  --reason-code duplicate_identity \
+  --reason "pre-#652 ULID-keyed duplicate of the Bundesverfassung; the locator-keyed row survives" \
+  --retracted-by "ops@evidara.example" \
+  --superseded-by doc_01jq7bdptzqv3xs0c41xpw1ybh \
+  --retract
+```
+
+Per document, in this order and no other: append the ledger row, delete from
+`published_sections`, then delete from `published_documents`. Sections go first so an
+interrupted run never leaves a document row that answers a detail read with no provisions.
+
+The summary JSON carries `retraction_ids`, `retracted_document_ids` and, per surface,
+`rows_matched` / `rows_removed` / `version_before` / `version_after`. Keep it.
+
+### Step 3: Reconcile, then verify
+
+The search index still holds the retracted document. Run
+[reconcile](#procedure-reconcile--remove-indexed-documents-canonical-does-not-back) — the
+stale id is now index-minus-canonical, so it is removable.
+
+```bash
+# The ledger is a normal Delta surface; read it like any other.
+python -c "
+from deltalake import DeltaTable
+import json
+print(json.dumps(DeltaTable('$DI_SURFACES_ROOT_URI/canonical_retractions').to_pyarrow_table().to_pylist(), default=str, indent=2))
+"
+```
+
+### Undo
+
+```bash
+# version_before comes from the ledger row's `surfaces` block.
+python -c "
+from deltalake import DeltaTable
+DeltaTable('$DI_SURFACES_ROOT_URI/published_sections').restore(<version_before>)
+DeltaTable('$DI_SURFACES_ROOT_URI/published_documents').restore(<version_before>)
+"
+```
+
+Then backfill so the index picks the rows back up. The undo works because nothing
+vacuums; if someone runs a `VACUUM` against these surfaces, it stops working, and the
+retraction ledger becomes a record of something no longer recoverable.
 
 ## Procedure: Delta-sourced versioned reindex (zero-downtime)
 
