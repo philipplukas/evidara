@@ -31,7 +31,7 @@
  * no cluster reachable. The CI-runnable half of this guard is the integration
  * test, which asserts the real bootstrap path produces a drift-free index.
  */
-import { DOCUMENTS_INDEX_PROPERTIES } from '../src/core/opensearch/documents-index.mapping';
+import { DOCUMENTS_INDEX_ANALYSIS, DOCUMENTS_INDEX_PROPERTIES } from '../src/core/opensearch/documents-index.mapping';
 import { findMappingDrift, formatMappingDrift } from '../src/core/opensearch/mapping-drift';
 
 const node = (process.env.OPENSEARCH_NODE ?? 'http://127.0.0.1:9200').replace(/\/$/, '');
@@ -61,8 +61,61 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  // `settings.analysis` too, and NOT as an afterthought (#978).
+  //
+  // This check compared mappings only, so an index missing the analyzer looked
+  // clean. That is not hypothetical: #974 added a `legal_query` search analyzer
+  // to stop a natural-language question out-ranking keywords, and a running
+  // index cannot receive it — `documents-bootstrap.ts` returns `exists` the
+  // moment the alias resolves and never reconciles settings. The fix was
+  // merged, production kept neither the analyzer nor the `search_analyzer`
+  // bindings, and nothing said so.
+  //
+  // The header above already records the same class of divergence once before:
+  // an index created "SETTINGS ONLY — no mappings, no `legal_text` analyzer".
+  // The guard written afterwards still did not look at analysis.
+  const settingsResponse = await fetch(`${node}/${index}/_settings`, { headers });
+  let liveAnalysis: Record<string, Record<string, unknown>> = {};
+  let analysisReadable = false;
+  if (settingsResponse.ok) {
+    analysisReadable = true;
+    const settingsBody = (await settingsResponse.json()) as Record<
+      string,
+      { settings?: { index?: { analysis?: Record<string, Record<string, unknown>> } } }
+    >;
+    for (const physical of Object.keys(settingsBody)) {
+      liveAnalysis[physical] = settingsBody[physical]?.settings?.index?.analysis ?? {};
+    }
+  }
+
   let drifted = false;
   for (const physical of physicalIndices) {
+    // Analysis first: a missing analyzer is invisible in `_mapping`, and a
+    // report that lists field drift while staying silent about a missing
+    // analyzer reads as "the analyzer is fine".
+    if (!analysisReadable) {
+      // DID-NOT-RUN, said out loud. Silence here would read as a pass on the
+      // very thing this block was added to check.
+      console.log(
+        `  analysis: NOT CHECKED — GET ${node}/${index}/_settings returned ` +
+          `${settingsResponse.status}`,
+      );
+    } else {
+      const wanted = DOCUMENTS_INDEX_ANALYSIS as unknown as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const got = liveAnalysis[physical] ?? {};
+      for (const section of Object.keys(wanted)) {
+        for (const name of Object.keys(wanted[section] ?? {})) {
+          if (got[section]?.[name] === undefined) {
+            console.log(`  analysis drift: ${section}.${name} is missing from ${physical}`);
+            drifted = true;
+          }
+        }
+      }
+    }
+
     const live = body[physical]?.mappings?.properties ?? {};
     const findings = findMappingDrift(
       live,
