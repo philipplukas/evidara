@@ -18,7 +18,7 @@ with **no way at all** to remove a canonical row that should not be there. `grep
 retract` across `legal-search/api/src`, `document-intelligence/src` and
 `platform-control/src` returned nothing.
 
-#806 is the case that made the gap load-bearing: the production index holds the
+Issue #806 is the case that made the gap load-bearing: the production index holds the
 Bundesverfassung twice, because a pre-#652 identity key minted a second `document_id` for
 the same norm. Two things mean the existing machinery cannot converge on that:
 
@@ -33,7 +33,7 @@ record, no undo.
 
 ### Why this is the #958 milestone's shape
 
-#958 asks that the corpus "states what is true, or refuses". A known-wrong record and a
+Issue #958 asks that the corpus "states what is true, or refuses". A known-wrong record and a
 correct one being indistinguishable to every consumer is the same defect as *absent*
 versus *broken* — with the extra hazard that the wrong record is the one that sounds
 authoritative. Removing it silently swaps one indistinguishability for another: afterwards
