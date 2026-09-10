@@ -315,6 +315,27 @@ fixture calibration applies with force here — a floor tuned to one sample will
 real answers on the next corpus, so the threshold is a versioned knob (D2) with its own
 regression case, not a constant someone picked.
 
+**Built 2026-09-10 (#891)** in
+`document-intelligence/src/document_intelligence/embeddings/gating.py`, ahead of
+any serving path — which is the ordering #891 exists to enforce. Three things the
+implementation had to settle that this section did not say:
+
+- **The floor is on a ratio, not on the raw score.** Measured over 24 labelled
+  queries against the live write alias, the raw-score populations *overlap*
+  (lowest in-corpus 0.11523, highest out-of-corpus 0.13840), so no raw floor
+  separates them. Dividing the top score by the query's sparse weight mass —
+  ADR-0042's denominator — is what makes a floor possible at all.
+- **Refusal is three states, not one.** `no_candidates` ("the corpus contains
+  nothing for this query") is reported separately from `below_floor` ("the
+  retriever returned documents because it always returns documents"), and
+  `unscorable` refuses rather than admitting results on a ratio with no
+  denominator.
+- **The margin rule ships inactive, and says so.** The serving corpus is three
+  copies of one document (#806), so top-K scores are identical for every query
+  and the knob cannot be calibrated; the gate reports it as *not evaluated* with
+  that reason rather than letting a withheld rule read as a passing one. The
+  absolute floor asserts every case the margin rule declines.
+
 ### D5 — Cross-reference expansion, because the graph already exists
 
 Implement CRAwLeR's insight over Evidara's own citation graph: after stage 1, expand the

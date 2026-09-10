@@ -10,6 +10,14 @@ no off-heap memory, and it is the representation this hardware can actually
 serve. See ADR-0054 D10.
 """
 
+from document_intelligence.embeddings.gating import (
+    Candidate,
+    GateConfig,
+    GateDecision,
+    RefusalReason,
+    gate,
+    query_weight_mass,
+)
 from document_intelligence.embeddings.sparse import (
     SparseEncoder,
     SparseVector,
@@ -17,4 +25,15 @@ from document_intelligence.embeddings.sparse import (
     sanitize_features,
 )
 
-__all__ = ["SparseEncoder", "SparseVector", "pool_sparse_chunks", "sanitize_features"]
+__all__ = [
+    "Candidate",
+    "GateConfig",
+    "GateDecision",
+    "RefusalReason",
+    "SparseEncoder",
+    "SparseVector",
+    "gate",
+    "pool_sparse_chunks",
+    "query_weight_mass",
+    "sanitize_features",
+]
