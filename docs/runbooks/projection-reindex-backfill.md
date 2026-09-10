@@ -236,72 +236,75 @@ therefore reproduces the absence faithfully. So does a
 to fix duplicate documents *and* notes `official_citation` is null on every production
 document. The rebuild fixes the first and cannot touch the second.
 
-### Step 1: Diff the table's metadata struct against what the pipeline emits
+### Step 1: Run the audit
 
-Read-only, and safe against a live surface — it opens the Delta log, not the data.
+Read-only. It opens the Delta log and reads two struct columns; it writes nothing, and it
+is safe against a live surface.
 
 ```bash
 cd document-intelligence
 export DI_S3_ENDPOINT_URL=... DI_S3_ACCESS_KEY_ID=... DI_S3_SECRET_ACCESS_KEY=...
-uv run --extra service python - <<'PY'
-import deltalake, pyarrow as pa
-from document_intelligence.persist.sinks import delta_storage_options
-
-URI = "s3://evidara-lakehouse/canonical/published_documents"   # or gs://.../published_documents
-options = delta_storage_options() or {}
-schema = deltalake.DeltaTable(URI, storage_options=options).to_pyarrow_dataset().schema
-for column in ("metadata", "provenance", "extensions"):
-    if column not in schema.names:
-        print(f"{column}: COLUMN ABSENT")
-        continue
-    field_type = schema.field(column).type
-    names = [field_type.field(i).name for i in range(field_type.num_fields)] if pa.types.is_struct(field_type) else []
-    print(f"{column}: {sorted(names)}")
-PY
+uv run --extra service python -m document_intelligence.persist.metadata_audit \
+  --uri s3://evidara-lakehouse/canonical/published_documents
+# or gs://evidara-document-intelligence-surfaces-dev/published/published_documents
+# --json for a machine-readable report, --plan to add the repair plan (still writes nothing)
 ```
 
-Compare `metadata` against the keys `_build_document` and `process_event` can set
-(`document-intelligence/src/document_intelligence/pipeline.py`). Anything the pipeline
-emits and the struct does not declare has been dropped for the life of the table.
-`in_force_from` / `in_force_until` are the ones to check first: they only reached
-`document.metadata` on 2026-07-19 (#661, #663), while the MinIO surfaces were configured
-on 2026-07-12 (#523/#526) — so any table created in that window cannot hold ADR-0033's
-temporal window at all, and a point-in-time query over it answers `unknown` by
-construction rather than by evidence.
+`document_intelligence/persist/metadata_audit.py` replaces the two hand-run snippets this
+runbook used to carry. They answered "which fields does the struct declare" and "how many
+rows are null" — both necessary, neither sufficient, because an operator still had to
+decide what a null meant. The tool makes that decision explicit and refuses it where the
+evidence is not there.
 
-To find out how much of the corpus is affected rather than whether the schema allows it,
-count the nulls:
+### Step 2: Read the four verdicts — the point is the third
 
-```bash
-uv run --extra service python - <<'PY'
-import deltalake, pyarrow.compute as pc
-from document_intelligence.persist.sinks import delta_storage_options
+| Verdict | What it means | What it justifies |
+|---|---|---|
+| `PRESENT` | declared and populated on at least one row | nothing to do |
+| `DROPPED` | the value existed and the table does not have it | repair (Step 3) |
+| `NEVER_EMITTED` | the key **is** declared — so the append cast preserved whatever each batch carried — and is null on every row | nothing to do; this is a corpus fact, not a defect |
+| `INDETERMINATE` | absent, with no evidence either way | **do not conclude anything.** Resolve against the source bundles before calling the table clean *or* broken |
 
-URI = "s3://evidara-lakehouse/canonical/published_documents"
-table = deltalake.DeltaTable(URI, storage_options=delta_storage_options() or {}).to_pyarrow_table(
-    columns=["document_id", "metadata"]
-)
-metadata = table.column("metadata").combine_chunks()
-for key in ("official_citation", "in_force_from", "in_force_until", "regeste"):
-    try:
-        present = pc.sum(pc.is_valid(metadata.field(key))).as_py() or 0
-    except KeyError:
-        present = "field not in schema"
-    print(f"{key}: {present} of {table.num_rows}")
-PY
-```
+`DROPPED` is asserted on one of three kinds of evidence, and never on a hunch:
 
-A field that is *in* the schema and null on every row is the same outcome by a different
-route — worth distinguishing, because it separates "the write dropped it" from "nothing
-ever produced it".
+1. **An unconditional emitter.** `metadata.source_origin_kind` / `metadata.trust_tier` come
+   from required manifest fields, and `provenance`'s six required fields plus the four
+   `_build_canonical_provenance` sets are on every canonical row by construction. Absent
+   means dropped — no further evidence needed.
+2. **A witness in the same row.** A different field whose presence the pipeline makes
+   sufficient for the key having been emitted — `metadata.field_provenance.in_force_from`
+   is written from the same `in_force_window` entry as `metadata.in_force_from`;
+   `extracted_metadata.publication_organ` is what `_resolve_official_citation` returns
+   verbatim; `extracted_metadata.headnote` is what `_resolve_regeste` returns. A fired
+   witness beside an absent key is proof of a drop, per row.
+3. Both of the above also fire when the key **is** declared but null on a row whose witness
+   fired — a partial loss an "is the field in the schema?" check reads as healthy.
 
-### Step 2: Choose a remediation — and do not choose the rebuild
+What the audit deliberately will not say:
+
+- **Absence of a witness is not evidence of absence.** The witnesses cover the routes named
+  in the registry, not every route — `_resolve_official_citation` has an explicit-value
+  route that leaves no trace in the row. Undeclared with no fired witness is
+  `INDETERMINATE`, never `NEVER_EMITTED`.
+- **A witness that is itself missing from the schema proves nothing.** `field_provenance`
+  is a struct too and is exposed to the same drop, so its silence is reported as an
+  unusable witness rather than read as an absence.
+- **An empty table is not evidence.** Every finding over zero rows is `INDETERMINATE`.
+
+### Step 3: Repair — and do not choose the rebuild
 
 | Situation | What actually restores the field |
 |---|---|
 | The table is disposable (dev, a handful of stub documents) | Delete the surface and re-run acquisition. Cheapest by far, and the honest option for #806's six-document production index. |
 | The documents matter and the raw bundles are still held | **Reprocess**, do not rebuild. Re-run the pipeline over each artifact bundle so it publishes a new `document_revision` carrying the full metadata, then run the Delta backfill — `iter_latest_document_rows` takes the newest revision, so the projection picks the repaired row up. |
 | The documents matter and the bundles are gone | The value is not recoverable from anything the platform holds. Re-acquire from the authority. |
+
+`--plan` prints exactly this decision per document, read from each row's own
+`provenance`: rows that still carry a `bundle_manifest_id` are listed under `reprocess`,
+rows that do not are listed under `reacquire` — because the plan's own input is a struct
+column exposed to the very defect being repaired, and a row whose `bundle_manifest_id` was
+dropped is not repairable from anything the platform holds. The plan is printed, never
+executed: reprocessing is an operator action, taken deliberately, after the fix is deployed.
 
 In every case, **deploy the widening fix first**. Until
 `_widen_for_new_nested_fields` is in the running image, a reprocessed document appends to
