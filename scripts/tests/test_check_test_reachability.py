@@ -74,6 +74,47 @@ class PlaywrightSelectionTests(unittest.TestCase):
     def inv(self, argv):
         return checker.Invocation(cwd=self.root, argv=argv, source="test")
 
+    def test_grep_invert_selects_everything_it_does_not_match(self):
+        """`--grep-invert @visual` WIDENS selection; it must not empty it.
+
+        Neither `--grep` nor the generic `-`-prefixed skip handled this flag, so its
+        pattern fell through to the positional-path list — and every spec was then
+        rejected for not having "@visual" in its path. All nine admin specs read as
+        unreachable the moment `npm run e2e` started excluding the visual spec by tag.
+        """
+        (self.e2e / "tagged-visual.spec.ts").write_text(
+            'test.describe("Visual regressions @visual", () => {\n'
+            '  test("matches baseline", async ({ page }) => {});\n'
+            "});\n"
+        )
+        invocation = self.inv(["playwright", "test", "--grep-invert", "@visual"])
+        # The untagged spec is reached...
+        self.assertTrue(
+            checker.playwright_reaches(invocation, self.surface, self.e2e / "smoke.spec.ts")
+        )
+        # ...and the tagged one is excluded, which is what inverting means.
+        self.assertFalse(
+            checker.playwright_reaches(
+                invocation, self.surface, self.e2e / "tagged-visual.spec.ts"
+            )
+        )
+
+    def test_grep_invert_equals_form_is_handled_too(self):
+        (self.e2e / "tagged-visual2.spec.ts").write_text(
+            'test.describe("Visual regressions @visual", () => {\n'
+            '  test("matches baseline", async ({ page }) => {});\n'
+            "});\n"
+        )
+        invocation = self.inv(["playwright", "test", "--grep-invert=@visual"])
+        self.assertTrue(
+            checker.playwright_reaches(invocation, self.surface, self.e2e / "smoke.spec.ts")
+        )
+        self.assertFalse(
+            checker.playwright_reaches(
+                invocation, self.surface, self.e2e / "tagged-visual2.spec.ts"
+            )
+        )
+
     def test_tag_filter_selects_only_the_tagged_spec(self):
         invocation = self.inv(["playwright", "test", "-g", "@smoke"])
         self.assertTrue(
