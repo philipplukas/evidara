@@ -215,6 +215,42 @@ const REASON_COPY: Record<string, { label: string; level: PillLevel; hint: strin
   },
 };
 
+/**
+ * What the queue's `proposed_action` means, in the operator's words.
+ *
+ * The codes come from the server (`CoverageWorkAction`), which is the thing to
+ * branch on; this is only the rendering. Deliberately NOT re-derived from
+ * `reasons` here: that mapping lived in one client, a second client re-derived it
+ * from the queue's sort order, and the two disagreed about whether a refused
+ * jurisdiction was the agent's to act on (#964). One definition, server-side.
+ */
+const ACTION_COPY: Record<string, { label: string; hint: string }> = {
+  register_source: {
+    label: "Register a source",
+    hint: "No source exists, so there is nothing to act through. Registering one is a repo edit and a deploy (#736).",
+  },
+  enumerate_denominator: {
+    label: "Enumerate",
+    hint: "Nothing has told us how much this jurisdiction publishes. Every other answer about it is unstatable until this exists.",
+  },
+  run_acceptance: {
+    label: "Run acceptance",
+    hint: "A denominator exists and we hold less than it. An acceptance run is the evidence primitive (ADR-0030).",
+  },
+  await_pipeline: {
+    label: "Wait for the pipeline",
+    hint: "Captured, not yet processed. Running acquisition again would add to a backlog rather than clear it.",
+  },
+  investigate_holdings: {
+    label: "Investigate holdings",
+    hint: "We hold more than the source claims to publish. A dedup failure, or a denominator counting something else. No run fixes it.",
+  },
+  resolve_refusal: {
+    label: "Resolve the refusal",
+    hint: "A run here was refused. The refusal is the answer, and a person decides what happens next.",
+  },
+};
+
 const queueColumns: DataTableColumn<CoverageWorkItem & { id: string }>[] = [
   {
     key: "jurisdiction",
@@ -252,6 +288,41 @@ const queueColumns: DataTableColumn<CoverageWorkItem & { id: string }>[] = [
           );
         })}
       </div>
+    ),
+  },
+  {
+    key: "action",
+    header: "Next",
+    render: (item) => {
+      const copy = ACTION_COPY[item.proposed_action];
+      return (
+        <span
+          className="text-[13px] text-[var(--foreground)]"
+          title={copy?.hint ?? item.proposed_action}
+        >
+          {copy?.label ?? item.proposed_action}
+        </span>
+      );
+    },
+  },
+  {
+    key: "actor",
+    header: "Who",
+    render: (item) => (
+      /*
+       * The autonomy boundary, rendered — not decided here. `actor` is folded
+       * server-side over every reason, so a refusal anywhere makes the row a
+       * person's whatever the named action is (#964, ADR-0056).
+       *
+       * There is deliberately no action button in this column. A refusal is an
+       * outcome to display, never a retry affordance: a closed config key is how
+       * an operator stops traffic at a portal when an authority complains about
+       * load, and a "Retry" here would be that override performed by the
+       * operator's own hand without being told what they were doing.
+       */
+      <Pill level={item.actor === "agent" ? "info" : "neutral"}>
+        {item.actor === "agent" ? "Agent" : "You"}
+      </Pill>
     ),
   },
   { key: "expected", header: "Expected", render: (item) => <Count value={item.expected} /> },
@@ -339,6 +410,17 @@ export function AcquisitionCoverageList() {
     () => (queue?.data ?? []).map((item) => ({ ...item, id: item.jurisdiction_id })),
     [queue],
   );
+  /*
+   * Read straight off the server's `actor`, never re-derived from `reasons`.
+   * Re-deriving is exactly #964: the mapping lived in one client, a second client
+   * rebuilt it from the queue's sort order, and they disagreed about whether a
+   * refused jurisdiction was the agent's to act on.
+   */
+  const agentOwned = useMemo(
+    () => queueRows.filter((item) => item.actor === "agent").length,
+    [queueRows],
+  );
+  const humanOwned = queueRows.length - agentOwned;
 
   const columns: DataTableColumn<AcquisitionCoverageRecord>[] = useMemo(
     () => [
@@ -487,6 +569,33 @@ export function AcquisitionCoverageList() {
                     </strong>{" "}
                     and are counted rather than listed: registering one is a repo edit and a deploy,
                     which is not work this queue can hand anyone.
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+            {view === "work" && queueRows.length > 0 ? (
+              /*
+               * Who owns this page of work. The operator agent (#909) already
+               * decides this per item; until now nothing rendered it, so a control
+               * plane that could act was invisible in the product (ADR-0056).
+               *
+               * Counted over the rows ON SCREEN, and it says so. The server caps
+               * the queue, so a total computed here would be a claim about a
+               * population this page has not seen — the ADR-0042 mistake in
+               * miniature.
+               */
+              <p
+                data-testid="queue-actor-split"
+                className="text-[12px] text-[var(--foreground-subtle)]"
+              >
+                Of the <strong>{queueRows.length}</strong> shown, the agent can work{" "}
+                <strong>{agentOwned}</strong> on its own; <strong>{humanOwned}</strong>{" "}
+                {humanOwned === 1 ? "needs" : "need"} you.
+                {humanOwned > 0 ? (
+                  <>
+                    {" "}
+                    A refusal is a decision to respect, not a run to retry — so those stay yours
+                    however the queue is ordered.
                   </>
                 ) : null}
               </p>
