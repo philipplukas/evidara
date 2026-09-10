@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from acquisition_core.identity import upstream_locator as resolve_upstream_locator
 from acquisition_core.normalization import ArtifactPipeline
 from acquisition_core.providers import (
     AcquisitionReadiness,
@@ -1862,7 +1863,7 @@ class RunService:
 
         source_snapshot_id = generate_prefixed_id("snap")
         bundle_manifest_id = generate_prefixed_id("abm")
-        upstream_locator = self._upstream_locator(artifacts[0].artifact_metadata)
+        upstream_locator = resolve_upstream_locator(artifacts[0].artifact_metadata)
 
         roles: list[str] = []
         for index, artifact in enumerate(artifacts):
@@ -2002,7 +2003,7 @@ class RunService:
         for artifact in doc_artifacts:
             source_snapshot_id = generate_prefixed_id("snap")
             bundle_manifest_id = generate_prefixed_id("abm")
-            upstream_locator = self._upstream_locator(artifact.artifact_metadata)
+            upstream_locator = resolve_upstream_locator(artifact.artifact_metadata)
 
             manifest_artifact = {
                 "artifact_id": artifact.artifact_id,
@@ -2241,33 +2242,6 @@ class RunService:
             PUBLISHED_ARTIFACTS_COUNT_KEY: published_artifacts,
         }
         await self.session.commit()
-
-    @staticmethod
-    def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:
-        """The locator `document_id` is derived from (#652, #806).
-
-        `document_intelligence`'s `_document_identity_key` keys `document_id` on this
-        string, and the projection upserts on `document_id`
-        (`opensearch.adapter.ts` `upsertProjection`). Two properties therefore matter.
-
-        **`source_url` must stay ahead of `final_url`.** They are different URIs by
-        construction for the SPARQL providers, not merely on redirect: `fedlex_sparql`
-        sets `source_url` to the act-level ELI (`.../eli/cc/1999/404`) and `final_url`
-        to the filestore manifestation, whose path **embeds the consolidation date**
-        (`fedlex_sparql_provider.py` `_filestore_html_url`). Keying on `final_url`
-        would mint a fresh `document_id` at every consolidation — the #652 duplicate,
-        permanently, across the whole federal corpus. `eur_lex_sparql` is the same
-        shape. Do not flip this order globally; see #806 for why the correct identity
-        is a per-provider decision (`lexfind_api` needs the opposite preference and is
-        wrong today).
-
-        Returns `""` when the artifact carries no URL at all. This must not be a shared
-        placeholder: every locator-less artifact of a source would derive one
-        `document_id` and silently overwrite itself in the index. Empty defers to
-        `_document_identity_key`'s per-artifact fallback — `upstream_locator` is
-        neither required nor constrained in `artifact-bundle-manifest.schema.json`.
-        """
-        return str(artifact_metadata.get("source_url") or artifact_metadata.get("final_url") or "")
 
     @staticmethod
     def _build_storage_ref_for_artifact(artifact: RawArtifact) -> dict[str, Any]:

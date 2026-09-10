@@ -258,6 +258,11 @@ LIMIT 1
                             ProviderResource(
                                 source_url=original_uri,
                                 final_url=resolved_url,
+                                # The seed work/ELI URI identifies the act; the
+                                # resolved manifestation URL is per expression and
+                                # per consolidation. Stated rather than inferred
+                                # (#850) — same shape as `fedlex_sparql`.
+                                identity_locator=original_uri,
                                 content_type=content_type,
                                 body=body_text,
                                 title=title or expression_uri.rsplit("/", 1)[-1],

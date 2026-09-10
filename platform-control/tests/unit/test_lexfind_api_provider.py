@@ -30,6 +30,8 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
+from acquisition_core.identity import upstream_locator
+from acquisition_core.normalization import ArtifactPipeline
 from platform_control.services.lexfind_api_provider import (
     LexFindApiProvider,
     _current_version,
@@ -1329,3 +1331,106 @@ async def test_the_spot_check_can_be_switched_off_entirely(provider, monkeypatch
     # Absent, not `verified: false`: a key that appears only when a check ran
     # cannot be misread as a check that passed.
     assert "mirror_fidelity" not in result.response_payload
+
+
+# --------------------------------------------------------------------------
+# Document identity — one law, one document, across versions (#850)
+# --------------------------------------------------------------------------
+
+
+def _fixture_with_version(original_url: str) -> dict:
+    """The captured payload with 554.51's canton URL swapped for another version's.
+
+    The canton path encodes both dates — `erlass-554_51-<enacted>-<in_force>-<seq>.html`
+    — so this is exactly what the payload looks like after ZH publishes a revision. The
+    text-of-law id (22888) does not move, because the law did not become another law.
+    """
+    page = copy.deepcopy(_FIXTURE)
+    record = next(
+        t for t in page["texts_of_law_with_matches"] if t["systematic_number"] == "554.51"
+    )
+    record["dta_urls"][0]["original_url"] = original_url
+    return page
+
+
+_CANTON_V1 = (
+    "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung/zhlex-ls/"
+    "erlass-554_51-2009_11_25-2010_01_01-129.html"
+)
+_CANTON_V2 = (
+    "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung/zhlex-ls/"
+    "erlass-554_51-2009_11_25-2025_06_01-142.html"
+)
+
+
+async def _capture_hundeverordnung(provider, monkeypatch, page):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        _client_factory(page=page),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26]),
+        _run(),
+    )
+    return next(r for r in result.inline_resources if r.title == "Hundeverordnung")
+
+
+@pytest.mark.asyncio
+async def test_two_versions_of_one_law_acquire_to_one_document_identity(provider, monkeypatch):
+    """The #850 defect, end to end through normalization.
+
+    ZH revising 554.51 changes `original_url` — which this provider sets as `source_url`,
+    because provenance must keep pointing at the canton. Identity must NOT follow it:
+    under the old global `source_url`-first rule these two captures derive two
+    `document_id`s for one law and accumulate as separate searchable copies (#652/#806).
+    """
+    v1 = await _capture_hundeverordnung(provider, monkeypatch, _fixture_with_version(_CANTON_V1))
+    v2 = await _capture_hundeverordnung(provider, monkeypatch, _fixture_with_version(_CANTON_V2))
+
+    # The precondition that makes the assertion below non-vacuous: the URL the old
+    # rule keyed on genuinely moved between the two acquisitions.
+    assert v1.source_url == _CANTON_V1
+    assert v2.source_url == _CANTON_V2
+    assert v1.source_url != v2.source_url
+
+    assert v1.identity_locator == v2.identity_locator == "https://www.lexfind.ch/tol/22888/de"
+
+    # And it survives into the metadata `upstream_locator` actually reads.
+    ((raw_v1, _),) = ArtifactPipeline().normalize(run_id="run_v1", resources=[v1])
+    ((raw_v2, _),) = ArtifactPipeline().normalize(run_id="run_v2", resources=[v2])
+    assert upstream_locator(raw_v1.metadata) == upstream_locator(raw_v2.metadata)
+    # No version date leaked into identity.
+    assert "2010_01_01" not in upstream_locator(raw_v1.metadata)
+    assert "2025_06_01" not in upstream_locator(raw_v2.metadata)
+
+
+@pytest.mark.asyncio
+async def test_identity_is_the_text_of_law_id_not_a_published_version_path(provider, monkeypatch):
+    """`/tolv/` is LexFind's per-VERSION path and must never be the identity.
+
+    `matches[].dtah_urls` carries `/tolv/253109/de` for this very record, so deriving
+    identity from a published URL rather than from `tol_id` is one upstream change away
+    from being version-scoped again.
+    """
+    resource = await _capture_hundeverordnung(provider, monkeypatch, copy.deepcopy(_FIXTURE))
+
+    assert resource.identity_locator == "https://www.lexfind.ch/tol/22888/de"
+    assert "/tolv/" not in resource.identity_locator
+
+
+@pytest.mark.asyncio
+async def test_two_different_laws_do_not_collide_onto_one_identity(provider, monkeypatch):
+    """The opposite failure: identity must still separate distinct acts."""
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26]),
+        _run(),
+    )
+    locators = [r.identity_locator for r in result.inline_resources]
+
+    assert len(result.inline_resources) == 4
+    assert len(set(locators)) == 4

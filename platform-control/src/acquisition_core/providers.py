@@ -28,6 +28,22 @@ class ProviderResource:
     http_status: int | None = None
     discovery_depth: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    identity_locator: str | None = None
+    """The URI that identifies *the law*, stable across versions (#850).
+
+    Document identity is a **per-provider decision**, not a global URL preference:
+    ``fedlex_sparql``'s stable URI is ``source_url`` (the act-level ELI) while
+    ``lexfind_api``'s is ``final_url`` (``/tol/{id}/{lang}``) — its ``source_url``
+    is the canton's page, whose path embeds the version dates. No single global
+    order can be right for both, and the wrong one mints a fresh ``document_id``
+    per version, which is the #652 duplicate mechanism.
+
+    Set this to the version-independent URI when the provider knows it. It travels
+    into raw artifact metadata and is preferred by
+    :func:`acquisition_core.identity.upstream_locator` over any URL heuristic.
+    Leave ``None`` when the provider genuinely does not know — the
+    ``source_url``-then-``final_url`` fallback then applies, unchanged.
+    """
 
     def __post_init__(self) -> None:
         if self.body is not None and self.body_bytes is not None:

@@ -11,6 +11,7 @@ from typing import Any, NoReturn
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from acquisition_core.identity import upstream_locator as resolve_upstream_locator
 from platform_control.domain import ProviderJobStatus, RunStatus
 from platform_control.errors import SignatureVerificationError, WebhookRetryableError
 from platform_control.events.artifact_bundle import (
@@ -398,7 +399,7 @@ class FirecrawlWebhookService:
 
         source_snapshot_id = generate_prefixed_id("snap")
         bundle_manifest_id = generate_prefixed_id("abm")
-        upstream_locator = self._upstream_locator(artifacts[0].artifact_metadata)
+        upstream_locator = resolve_upstream_locator(artifacts[0].artifact_metadata)
 
         manifest_artifacts: list[dict[str, Any]] = []
         for index, artifact in enumerate(artifacts):
@@ -493,17 +494,6 @@ class FirecrawlWebhookService:
         )
         await self.publisher.publish_artifact_bundle_available(event)
         metrics.record_bundle_event_published()
-
-    @staticmethod
-    def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:
-        """The locator that document identity is keyed on — see
-        ``RunService._upstream_locator`` for why the no-URL case returns ``""`` rather
-        than a shared placeholder (#652, #806).
-        """
-        metadata = artifact_metadata.get("metadata", {})
-        return str(
-            artifact_metadata.get("url") or metadata.get("sourceURL") or metadata.get("url") or ""
-        )
 
     async def _resolve_authority_name(self, authority_id: str | None) -> str | None:
         if not authority_id:

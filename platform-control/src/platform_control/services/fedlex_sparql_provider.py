@@ -305,6 +305,14 @@ LIMIT 1
                         ProviderResource(
                             source_url=work_uri,
                             final_url=resolved_url,
+                            # Identity is the act-level ELI, STATED rather than left
+                            # to a global URL-preference order that happened to
+                            # agree with it (#850). `final_url` is the filestore
+                            # manifestation and its path embeds the consolidation
+                            # date (`_filestore_html_url`), so identifying the act
+                            # by it would mint a new `document_id` at every
+                            # consolidation, across the whole federal corpus.
+                            identity_locator=work_uri,
                             content_type=content_type,
                             body=body_text,
                             title=title or html_title or title_short or work_uri.rsplit("/", 1)[-1],

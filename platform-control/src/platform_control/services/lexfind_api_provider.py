@@ -1503,9 +1503,39 @@ class LexFindApiProvider:
 
         title = (version or {}).get("title") or record.get("title")
 
+        # DOCUMENT IDENTITY IS STATED HERE, NOT INFERRED DOWNSTREAM (#850).
+        #
+        # `source_url` is the canton's own page and its path embeds BOTH version
+        # dates — `erlass-554_51-2009_11_25-2010_01_01-129.html` is enactment
+        # 2009-11-25, in force 2010-01-01. It changes with every version, so
+        # keying `document_id` on it mints a fresh searchable copy of the law at
+        # each revision instead of superseding the previous one: the #652
+        # duplicate mechanism, which is why it must not be the identity.
+        #
+        # It stays `source_url` regardless — provenance must keep pointing at the
+        # canton, not at the mirror (the refusal above). Identity and provenance
+        # are different questions and this provider is the case where they have
+        # different answers; the global `source_url`-first rule could only ever
+        # get one of the two providers right (see `acquisition_core.identity`).
+        #
+        # The identity is the text-of-law id, built from `tol_id` rather than from
+        # the download entry's URL: `dta_urls[].url` happens to be `/tol/{id}/{lang}`
+        # today, but `/tolv/{id}/{lang}` — the per-VERSION path — appears elsewhere
+        # in the same payload (`matches[].dtah_urls`), so deriving identity from a
+        # published URL is one upstream change away from being version-scoped again.
+        # `tol_id` cannot be.
+        #
+        # The captured language is part of the identity because it is part of the
+        # manifestation: `_download_entry` may fall back to another language than the
+        # one requested, and the German and French texts of an act are different
+        # documents in this corpus, not two copies of one.
+        captured_language = str((dta or {}).get("language") or language)
+        identity_locator = f"{_BASE_URL}/tol/{tol_id}/{captured_language}"
+
         return ProviderResource(
             source_url=original_url,
             final_url=f"{_BASE_URL}{pdf_url}",
+            identity_locator=identity_locator,
             content_type="application/pdf",
             body_bytes=body,
             title=title,
