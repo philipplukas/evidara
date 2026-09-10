@@ -1,0 +1,375 @@
+{
+  "provenance": {
+    "measured_at": "2026-09-10",
+    "cluster": "self-hosted Hetzner k3s, OpenSearch 3.7.0",
+    "index": "documents-write -> documents-read-20260729111140",
+    "searchable_documents": 2,
+    "indexed_documents": 3,
+    "corpus_note": "every document is a copy of the Bundesverfassung (#806); only 2 of the 3 carry content_sparse",
+    "encoder": "BAAI/bge-m3 lexical weights via document_intelligence.embeddings.sparse.SparseEncoder",
+    "query_shape": "bool.should of rank_feature(linear, boost=query weight) over the top 512 query features",
+    "script": "reproduced by docs/runbooks/sparse-embedding-backfill.md step 5 (sparse_gate_probe)"
+  },
+  "queries": [
+    {
+      "label": "IN",
+      "query": "Welche Rechte haben Menschen mit Behinderung?",
+      "query_features": 7,
+      "query_weight_mass": 1.071,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.14868,
+        0.14868
+      ],
+      "sparse_top": 0.14868,
+      "coverage": 0.13883,
+      "bm25_hits": 3,
+      "bm25_top": 0.7214
+    },
+    {
+      "label": "IN",
+      "query": "Wie wird der Bundesrat gewaehlt?",
+      "query_features": 9,
+      "query_weight_mass": 1.0647,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.15541,
+        0.15541
+      ],
+      "sparse_top": 0.15541,
+      "coverage": 0.14597,
+      "bm25_hits": 3,
+      "bm25_top": 1.3307
+    },
+    {
+      "label": "IN",
+      "query": "Was regelt die Bundesverfassung ueber die Religionsfreiheit?",
+      "query_features": 9,
+      "query_weight_mass": 0.9001,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.201,
+        0.201
+      ],
+      "sparse_top": 0.201,
+      "coverage": 0.2233,
+      "bm25_hits": 3,
+      "bm25_top": 1.9585
+    },
+    {
+      "label": "IN",
+      "query": "Wer waehlt die Bundesrichter?",
+      "query_features": 9,
+      "query_weight_mass": 1.0938,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.11523,
+        0.11523
+      ],
+      "sparse_top": 0.11523,
+      "coverage": 0.10535,
+      "bm25_hits": 3,
+      "bm25_top": 1.0429
+    },
+    {
+      "label": "IN",
+      "query": "Welche Aufgaben hat die Bundesversammlung?",
+      "query_features": 7,
+      "query_weight_mass": 1.1401,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.22854,
+        0.22854
+      ],
+      "sparse_top": 0.22854,
+      "coverage": 0.20046,
+      "bm25_hits": 3,
+      "bm25_top": 0.6482
+    },
+    {
+      "label": "IN",
+      "query": "Gilt die Meinungsaeusserungsfreiheit auch fuer Auslaender?",
+      "query_features": 10,
+      "query_weight_mass": 1.006,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.12178,
+        0.12178
+      ],
+      "sparse_top": 0.12178,
+      "coverage": 0.12105,
+      "bm25_hits": 3,
+      "bm25_top": 2.168
+    },
+    {
+      "label": "IN",
+      "query": "Wie funktioniert die Volksinitiative?",
+      "query_features": 6,
+      "query_weight_mass": 1.0185,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.13125,
+        0.13125
+      ],
+      "sparse_top": 0.13125,
+      "coverage": 0.12887,
+      "bm25_hits": 3,
+      "bm25_top": 0.3597
+    },
+    {
+      "label": "IN",
+      "query": "Welche Kompetenzen haben die Kantone?",
+      "query_features": 8,
+      "query_weight_mass": 1.0991,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.19446,
+        0.19446
+      ],
+      "sparse_top": 0.19446,
+      "coverage": 0.17692,
+      "bm25_hits": 3,
+      "bm25_top": 0.6144
+    },
+    {
+      "label": "IN",
+      "query": "Was steht zur Gleichstellung von Mann und Frau?",
+      "query_features": 9,
+      "query_weight_mass": 1.0095,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.1259,
+        0.1259
+      ],
+      "sparse_top": 0.1259,
+      "coverage": 0.12472,
+      "bm25_hits": 3,
+      "bm25_top": 1.2666
+    },
+    {
+      "label": "IN",
+      "query": "Unter welchen Bedingungen darf ein Grundrecht eingeschraenkt werden?",
+      "query_features": 12,
+      "query_weight_mass": 1.1269,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.16101,
+        0.16101
+      ],
+      "sparse_top": 0.16101,
+      "coverage": 0.14289,
+      "bm25_hits": 3,
+      "bm25_top": 0.7502
+    },
+    {
+      "label": "IN",
+      "query": "Wie wird die Bundesverfassung geaendert?",
+      "query_features": 11,
+      "query_weight_mass": 1.1891,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.17805,
+        0.17805
+      ],
+      "sparse_top": 0.17805,
+      "coverage": 0.14974,
+      "bm25_hits": 3,
+      "bm25_top": 0.5022
+    },
+    {
+      "label": "IN",
+      "query": "Welche Amtssprachen kennt der Bund?",
+      "query_features": 9,
+      "query_weight_mass": 1.2351,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.18625,
+        0.18625
+      ],
+      "sparse_top": 0.18625,
+      "coverage": 0.1508,
+      "bm25_hits": 3,
+      "bm25_top": 0.4936
+    },
+    {
+      "label": "OUT",
+      "query": "recipe for chocolate cake",
+      "query_features": 4,
+      "query_weight_mass": 0.699,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.00326,
+        0.00326
+      ],
+      "sparse_top": 0.00326,
+      "coverage": 0.00466,
+      "bm25_hits": 0,
+      "bm25_top": 0.0
+    },
+    {
+      "label": "OUT",
+      "query": "quantum chromodynamics lattice gauge theory",
+      "query_features": 9,
+      "query_weight_mass": 0.9867,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.00927,
+        0.00927
+      ],
+      "sparse_top": 0.00927,
+      "coverage": 0.00939,
+      "bm25_hits": 0,
+      "bm25_top": 0.0
+    },
+    {
+      "label": "OUT",
+      "query": "how to replace a bicycle inner tube",
+      "query_features": 8,
+      "query_weight_mass": 1.2534,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.02007,
+        0.02007
+      ],
+      "sparse_top": 0.02007,
+      "coverage": 0.01601,
+      "bm25_hits": 3,
+      "bm25_top": 0.1308
+    },
+    {
+      "label": "OUT",
+      "query": "beste Pizzeria in Neapel Oeffnungszeiten",
+      "query_features": 9,
+      "query_weight_mass": 1.1693,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.00498,
+        0.00498
+      ],
+      "sparse_top": 0.00498,
+      "coverage": 0.00426,
+      "bm25_hits": 3,
+      "bm25_top": 0.1332
+    },
+    {
+      "label": "OUT",
+      "query": "symptoms of feline hyperthyroidism in older cats",
+      "query_features": 10,
+      "query_weight_mass": 1.2931,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.00349,
+        0.00349
+      ],
+      "sparse_top": 0.00349,
+      "coverage": 0.0027,
+      "bm25_hits": 3,
+      "bm25_top": 0.1332
+    },
+    {
+      "label": "OUT",
+      "query": "python pandas groupby multiple columns example",
+      "query_features": 11,
+      "query_weight_mass": 1.3032,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.00837,
+        0.00837
+      ],
+      "sparse_top": 0.00837,
+      "coverage": 0.00642,
+      "bm25_hits": 0,
+      "bm25_top": 0.0
+    },
+    {
+      "label": "OUT",
+      "query": "Wechselkurs Yen Euro heute",
+      "query_features": 5,
+      "query_weight_mass": 1.0338,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.07108,
+        0.07108
+      ],
+      "sparse_top": 0.07108,
+      "coverage": 0.06876,
+      "bm25_hits": 3,
+      "bm25_top": 0.1488
+    },
+    {
+      "label": "OUT",
+      "query": "Aufstellung Champions League Finale 1999",
+      "query_features": 7,
+      "query_weight_mass": 1.2224,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.12753,
+        0.12753
+      ],
+      "sparse_top": 0.12753,
+      "coverage": 0.10434,
+      "bm25_hits": 3,
+      "bm25_top": 0.2428
+    },
+    {
+      "label": "OUT",
+      "query": "how do tides work on the moon",
+      "query_features": 9,
+      "query_weight_mass": 1.4141,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.01414,
+        0.01414
+      ],
+      "sparse_top": 0.01414,
+      "coverage": 0.01,
+      "bm25_hits": 0,
+      "bm25_top": 0.0
+    },
+    {
+      "label": "OUT",
+      "query": "Reparaturanleitung Waschmaschine Trommellager",
+      "query_features": 8,
+      "query_weight_mass": 1.1084,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.01765,
+        0.01765
+      ],
+      "sparse_top": 0.01765,
+      "coverage": 0.01592,
+      "bm25_hits": 0,
+      "bm25_top": 0.0
+    },
+    {
+      "label": "OUT",
+      "query": "darf ich meinen Hund im Restaurant mitnehmen",
+      "query_features": 7,
+      "query_weight_mass": 0.8915,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.03725,
+        0.03725
+      ],
+      "sparse_top": 0.03725,
+      "coverage": 0.04179,
+      "bm25_hits": 3,
+      "bm25_top": 0.2569
+    },
+    {
+      "label": "OUT",
+      "query": "welche Bewilligung brauche ich fuer einen Kampfhund in Zuerich",
+      "query_features": 11,
+      "query_weight_mass": 1.5917,
+      "sparse_hits": 2,
+      "sparse_scores": [
+        0.1384,
+        0.1384
+      ],
+      "sparse_top": 0.1384,
+      "coverage": 0.08695,
+      "bm25_hits": 3,
+      "bm25_top": 2.0526
+    }
+  ]
+}

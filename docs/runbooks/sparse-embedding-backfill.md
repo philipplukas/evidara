@@ -1,8 +1,8 @@
 # Runbook — learned-sparse embedding backfill (ADR-0054)
 
 Owner: Platform team
-Last reviewed: 2026-09-05
-Last verified: **2026-09-05, workstation path only — see [Status](#status)**
+Last reviewed: 2026-09-10
+Last verified: **2026-09-05 (backfill write) / 2026-09-10 (gate probe), workstation path only — see [Status](#status)**
 Applies to: prod (self-hosted Hetzner k3s, ADR-0029)
 
 ## Status
@@ -11,7 +11,7 @@ The **workstation path below has been run against the live write alias** and is
 reproducible. The **in-cluster GPU Job is a template that has never run**, because
 the image it needs is not published — see [Step 4](#step-4--the-in-cluster-gpu-job-not-yet-runnable).
 
-What was proven on 2026-09-05, and nothing beyond it:
+What was proven on 2026-09-05, plus the two gate rows re-measured on 2026-09-10 — and nothing beyond it:
 
 | Claim | Evidence |
 |---|---|
@@ -19,6 +19,8 @@ What was proven on 2026-09-05, and nothing beyond it:
 | BGE-M3 loads and encodes on that GPU | 76 chunks over 2 documents, 20.6s including model load |
 | `rank_features` accepts the vectors | 2 documents updated, 0 failed, 3,671 features each |
 | A sparse query retrieves them | see [Step 5](#step-5--verify) |
+| Sparse retrieval never abstains | 24/24 queries returned every searchable document — [Step 6](#step-6--the-abstention-gate-adr-0054-d4) |
+| The D4 gate refuses on the measured floor | 10 of 12 out-of-corpus queries refused, 12 of 12 in-corpus admitted (2026-09-10) |
 | GPU scheduling works in-cluster | a smoke pod printed `NVIDIA GeForce RTX 5090, 32607 MiB` |
 | The Job manifest is correct | **not proven** — no image, so it has never been applied |
 
@@ -218,6 +220,61 @@ to the corpus returned every document in it. The score is two orders of magnitud
 lower, which is what makes a threshold possible — and exactly why ADR-0054 D4
 makes the abstention gate a first-class, separately tested behaviour rather than
 something to add later.
+
+## Step 6 — the abstention gate (ADR-0054 D4)
+
+The gate now exists (#891), and this is the command that exercises it. Use it
+instead of a hand-rolled `curl`: it issues the query in the shape the gate's
+floor was calibrated against, so a run today is comparable to the committed
+calibration rather than to a differently-shaped query.
+
+```bash
+cd document-intelligence
+uv run --extra embeddings python -m document_intelligence.jobs.sparse_gate_probe \
+  --opensearch-url "http://$CLUSTER_IP:9200" \
+  --index documents-write \
+  --queries-file tests/fixtures/sparse_gate_calibration.json
+```
+
+Each line is a decision, not a hit list: `ADMIT`, or `REFUSE(<reason>)` where the
+reason distinguishes **`no_candidates`** ("the corpus contains nothing for this
+query") from **`below_floor`** ("the retriever returned documents because it
+always returns documents"). Returning the whole index is not an answer, and
+neither is a silence that reads as an empty corpus.
+
+Re-measured on the live write alias 2026-09-10, over the 24 labelled queries in
+that fixture (12 about Swiss federal constitutional law, 12 provably not):
+
+| | sparse hits | admitted | refused |
+|---|---|---|---|
+| in corpus (12) | 2 each | 12 | 0 |
+| out of corpus (12) | 2 each | 2 | 10 |
+
+**Every one of the 24 queries retrieved every searchable document.** That is the
+defect, unchanged since 2026-09-05 and now measured with a denominator rather
+than anecdotally. The gate is what turns it into 10 refusals.
+
+Two things this table is deliberately honest about:
+
+- **The floor leaks two.** `Aufstellung Champions League Finale 1999` and
+  `welche Bewilligung brauche ich fuer einen Kampfhund in Zuerich` clear a
+  coverage floor of `0.08`. The second is the hard one — a legally-worded German
+  question the corpus genuinely cannot answer — and it is a corpus problem, not a
+  threshold problem. Raising the floor to `0.105` would separate this sample
+  perfectly and would sit **0.001** above a real query
+  (`Wer waehlt die Bundesrichter?`, coverage `0.10535`). That is the fixture trap
+  AGENTS.md warns about, arrived at by measurement; the floor is deliberately not
+  set there.
+- **D4's margin-collapse rule ships inactive.** The serving corpus is three copies
+  of one document (#806), so the top-K scores are identical for every query and
+  the knob cannot be calibrated. The gate reports the rule as *not evaluated*,
+  with that reason, rather than letting it read as passing. `--enable-margin`
+  turns it on once a corpus with distinct documents exists.
+
+`--coverage-floor` re-runs the same measurement at a different knob, which is how
+you see what a floor change would decide before changing it. The knobs and their
+version live in `document_intelligence/embeddings/gating.py` (`GateConfig`,
+`RETRIEVAL_CONFIG_VERSION`) per ADR-0054 D2.
 
 ## What this does not prove
 
