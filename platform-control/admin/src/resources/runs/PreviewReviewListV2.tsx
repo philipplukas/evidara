@@ -17,7 +17,7 @@ import type { RunListRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DataTable, type DataTableColumn, Pill, type PillLevel } from "../../ui/primitives";
 import { runRecordStatusToLevel } from "../shared/statusLevels";
-import { CancelRunButton } from "./RunActions";
+import { CancelRunButton, RetryRunButton } from "./RunActions";
 import { RunLaunchButton } from "./RunLaunchDialog";
 
 type RunStatus = RunListRecord["status"];
@@ -173,11 +173,30 @@ export default function PreviewReviewListV2() {
     {
       key: "actions",
       header: "Actions",
-      headerClassName: "sr-only",
+      /*
+       * Pinned, and the header made visible, for the same reason the run queue
+       * pins its own (#873 / RunListV2): this table overflows at every width
+       * tested — scrollWidth 1324 against clientWidth 1054 at 1440 and 894 at
+       * 1280 — so ACTIONS sat past the right edge of a scroller that showed no
+       * cue. At 390px the button measured 876px past the edge.
+       *
+       * `sr-only` is `position: absolute` and cannot also be `position: sticky`,
+       * so showing the header is not cosmetic — it is what lets the column pin
+       * at all. It is the better trade regardless: a pinned column that never
+       * says what it is reads as a rendering artefact.
+       */
+      stickyRight: true,
       className: "text-right",
+      /*
+       * Retry belongs here too. Cancel covers pending/running; without Retry a
+       * failed or cancelled preview run offered NO lever from this list, while
+       * the identical run in the run queue offered one — the same data,
+       * two screens, two answers about what the operator can do.
+       */
       render: (record) => (
         <RecordContextProvider value={record}>
           <CancelRunButton />
+          <RetryRunButton />
         </RecordContextProvider>
       ),
     },
