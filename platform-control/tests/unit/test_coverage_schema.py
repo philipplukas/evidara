@@ -12,7 +12,14 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from platform_control.domain import DenominatorTier, NormLevel
+from platform_control.domain import (
+    REASON_ACTION_PRIORITY,
+    CoverageWorkActor,
+    CoverageWorkReason,
+    DenominatorTier,
+    NormLevel,
+    resolve_work_actor,
+)
 from platform_control.schemas.coverage import AcquisitionCoverageEntry
 
 
@@ -139,3 +146,89 @@ def test_gap_may_be_negative() -> None:
 def test_counts_may_not_be_negative() -> None:
     with pytest.raises(ValidationError):
         AcquisitionCoverageEntry(**_entry(acquired_distinct_urls=-1))
+
+
+class TestWorkActionAndActor:
+    """#964 — one mapping, and an autonomy boundary that no ordering can move.
+
+    The reason -> action mapping used to live only in `tools/evidara-cli`. A second
+    client deriving it from the queue's own sort order classified
+    `refusals_outstanding` + `never_acquired` — the normal shape of a refusal, every
+    run refused so nothing acquired — as work the agent may do.
+    """
+
+    def test_every_reason_maps_to_an_action(self):
+        """`resolve_work_action` raises rather than guessing, so an unmapped reason
+        would be a 500 in production. This is what keeps that unreachable."""
+        mapped = {reason for reason, _ in REASON_ACTION_PRIORITY}
+        assert mapped == set(CoverageWorkReason), (
+            "every CoverageWorkReason must map to an action; unmapped: "
+            f"{sorted(r.value for r in set(CoverageWorkReason) - mapped)}"
+        )
+
+    @pytest.mark.parametrize(
+        "reasons",
+        [
+            pytest.param([CoverageWorkReason.REFUSALS_OUTSTANDING], id="refusal-alone"),
+            pytest.param(
+                [CoverageWorkReason.REFUSALS_OUTSTANDING, CoverageWorkReason.NEVER_ACQUIRED],
+                id="the-964-case",
+            ),
+            pytest.param(
+                [CoverageWorkReason.NO_DENOMINATOR, CoverageWorkReason.REFUSALS_OUTSTANDING],
+                id="refusal-behind-a-more-blocking-reason",
+            ),
+            pytest.param(
+                [CoverageWorkReason.ACQUISITION_GAP, CoverageWorkReason.REFUSALS_OUTSTANDING],
+                id="refusal-behind-a-gap",
+            ),
+        ],
+    )
+    def test_a_refusal_anywhere_makes_the_item_human_only(self, reasons):
+        """The guard. `resolve_work_actor` folds over EVERY reason rather than the
+        first that matches, so this holds whatever `REASON_ACTION_PRIORITY`'s order
+        is. Change it to `resolve_work_action(...) in HUMAN_ONLY_ACTIONS` and the
+        `refusal-behind-a-more-blocking-reason` case goes red — which is exactly the
+        first-match rule that produced #964."""
+        assert resolve_work_actor(reasons) is CoverageWorkActor.HUMAN
+
+    def test_reordering_the_action_priority_cannot_grant_the_agent_a_refusal(self):
+        """Mutation-resistance, stated as a test rather than left to review.
+
+        Every non-empty subset containing a human-only reason must be human, under
+        every rotation of the priority tuple.
+        """
+        import itertools
+
+        human_reasons = [
+            CoverageWorkReason.REFUSALS_OUTSTANDING,
+            CoverageWorkReason.HOLDINGS_EXCEED_DENOMINATOR,
+            CoverageWorkReason.NO_SOURCE,
+        ]
+        others = [r for r in CoverageWorkReason if r not in human_reasons]
+        for human in human_reasons:
+            for size in range(0, len(others) + 1):
+                for combo in itertools.combinations(others, size):
+                    assert resolve_work_actor([human, *combo]) is CoverageWorkActor.HUMAN
+
+    def test_a_purely_agent_set_is_agent(self):
+        """The guard must not be trivially satisfied by answering HUMAN always."""
+        assert (
+            resolve_work_actor(
+                [CoverageWorkReason.NEVER_ACQUIRED, CoverageWorkReason.ACQUISITION_GAP]
+            )
+            is CoverageWorkActor.AGENT
+        )
+        assert resolve_work_actor([CoverageWorkReason.PROCESSING_GAP]) is CoverageWorkActor.AGENT
+
+    def test_the_sort_order_and_the_action_order_are_allowed_to_differ(self):
+        """They answer different questions and both are correct — but the CLI's
+        comment claimed they were the same, which is how #964 happened. Pinned so a
+        future reader sees the difference is deliberate, not drift."""
+        from platform_control.services.coverage_service import _WORK_REASON_ORDER
+
+        action_order = [reason for reason, _ in REASON_ACTION_PRIORITY]
+        assert list(_WORK_REASON_ORDER) != action_order
+        assert set(_WORK_REASON_ORDER) == set(action_order), (
+            "they may order differently, but neither may omit a reason"
+        )

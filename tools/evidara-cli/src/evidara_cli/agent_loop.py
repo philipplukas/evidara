@@ -173,6 +173,33 @@ def actor_for(action: AgentAction) -> str:
     )
 
 
+def _server_action(item: dict[str, Any]) -> AgentAction | None:
+    """The action the server named for this item, if it named one.
+
+    Unknown values return None rather than raising: a server that adds an action this
+    client has not learned should degrade to the local mapping and be reported by
+    `unplannable_items`, not crash the plan.
+    """
+    raw = item.get("proposed_action")
+    if not isinstance(raw, str):
+        return None
+    try:
+        return AgentAction(raw)
+    except ValueError:
+        return None
+
+
+def _server_actor(item: dict[str, Any]) -> str | None:
+    """The actor the server assigned, if it assigned one.
+
+    Only `"agent"` and `"human"` are honoured. An unrecognised value falls through to
+    the local classification rather than being trusted — this is the autonomy
+    boundary, and an unknown string must never read as permission.
+    """
+    raw = item.get("actor")
+    return raw if raw in {"agent", "human"} else None
+
+
 def plan_from_queue(payload: dict[str, Any]) -> list[PlannedWork]:
     """Turn `GET /v1/acquisition-coverage/queue` into a plan, in the server's order.
 
@@ -187,7 +214,16 @@ def plan_from_queue(payload: dict[str, Any]) -> list[PlannedWork]:
         if not isinstance(item, dict):
             continue
         reasons = [r for r in (item.get("reasons") or []) if isinstance(r, str)]
-        action = action_for(reasons)
+        # The SERVER's answer wins when it states one (#964). This mapping used to
+        # live only here, so a second client had to copy or re-derive it — and the
+        # copy is where they disagreed: read off the queue's sort order,
+        # `refusals_outstanding` + `never_acquired` came out agent-actionable, which
+        # is an agent retrying work a person refused.
+        #
+        # The local mapping stays as a fallback for a server that predates the field,
+        # and `test_local_mapping_agrees_with_the_server_on_every_reason_subset` fails
+        # if the two ever drift apart again.
+        action = _server_action(item) or action_for(reasons)
         if action is None:
             # A reason the server added and this client does not know. Skipping it
             # silently would make the plan quietly incomplete, so it is surfaced by
@@ -198,7 +234,7 @@ def plan_from_queue(payload: dict[str, Any]) -> list[PlannedWork]:
                 jurisdiction_id=str(item.get("jurisdiction_id", "")),
                 name=str(item.get("name", "")),
                 action=action,
-                actor=actor_for(action),
+                actor=_server_actor(item) or actor_for(action),
                 reasons=reasons,
                 source_ids=[s for s in (item.get("source_ids") or []) if isinstance(s, str)],
                 expected=item.get("expected"),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import StrEnum
 
 
@@ -313,6 +314,131 @@ class CoverageWorkReason(StrEnum):
     PROCESSING_GAP = "processing_gap"
     HOLDINGS_EXCEED_DENOMINATOR = "holdings_exceed_denominator"
     REFUSALS_OUTSTANDING = "refusals_outstanding"
+
+
+class CoverageWorkAction(StrEnum):
+    """What a coverage-queue item implies should happen next.
+
+    This vocabulary already existed — in `tools/evidara-cli`'s `agent_loop.py`, in
+    Python, reachable only by that one client. #964: a second client had to either
+    re-derive it or copy it, and the copy is where the two disagreed.
+
+    It lives here now so there is one definition and both the CLI and the operator
+    panel read it (ADR-0056 constraint 1). The values are unchanged from the CLI's,
+    so nothing consuming them has to relearn a vocabulary.
+
+    REGISTER_SOURCE       no source exists, so there is nothing to act through.
+                          Registering one is a repo edit and a deploy (#736).
+    ENUMERATE_DENOMINATOR nothing has told us how much this jurisdiction publishes.
+                          Every other answer about it is unstatable until this exists.
+    RUN_ACCEPTANCE        a denominator exists and we hold less than it. An acceptance
+                          run is the evidence primitive (ADR-0030).
+    AWAIT_PIPELINE        captured, not yet processed. Wait and re-check — running
+                          acquisition again adds to a backlog rather than clearing it.
+    INVESTIGATE_HOLDINGS  we hold more than the source claims to publish. A dedup
+                          failure or a denominator counting something else. No run
+                          fixes it.
+    RESOLVE_REFUSAL       a run here was refused. The refusal is the answer, and a
+                          person decides what happens next.
+    """
+
+    REGISTER_SOURCE = "register_source"
+    ENUMERATE_DENOMINATOR = "enumerate_denominator"
+    RUN_ACCEPTANCE = "run_acceptance"
+    AWAIT_PIPELINE = "await_pipeline"
+    INVESTIGATE_HOLDINGS = "investigate_holdings"
+    RESOLVE_REFUSAL = "resolve_refusal"
+
+
+class CoverageWorkActor(StrEnum):
+    """Who may carry out a queue item's action.
+
+    Not a UI convention — the autonomy boundary, stated where every client reads the
+    same answer. #854 already moved the ADR-0030 two-key guard server-side; this is
+    the same idea one step earlier, for work that has not reached the key yet.
+
+    AGENT  the agent may carry this out on its own.
+    HUMAN  doing something is the wrong response, and a person decides.
+    """
+
+    AGENT = "agent"
+    HUMAN = "human"
+
+
+#: Actions that belong to a person, never to the agent.
+#:
+#: Both refusal and holdings-exceeding-denominator are cases where *acting* is the
+#: wrong move: a refusal is a decision to respect — a closed config key is how an
+#: operator stops traffic at a portal when an authority complains about load — and
+#: holdings above a denominator is a measurement problem no run resolves.
+#: `register_source` needs a deploy, which no queue action can express.
+HUMAN_ONLY_ACTIONS: frozenset[CoverageWorkAction] = frozenset(
+    {
+        CoverageWorkAction.RESOLVE_REFUSAL,
+        CoverageWorkAction.INVESTIGATE_HOLDINGS,
+        CoverageWorkAction.REGISTER_SOURCE,
+    }
+)
+
+
+#: Reason -> action. Ordered by what most constrains the response, which is NOT the
+#: same as `_WORK_REASON_ORDER` in `coverage_service`, and #964 is what happens when
+#: the two are assumed to be one thing.
+#:
+#: They answer different questions and both are correct:
+#:   * `_WORK_REASON_ORDER` decides how the queue is SORTED — most blocking first,
+#:     so an operator reads the worst thing at the top.
+#:   * this order decides what may be DONE, so a refusal outranks a gap. Under the
+#:     sort order, a jurisdiction whose every run was refused (`refusals_outstanding`
+#:     + `never_acquired`, the normal shape of a refusal) resolved to `run_acceptance`
+#:     — an agent retrying work a person had refused.
+#:
+#: The safety answer does not actually depend on this order any more; see
+#: `resolve_work_actor`, which folds over every reason rather than the first. The
+#: order decides only which action is NAMED.
+REASON_ACTION_PRIORITY: tuple[tuple[CoverageWorkReason, CoverageWorkAction], ...] = (
+    (CoverageWorkReason.NO_SOURCE, CoverageWorkAction.REGISTER_SOURCE),
+    (CoverageWorkReason.NO_DENOMINATOR, CoverageWorkAction.ENUMERATE_DENOMINATOR),
+    (CoverageWorkReason.REFUSALS_OUTSTANDING, CoverageWorkAction.RESOLVE_REFUSAL),
+    (
+        CoverageWorkReason.HOLDINGS_EXCEED_DENOMINATOR,
+        CoverageWorkAction.INVESTIGATE_HOLDINGS,
+    ),
+    (CoverageWorkReason.NEVER_ACQUIRED, CoverageWorkAction.RUN_ACCEPTANCE),
+    (CoverageWorkReason.ACQUISITION_GAP, CoverageWorkAction.RUN_ACCEPTANCE),
+    (CoverageWorkReason.PROCESSING_GAP, CoverageWorkAction.AWAIT_PIPELINE),
+)
+
+
+def resolve_work_action(reasons: Sequence[CoverageWorkReason]) -> CoverageWorkAction:
+    """The action to NAME for a set of reasons: the most constraining one present."""
+    present = set(reasons)
+    for reason, action in REASON_ACTION_PRIORITY:
+        if reason in present:
+            return action
+    # Unreachable while every enum member is mapped, which
+    # `test_every_reason_maps_to_an_action` enforces. Refusing beats guessing.
+    raise ValueError(f"no action mapped for reasons: {sorted(r.value for r in reasons)}")
+
+
+def resolve_work_actor(reasons: Sequence[CoverageWorkReason]) -> CoverageWorkActor:
+    """Who may act, folded over EVERY reason rather than the first one that matches.
+
+    This is deliberately not `resolve_work_action(...) in HUMAN_ONLY_ACTIONS`. A
+    first-match rule makes the autonomy boundary depend on an ordering, and #964 is
+    that dependency going wrong in a real client. Folding means a human-only reason
+    anywhere in the set makes the item human-only, whatever it is named — so
+    reordering `REASON_ACTION_PRIORITY` can change a label but can never hand the
+    agent work a person owns.
+
+    It also stays true to `CoverageWorkReason`'s own rule that the queue ships no
+    ranking: every reason is consulted, none outranks the others for this answer.
+    """
+    for reason in reasons:
+        for mapped_reason, action in REASON_ACTION_PRIORITY:
+            if mapped_reason is reason and action in HUMAN_ONLY_ACTIONS:
+                return CoverageWorkActor.HUMAN
+    return CoverageWorkActor.AGENT
 
 
 class DenominatorTier(StrEnum):

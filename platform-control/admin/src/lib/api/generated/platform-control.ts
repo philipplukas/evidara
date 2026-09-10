@@ -2129,6 +2129,47 @@ export interface components {
          */
         CorrectionType: "field_edit" | "annotation" | "reject" | "rescore_request";
         /**
+         * CoverageWorkAction
+         * @description What a coverage-queue item implies should happen next.
+         *
+         *     This vocabulary already existed — in `tools/evidara-cli`'s `agent_loop.py`, in
+         *     Python, reachable only by that one client. #964: a second client had to either
+         *     re-derive it or copy it, and the copy is where the two disagreed.
+         *
+         *     It lives here now so there is one definition and both the CLI and the operator
+         *     panel read it (ADR-0056 constraint 1). The values are unchanged from the CLI's,
+         *     so nothing consuming them has to relearn a vocabulary.
+         *
+         *     REGISTER_SOURCE       no source exists, so there is nothing to act through.
+         *                           Registering one is a repo edit and a deploy (#736).
+         *     ENUMERATE_DENOMINATOR nothing has told us how much this jurisdiction publishes.
+         *                           Every other answer about it is unstatable until this exists.
+         *     RUN_ACCEPTANCE        a denominator exists and we hold less than it. An acceptance
+         *                           run is the evidence primitive (ADR-0030).
+         *     AWAIT_PIPELINE        captured, not yet processed. Wait and re-check — running
+         *                           acquisition again adds to a backlog rather than clearing it.
+         *     INVESTIGATE_HOLDINGS  we hold more than the source claims to publish. A dedup
+         *                           failure or a denominator counting something else. No run
+         *                           fixes it.
+         *     RESOLVE_REFUSAL       a run here was refused. The refusal is the answer, and a
+         *                           person decides what happens next.
+         * @enum {string}
+         */
+        CoverageWorkAction: "register_source" | "enumerate_denominator" | "run_acceptance" | "await_pipeline" | "investigate_holdings" | "resolve_refusal";
+        /**
+         * CoverageWorkActor
+         * @description Who may carry out a queue item's action.
+         *
+         *     Not a UI convention — the autonomy boundary, stated where every client reads the
+         *     same answer. #854 already moved the ADR-0030 two-key guard server-side; this is
+         *     the same idea one step earlier, for work that has not reached the key yet.
+         *
+         *     AGENT  the agent may carry this out on its own.
+         *     HUMAN  doing something is the wrong response, and a person decides.
+         * @enum {string}
+         */
+        CoverageWorkActor: "agent" | "human";
+        /**
          * CoverageWorkItem
          * @description One jurisdiction that needs work, and why.
          *
@@ -2182,6 +2223,8 @@ export interface components {
             quarantined_documents: number;
             /** Source Ids */
             source_ids?: string[];
+            proposed_action: components["schemas"]["CoverageWorkAction"];
+            actor: components["schemas"]["CoverageWorkActor"];
         };
         /** CoverageWorkQueueResponse */
         CoverageWorkQueueResponse: {
