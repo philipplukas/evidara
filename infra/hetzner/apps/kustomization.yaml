@@ -226,16 +226,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
+    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
+    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
+    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
+    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
+    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
+    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: 2ce8c720cae5ae6a5466e3d76663498f2b8ec575
+    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
