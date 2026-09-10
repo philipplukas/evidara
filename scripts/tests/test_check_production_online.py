@@ -92,6 +92,7 @@ def _kubectl_stub(*, ready: str = "1", image_sha: str, ingress_hosts: str,
 class ProductionOnlineCheckTest(unittest.TestCase):
     def _run(self, *, kubectl: str | None, env_extra: dict[str, str] | None = None,
              root: Path | None = None, curl_code: str = "200",
+             health_code: str | None = None,
              resolves: bool = True) -> subprocess.CompletedProcess[str]:
         with TemporaryDirectory() as tmp:
             bindir = Path(tmp) / "bin"
@@ -99,8 +100,20 @@ class ProductionOnlineCheckTest(unittest.TestCase):
             if kubectl is not None:
                 (bindir / "kubectl").write_text(kubectl)
                 (bindir / "kubectl").chmod(0o755)
-            (bindir / "curl").write_text(
-                f'#!/usr/bin/env bash\nprintf "%s" "{curl_code}"\n')
+            # `health_code` answers only `/health`; `curl_code` answers everything
+            # else. Without a per-path stub the `/health`-first probe and the
+            # fallback to `/` are indistinguishable, and a test that cannot tell
+            # them apart cannot guard either.
+            if health_code is None:
+                (bindir / "curl").write_text(
+                    f'#!/usr/bin/env bash\nprintf "%s" "{curl_code}"\n')
+            else:
+                (bindir / "curl").write_text(
+                    '#!/usr/bin/env bash\n'
+                    'case "$*" in\n'
+                    f'  *"/health"*) printf "%s" "{health_code}" ;;\n'
+                    f'  *) printf "%s" "{curl_code}" ;;\n'
+                    'esac\n')
             (bindir / "curl").chmod(0o755)
             (bindir / "getent").write_text(
                 "#!/usr/bin/env bash\nexit %d\n" % (0 if resolves else 2))
@@ -196,9 +209,45 @@ class ProductionOnlineCheckTest(unittest.TestCase):
             self.assertIn("backend is not answering", bad.stdout)
 
             ok = self._run(kubectl=None, root=root, curl_code="401")
-            self.assertIn("somewhere.invalid -> 401", ok.stdout)
-            self.assertNotIn("somewhere.invalid ->", ok.stdout.replace(
-                "somewhere.invalid -> 401", ""))
+            self.assertIn("somewhere.invalid/ -> 401", ok.stdout)
+            self.assertNotIn("somewhere.invalid/ ->", ok.stdout.replace(
+                "somewhere.invalid/ -> 401", ""))
+
+    def test_a_root_404_on_an_api_is_not_an_outage(self):
+        """Guard: probe `/health` before `/`.
+
+        An API has no root route, so `GET /` returns a healthy 404 — and this
+        check reported `legal-search-api.ts.veyo.dev -> 404` and
+        `platform-control-api.ts.veyo.dev -> 404` as two production outages while
+        both served `/health` with 200. Delete the `/health` probe and this goes
+        red, which is the false alarm returning.
+        """
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            (root / "infra" / "hetzner").mkdir(parents=True)
+            (root / "infra" / "hetzner" / "ing.yaml").write_text(
+                "spec:\n  rules:\n    - host: somewhere.invalid\n")
+            res = self._run(kubectl=None, root=root, health_code="200", curl_code="404")
+            self.assertEqual(res.returncode, 0, res.stdout)
+            self.assertIn("somewhere.invalid/health -> 200", res.stdout)
+
+    def test_an_ingress_that_was_never_applied_is_still_caught(self):
+        """The other half, and the reason `/health` cannot simply pass every 404.
+
+        An Ingress declared in git and never applied 404s on EVERY path (#884).
+        Verified against the live edge with a bogus host that wildcard DNS
+        resolves to the ingress IP. Make the `/health` probe pass unconditionally
+        and this goes red — the check would then be blind to the failure this
+        whole section exists to find.
+        """
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            (root / "infra" / "hetzner").mkdir(parents=True)
+            (root / "infra" / "hetzner" / "ing.yaml").write_text(
+                "spec:\n  rules:\n    - host: somewhere.invalid\n")
+            res = self._run(kubectl=None, root=root, health_code="404", curl_code="404")
+            self.assertEqual(res.returncode, 1, res.stdout)
+            self.assertIn("somewhere.invalid/ -> 404", res.stdout)
 
     # ── Argo CD scoping ──────────────────────────────────────────────────────
 
