@@ -91,6 +91,7 @@ document_intelligence_runtime_consumer = "document_intelligence.jobs.runtime_con
 document_intelligence_replay_local_outbox = "document_intelligence.jobs.local_outbox_replay:main"
 document_intelligence_delta_projection_backfill = "document_intelligence.jobs.delta_projection_backfill:main"
 document_intelligence_projection_reconcile = "document_intelligence.jobs.projection_reconcile:main"
+document_intelligence_canonical_retract = "document_intelligence.jobs.canonical_retract:main"
 document_intelligence_embedding_backfill = "document_intelligence.jobs.embedding_backfill:main"
 
 [tool.setuptools]

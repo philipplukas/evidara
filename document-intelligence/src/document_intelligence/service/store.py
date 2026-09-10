@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from document_intelligence.config.runtime import RuntimeSettings
-from document_intelligence.persist.sinks import delta_dataset_filesystem, delta_storage_options
+from document_intelligence.persist.sinks import (
+    delta_dataset_filesystem,
+    delta_storage_options,
+    delta_string_equals,
+)
 
 _DOC_ID_RE = re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
 _PM_ID_RE = re.compile(r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
@@ -136,11 +140,14 @@ class DeltaPublishedDocumentStore:
             return None
 
         dataset_mod = importlib.import_module("pyarrow.dataset")
-        filters = [dataset_mod.field("document_id") == document_id]
+        # String predicates go through `delta_string_equals`: a table that has had a row
+        # retracted (ADR-0057) scans its string columns as `string_view`, which the plain
+        # `field == value` comparison cannot match a kernel for.
+        filters = [delta_string_equals("document_id", document_id)]
         if document_revision is not None:
             filters.append(dataset_mod.field("document_revision") == document_revision)
         if processing_manifest_id is not None:
-            filters.append(dataset_mod.field("processing_manifest_id") == processing_manifest_id)
+            filters.append(delta_string_equals("processing_manifest_id", processing_manifest_id))
 
         table = self._open_dataset(self._published_documents_uri).to_table(
             filter=_and_filters(filters),
@@ -206,11 +213,11 @@ class DeltaPublishedDocumentStore:
             return []
 
         dataset_mod = importlib.import_module("pyarrow.dataset")
-        filters = [dataset_mod.field("document_id") == document_id]
+        filters = [delta_string_equals("document_id", document_id)]
         if document_revision is not None:
             filters.append(dataset_mod.field("document_revision") == document_revision)
         if processing_manifest_id is not None:
-            filters.append(dataset_mod.field("processing_manifest_id") == processing_manifest_id)
+            filters.append(delta_string_equals("processing_manifest_id", processing_manifest_id))
 
         try:
             table = self._open_dataset(self._published_sections_uri).to_table(filter=_and_filters(filters))

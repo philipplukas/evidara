@@ -25,6 +25,7 @@ def render_register_surfaces_sql(
         "published_sections": surface_uris.published_sections_uri,
         "processing_manifests": surface_uris.processing_manifests_uri,
         "published_commentary_insights": surface_uris.published_commentary_insights_uri,
+        "canonical_retractions": surface_uris.canonical_retractions_uri,
     }
 
     statements = [

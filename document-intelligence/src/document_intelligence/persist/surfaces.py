@@ -216,6 +216,44 @@ PUBLISHED_COMMENTARY_INSIGHTS = PublishedSurfaceDefinition(
 )
 
 
+CANONICAL_RETRACTIONS = PublishedSurfaceDefinition(
+    surface_name="canonical_retractions",
+    surface_version=1,
+    selector_kind="record_key",
+    selector_fields=("retraction_id",),
+    description=(
+        "Append-only ledger of canonical rows removed by an operator (ADR-0057). "
+        "Every removal from published_documents / published_sections writes one row here first."
+    ),
+    columns=(
+        SurfaceColumn("retraction_id", "string", False, "Stable retraction ID."),
+        SurfaceColumn("document_id", "string", False, "Document identity whose rows were removed."),
+        SurfaceColumn(
+            "retracted_revisions",
+            "object",
+            False,
+            "Document revisions removed by this retraction.",
+        ),
+        SurfaceColumn("reason_code", "string", False, "Closed-vocabulary retraction reason."),
+        SurfaceColumn("reason", "string", False, "Operator narrative: why this row is not truth."),
+        SurfaceColumn(
+            "superseded_by_document_id",
+            "string",
+            True,
+            "Surviving document identity this row duplicated, when the reason is duplicate_identity.",
+        ),
+        SurfaceColumn("retracted_by", "string", False, "Operator attribution for the retraction (ADR-0038)."),
+        SurfaceColumn("retracted_at", "timestamp", False, "When the retraction was committed."),
+        SurfaceColumn(
+            "surfaces",
+            "object",
+            False,
+            "Per-surface rows matched and the pre-delete Delta version to restore to.",
+        ),
+    ),
+)
+
+
 SURFACE_DEFINITIONS: dict[str, PublishedSurfaceDefinition] = {
     definition.surface_name: definition
     for definition in (
@@ -223,6 +261,7 @@ SURFACE_DEFINITIONS: dict[str, PublishedSurfaceDefinition] = {
         PUBLISHED_SECTIONS,
         PROCESSING_MANIFESTS,
         PUBLISHED_COMMENTARY_INSIGHTS,
+        CANONICAL_RETRACTIONS,
     )
 }
 
