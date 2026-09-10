@@ -1,10 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { mockAdminRunFlowApi } from "./helpers/mock-admin-api";
 import { mockSearchApi } from "./helpers/mock-api";
 import { forceExpandDetailPanel } from "./helpers/visual-stability";
 
-const ADMIN_BASE_URL = process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://localhost:3100";
-const ADMIN_LOCAL_STORAGE_ROLE_KEY = "evidara_user_role";
 const SEARCH_PLACEHOLDER =
   /search article, case, commentary, citation|nach artikel, urteil, kommentar oder zitat|rechercher un article, un arrêt, un commentaire ou une citation/i;
 const DESKTOP_VIEWPORT = { width: 1600, height: 900 };
@@ -78,53 +75,6 @@ test.describe("Visual regressions", () => {
     await expect(region).toBeVisible();
 
     await expect(region).toHaveScreenshot("results-control-region.png");
-  });
-
-  // Net-new tracked coverage for the admin run-detail v2 layout introduced in
-  // PR #413 ("Run overview" quadrant: `Why this matters` primary card plus
-  // three subordinate cards). The screenshot-pack capture at
-  // `screenshot-pack.spec.ts:~274` is a scratch artefact (gitignored), not
-  // committed coverage — a layout regression in this quadrant would slip past
-  // CI without this baseline. Navigation + wait points mirror that capture so
-  // the framing stays comparable.
-  test("admin run-detail v2 — primary decision hierarchy matches baseline", async ({ page }) => {
-    // This is the only visual test that drives the *admin* dev server (port
-    // 3100). Next.js `dev` compiles routes lazily on first request, and since
-    // admin's `Pill` now pulls the shared `@evidara/ui` tree into the graph
-    // (PR #503), that first cold compile can exceed the default 30s test
-    // timeout — the `page.goto` below then times out on attempt 1 and the app
-    // shell is still hydrating when attempt 2's 5s `toBeVisible` fires. Give
-    // this test (and its first navigation) generous headroom so the one-time
-    // cold compile completes deterministically; the frontend-only tests are
-    // unaffected and keep the default budget.
-    test.setTimeout(120_000);
-    await mockSearchApi(page);
-    await mockAdminRunFlowApi(page);
-    await page.addInitScript(([key]) => {
-      window.localStorage.setItem(key, "admin");
-    }, [ADMIN_LOCAL_STORAGE_ROLE_KEY]);
-    await page.setViewportSize({ width: 1600, height: 900 });
-
-    await page.goto(`${ADMIN_BASE_URL}/#/runs-v2/run_01`, {
-      waitUntil: "load",
-      timeout: 90_000,
-    });
-    await expect(page.getByRole("heading", { name: /Decision support/ })).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByRole("heading", { name: /Run run_01/ })).toBeVisible({
-      timeout: 20_000,
-    });
-    // `RunDetailSectionsV2` renders collapsed accordion items below the
-    // metadata grid. Wait for the `Provider Jobs` trigger so the capture
-    // includes the full lifecycle stack (matches screenshot-pack framing).
-    await expect(page.getByRole("button", { name: /Provider Jobs/ })).toBeVisible({
-      timeout: 20_000,
-    });
-
-    await expect(page).toHaveScreenshot("admin-run-detail-v2.png", {
-      fullPage: true,
-    });
   });
 
   // ---------------------------------------------------------------------------

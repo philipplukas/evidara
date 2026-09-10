@@ -24,10 +24,16 @@ in a diff nobody can read.
 
 The rule
 --------
-If any ``*.png`` under ``legal-search/frontend/e2e/visual.spec.ts-snapshots/``
-is added, modified, or deleted relative to the merge base, then
-``PROVENANCE.md`` in that same directory must also change in the same diff, and
-must name every changed file.
+If any ``*.png`` under a guarded ``e2e/visual.spec.ts-snapshots/`` directory (see
+``SNAPSHOT_DIRS``) is added, modified, or deleted relative to the merge base, then
+the ``PROVENANCE.md`` **in that same directory** must also change in the same diff,
+and must name every changed file.
+
+Each surface owns its own snapshot directory and its own ledger. That is not
+tidiness: a PNG has no merge strategy, so two branches that touch one surface's
+layout collide on a binary file neither can merge, and a baseline parked under
+another surface routes its failure to a CI job whose tree the author never opened
+(#913; #902/#905 collided, #895 reported the misrouted failure).
 
 What this can and cannot do
 ---------------------------
@@ -49,8 +55,30 @@ import subprocess
 import sys
 from pathlib import Path
 
-SNAPSHOT_DIR = Path("legal-search/frontend/e2e/visual.spec.ts-snapshots")
-PROVENANCE_FILE = SNAPSHOT_DIR / "PROVENANCE.md"
+# Every guarded snapshot directory. A surface that owns a visual baseline owns its
+# own ledger beside it: a PNG has no merge strategy, so parking one surface's
+# baselines under another's directory makes two unrelated branches collide on one
+# binary file AND routes the failure to a CI job the author never touched
+# (#913 — PRs #902/#905 collided; #895 reported the misrouted failure).
+#
+# Adding a surface here is what makes its baselines guarded. `test_every_snapshot_dir_on_disk_is_guarded`
+# fails if a `visual.spec.ts-snapshots` directory exists in the tree and is not listed.
+SNAPSHOT_DIRS: tuple[Path, ...] = (
+    Path("legal-search/frontend/e2e/visual.spec.ts-snapshots"),
+    Path("platform-control/admin/e2e/visual.spec.ts-snapshots"),
+)
+
+# Retained for readers who only care about the original surface; the guard itself
+# iterates SNAPSHOT_DIRS.
+SNAPSHOT_DIR = SNAPSHOT_DIRS[0]
+
+
+def provenance_file(snapshot_dir: Path) -> Path:
+    """The ledger that must move in the same diff as `snapshot_dir`'s baselines."""
+    return snapshot_dir / "PROVENANCE.md"
+
+
+PROVENANCE_FILE = provenance_file(SNAPSHOT_DIR)
 
 # An entry must say more than the filename. These are the fields the ledger
 # template asks for; a stanza missing them is a rubber stamp, not a reason.
@@ -115,12 +143,37 @@ def changed_files(base_ref: str) -> list[str]:
     return sorted({line.strip() for line in out.splitlines() if line.strip()})
 
 
-def evaluate(changed: list[str], provenance_text: str) -> list[str]:
-    """Pure core, so the self-test can drive both directions without a git tree.
+def evaluate(
+    changed: list[str],
+    provenance_texts: str | dict[str, str],
+) -> list[str]:
+    """Pure core, so the self-test can drive both directions without a repo checkout.
+
+    `provenance_texts` maps a snapshot directory (posix path) to its ledger's text.
+    A bare string is accepted as shorthand for the first guarded directory, which is
+    what the single-surface self-tests use.
 
     Returns a list of human-readable errors; empty means pass.
     """
-    snapshot_prefix = f"{SNAPSHOT_DIR.as_posix()}/"
+    if isinstance(provenance_texts, str):
+        provenance_texts = {SNAPSHOT_DIRS[0].as_posix(): provenance_texts}
+
+    errors: list[str] = []
+    for snapshot_dir in SNAPSHOT_DIRS:
+        errors.extend(
+            _evaluate_one(
+                changed,
+                snapshot_dir,
+                provenance_texts.get(snapshot_dir.as_posix(), ""),
+            )
+        )
+    return errors
+
+
+def _evaluate_one(changed: list[str], snapshot_dir: Path, provenance_text: str) -> list[str]:
+    """The original single-directory rule, applied to one guarded surface."""
+    ledger = provenance_file(snapshot_dir)
+    snapshot_prefix = f"{snapshot_dir.as_posix()}/"
     baselines = [
         p for p in changed if p.startswith(snapshot_prefix) and p.lower().endswith(".png")
     ]
@@ -129,10 +182,10 @@ def evaluate(changed: list[str], provenance_text: str) -> list[str]:
 
     errors: list[str] = []
 
-    if PROVENANCE_FILE.as_posix() not in changed:
+    if ledger.as_posix() not in changed:
         errors.append(
-            f"{len(baselines)} visual baseline(s) changed but "
-            f"{PROVENANCE_FILE.as_posix()} was not updated in the same change.\n"
+            f"{len(baselines)} visual baseline(s) changed under {snapshot_dir.as_posix()} but "
+            f"{ledger.as_posix()} was not updated in the same change.\n"
             "        Every baseline in this repo that certified a bug was a silent "
             "local re-bless (#611).\n"
             "        Record what you regenerated and why."
@@ -141,10 +194,7 @@ def evaluate(changed: list[str], provenance_text: str) -> list[str]:
     for path in baselines:
         name = Path(path).name
         if name not in provenance_text:
-            errors.append(
-                f"baseline '{name}' changed but is not named in "
-                f"{PROVENANCE_FILE.as_posix()}."
-            )
+            errors.append(f"baseline '{name}' changed but is not named in {ledger.as_posix()}.")
 
     # The newest stanza must carry real fields, not just a filename list.
     newest = _newest_entry(provenance_text)
@@ -152,14 +202,14 @@ def evaluate(changed: list[str], provenance_text: str) -> list[str]:
         missing = [f for f in REQUIRED_ENTRY_FIELDS if f not in newest]
         if missing:
             errors.append(
-                "the most recent PROVENANCE.md entry is missing required "
+                f"the most recent {ledger.as_posix()} entry is missing required "
                 f"field(s): {', '.join(missing)}"
             )
 
         left_over = [marker for marker in PLACEHOLDER_MARKERS if marker in newest]
         if left_over:
             errors.append(
-                "the most recent PROVENANCE.md entry still carries the refresh job's "
+                f"the most recent {ledger.as_posix()} entry still carries the refresh job's "
                 "placeholder reason.\n"
                 "        CI can record who regenerated a baseline and which files moved; "
                 "only you can say why\n"
@@ -198,12 +248,14 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
-    provenance_path = repo_root / PROVENANCE_FILE
-    provenance_text = (
-        provenance_path.read_text(encoding="utf-8") if provenance_path.exists() else ""
-    )
+    provenance_texts = {}
+    for snapshot_dir in SNAPSHOT_DIRS:
+        path = repo_root / provenance_file(snapshot_dir)
+        provenance_texts[snapshot_dir.as_posix()] = (
+            path.read_text(encoding="utf-8") if path.exists() else ""
+        )
 
-    errors = evaluate(changed_files(args.base_ref), provenance_text)
+    errors = evaluate(changed_files(args.base_ref), provenance_texts)
     if errors:
         print("FAIL: visual baseline provenance", file=sys.stderr)
         for err in errors:
@@ -214,8 +266,8 @@ def main() -> int:
             "  verifies them: add the `visual-baseline-refresh` label to your PR. The\n"
             "  job regenerates the baselines on the CI runner and writes the\n"
             "  PROVENANCE.md entry for you.\n\n"
-            "  Otherwise — add an entry to\n"
-            f"  {PROVENANCE_FILE.as_posix()} naming each regenerated file, how it was\n"
+            "  Otherwise — add an entry to the PROVENANCE.md beside the baseline\n"
+            "  (each surface owns its own ledger) naming each regenerated file, how it was\n"
             "  generated, and why the NEW image is correct. 'Tests were red' is not a\n"
             "  reason; that is the failure mode this guard exists to catch (#611).",
             file=sys.stderr,

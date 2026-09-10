@@ -19,6 +19,16 @@
 # divergence (repo `engines` are ">=22 <24") affects the dev server, not
 # Chromium's rasterisation, and is checked below rather than silently ignored.
 #
+# SCOPE: legal-search/frontend only. The platform-control admin owns its own
+# baselines under `platform-control/admin/e2e/visual.spec.ts-snapshots/` as of
+# #913, and this script deliberately does NOT regenerate them. There is exactly
+# one sanctioned way to move that surface's baselines — the
+# `admin-visual-baseline-refresh` CI job (the `visual-baseline-refresh` PR
+# label), which renders on the same runner that verifies. Adding a second,
+# less-faithful local generator for a brand-new surface would recreate the
+# problem #611 exists to prevent, and the caveats above say plainly that this
+# container matches CI on neither OS nor Node.
+#
 # Bump the image tag when bumping @playwright/test in legal-search/frontend/package.json.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

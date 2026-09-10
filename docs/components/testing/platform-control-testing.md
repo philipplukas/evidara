@@ -97,11 +97,64 @@ These tests should answer:
 
 ---
 
+## Admin Playwright suite (`platform-control/admin/e2e/`)
+
+Run it with `ADMIN_E2E_PORT=<free port> npm run e2e` from `platform-control/admin`
+(`npm run e2e:browsers` once first). Every spec mocks platform-control with
+`page.route`, so no backend, database or API key is needed — only the Next dev
+server Playwright starts itself.
+
+This is the **only** layer that sees layout, stylesheets and routing. jsdom has
+none of the three, which is how a clipped ACTIONS column, a UA-beveled sort header
+and a completely absent dark mode all passed `npm run check`.
+
+### Pixel baselines (`e2e/visual.spec.ts`)
+
+`npm run e2e:visual` compares the run-detail v2 page against the committed PNG in
+`e2e/visual.spec.ts-snapshots/`. The functional suite is `npm run e2e`, which runs
+`--grep-invert @visual` so the two report independently; both are invoked by
+`.github/workflows/platform-control.yml`, which is what
+`scripts/check-e2e-spec-coverage.sh` asserts.
+
+**This baseline used to live under `legal-search/frontend/`** and moved here in
+#913. Two costs, both measured: a PNG has no merge strategy, so two branches
+touching admin layout collided on an unmergeable binary (#902, #905); and an admin
+change failed a *legal-search* CI job, undiscoverable from the admin tree (#895).
+A surface owns its own baselines, its own ledger and its own CI job.
+
+**Zero pixel tolerance.** `playwright.config.ts` sets no `maxDiffPixelRatio`, so
+`toHaveScreenshot` allows zero differing pixels. The legal-search suite carried a
+project-level `0.06` — ~86,000 pixels on a 1600x900 full-page shot — and stayed
+green across a ~260px mislaid layout region for 3.5 months (#605/#611). Do not
+reintroduce a default; scope slack to one call with a written justification.
+
+**Baselines are generated in CI.** Add the `visual-baseline-refresh` label to the
+PR and push. `admin-visual-baseline-refresh` regenerates on `ubuntu-latest` — the
+same runner that verifies — and appends an entry to
+`platform-control/admin/e2e/visual.spec.ts-snapshots/PROVENANCE.md`. Generation
+and verification must share an environment: font rasterisation differs between
+machines and zero tolerance does not forgive it.
+
+**Every baseline change needs a recorded reason.**
+`scripts/check_visual_baseline_provenance.py` guards both snapshot directories and
+fails CI and pre-commit if a `*.png` changes without a matching `PROVENANCE.md`
+entry naming it. It also rejects the refresh job's own placeholder `Reason:`, so a
+machine-generated image cannot go green until a human says why it is correct.
+"The tests were red" is not a reason — re-blessing to restore green is precisely
+how three legal-search baselines came to certify live bugs.
+
+**Pixels are the wrong tool for geometry.** A clipped column or an overflowing
+table is small in pixel terms and fatal in use. Assert those with bounding-box
+checks (`run-detail-sections.spec.ts`, `operator-usability.spec.ts`), which state
+the invariant outright, and reserve screenshots for styling.
+
+---
+
 ## What NOT to Overbuild Early
 
 - Do not build comprehensive CRUD tests for every entity — focus on state transitions and boundaries
 - Do not test database query performance — correctness first
-- Do not build broad UI automation for the React-admin app early — prefer API and service tests; add targeted Playwright only for critical operator flows when they stabilize
+- Do not build broad UI automation for the React-admin app early — prefer API and service tests; add targeted Playwright only for critical operator flows when they stabilize. (Those flows have stabilized: the suite described above exists, and #686 documents why running it is not optional.)
 - Do not test every possible source configuration — test the schema validation, trust that the schema covers the rest
 - Do not build sophisticated source health monitoring — simple artifact count and content type checks are enough for MVP
 - Do not call live Firecrawl in CI — stub provider calls and use fixture webhook payloads instead

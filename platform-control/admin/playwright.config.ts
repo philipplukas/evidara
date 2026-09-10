@@ -36,6 +36,24 @@ export default defineConfig({
   timeout: 30_000,
   retries: 0,
   globalSetup: "../../scripts/e2e/playwright-server-identity.mjs",
+  expect: {
+    toHaveScreenshot: {
+      animations: "disabled",
+      // NO `maxDiffPixelRatio` HERE — deliberately. See #611.
+      //
+      // The legal-search suite carried a project-level `maxDiffPixelRatio: 0.06`,
+      // which on a 1600x900 full-page shot licenses ~86k pixels of drift. It stayed
+      // green across a ~260px mislaid filter rail for ~3.5 months (#605), across a
+      // replaced brand mark, and across the #674 filter-badge bug — in both
+      // directions. A VRT suite that cannot go red is worse than none, because its
+      // greenness is read as evidence.
+      //
+      // The default (undefined) allows zero differing pixels. If one snapshot
+      // genuinely needs slack for platform font rendering, scope it to that single
+      // `toHaveScreenshot` call with a comment justifying the number. Never widen
+      // the default.
+    },
+  },
   use: {
     baseURL,
     headless: true,

@@ -16,6 +16,7 @@ on:
       - "scripts/check-platform-control.sh"
       - "scripts/generate_platform_control_contract.py"
       - "scripts/check-e2e-spec-coverage.sh"
+      - "scripts/check_visual_baseline_provenance.py"
       - "scripts/e2e/**"
       - "styles/**"
 
@@ -55,6 +56,7 @@ jobs:
               - 'scripts/check-platform-control.sh'
               - 'scripts/generate_platform_control_contract.py'
               - 'scripts/check-e2e-spec-coverage.sh'
+              - 'scripts/check_visual_baseline_provenance.py'
               - 'scripts/e2e/**'
               - 'styles/**'
               - '.github/workflows/platform-control.yml'
@@ -188,6 +190,228 @@ jobs:
           path: platform-control/admin/playwright-report/
           retention-days: 7
 
+  # ─── Baseline provenance ───
+  #
+  # Mirrors the pre-commit hook of the same name (AGENTS.md: pre-commit and CI run
+  # the same checks) and the identically named job in `legal-search.yml`. The guard
+  # covers BOTH snapshot directories, so it must run from whichever surface changed
+  # — running it only in the legal-search workflow is the misrouting #913 is about.
+  # Needs full history for the merge-base diff.
+  visual-baseline-provenance:
+    name: Visual baseline provenance
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check visual baseline provenance
+        run: |
+          python3 scripts/check_visual_baseline_provenance.py \
+            --base-ref "origin/${{ github.event.pull_request.base.ref }}"
+
+  # ─── Admin pixel baselines ───
+  #
+  # The admin's run-detail v2 layout used to be photographed by a test in
+  # `legal-search/frontend/e2e/visual.spec.ts`, with its baseline PNG committed
+  # under that surface. An admin layout change therefore failed a LEGAL-SEARCH job
+  # (#895), and two branches touching admin layout collided on an unmergeable
+  # binary (#902/#905). It lives here now (#913).
+  #
+  # Split from `admin-e2e` rather than folded into it for the same reason that job
+  # is split from `check`: a pixel baseline is the one thing in this workflow that
+  # can go red for an environmental reason (font rasterisation), and it must not be
+  # able to mask the functional suite — nor be masked by it.
+  #
+  # ZERO pixel tolerance: `playwright.config.ts` sets no `maxDiffPixelRatio`. Do not
+  # add one. The legal-search suite carried 0.06 and stayed green across a ~260px
+  # mislaid layout region for 3.5 months (#605/#611).
+  admin-visual-regression:
+    name: Admin visual regression (Playwright)
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: platform-control/admin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: platform-control/admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('platform-control/admin/package-lock.json') }}
+
+      - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npm run e2e:browsers
+
+      - name: Install Playwright system deps
+        if: runner.environment == 'github-hosted'
+        run: npx playwright install-deps chromium
+
+      - name: Visual pixel regression
+        run: npm run e2e:visual
+
+      # On failure, upload the actual render, the diff and the trace so a drift can
+      # be inspected without reproducing it locally — and, when the drift is
+      # intended, so a reviewer can see what moved before applying the refresh label.
+      - name: Upload visual regression artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-visual-regression-results-${{ github.run_id }}
+          path: platform-control/admin/test-results
+          retention-days: 7
+          if-no-files-found: warn
+
+  # ─── Baseline regeneration, in CI, on demand ───
+  #
+  # The admin twin of `visual-baseline-refresh` in `legal-search.yml`. Generation
+  # happens on the same runner that verifies, which is what makes zero tolerance
+  # achievable: a baseline blessed on a workstation carries that workstation's font
+  # rasterisation, which no other machine reproduces byte-for-byte.
+  #
+  # To use it: add the `visual-baseline-refresh` label to the PR, then push (the
+  # label alone does not start a run; it is read from the PR payload of the next
+  # push). It deliberately does not run on `main`.
+  admin-visual-baseline-refresh:
+    name: Admin visual baseline refresh
+    needs: changes
+    if: >-
+      github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.labels.*.name, 'visual-baseline-refresh') &&
+      needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: platform-control/admin
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          fetch-depth: 0
+
+      # Same toolchain as `admin-visual-regression` above. If these two ever
+      # diverge, baselines are generated in one environment and verified in another
+      # — the whole failure this job exists to prevent.
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: platform-control/admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('platform-control/admin/package-lock.json') }}
+
+      - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npm run e2e:browsers
+
+      - name: Install Playwright system deps
+        if: runner.environment == 'github-hosted'
+        run: npx playwright install-deps chromium
+
+      # `=changed`, NOT the bare `--update-snapshots` (which means `=all`). `=all`
+      # rewrites every snapshot even when it already matches, so a reviewer can no
+      # longer tell which baseline actually moved. An unreadable diff is how bad
+      # baselines get waved through.
+      - name: Regenerate baselines (only those that actually differ)
+        run: npx playwright test e2e/visual.spec.ts --update-snapshots=changed
+
+      - name: Record provenance and commit
+        working-directory: .
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ACTOR: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          cd platform-control/admin/e2e/visual.spec.ts-snapshots
+
+          changed="$(git status --porcelain . | awk '{print $2}' | xargs -r -n1 basename | sort)"
+          if [ -z "$changed" ]; then
+            echo "No baseline changed — nothing to record."
+            exit 0
+          fi
+
+          echo "Regenerated:"; echo "$changed"
+
+          entry="$(mktemp)"
+          {
+            echo "## $(date -u +%Y-%m-%d) — PR #${PR_NUMBER} — CI-generated refresh"
+            echo
+            echo "- Generated by: \`admin-visual-baseline-refresh\` on \`ubuntu-latest\` ([run](${RUN_URL}))"
+            echo "- Requested by: @${ACTOR}"
+            echo "- Source commit: \`$(git rev-parse HEAD)\`"
+            echo "- Reason: _requested via the \`visual-baseline-refresh\` label._"
+            echo "  **Replace this line with why the NEW image is correct before merging.**"
+            echo "  A reviewer must be able to check the claim against the diff."
+            echo "- Files:"
+            echo "$changed" | sed 's/^/  - /'
+            echo
+          } > "$entry"
+
+          # Insert above the newest existing entry. Anchored on a DATE heading, not a
+          # bare `## `, so the file's own prose headings are not mistaken for entries
+          # — the same distinction the guard script draws.
+          awk 'NR==FNR{e=e $0 ORS; next}
+               /^## [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ && !done {printf "%s", e; done=1}
+               {print}' \
+            "$entry" PROVENANCE.md > PROVENANCE.new
+          mv PROVENANCE.new PROVENANCE.md
+
+          cd "${GITHUB_WORKSPACE}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add platform-control/admin/e2e/visual.spec.ts-snapshots
+
+          msg="$(mktemp)"
+          {
+            printf 'test(platform-control): refresh admin visual baselines in CI (PR #%s)\n\n' "${PR_NUMBER}"
+            printf 'Generated by the admin-visual-baseline-refresh job so the images come\n'
+            printf 'from the same environment that verifies them (#611, #913).\n'
+          } > "$msg"
+          git commit -F "$msg"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+
+          echo "::notice::Baselines refreshed. Fill in the Reason: line in PROVENANCE.md before merging."
+
   # The single required status check for this workflow. Individual jobs are
   # path-filtered and GitHub reports no conclusion for a job skipped by `if:`,
   # so requiring one directly would leave unrelated PRs pending forever.
@@ -198,6 +422,9 @@ jobs:
       - changes
       - check
       - admin-e2e
+      - visual-baseline-provenance
+      - admin-visual-regression
+      - admin-visual-baseline-refresh
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

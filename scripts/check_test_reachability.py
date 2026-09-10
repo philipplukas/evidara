@@ -552,13 +552,26 @@ def playwright_reaches(inv: Invocation, surface: Surface, spec: Path) -> bool:
     args = args[1:]
 
     grep: list[str] = []
+    grep_invert: list[str] = []
     paths: list[str] = []
     skip_next = False
     for idx, arg in enumerate(args):
         if skip_next:
             skip_next = False
             continue
-        if arg in {"-g", "--grep"}:
+        # `--grep-invert` must be matched BEFORE `--grep`, and before the generic
+        # `startswith("-")` skip. Handled by neither, its flag was dropped and its
+        # PATTERN fell through to `paths` as though it were a path substring — so
+        # `playwright test --grep-invert @visual` selected only specs whose path
+        # contained "@visual", i.e. none, and every admin spec was reported
+        # unreachable. A filter that widens selection read as one that empties it.
+        if arg in {"--grep-invert", "--grep-invert="}:
+            if idx + 1 < len(args):
+                grep_invert.append(args[idx + 1])
+            skip_next = True
+        elif arg.startswith("--grep-invert="):
+            grep_invert.append(arg.split("=", 1)[1])
+        elif arg in {"-g", "--grep"}:
             if idx + 1 < len(args):
                 grep.append(args[idx + 1])
             skip_next = True
@@ -575,10 +588,24 @@ def playwright_reaches(inv: Invocation, surface: Surface, spec: Path) -> bool:
         if not any(p.strip("./") in target for p in paths):
             return False
 
+    titles, dynamic = spec_titles(spec)
+
+    # An inverted filter EXCLUDES the specs it matches and selects the rest, so a
+    # spec is unreachable through this command only if it matches. Titles are read
+    # statically, so a spec whose titles are built dynamically cannot be proven
+    # excluded — and the honest answer there is that the command still reaches it,
+    # rather than silently dropping it from coverage.
+    for pattern in grep_invert:
+        try:
+            compiled = re.compile(pattern)
+        except re.error:
+            compiled = re.compile(re.escape(pattern))
+        if not dynamic and any(compiled.search(t) for t in titles):
+            return False
+
     if not grep:
         return True
 
-    titles, dynamic = spec_titles(spec)
     for pattern in grep:
         try:
             compiled = re.compile(pattern)
