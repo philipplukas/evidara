@@ -37,6 +37,8 @@ import {
   InlineAlert,
   Panel,
   Pill,
+  STICKY_RIGHT_CELL_CLASS,
+  STICKY_RIGHT_HEADER_CLASS,
 } from "../../ui/primitives";
 import { sourceVersionStatusToLevel } from "../shared/statusLevels";
 import { AcquisitionSpecPanel } from "./AcquisitionSpecPanel";
@@ -845,7 +847,18 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                   ].map((heading) => (
                     <th
                       key={heading}
-                      className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-meta)]"
+                      // Actions is pinned: at 1280px this table overflows
+                      // (scroller 844px wide over 972px of content) and every
+                      // button — Edit, Config, Preview run, Production run, and
+                      // the ADR-0033 Approve/Reject gate — sat past the visible
+                      // right edge with no fade, no hint and no scrollbar cue.
+                      // A column the operator must reach under pressure does not
+                      // get to be the one that scrolls away.
+                      data-sticky-right={heading === "Actions" ? "true" : undefined}
+                      className={cn(
+                        "px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-meta)]",
+                        heading === "Actions" && STICKY_RIGHT_HEADER_CLASS,
+                      )}
                     >
                       {heading}
                     </th>
@@ -922,7 +935,7 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                         <td className="px-4 py-3.5 whitespace-nowrap text-[12px] text-[var(--foreground-muted)]">
                           {formatSwissDateTime(version.updated_at)}
                         </td>
-                        <td className="px-4 py-3.5">
+                        <td className={cn("px-4 py-3.5", STICKY_RIGHT_CELL_CLASS)}>
                           <div className="flex flex-wrap items-center gap-1.5">
                             <VersionActionButton
                               action="edit"
