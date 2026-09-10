@@ -12,6 +12,48 @@
             "lowercase",
             "german_normalization"
           ]
+        },
+        "legal_query": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "german_normalization",
+            "query_noise"
+          ]
+        }
+      },
+      "filter": {
+        "query_noise": {
+          "type": "stop",
+          "ignore_case": true,
+          "stopwords": [
+            "ich",
+            "mein",
+            "meine",
+            "meinen",
+            "meiner",
+            "meinem",
+            "mir",
+            "mich",
+            "du",
+            "dein",
+            "deine",
+            "deinen",
+            "dir",
+            "dich",
+            "wir",
+            "unser",
+            "unsere",
+            "uns",
+            "wie",
+            "was",
+            "wann",
+            "wo",
+            "warum",
+            "weshalb",
+            "wieso"
+          ]
         }
       }
     }
@@ -27,6 +69,7 @@
       "title": {
         "type": "text",
         "analyzer": "legal_text",
+        "search_analyzer": "legal_query",
         "fields": {
           "keyword": {
             "type": "keyword"
@@ -36,6 +79,7 @@
       "authority_name": {
         "type": "text",
         "analyzer": "legal_text",
+        "search_analyzer": "legal_query",
         "fields": {
           "keyword": {
             "type": "keyword"
@@ -45,6 +89,7 @@
       "official_citation": {
         "type": "text",
         "analyzer": "legal_text",
+        "search_analyzer": "legal_query",
         "fields": {
           "keyword": {
             "type": "keyword"
@@ -53,11 +98,13 @@
       },
       "regeste": {
         "type": "text",
-        "analyzer": "legal_text"
+        "analyzer": "legal_text",
+        "search_analyzer": "legal_query"
       },
       "content": {
         "type": "text",
-        "analyzer": "legal_text"
+        "analyzer": "legal_text",
+        "search_analyzer": "legal_query"
       },
       "content_preview": {
         "type": "text"
@@ -138,7 +185,8 @@
           },
           "scope": {
             "type": "text",
-            "analyzer": "legal_text"
+            "analyzer": "legal_text",
+            "search_analyzer": "legal_query"
           }
         }
       },

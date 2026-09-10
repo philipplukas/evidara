@@ -49,6 +49,82 @@ export const DOCUMENTS_INDEX_ANALYSIS = {
       tokenizer: 'standard',
       filter: ['lowercase', 'german_normalization'],
     },
+    /**
+     * Query-time chain. Identical to `legal_text` plus `query_noise`.
+     *
+     * Query-time ONLY, deliberately: the index keeps every token, so phrase
+     * search still sees `ohne Bewilligung` intact and **no reindex is
+     * required**. Only what the user typed is filtered.
+     */
+    legal_query: {
+      type: 'custom',
+      tokenizer: 'standard',
+      filter: ['lowercase', 'german_normalization', 'query_noise'],
+    },
+  },
+  filter: {
+    /**
+     * Words that occur when a person ASKS a question and essentially never in
+     * the legal prose being searched (#973).
+     *
+     * This is NOT the `_german_` stopword list, and the difference is the
+     * whole point. Measured over the 903-document corpus:
+     *
+     *   ich      5 documents      hund   13
+     *   meinen   3 documents      leine   7
+     *   ohne   392                darf  276
+     *   nicht  774
+     *
+     * `ich` and `meinen` are RARER than `hund` and `leine`. BM25 is not
+     * malfunctioning when it ranks them highest — colloquial first-person
+     * German appears in almost no statute, so they genuinely are the most
+     * distinctive terms in the query. That is why asking
+     * "Darf ich meinen Hund in Zürich ohne Leine laufen lassen" returned a
+     * Gymnasium admission rule and a sewage-plant treaty while
+     * "Hund Leine Zürich" returned exactly `Hundegesetz (HuG) 554.5`.
+     *
+     * `_german_` would also remove `nicht` and `ohne`, and those must stay:
+     * `ohne Bewilligung` and a negation change what a norm MEANS, and at 392
+     * and 774 documents IDF already discounts them correctly. Removing a term
+     * BM25 is handling well, to fix a term it is handling badly, would trade a
+     * ranking bug for a correctness one.
+     *
+     * So: pronouns, possessives and modal/interrogative openers only. Nothing
+     * here can narrow a legal claim.
+     */
+    query_noise: {
+      type: 'stop',
+      ignore_case: true,
+      stopwords: [
+        // First and second person. A statute does not say "I" or "my".
+        'ich',
+        'mein',
+        'meine',
+        'meinen',
+        'meiner',
+        'meinem',
+        'mir',
+        'mich',
+        'du',
+        'dein',
+        'deine',
+        'deinen',
+        'dir',
+        'dich',
+        'wir',
+        'unser',
+        'unsere',
+        'uns',
+        // Interrogative openers.
+        'wie',
+        'was',
+        'wann',
+        'wo',
+        'warum',
+        'weshalb',
+        'wieso',
+      ],
+    },
   },
 } as const;
 
@@ -58,10 +134,17 @@ const facetKeyword = {
   fields: { keyword: { type: 'keyword' } },
 } as const;
 
-/** Full-text field analyzed with `legal_text`, plus an exact `.keyword`. */
+/**
+ * Full-text field: indexed with `legal_text`, SEARCHED with `legal_query`.
+ *
+ * The two differ only by `query_noise` (#973). Splitting them is what lets a
+ * question be filtered without touching a single indexed token — so this is a
+ * mapping update, not a reindex.
+ */
 const legalText = {
   type: 'text',
   analyzer: 'legal_text',
+  search_analyzer: 'legal_query',
   fields: { keyword: { type: 'keyword' } },
 } as const;
 
@@ -82,10 +165,11 @@ export const DOCUMENTS_INDEX_PROPERTIES = {
   official_citation: {
     type: 'text',
     analyzer: 'legal_text',
+    search_analyzer: 'legal_query',
     fields: { keyword: { type: 'keyword' } },
   },
-  regeste: { type: 'text', analyzer: 'legal_text' },
-  content: { type: 'text', analyzer: 'legal_text' },
+  regeste: { type: 'text', analyzer: 'legal_text', search_analyzer: 'legal_query' },
+  content: { type: 'text', analyzer: 'legal_text', search_analyzer: 'legal_query' },
   content_preview: { type: 'text' },
   structural_path: { type: 'text', fields: { keyword: { type: 'keyword' } } },
 
@@ -132,7 +216,7 @@ export const DOCUMENTS_INDEX_PROPERTIES = {
       target_level: { type: 'keyword' },
       target_jurisdiction_id: { type: 'keyword' },
       section_id: { type: 'keyword' },
-      scope: { type: 'text', analyzer: 'legal_text' },
+      scope: { type: 'text', analyzer: 'legal_text', search_analyzer: 'legal_query' },
     },
   },
 
