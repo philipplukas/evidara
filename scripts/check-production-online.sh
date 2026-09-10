@@ -313,14 +313,37 @@ else
     fi
 
     # b. is it actually served
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$host/" 2>/dev/null)
+    #
+    # `/health` FIRST, then `/`. An API has no root route, so `GET /` returns a
+    # perfectly healthy 404 — and this check used to call that a failure. It
+    # reported `legal-search-api.ts.veyo.dev -> 404` and
+    # `platform-control-api.ts.veyo.dev -> 404` as two production outages while
+    # both served `/health` 200. A gate that cries wolf about healthy services
+    # is worse than no gate: the next real failure reads as more noise.
+    #
+    # Passing every 404 instead would be the opposite mistake. An Ingress that
+    # exists as a file and was never applied ALSO 404s, and catching that is the
+    # whole reason this section talks to DNS rather than to the cluster (#884).
+    # Probing a path the backend actually serves separates the two: an
+    # unapplied Ingress fails `/health` as well.
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$host/health" 2>/dev/null)
+    probed="/health"
+    case "$code" in
+      2*|3*) ;;
+      *)
+        # No `/health` (marketing, consoles, anything not an API) — fall back to
+        # the root and judge it as before.
+        code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$host/" 2>/dev/null)
+        probed="/"
+        ;;
+    esac
     case "$code" in
       # 401/403 are a PASS: the auth proxy answering is proof the whole chain —
       # DNS, TLS, Traefik, the Ingress — is up. 2xx/3xx likewise.
-      2*|3*|401|403) pass "$host -> $code" ;;
+      2*|3*|401|403) pass "$host$probed -> $code" ;;
       000) fail "$host resolves but the connection failed (TLS handshake, or nothing listening)" ;;
-      5*)  fail "$host -> $code — the edge is up but the backend is not answering" ;;
-      *)   fail "$host -> $code" ;;
+      5*)  fail "$host$probed -> $code — the edge is up but the backend is not answering" ;;
+      *)   fail "$host$probed -> $code" ;;
     esac
 
     # c. is the certificate about to lapse
