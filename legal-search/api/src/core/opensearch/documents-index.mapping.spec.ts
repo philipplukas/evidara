@@ -8,7 +8,11 @@ import type {
 } from '../../modules/projections/projections.repository';
 import { ProjectionsService } from '../../modules/projections/projections.service';
 import { buildAliasActions, deriveDocumentsPhysicalIndex } from './documents-bootstrap';
-import { DOCUMENTS_INDEX_PROPERTIES, documentsIndexFields } from './documents-index.mapping';
+import {
+  DOCUMENTS_INDEX_ANALYSIS,
+  DOCUMENTS_INDEX_PROPERTIES,
+  documentsIndexFields,
+} from './documents-index.mapping';
 
 function createRepositoryMock(): ProjectionRepository {
   return {
@@ -220,5 +224,70 @@ describe('documents alias bootstrap', () => {
     expect(actions).toContainEqual({
       remove: { index: 'documents-000001', alias: 'documents-write' },
     });
+  });
+});
+
+/**
+ * #973 — a question must not out-rank keywords, and the fix must not blunt the
+ * words that carry legal meaning.
+ *
+ * These assert the ANALYSIS DEFINITION. The ranking itself is asserted by
+ * `documents-analyzer.integration.spec.ts`, which needs a real cluster; jsdom
+ * and a plain object cannot score a query.
+ */
+describe('legal_query — the query-time noise filter (#973)', () => {
+  const analysis = DOCUMENTS_INDEX_ANALYSIS as unknown as {
+    analyzer: Record<string, { filter: string[] }>;
+    filter: Record<string, { type: string; stopwords: string[] }>;
+  };
+
+  it('filters the query side only, so the index keeps every token', () => {
+    // The whole reason this is a mapping update and not a reindex. If
+    // `query_noise` ever appears on `legal_text`, indexed content loses those
+    // tokens and phrase search over them breaks silently.
+    expect(analysis.analyzer.legal_text.filter).not.toContain('query_noise');
+    expect(analysis.analyzer.legal_query.filter).toContain('query_noise');
+  });
+
+  it('strips the pronouns that a statute never uses', () => {
+    // Measured over the 903-document corpus: `ich` appears in 5 documents and
+    // `meinen` in 3 — RARER than `hund` (13) and `leine` (7). BM25 therefore
+    // ranks them as the query's most distinctive terms, which is why the dog
+    // question returned a Gymnasium admission rule and a sewage-plant treaty.
+    for (const word of ['ich', 'meinen', 'mein', 'mir', 'mich']) {
+      expect(analysis.filter.query_noise.stopwords).toContain(word);
+    }
+  });
+
+  it('KEEPS the words that change what a norm means', () => {
+    // The guard against "just use _german_". That list removes `nicht` and
+    // `ohne` — and `ohne Bewilligung` is not `Bewilligung`, while a negation
+    // inverts a norm outright. At 774 and 392 documents, IDF already discounts
+    // them correctly; removing a term BM25 handles well, to fix one it handles
+    // badly, trades a ranking bug for a correctness bug.
+    //
+    // Swap `query_noise` to `_german_` and this test goes red.
+    for (const word of ['nicht', 'ohne', 'kein', 'keine', 'muss', 'darf']) {
+      expect(analysis.filter.query_noise.stopwords).not.toContain(word);
+    }
+  });
+
+  it('every text field that is searched uses the query analyzer', () => {
+    // A field left on the index analyzer would keep the old behaviour with no
+    // visible difference — the exact silent-drift shape this mapping file
+    // exists to prevent.
+    const props = DOCUMENTS_INDEX_PROPERTIES as unknown as Record<
+      string,
+      { type?: string; analyzer?: string; search_analyzer?: string }
+    >;
+    const analyzedText = Object.entries(props).filter(
+      ([, def]) => def?.type === 'text' && def?.analyzer === 'legal_text',
+    );
+    expect(analyzedText.length).toBeGreaterThan(0);
+    for (const [name, def] of analyzedText) {
+      expect(def.search_analyzer, `${name} is searched with the index analyzer`).toBe(
+        'legal_query',
+      );
+    }
   });
 });
