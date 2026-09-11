@@ -124,6 +124,51 @@ new mapping fields. Documents indexed before this change carry none of them and 
 appear in any level bucket until reprojected — see
 `docs/runbooks/projection-reindex-backfill.md`.
 
+## Search refusal on coverage grounds
+
+`GET /v1/search` can decline to answer. When the query **names** a sub-federal
+jurisdiction the index holds nothing for, the response carries a `refusal` object and an
+empty `results` array instead of the best-scoring documents of some other canton (#986).
+
+**This is not a relevance threshold, and there is no score floor.** Measured against
+production's 889-document ZH corpus, `"Statistikgesetz Kanton Zürich"` (answerable) and
+`"Hundegesetz Kanton Bern"` (not) score **identically**, 14.01. The ZH *Hundegesetz*
+genuinely is in the corpus; the second query is wrong about the *canton*, not the topic,
+so nothing about relevance differs. The in-corpus and out-of-corpus score populations
+overlap end to end (lowest in 5.60, highest out 14.01), and a floor fitted to that sample
+would withhold real answers on the next corpus.
+
+**Refusal requires three positive findings, and the absence of any one answers normally:**
+
+1. **The query names a jurisdiction.** Names come from
+   `contracts/vocabularies/subdivisions.json` and are joined to canonical jurisdiction ids
+   through the seed's slug (`CH-BE` → `jur_ch_be`); there is no hand-written canton list.
+   A name alone is **not** enough — a tier marker must sit beside it (`Kanton Bern`,
+   `canton de Berne`, `Bern (Kanton)`) or the ISO code must appear (`CH-BE`). Half the
+   cantons are also ordinary words or cities: `Zug` is a train, `Jura` is a mountain
+   range, and `Zürich`, `Bern`, `Basel` and `Genf` are cities. A bare "Mietrecht Bern" is
+   therefore detected as nothing and searched exactly as before.
+2. **The corpus's holdings are known.** A `jurisdiction_ids` terms aggregation over the
+   read alias — the index *is* the corpus — cached for five minutes. A failed lookup, or
+   one returning no buckets, is reported as **unknown** and refuses nothing. Empty buckets
+   are what a drifted mapping produces (#675), so treating them as "holds nothing" would
+   turn a mapping defect into a refusal of every jurisdictional query.
+3. **None of the named jurisdictions is held.** "Kanton Bern und Kanton Zürich" against a
+   ZH corpus is **answered**: a partial answer beats no answer.
+
+The bias is deliberate and one-directional: **under-refuse, never over-refuse.** A false
+answer is what this fixes, but a false refusal hides law a user is entitled to and — unlike
+a wrong result — the caller cannot detect it.
+
+**A refusal is not an empty result set.** `totalResults: 0` with no `refusal` still means
+the query ran and matched nothing. The two are different answers and callers must not
+flatten them into "no results" (#984). `holding: not_held` on a refused jurisdiction
+carries exactly the meaning it does on `/v1/coverage` above: a statement about our
+holdings, never about whether the law exists.
+
+**Not yet consumed by the frontend.** The API produces the refusal and the generated
+client types it; rendering it as something other than "no results" is follow-up work.
+
 ## Minimal next tasks
 
 - [x] Define search projection schema
