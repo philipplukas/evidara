@@ -2,23 +2,27 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
-from fastapi.responses import PlainTextResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from document_intelligence.http_observability import install_http_observability
 from document_intelligence.service.lean import to_lean_dict, to_plain_text
 from document_intelligence.service.store import (
     EmptyPublishedDocumentStore,
     PublishedDocumentStore,
+    PublishedSectionsUnavailable,
     store_from_env,
 )
 
 _DOC_ID_RE = re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
 _PM_ID_RE = re.compile(r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
+
+logger = logging.getLogger(__name__)
 
 
 def _bad_id(message: str) -> HTTPException:
@@ -53,6 +57,29 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
 
     def get_store() -> PublishedDocumentStore:
         return effective
+
+    @app.exception_handler(PublishedSectionsUnavailable)
+    async def _published_sections_unavailable(
+        _request: Request,
+        exc: PublishedSectionsUnavailable,
+    ) -> JSONResponse:
+        """Refuse, rather than serve a document that appears to have no sections (#972).
+
+        The store raises this only when the sections read *failed*; a document with zero
+        sections returns normally. Serving 200 here would state something false about the
+        corpus — the shape #958 exists to remove — so the service answers 503 and the
+        consumer can render "unavailable" instead of "none".
+        """
+        logger.warning("published_sections_unavailable_refusal", extra={"uri": exc.uri})
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": (
+                    "Published sections are temporarily unavailable for this document; "
+                    "refusing to serve it as having none"
+                )
+            },
+        )
 
     @app.get("/v1/documents/{document_id}", tags=["documents"])
     async def get_document_docling_full(

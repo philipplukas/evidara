@@ -16,6 +16,27 @@ User-facing **document detail** combines OpenSearch-backed metadata from the **l
 3. **Verify `document.processed` was emitted** — Search projection and body reads both depend on publication signals and published Delta surfaces.
 4. **Validate environment config** — BFF must point at the correct Document Service base URL and bearer credential pair (`DOCUMENT_INTELLIGENCE_BASE_URL`, `DOCUMENT_INTELLIGENCE_API_KEY` / `DOCUMENT_SERVICE_BEARER_TOKEN`).
 
+## Symptom: `503` from the Document Service ("Published sections are temporarily unavailable")
+
+This is a **deliberate refusal**, not a crash (#972). The store answers `503` when the
+published-sections read *failed* — a schema mismatch, a filter against a column the table does not
+have, an unreadable surface, a credential problem. It exists because the alternative is worse: until
+this landed, every one of those returned `[]`, which is exactly what a document with genuinely zero
+sections returns, so a broken read rendered as *"this document has no sections"*.
+
+A document that truly has no sections still answers `200` without a `sections` array, and a sections
+surface that has never been written is a genuine zero, not a refusal.
+
+1. **Read the log line** — `published_sections_unavailable` carries the surface `uri` and the
+   underlying error; `published_sections_unavailable_refusal` marks the HTTP answer.
+2. **Check the sections surface schema** — the most common cause is a `published_sections` table
+   missing a column `get_full` filters on (`document_id`, `document_revision`,
+   `processing_manifest_id`). Compare against `PUBLISHED_SECTIONS`.
+3. **Check credentials and the surface root** — `DI_SURFACES_ROOT_URI` and the `DI_S3_*` pair must
+   reach the same object store the consumer wrote to.
+4. **Do not "fix" it by widening the catch.** Serving the document as section-less is the failure
+   mode this refusal replaced.
+
 ## Symptom: Slow document detail (high latency)
 
 1. **Payload size** — Lean vs full Docling JSON; prefer `/lean` for UI paths.

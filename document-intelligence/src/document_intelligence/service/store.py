@@ -16,6 +16,7 @@ from document_intelligence.persist.sinks import (
     delta_dataset_filesystem,
     delta_storage_options,
     delta_string_equals,
+    is_missing_delta_table,
 )
 
 _DOC_ID_RE = re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
@@ -37,6 +38,26 @@ _BACKFILL_ROW_COLUMNS = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class PublishedSectionsUnavailable(RuntimeError):
+    """The published-sections read failed — which is NOT "this document has no sections" (#972).
+
+    Before this existed, ``_get_sections`` answered every failure of the sections read with
+    ``[]``: the same value a document with genuinely zero sections produces. A schema
+    mismatch, a filter against a column the table does not have, an unreadable surface or a
+    credential problem all rendered as *"this document has no sections"* — a false statement
+    about the corpus rather than a refusal, which is the defect #958 exists to remove and
+    ADR-0052's *unknown is not zero* applied one layer below the UI.
+
+    Raised only for a read that failed. A sections surface that has never been written is a
+    genuine zero and still returns ``[]`` — see ``_get_sections``.
+    """
+
+    def __init__(self, uri: str | None, cause: BaseException) -> None:
+        super().__init__(f"published sections could not be read from {uri!r}: {cause}")
+        self.uri = uri
+        self.cause = cause
 
 
 class PublishedDocumentStore(Protocol):
@@ -209,6 +230,13 @@ class DeltaPublishedDocumentStore:
         document_revision: int | None,
         processing_manifest_id: str | None,
     ) -> list[dict[str, Any]]:
+        """Published sections for one document revision, or a refusal (#972).
+
+        Returns ``[]`` only where zero sections is the *truth*: no sections surface is
+        configured, the surface has never been written, or the filter matched no row.
+        A read that failed raises :class:`PublishedSectionsUnavailable` instead, so the
+        caller can say "unavailable" rather than "none".
+        """
         if not self._published_sections_uri:
             return []
 
@@ -221,12 +249,21 @@ class DeltaPublishedDocumentStore:
 
         try:
             table = self._open_dataset(self._published_sections_uri).to_table(filter=_and_filters(filters))
-        except Exception as exc:  # pragma: no cover - depends on Delta backend failure mode
+        except Exception as exc:
+            if is_missing_delta_table(exc):
+                # The surface has never been written. `_write_rows` skips an empty row set
+                # (`sinks.py`), so no Delta log at this URI means no document anywhere has
+                # published sections — a genuine zero, not an unknown.
+                logger.info(
+                    "published_sections_surface_absent",
+                    extra={"uri": self._published_sections_uri},
+                )
+                return []
             logger.warning(
                 "published_sections_unavailable",
                 extra={"uri": self._published_sections_uri, "error": str(exc)},
             )
-            return []
+            raise PublishedSectionsUnavailable(self._published_sections_uri, exc) from exc
 
         rows = table.to_pylist()
         rows.sort(key=lambda row: (int(row.get("ordinal") or 0), str(row.get("section_id") or "")))

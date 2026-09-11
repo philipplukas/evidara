@@ -61,6 +61,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: |
+            The published-sections read failed. The service refuses rather than serving the
+            document as if it had no sections — a failed read must never be indistinguishable
+            from a genuine zero (#972, ADR-0052). A document that truly has no sections is
+            served as `200` without a `sections` array.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/documents/{document_id}/lean:
     get:
@@ -87,6 +97,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: |
+            The published-sections read failed. The service refuses rather than serving the
+            document as if it had no sections — a failed read must never be indistinguishable
+            from a genuine zero (#972, ADR-0052). A document that truly has no sections is
+            served as `200` without a `sections` array.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/documents/{document_id}/text:
     get:
@@ -107,6 +127,16 @@ paths:
                 type: string
         "404":
           description: Document not found or not visible for the caller scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: |
+            The published-sections read failed. The service refuses rather than serving the
+            document as if it had no sections — a failed read must never be indistinguishable
+            from a genuine zero (#972, ADR-0052). A document that truly has no sections is
+            served as `200` without a `sections` array.
           content:
             application/json:
               schema:

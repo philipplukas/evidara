@@ -555,7 +555,7 @@ class DeltaCanonicalSink(CanonicalSink):
         except Exception as error:
             # The surface not existing yet is the ordinary first-publication case, not a
             # fault; only genuinely unexpected read failures are worth a warning.
-            if not _is_missing_delta_table(error):
+            if not is_missing_delta_table(error):
                 logger.warning(
                     "latest_document_revision_unavailable",
                     extra={"document_id": document_id},
@@ -611,7 +611,7 @@ class DeltaCanonicalSink(CanonicalSink):
             ) from error
 
 
-def _is_missing_delta_table(error: BaseException) -> bool:
+def is_missing_delta_table(error: BaseException) -> bool:
     """Whether ``error`` means "this Delta surface does not exist yet" (#652).
 
     Matched on the exception *name* rather than the type: ``TableNotFoundError`` lives in
