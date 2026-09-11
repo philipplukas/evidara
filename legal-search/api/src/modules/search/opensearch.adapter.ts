@@ -332,6 +332,32 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         fields: [...SEARCH_FIELD_WEIGHTS],
         type: 'best_fields' as const,
         fuzziness: 'AUTO',
+        /*
+         * The first two characters must match exactly (#981).
+         *
+         * Bare `fuzziness: 'AUTO'` does not soften matching, it destroys it.
+         * Measured against the 889-document production corpus, same query,
+         * same fields, same analyzer, varying only this:
+         *
+         *   "Darf ich meinen Hund in Zuerich ohne Leine laufen lassen"
+         *     AUTO                    -> "Aufnahme in die K+S Klassen ..."
+         *     AUTO + prefix_length 2  -> "Hundegesetz (HuG) 554.5"
+         *
+         *   "Hund Leine Zuerich"
+         *     AUTO                    -> "Vetsuisse-Fakultaet der Universitaeten ..."
+         *     AUTO + prefix_length 2  -> "Hundegesetz (HuG) 554.5"
+         *
+         * Short tokens expand to unrelated terms within edit distance and the
+         * expansions outscore the exact hits. `prefix_length` keeps typo
+         * tolerance — a transposed or dropped character later in a word still
+         * matches — while refusing an expansion that shares no opening.
+         *
+         * Note the second example: this was never "questions fail, keywords
+         * work". `classifyQuery` routes <=3 tokens down `short_legal`, which
+         * sets no fuzziness, so short queries were only ACCIDENTALLY exempt.
+         * Anything longer was fuzzy-matched into noise.
+         */
+        prefix_length: 2,
       },
     };
   }
