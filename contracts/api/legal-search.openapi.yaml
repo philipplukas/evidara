@@ -176,7 +176,14 @@ paths:
             maximum: 100
       responses:
         "200":
-          description: Search results with embedded facets
+          description: |
+            Search results with embedded facets — or a refusal.
+
+            When the query names a sub-federal jurisdiction the corpus holds
+            nothing for, the response carries `refusal` and an empty `results`
+            array instead of the best-scoring documents of a different
+            jurisdiction (#986). An empty `results` WITHOUT `refusal` is the
+            other thing entirely: the query ran and matched nothing.
           content:
             application/json:
               schema:
@@ -676,6 +683,70 @@ components:
           default: []
         totalResults:
           type: integer
+        refusal:
+          allOf:
+            - $ref: "#/components/schemas/SearchRefusalView"
+          description: |
+            Present when the search was NOT answered. Absent when it was.
+
+            `totalResults: 0` with no `refusal` means the query executed and
+            matched nothing. A `refusal` means the query was not run at all and
+            says why — a different statement, and callers must not flatten the
+            two into "no results" (#984, #986).
+
+    SearchRefusalView:
+      type: object
+      description: |
+        Why search declined to answer (#986).
+
+        Refusal in a legal corpus is a coverage question, not a relevance one:
+        "Statistikgesetz Kanton Zürich" and "Hundegesetz Kanton Bern" score
+        identically against a Zurich-only corpus, because the second is wrong
+        about the canton and not about the topic. So the check is whether the
+        corpus holds the jurisdiction the query names, never how well anything
+        scored.
+      required: [code, message, jurisdictions]
+      properties:
+        code:
+          type: string
+          enum: [jurisdiction_not_held]
+          description: |
+            Machine-readable reason. `jurisdiction_not_held`: the query named a
+            sub-federal jurisdiction and the index holds no document for it.
+        message:
+          type: string
+          description: Human- and agent-readable explanation naming the jurisdiction.
+        jurisdictions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RefusedJurisdictionView"
+          description: |
+            Every jurisdiction the query named that the corpus holds nothing
+            for. A query naming one held and one unheld jurisdiction is
+            ANSWERED, not refused, so this list is never partial.
+
+    RefusedJurisdictionView:
+      type: object
+      required: [jurisdiction_id, iso_code, label, holding]
+      properties:
+        jurisdiction_id:
+          type: string
+          description: "Canonical platform jurisdiction id, e.g. `jur_ch_be`"
+        iso_code:
+          type: string
+          description: "ISO 3166-2 code from contracts/vocabularies/subdivisions.json, e.g. `CH-BE`"
+        label:
+          type: string
+          description: Display name from the jurisdiction seed
+        holding:
+          type: string
+          enum: [not_held]
+          description: |
+            A statement about the CORPUS, never about the law. `not_held` means
+            the index contains no matching document; it is not evidence the norm
+            does not exist. The enum has one member so no caller can find a
+            value meaning "confirmed absent in law" — the same discipline
+            `/v1/coverage` applies.
 
     SearchResultView:
       type: object

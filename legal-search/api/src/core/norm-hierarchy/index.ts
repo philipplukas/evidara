@@ -9,6 +9,7 @@ export {
   deriveSubordinateTo,
   getGoverningScopes,
   getJurisdiction,
+  getJurisdictionBySlug,
   getNormHierarchyLevels,
   isNormLevel,
   type JurisdictionLevel,

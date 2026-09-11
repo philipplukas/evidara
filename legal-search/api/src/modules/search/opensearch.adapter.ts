@@ -57,6 +57,13 @@ const PHRASE_BOOST_FIELDS = [
   ['docket_number', 4],
 ] as const;
 
+/**
+ * Bucket ceiling for the jurisdiction-holdings aggregation. The jurisdiction
+ * seed has 2,169 entries; this must stay above it, because a truncated holdings
+ * list reads as "not held" for everything it dropped.
+ */
+const JURISDICTION_HOLDINGS_MAX_BUCKETS = 3000;
+
 type QueryShape = 'wildcard' | 'short_legal' | 'free_text';
 
 @Injectable()
@@ -260,6 +267,38 @@ export class SearchOpenSearchAdapter implements SearchRepository {
       };
     } catch (err) {
       throw this.failure('context aggregation', err);
+    }
+  }
+
+  /**
+   * Terms aggregation over `jurisdiction_ids.keyword` — the index's own account
+   * of which jurisdictions it holds (#986).
+   *
+   * `size: 0` hits, `size: 3000` buckets: the seed carries 2,169 jurisdictions,
+   * so a default of 10 would silently truncate the corpus's holdings into a
+   * short list and make every unlisted jurisdiction look unheld. Truncating a
+   * holdings list is how a coverage check turns into a false refusal.
+   *
+   * `.keyword` is the sub-field, matching how `search()` filters the same field.
+   */
+  async getHeldJurisdictionIds(): Promise<string[]> {
+    try {
+      const response = await this.client.search({
+        index: this.indexDocuments,
+        body: {
+          size: 0,
+          aggs: {
+            held_jurisdictions: {
+              terms: { field: 'jurisdiction_ids.keyword', size: JURISDICTION_HOLDINGS_MAX_BUCKETS },
+            },
+          },
+        },
+      });
+      return this.parseBuckets(response.body.aggregations?.held_jurisdictions).map(
+        (bucket) => bucket.key,
+      );
+    } catch (err) {
+      throw this.failure('jurisdiction holdings aggregation', err);
     }
   }
 

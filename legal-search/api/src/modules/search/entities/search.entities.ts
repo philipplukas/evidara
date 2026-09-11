@@ -72,3 +72,36 @@ export interface ContextAggregations {
   languages: AggregationBucket[];
   source_types: AggregationBucket[];
 }
+
+/**
+ * Why search declined to answer (#986).
+ *
+ * A refusal is NOT an empty result set. `totalResults: 0` with no `refusal`
+ * means the query executed and matched nothing; a `refusal` means the query was
+ * not answered at all, and says what stopped it. #984 is what happens when a
+ * layer flattens that distinction, so it is carried as its own object rather
+ * than encoded in a count.
+ */
+export interface SearchRefusalEntity {
+  /** Machine-readable reason. One member today; a union so callers must switch. */
+  code: 'jurisdiction_not_held';
+  /** Operator- and agent-readable explanation naming the jurisdiction. */
+  message: string;
+  /** The jurisdictions the query named that the corpus holds nothing for. */
+  jurisdictions: RefusedJurisdictionEntity[];
+}
+
+export interface RefusedJurisdictionEntity {
+  /** Canonical platform jurisdiction id, e.g. `jur_ch_be`. */
+  jurisdiction_id: string;
+  /** ISO 3166-2 code from the subdivisions vocabulary, e.g. `CH-BE`. */
+  iso_code: string;
+  /** Display name from the jurisdiction seed. */
+  label: string;
+  /**
+   * Always `not_held`. It is a statement about the CORPUS, never about the law
+   * — the same two-member discipline `/v1/coverage` uses, so no caller can find
+   * a value meaning "confirmed absent in law".
+   */
+  holding: 'not_held';
+}

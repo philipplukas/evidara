@@ -16,6 +16,18 @@ export interface SearchRepository {
   /** Same contract as `search`: rejects rather than returning empty aggregations. */
   getContextAggregations(): Promise<ContextAggregations>;
   /**
+   * The canonical jurisdiction ids (`jur_*`) the index holds at least one
+   * document for — a `jurisdiction_ids` terms aggregation over the read alias.
+   *
+   * This is what lets search answer "do I hold the law of the place being asked
+   * about?" instead of ranking (#986). Same contract as `search`: it rejects
+   * rather than resolving empty when the query could not be executed. An empty
+   * array means the aggregation ran and produced no buckets — which the caller
+   * must treat as UNKNOWN rather than "holds nothing", because a drifted
+   * mapping produces exactly that shape (#675).
+   */
+  getHeldJurisdictionIds(): Promise<string[]>;
+  /**
    * Readiness probe: does the documents read alias resolve to at least one
    * index? Non-throwing by design — the caller (health endpoint) reports the
    * failure rather than propagating it.

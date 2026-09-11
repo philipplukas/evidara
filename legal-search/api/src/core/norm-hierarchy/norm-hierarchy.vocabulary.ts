@@ -111,6 +111,26 @@ export function getJurisdiction(jurisdictionId: string): JurisdictionNode | unde
   return JURISDICTIONS.get(jurisdictionId);
 }
 
+const JURISDICTIONS_BY_SLUG = new Map<string, JurisdictionNode>();
+for (const node of JURISDICTIONS.values()) {
+  // Slugs are unique in the seed; first writer wins if they ever are not, so a
+  // duplicate can never silently rebind an existing slug to another node.
+  if (!JURISDICTIONS_BY_SLUG.has(node.slug)) JURISDICTIONS_BY_SLUG.set(node.slug, node);
+}
+
+/**
+ * Look a jurisdiction up by its canonical slug (`ch-zh`, `ch-federal`).
+ *
+ * The slug — not a string-concatenated id — is the supported way to cross from
+ * another vocabulary into this one. `contracts/vocabularies/subdivisions.json`
+ * keys cantons as ISO 3166-2 (`CH-ZH`), and `country`+`slug` from that file
+ * composes exactly the slug used here, so the two vocabularies join without
+ * either inventing an id format the seed does not promise.
+ */
+export function getJurisdictionBySlug(slug: string): JurisdictionNode | undefined {
+  return JURISDICTIONS_BY_SLUG.get(slug.toLowerCase());
+}
+
 /**
  * The scopes whose law governs `jurisdictionId`, including the jurisdiction
  * itself, ordered most authoritative first.
