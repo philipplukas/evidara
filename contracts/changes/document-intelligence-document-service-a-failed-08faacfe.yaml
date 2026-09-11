@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  document-intelligence document service: a failed published-sections read answers 503 instead of a 200 that looks like 'this document has no sections' (#972)

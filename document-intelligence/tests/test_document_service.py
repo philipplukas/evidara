@@ -14,7 +14,11 @@ try:
     from starlette.testclient import TestClient
 
     from document_intelligence.service.app import create_app
-    from document_intelligence.service.store import DeltaPublishedDocumentStore, FilePublishedDocumentStore
+    from document_intelligence.service.store import (
+        DeltaPublishedDocumentStore,
+        FilePublishedDocumentStore,
+        PublishedSectionsUnavailable,
+    )
 except ImportError:
     deltalake = None  # type: ignore[misc, assignment]
     pa = None  # type: ignore[misc, assignment]
@@ -22,6 +26,7 @@ except ImportError:
     create_app = None  # type: ignore[misc, assignment]
     DeltaPublishedDocumentStore = None  # type: ignore[misc, assignment]
     FilePublishedDocumentStore = None  # type: ignore[misc, assignment]
+    PublishedSectionsUnavailable = None  # type: ignore[misc, assignment]
 
 _DOC = "doc_01jq7bdptzqv3xs0c41xpw1ybg"
 _PM = "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
@@ -349,6 +354,134 @@ class TestDeltaPublishedDocumentStore(unittest.TestCase):
                 row["sections"][0]["metadata"]["citations"][0]["citation_type"],
                 "at_bgbl",
             )
+
+
+_OTHER_DOC = "doc_01jq7bdptzqv3xs0c41xpw1ybh"
+
+
+def _document_row(document_id: str, processing_manifest_id: str) -> dict[str, object]:
+    return {
+        "document_id": document_id,
+        "document_revision": 1,
+        "processing_manifest_id": processing_manifest_id,
+        "title": "A document",
+        "full_text": "body",
+    }
+
+
+def _section_row(document_id: str, processing_manifest_id: str | None) -> dict[str, object]:
+    row: dict[str, object] = {
+        "section_id": f"sec_{document_id[-4:]}",
+        "document_id": document_id,
+        "document_revision": 1,
+        "ordinal": 0,
+        "depth": 0,
+        "title": "First",
+        "content": "First content",
+        "section_type": "body",
+    }
+    if processing_manifest_id is not None:
+        row["processing_manifest_id"] = processing_manifest_id
+    return row
+
+
+@unittest.skipUnless(deltalake is not None, "deltalake is not installed")
+class TestSectionsReadFailureIsNotAnEmptyResult(unittest.TestCase):
+    """#972 — a failed sections read must not render as "this document has no sections".
+
+    The two halves below are deliberately the same assertion shape over the same store:
+    one document whose sections read FAILS and one that genuinely HAS NO sections. Before
+    the fix both produced a payload with no ``sections`` key, so no assertion about the
+    payload could tell them apart — which is the defect itself.
+    """
+
+    def setUp(self) -> None:
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        base = Path(self._dir.name)
+        self.documents_uri = str(base / "published_documents")
+        self.sections_uri = str(base / "published_sections")
+        self.absent_sections_uri = str(base / "never_written_sections")
+        _write_published_documents(
+            self.documents_uri,
+            [_document_row(_DOC, _PM), _document_row(_OTHER_DOC, _PM)],
+        )
+
+    def _store(self, sections_uri: str) -> object:
+        assert DeltaPublishedDocumentStore is not None
+        return DeltaPublishedDocumentStore(self.documents_uri, sections_uri, storage_options={})
+
+    def test_broken_sections_read_refuses_instead_of_reporting_no_sections(self) -> None:
+        """The real #972 reproduction: the sections surface lacks a column the filter uses.
+
+        ``PUBLISHED_SECTIONS`` declares ``processing_manifest_id`` non-nullable and
+        ``get_full`` filters on it, so a table written without it makes pyarrow raise
+        ``ArrowInvalid``. That is a broken read, not an empty one.
+        """
+        _write_published_sections(self.sections_uri, [_section_row(_DOC, None)])
+
+        with self.assertRaises(PublishedSectionsUnavailable) as ctx:
+            self._store(self.sections_uri).get_full(_DOC, None)
+
+        self.assertEqual(ctx.exception.uri, self.sections_uri)
+        self.assertIn("processing_manifest_id", str(ctx.exception.cause))
+
+    def test_document_with_genuinely_no_sections_still_returns_a_payload(self) -> None:
+        """The other half: a readable surface that holds no row for this document."""
+        _write_published_sections(self.sections_uri, [_section_row(_OTHER_DOC, _PM)])
+
+        payload = self._store(self.sections_uri).get_full(_DOC, None)
+
+        assert payload is not None
+        self.assertEqual(payload["document_id"], _DOC)
+        self.assertEqual(payload.get("sections", []), [])
+
+    def test_sections_surface_that_was_never_written_is_a_genuine_zero(self) -> None:
+        """A URI with no Delta log means no document anywhere published sections.
+
+        ``_write_rows`` skips an empty row set, so this is the ordinary state of a corpus
+        that has never sectioned anything — a real zero, and the one read failure that is
+        NOT a refusal. Removing the ``is_missing_delta_table`` branch turns this red.
+        """
+        payload = self._store(self.absent_sections_uri).get_full(_DOC, None)
+
+        assert payload is not None
+        self.assertEqual(payload.get("sections", []), [])
+
+
+@unittest.skipUnless(TestClient is not None, "Install document-intelligence[service] for HTTP tests")
+class TestSectionsUnavailableIsRefusedOverHTTP(unittest.TestCase):
+    """The service refuses (503) rather than serving a section-less 200 (#972, #958)."""
+
+    class _BrokenSectionsStore:
+        def get_full(
+            self,
+            document_id: str,
+            document_revision: int | None,
+            processing_manifest_id: str | None = None,
+        ) -> dict[str, object] | None:
+            raise PublishedSectionsUnavailable("s3://bucket/published_sections", RuntimeError("boom"))
+
+    class _NoSectionsStore:
+        def get_full(
+            self,
+            document_id: str,
+            document_revision: int | None,
+            processing_manifest_id: str | None = None,
+        ) -> dict[str, object] | None:
+            return {"document_id": document_id, "body": {"text": "Hello"}}
+
+    def test_broken_sections_read_answers_503(self) -> None:
+        client = TestClient(create_app(self._BrokenSectionsStore()), raise_server_exceptions=False)
+        for path in ("", "/lean", "/text"):
+            with self.subTest(path=path):
+                response = client.get(f"/v1/documents/{_DOC}{path}")
+                self.assertEqual(response.status_code, 503)
+
+    def test_document_with_no_sections_answers_200(self) -> None:
+        client = TestClient(create_app(self._NoSectionsStore()))
+        response = client.get(f"/v1/documents/{_DOC}")
+        self.assertEqual(response.status_code, 200)
 
 
 if __name__ == "__main__":
