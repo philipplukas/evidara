@@ -9,7 +9,7 @@
  * - `RunRefusalBanner` — `run.refused` (ADR-0035 / #634). Rendered by nothing
  *   until now, so a refused dispatch looked like a provider failure and sent
  *   operators to debug something that was never called.
- * - `RunStallPanel` — the six named stall causes from the CLI, replacing one
+ * - `RunStallPanel` — the named stall causes from the CLI, replacing one
  *   sentence that covered all of them.
  * - `RunAcceptanceEvidencePanel` — the ADR-0030 verdict, including the
  *   `execution_mode` join that lives on the **source version**
@@ -172,8 +172,12 @@ export function RunStallPanel({
   healthError: unknown;
 }) {
   const diagnosis = useMemo(
-    () => diagnoseRunStall({ status: run.status, refused: run.refused }, health),
-    [health, run.status, run.refused],
+    () =>
+      diagnoseRunStall(
+        { status: run.status, refused: run.refused, failure_reason: run.failure_reason },
+        health,
+      ),
+    [health, run.status, run.refused, run.failure_reason],
   );
 
   // Nothing to diagnose: a completed run that produced lifecycle events reached
@@ -198,9 +202,12 @@ export function RunStallPanel({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Pill level={diagnosis.cause === "unknown" ? "neutral" : "degraded"}>
-              {diagnosis.cause}
-            </Pill>
+            {/*
+              `isDiagnosed` is false for `unknown` and `too_early_to_diagnose`: a
+              question that could not be answered yet must not wear the same chip
+              as a named defect (ADR-0052).
+            */}
+            <Pill level={diagnosis.isDiagnosed ? "degraded" : "neutral"}>{diagnosis.cause}</Pill>
             <Pill variant="meta">{diagnosis.label}</Pill>
           </div>
           <p className="text-[13px] text-[var(--foreground-muted)]">{diagnosis.detail}</p>

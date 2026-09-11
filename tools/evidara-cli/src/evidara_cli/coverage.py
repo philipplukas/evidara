@@ -232,6 +232,19 @@ STALL_PUBLISH_PATH_DISABLED = "publish_path_disabled"
 STALL_DI_CONSUMER_SILENT = "di_consumer_silent"
 STALL_PROJECTION_STALLED = "projection_stalled"
 STALL_SEARCH_PENDING = "search_projection_pending"
+#: The run failed on its own terms and recorded why. Not a signature derived from
+#: stage state — the run's own ``failure_reason``, which the diagnosis used to
+#: ignore entirely, reporting ``unknown`` over a recorded cause (#950).
+STALL_RUN_FAILED = "run_failed"
+#: No cause can be named yet, which is not the same as "nothing is wrong".
+#:
+#: A run still in flight has its downstream stages ``pending`` because nothing has
+#: asked them to do anything. Telling "not yet" from "stuck" needs elapsed time,
+#: which this snapshot does not carry, so the honest answer is that the question is
+#: premature (ADR-0052: a diagnosis that cannot be made is not a clean bill of
+#: health). Reading those pendings as a cause is what named ``projection_stalled``
+#: on every healthy young run (#950).
+STALL_TOO_EARLY = "too_early_to_diagnose"
 STALL_UNKNOWN = "unknown"
 
 _STALL_DETAIL = {
@@ -266,6 +279,19 @@ _STALL_DETAIL = {
         "Projection has run but the search stage has not reported. Give the index a moment, "
         "then assert searchability directly with `evidara legal-search search`."
     ),
+    STALL_RUN_FAILED: (
+        "The run failed and was not refused by the two-key lock, and no failure reason "
+        "was recorded. That is unrecorded, not absent — read the run's provider jobs and "
+        "the dispatcher logs. The stages say how far it got, not why it stopped."
+    ),
+    STALL_TOO_EARLY: (
+        "The run is still executing, so the stages after acquisition are pending because "
+        "nothing has asked them to do anything yet. That is the expected shape of a run in "
+        "flight, not a stall — no downstream cause can be named while acquisition is still "
+        "going, because telling 'not yet' from 'stuck' needs elapsed time this snapshot "
+        "does not carry. Watch the acquisition stage and ask again once the run reaches a "
+        "terminal state."
+    ),
     STALL_UNKNOWN: (
         "No known stall signature matched. Inspect the pipeline-health stages directly."
     ),
@@ -285,7 +311,14 @@ def diagnose_stall(run: dict[str, Any], health: dict[str, Any]) -> dict[str, Any
     Returns a ``cause`` code an agent can branch on plus operator-facing detail. The
     causes are the failure modes actually hit driving the loop end to end, not a
     theoretical list.
+
+    Ask what the run's own status already says **before** deriving anything from
+    stage state. Doing it the other way round is #950: a failed run whose
+    ``failure_reason`` was recorded came back ``unknown``, and a healthy run still in
+    flight came back ``projection_stalled`` because every stage after acquisition is
+    pending by construction.
     """
+    failure_reason = str(run.get("failure_reason") or "").strip()
     if bool(run.get("refused")):
         cause = STALL_RUN_REFUSED
     else:
@@ -298,20 +331,44 @@ def diagnose_stall(run: dict[str, Any], health: dict[str, Any]) -> dict[str, Any
 
         if run_status == "pending":
             cause = STALL_NO_DISPATCH_WORKER
+        elif run_status == "failed":
+            cause = STALL_RUN_FAILED
         elif run_status == "completed" and processing_events == 0:
             cause = STALL_PUBLISH_PATH_DISABLED
+        elif run_status in {"running", "in_progress"}:
+            cause = STALL_TOO_EARLY
         elif di.get("status") in {"pending", "in_progress"} and processing_events > 0:
             cause = STALL_DI_CONSUMER_SILENT
-        elif lifecycle_events == 0 and projection.get("status") in {"pending", "in_progress"}:
+        elif (
+            processing_events > 0
+            and lifecycle_events == 0
+            and projection.get("status") in {"pending", "in_progress"}
+        ):
+            # ``processing_events > 0`` is what this cause's own sentence has always
+            # claimed — "DI reported processing but no document-lifecycle events were
+            # projected" — and what the branch never checked.
             cause = STALL_PROJECTION_STALLED
-        elif search.get("status") == "pending":
+        elif lifecycle_events > 0 and search.get("status") == "pending":
+            # Likewise: "Projection has run but the search stage has not reported" is
+            # only true if projection emitted something.
             cause = STALL_SEARCH_PENDING
         else:
             cause = STALL_UNKNOWN
 
+    detail = _STALL_DETAIL[cause]
+    if cause == STALL_RUN_FAILED and failure_reason:
+        detail = (
+            f"The run failed and recorded why: {failure_reason!r}. That is the diagnosis — "
+            "read it before reading the stages, which say how far the run got, not why it "
+            "stopped."
+        )
+
     return {
         "cause": cause,
-        "detail": _STALL_DETAIL[cause],
+        "detail": detail,
+        # False for the two outcomes that are not a finding: a caller must render
+        # neither as a defect and neither as health (ADR-0052).
+        "is_diagnosed": cause not in {STALL_TOO_EARLY, STALL_UNKNOWN},
         "run_status": run.get("status"),
         "refused": bool(run.get("refused")),
         "failure_reason": run.get("failure_reason"),

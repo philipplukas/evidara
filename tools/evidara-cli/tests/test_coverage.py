@@ -41,8 +41,13 @@ from evidara_cli.coverage import (
     REMEDY_RUN_ACCEPTANCE_LOOP,
     STALL_DI_CONSUMER_SILENT,
     STALL_NO_DISPATCH_WORKER,
+    STALL_PROJECTION_STALLED,
     STALL_PUBLISH_PATH_DISABLED,
+    STALL_RUN_FAILED,
     STALL_RUN_REFUSED,
+    STALL_SEARCH_PENDING,
+    STALL_TOO_EARLY,
+    STALL_UNKNOWN,
     acceptance_evidence_verdict,
     classify_template,
     config_key_state,
@@ -270,6 +275,88 @@ def test_diagnose_di_events_but_no_progress() -> None:
         },
     )
     assert result["cause"] == STALL_DI_CONSUMER_SILENT
+
+
+# --- #950: wrong in both directions --------------------------------------------------
+
+
+def _young_running_health() -> dict[str, object]:
+    """A run still acquiring: nothing downstream has been asked to do anything.
+
+    This is the exact shape the old ``lifecycle_events == 0 and projection pending``
+    branch fired on, which is why the test below asserts the shape before asserting
+    the diagnosis — a fixture that never reached the branch would make the
+    "not diagnosed" assertion pass for the wrong reason.
+    """
+    return {
+        "overall_status": "in_progress",
+        "processing_status_event_count": 0,
+        "document_lifecycle_event_count": 0,
+        "stages": [
+            {"stage": "acquisition", "status": "in_progress", "detail": ""},
+            {"stage": "document_intelligence", "status": "pending", "detail": ""},
+            {"stage": "projection", "status": "pending", "detail": ""},
+            {"stage": "search", "status": "pending", "detail": ""},
+        ],
+    }
+
+
+def test_running_run_that_has_not_reached_di_is_not_given_a_cause() -> None:
+    health = _young_running_health()
+    assert health["document_lifecycle_event_count"] == 0
+    assert health["stages"][2] == {"stage": "projection", "status": "pending", "detail": ""}
+
+    result = diagnose_stall({"status": "running", "refused": False}, health)
+    assert result["cause"] == STALL_TOO_EARLY
+    assert result["cause"] != STALL_PROJECTION_STALLED
+    assert result["is_diagnosed"] is False
+    assert "projection bridge" not in result["detail"]
+    assert "not a stall" in result["detail"]
+
+
+def test_failed_run_surfaces_its_recorded_reason() -> None:
+    reason = "provider returned HTTP 503 for 2 of 2 captured resources, after 3 retries"
+    result = diagnose_stall(
+        {"status": "failed", "refused": False, "failure_reason": reason},
+        {
+            "processing_status_event_count": 5,
+            "document_lifecycle_event_count": 5,
+            "stages": [{"stage": "search", "status": "complete", "detail": ""}],
+        },
+    )
+    assert result["cause"] == STALL_RUN_FAILED
+    assert result["cause"] != STALL_UNKNOWN
+    assert result["is_diagnosed"] is True
+    assert reason in result["detail"]
+
+
+def test_failed_run_with_no_reason_says_unrecorded_not_absent() -> None:
+    result = diagnose_stall(
+        {"status": "failed", "refused": False, "failure_reason": None},
+        {"processing_status_event_count": 5, "document_lifecycle_event_count": 5, "stages": []},
+    )
+    assert result["cause"] == STALL_RUN_FAILED
+    assert "no failure reason was recorded" in result["detail"]
+    assert "not absent" in result["detail"]
+
+
+def test_projection_stall_requires_di_to_have_reported_processing() -> None:
+    """Its own sentence claims "DI reported processing"; the branch never checked."""
+    result = diagnose_stall(
+        {"status": "cancelled", "refused": False},
+        {
+            "processing_status_event_count": 0,
+            "document_lifecycle_event_count": 0,
+            "stages": [
+                {"stage": "projection", "status": "pending", "detail": ""},
+                {"stage": "search", "status": "pending", "detail": ""},
+            ],
+        },
+    )
+    assert result["cause"] == STALL_UNKNOWN
+    assert result["cause"] != STALL_PROJECTION_STALLED
+    assert result["cause"] != STALL_SEARCH_PENDING
+    assert result["is_diagnosed"] is False
 
 
 # --- acceptance evidence verdict -----------------------------------------------------
