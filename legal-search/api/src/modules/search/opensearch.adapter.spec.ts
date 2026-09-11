@@ -419,9 +419,66 @@ describe('SearchOpenSearchAdapter', () => {
       expect.objectContaining({
         query: 'verwaltungsrat haftung gesellschaftsrecht',
         fuzziness: 'AUTO',
+        // #981: bare AUTO does not soften matching, it destroys it. Delete
+        // `prefix_length` from the adapter and this assertion goes red.
+        prefix_length: 2,
       }),
     );
     expect(firstCall.body.query.bool.must[0].multi_match.operator).toBeUndefined();
+  });
+
+  it('free-text fuzziness is bounded by a prefix, or it out-scores exact hits (#981)', async () => {
+    /*
+     * The guard for #981, and the reason it is stated as a property rather than
+     * a snapshot of one query.
+     *
+     * Measured against the 889-document production corpus, varying ONLY this
+     * parameter:
+     *
+     *   "Darf ich meinen Hund in Zürich ohne Leine laufen lassen"
+     *     fuzziness AUTO                    -> "Aufnahme in die K+S Klassen …"
+     *     fuzziness AUTO, prefix_length 2   -> "Hundegesetz (HuG) 554.5"
+     *
+     *   "Hund Leine Zürich"
+     *     fuzziness AUTO                    -> "Vetsuisse-Fakultät der Universitäten …"
+     *     fuzziness AUTO, prefix_length 2   -> "Hundegesetz (HuG) 554.5"
+     *
+     * The second case matters: this was never "questions fail, keywords work".
+     * `classifyQuery` exempts <=3 tokens from fuzziness entirely, so short
+     * queries were only accidentally safe.
+     *
+     * This asserts the QUERY THE ADAPTER BUILDS. #974 was merged claiming to fix
+     * #973 because it was measured with a hand-written query that omitted
+     * `fuzziness` — the very parameter under test. A retrieval guard that does
+     * not run the adapter's own shape cannot catch that class of mistake.
+     */
+    const search = vi.fn().mockResolvedValue({
+      body: { hits: { total: { value: 0 }, hits: [] }, aggregations: {} },
+    });
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+      new MetricsService(),
+    );
+
+    // Over three tokens, so `classifyQuery` returns `free_text` — the branch
+    // that carries fuzziness.
+    await adapter.search('Darf ich meinen Hund in Zürich ohne Leine laufen lassen');
+
+    const call = search.mock.calls[0][0] as {
+      body: { query: { bool: { must: [{ multi_match: Record<string, unknown> }] } } };
+    };
+    const mm = call.body.query.bool.must[0].multi_match;
+
+    // Guard against a vacuous pass: if this query ever stops taking the fuzzy
+    // branch, the assertion below would hold for the wrong reason.
+    expect(mm.fuzziness, 'this query no longer takes the fuzzy branch — retune this test').toBe(
+      'AUTO',
+    );
+    expect(mm.prefix_length).toBe(2);
   });
 
   // ─── Failure vs. zero matches (#551) ───
