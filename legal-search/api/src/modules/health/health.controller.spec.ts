@@ -22,6 +22,7 @@ function createController(options?: {
   const repository = {
     search: vi.fn(),
     getContextAggregations: vi.fn(),
+    getHeldJurisdictionIds: vi.fn(),
     checkReadAlias: vi.fn().mockResolvedValue(options?.readAlias ?? ALIAS_OK),
   } satisfies SearchRepository;
 

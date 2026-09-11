@@ -55,6 +55,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import { documentsIndexDefinition } from '../../core/opensearch/documents-index.mapping';
+import { CorpusJurisdictionsService } from './corpus-jurisdictions.service';
 import { SearchOpenSearchAdapter } from './opensearch.adapter';
 import { SearchController } from './search.controller';
 import { SEARCH_REPOSITORY } from './search.repository';
@@ -203,6 +204,7 @@ async function createApp(): Promise<INestApplication> {
     controllers: [SearchController],
     providers: [
       SearchService,
+      CorpusJurisdictionsService,
       MetricsService,
       { provide: SEARCH_REPOSITORY, useClass: SearchOpenSearchAdapter },
       { provide: OPENSEARCH_CLIENT, useValue: client },
@@ -223,6 +225,11 @@ async function createApp(): Promise<INestApplication> {
 
 type SearchBody = {
   totalResults: number;
+  refusal?: {
+    code: string;
+    message: string;
+    jurisdictions: { jurisdiction_id: string; iso_code: string; holding: string }[];
+  };
   results: { documentId?: string; document_id?: string }[];
   facets: { key: string; label: string; options: { value: string; count?: number }[] }[];
 };
@@ -277,6 +284,35 @@ describe('search against a real seeded index (canonical mapping)', () => {
 
     const byAuthority = await search('q=Recht&authority_id=auth_de_bgh');
     expect(byAuthority.totalResults).toBe(1);
+  });
+
+  // ── #986: refusal is a coverage question, and only a real index can answer it ──
+
+  it('refuses a query naming a canton the seeded corpus does not hold', async () => {
+    // This is the one layer that meets a real mapping. The holdings check reads
+    // `jurisdiction_ids.keyword` via a terms aggregation, and #675's lesson is
+    // that a field which does not aggregate returns EMPTY BUCKETS rather than
+    // an error — so a mocked repository can never prove this works.
+    const refused = await search('q=Recht%20Kanton%20Bern');
+
+    expect(refused.refusal?.code).toBe('jurisdiction_not_held');
+    expect(refused.refusal?.jurisdictions).toEqual([
+      expect.objectContaining({ jurisdiction_id: 'jur_ch_be', iso_code: 'CH-BE' }),
+    ]);
+    expect(refused.totalResults).toBe(0);
+    expect(refused.results).toEqual([]);
+  });
+
+  it('answers a query naming a canton the seeded corpus DOES hold', async () => {
+    // Without this the test above would pass against a mechanism that refuses
+    // every query — and that mechanism is worse than the bug it replaces.
+    // Five tokens, so `classifyQuery` routes it down `free_text` (OR-ish) and
+    // the corpus can actually match it — the point is the absence of a refusal,
+    // not the ranking.
+    const answered = await search('q=Recht%20der%20Tierhaltung%20Kanton%20Z%C3%BCrich');
+
+    expect(answered.refusal).toBeUndefined();
+    expect(answered.totalResults).toBeGreaterThan(0);
   });
 
   it('keeps the lowercase `languages` convention working', async () => {

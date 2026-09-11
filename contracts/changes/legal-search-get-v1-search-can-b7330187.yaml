@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  legal-search: GET /v1/search can return a jurisdiction-coverage refusal (#986)

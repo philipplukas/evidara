@@ -41,6 +41,7 @@ import type {
 } from '../modules/search/entities/search.entities';
 import { SearchController } from '../modules/search/search.controller';
 import type { SearchRepository } from '../modules/search/search.repository';
+import { CorpusJurisdictionsService } from '../modules/search/corpus-jurisdictions.service';
 import { SEARCH_REPOSITORY } from '../modules/search/search.repository';
 import { SearchService } from '../modules/search/search.service';
 
@@ -117,6 +118,7 @@ export async function createTestApp(overrides?: {
   const searchRepo: SearchRepository = {
     search: vi.fn().mockResolvedValue(SEARCH_WITH_RESULTS),
     getContextAggregations: vi.fn().mockResolvedValue(CONTEXT_AGGS),
+    getHeldJurisdictionIds: vi.fn().mockResolvedValue(['jur_ch_zh', 'jur_ch_federal']),
     checkReadAlias: vi
       .fn()
       .mockResolvedValue({ status: 'ok', alias: 'documents-read', indices: ['documents-000001'] }),
@@ -202,6 +204,7 @@ export async function createTestApp(overrides?: {
     controllers: [HealthController, SearchController, DocumentsController, ProjectionsController],
     providers: [
       SearchService,
+      CorpusJurisdictionsService,
       DocumentsService,
       ProjectionsService,
       { provide: SEARCH_REPOSITORY, useValue: searchRepo },

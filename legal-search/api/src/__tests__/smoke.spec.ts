@@ -55,6 +55,30 @@ describe('GET /v1/search', () => {
     await supertest(app.getHttpServer()).get('/v1/search').expect(400);
   });
 
+  // #986 / #984: the refusal has to survive serialization, not just exist in
+  // the service. The test-app's corpus holds `jur_ch_zh` and `jur_ch_federal`.
+  it('carries a refusal to the wire when the query names a canton the corpus lacks', async () => {
+    const res = await supertest(app.getHttpServer())
+      .get('/v1/search?q=Hundegesetz%20Kanton%20Bern')
+      .expect(200);
+
+    expect(res.body.refusal).toMatchObject({
+      code: 'jurisdiction_not_held',
+      jurisdictions: [{ jurisdiction_id: 'jur_ch_be', iso_code: 'CH-BE', holding: 'not_held' }],
+    });
+    expect(res.body.results).toEqual([]);
+    expect(res.body.totalResults).toBe(0);
+  });
+
+  it('carries NO refusal for a held canton — refusal is not the default', async () => {
+    const res = await supertest(app.getHttpServer())
+      .get('/v1/search?q=Statistikgesetz%20Kanton%20Z%C3%BCrich')
+      .expect(200);
+
+    expect(res.body.refusal).toBeUndefined();
+    expect(res.body.results.length).toBeGreaterThan(0);
+  });
+
   it('returns 400 when page is below minimum', async () => {
     await supertest(app.getHttpServer()).get('/v1/search?q=test&page=0').expect(400);
   });

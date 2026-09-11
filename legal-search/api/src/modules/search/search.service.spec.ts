@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { CorpusJurisdictionsService } from './corpus-jurisdictions.service';
 import type { ContextAggregations, SearchResultEntity } from './entities/search.entities';
 import type { SearchRepository } from './search.repository';
 import { SearchService } from './search.service';
@@ -27,6 +28,7 @@ function createMockRepo(overrides?: Partial<SearchRepository>): SearchRepository
       languages: [{ key: 'de', doc_count: 100 }],
       source_types: [{ key: 'law', doc_count: 50 }],
     } satisfies ContextAggregations),
+    getHeldJurisdictionIds: vi.fn().mockResolvedValue(['jur_ch_zh']),
     checkReadAlias: vi
       .fn()
       .mockResolvedValue({ status: 'ok', alias: 'documents-read', indices: ['documents-000001'] }),
@@ -39,7 +41,7 @@ function createMockRepo(overrides?: Partial<SearchRepository>): SearchRepository
 describe('SearchService', () => {
   it('should return ViewModel results from search', async () => {
     const repo = createMockRepo();
-    const service = new SearchService(repo);
+    const service = new SearchService(repo, new CorpusJurisdictionsService(repo));
 
     const result = await service.search('test');
 
@@ -53,7 +55,7 @@ describe('SearchService', () => {
 
   it('should pass search options to repository', async () => {
     const repo = createMockRepo();
-    const service = new SearchService(repo);
+    const service = new SearchService(repo, new CorpusJurisdictionsService(repo));
 
     await service.search('test', {
       jurisdictions: ['ch'],
@@ -76,7 +78,7 @@ describe('SearchService', () => {
 
   it('should return context from getContext', async () => {
     const repo = createMockRepo();
-    const service = new SearchService(repo);
+    const service = new SearchService(repo, new CorpusJurisdictionsService(repo));
 
     const ctx = await service.getContext();
 
@@ -94,7 +96,7 @@ describe('SearchService', () => {
         aggregations: {},
       }),
     });
-    const service = new SearchService(repo);
+    const service = new SearchService(repo, new CorpusJurisdictionsService(repo));
 
     const result = await service.search('nothing');
 

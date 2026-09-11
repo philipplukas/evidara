@@ -19,20 +19,16 @@ particular, for what a coverage answer may and may not be read to mean.
 
  * OpenAPI spec version: 0.11.0
  */
-import type { SearchResultView } from './searchResultView';
-import type { FilterFacetView } from './filterFacetView';
-import type { SearchRefusalView } from './searchRefusalView';
 
-export interface SearchResponseView {
-  results: SearchResultView[];
-  facets: FilterFacetView[];
-  totalResults: number;
-  /** Present when the search was NOT answered. Absent when it was.
+/**
+ * Machine-readable reason. `jurisdiction_not_held`: the query named a
+sub-federal jurisdiction and the index holds no document for it.
 
-`totalResults: 0` with no `refusal` means the query executed and
-matched nothing. A `refusal` means the query was not run at all and
-says why — a different statement, and callers must not flatten the
-two into "no results" (#984, #986).
  */
-  refusal?: SearchRefusalView;
-}
+export type SearchRefusalViewCode = typeof SearchRefusalViewCode[keyof typeof SearchRefusalViewCode];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const SearchRefusalViewCode = {
+  jurisdiction_not_held: 'jurisdiction_not_held',
+} as const;

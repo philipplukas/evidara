@@ -19,20 +19,20 @@ particular, for what a coverage answer may and may not be read to mean.
 
  * OpenAPI spec version: 0.11.0
  */
-import type { SearchResultView } from './searchResultView';
-import type { FilterFacetView } from './filterFacetView';
-import type { SearchRefusalView } from './searchRefusalView';
+import type { RefusedJurisdictionViewHolding } from './refusedJurisdictionViewHolding';
 
-export interface SearchResponseView {
-  results: SearchResultView[];
-  facets: FilterFacetView[];
-  totalResults: number;
-  /** Present when the search was NOT answered. Absent when it was.
-
-`totalResults: 0` with no `refusal` means the query executed and
-matched nothing. A `refusal` means the query was not run at all and
-says why — a different statement, and callers must not flatten the
-two into "no results" (#984, #986).
+export interface RefusedJurisdictionView {
+  /** Canonical platform jurisdiction id, e.g. `jur_ch_be` */
+  jurisdiction_id: string;
+  /** ISO 3166-2 code from contracts/vocabularies/subdivisions.json, e.g. `CH-BE` */
+  iso_code: string;
+  /** Display name from the jurisdiction seed */
+  label: string;
+  /** A statement about the CORPUS, never about the law. `not_held` means
+the index contains no matching document; it is not evidence the norm
+does not exist. The enum has one member so no caller can find a
+value meaning "confirmed absent in law" — the same discipline
+`/v1/coverage` applies.
  */
-  refusal?: SearchRefusalView;
+  holding: RefusedJurisdictionViewHolding;
 }
