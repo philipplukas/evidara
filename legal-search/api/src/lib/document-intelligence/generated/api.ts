@@ -38,11 +38,16 @@ export type getDocumentFullResponse404 = {
   data: ErrorResponse
   status: 404
 }
+
+export type getDocumentFullResponse503 = {
+  data: ErrorResponse
+  status: 503
+}
     
 export type getDocumentFullResponseSuccess = (getDocumentFullResponse200) & {
   headers: Headers;
 };
-export type getDocumentFullResponseError = (getDocumentFullResponse404) & {
+export type getDocumentFullResponseError = (getDocumentFullResponse404 | getDocumentFullResponse503) & {
   headers: Headers;
 };
 
@@ -93,11 +98,16 @@ export type getDocumentLeanResponse404 = {
   data: ErrorResponse
   status: 404
 }
+
+export type getDocumentLeanResponse503 = {
+  data: ErrorResponse
+  status: 503
+}
     
 export type getDocumentLeanResponseSuccess = (getDocumentLeanResponse200) & {
   headers: Headers;
 };
-export type getDocumentLeanResponseError = (getDocumentLeanResponse404) & {
+export type getDocumentLeanResponseError = (getDocumentLeanResponse404 | getDocumentLeanResponse503) & {
   headers: Headers;
 };
 
@@ -146,11 +156,16 @@ export type getDocumentPlainTextResponse404 = {
   data: ErrorResponse
   status: 404
 }
+
+export type getDocumentPlainTextResponse503 = {
+  data: ErrorResponse
+  status: 503
+}
     
 export type getDocumentPlainTextResponseSuccess = (getDocumentPlainTextResponse200) & {
   headers: Headers;
 };
-export type getDocumentPlainTextResponseError = (getDocumentPlainTextResponse404) & {
+export type getDocumentPlainTextResponseError = (getDocumentPlainTextResponse404 | getDocumentPlainTextResponse503) & {
   headers: Headers;
 };
 
