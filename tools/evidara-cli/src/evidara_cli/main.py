@@ -11,6 +11,7 @@ from typing import Annotated, Any
 import httpx
 import typer
 
+from evidara_cli.acquisition_loop_cmd import coverage_drive
 from evidara_cli.client import (
     HttpJsonError,
     join_url,
@@ -43,6 +44,11 @@ workflow.add_typer(workflow_source_app, name="source")
 workflow.add_typer(workflow_search_app, name="search")
 workflow.add_typer(workflow_run_app, name="run")
 workflow.add_typer(coverage_app, name="coverage")
+# Registered here rather than declared in coverage_cmd.py: the loop imports the coverage
+# classification, so declaring it there would close an import cycle. The command belongs
+# to the same `coverage` surface either way — one control surface, not a second one
+# (ADR-0056 constraint 1).
+coverage_app.command("drive")(coverage_drive)
 
 pc = typer.Typer(
     no_args_is_help=True,
