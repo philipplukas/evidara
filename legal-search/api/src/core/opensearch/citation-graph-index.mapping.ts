@@ -60,6 +60,27 @@ export const CITATIONS_INDEX_PROPERTIES = {
   citation_text: { type: 'text', fields: { keyword: { type: 'keyword' } } },
   citation_type: dualKeyword,
   resolved: { type: 'boolean' },
+
+  /**
+   * Whether resolution was ATTEMPTED, and what it concluded:
+   * `resolved` | `unresolved`. ABSENT means never attempted — a row written
+   * before this field existed, or one whose lookup against `citation-targets`
+   * failed (an outage is `unknown`, not `no_target_in_corpus`).
+   *
+   * `resolved: false` alone cannot express that difference, and a graph whose
+   * misses are unattributable is the "silently missing edges" failure
+   * ADR-0032/ADR-0052 are about. Written by
+   * `ProjectionsService.resolveCitations`.
+   */
+  resolution_status: dualKeyword,
+  /**
+   * Why `resolution_status: 'unresolved'` — `not_normalizable` (extractor
+   * gap: the string names no identifier), `no_target_in_corpus` (coverage
+   * gap: the key is valid, the norm is not ingested), or `ambiguous` (several
+   * DIFFERENT documents answer this key, so it was refused rather than
+   * guessed). Absent when resolved.
+   */
+  unresolved_reason: dualKeyword,
 } as const;
 
 /**

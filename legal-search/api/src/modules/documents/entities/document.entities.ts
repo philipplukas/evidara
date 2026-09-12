@@ -74,5 +74,7 @@ export interface CitationEntity {
   target_document_type?: string;
   citation_text: string;
   citation_type?: string;
+  /** DI's canonical key (`sr:210`, `abbrev_art:BV/36`). The order-independent join. */
+  normalized_reference?: string;
   resolved: boolean;
 }

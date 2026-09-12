@@ -98,6 +98,51 @@ export class CitationsOpenSearchAdapter implements CitationsRepository {
     }
   }
 
+  async findTargetsByKeys(normalizedReferences: string[]): Promise<Map<string, CitationTarget[]>> {
+    const result = new Map<string, CitationTarget[]>();
+    const parsed = normalizedReferences
+      .map((ref) => ({ ref, parsed: parseCitationKey(ref) }))
+      .filter((entry): entry is { ref: string; parsed: NonNullable<typeof entry.parsed> } =>
+        Boolean(entry.parsed),
+      );
+    if (parsed.length === 0) return result;
+
+    const response = await this.client.search({
+      index: this.indexCitationTargets,
+      body: {
+        // Sized for ambiguity, not for keys: several documents answering one
+        // key is the case the refusal is computed from, and a page of one row
+        // per key would truncate exactly those rivals away.
+        size: Math.min(parsed.length * 10, 1000),
+        query: {
+          bool: {
+            should: parsed.map((entry) => ({
+              bool: {
+                filter: [
+                  { term: { 'identifier_type.keyword': entry.parsed.identifierType } },
+                  { term: { 'identifier_value.keyword': entry.parsed.identifierValue } },
+                ],
+              },
+            })),
+            minimum_should_match: 1,
+          },
+        },
+      },
+    });
+
+    const wanted = new Set(parsed.map((entry) => entry.ref));
+    for (const hit of (response.body.hits?.hits ?? []) as OpenSearchHit[]) {
+      if (hit._source == null) continue;
+      const target = CitationsOpenSearchAdapter.toTarget(hit._source);
+      const key = `${target.identifier_type}:${target.identifier_value}`;
+      if (!wanted.has(key)) continue;
+      const bucket = result.get(key);
+      if (bucket) bucket.push(target);
+      else result.set(key, [target]);
+    }
+    return result;
+  }
+
   async findTargetsByDocumentId(documentId: string): Promise<CitationTarget[]> {
     try {
       const response = await this.client.search({

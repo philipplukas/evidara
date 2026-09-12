@@ -6,7 +6,14 @@ import {
   DOCUMENT_INTELLIGENCE_CLIENT,
   type DocumentIntelligenceClient,
 } from '../../lib/document-intelligence/document-intelligence.client';
+import { resolveAgainstTargets } from '../citations/citation-resolution';
+import {
+  CITATIONS_REPOSITORY,
+  type CitationsRepository,
+  type CitationTarget,
+} from '../citations/citations.repository';
 import { DOCUMENTS_REPOSITORY, type DocumentsRepository } from './documents.repository';
+import type { CitationEntity } from './entities/document.entities';
 import { mapDocumentToDetailView } from './mappers/document-detail.mapper';
 
 /** A body is only a body if it carries text — an empty string is not one. */
@@ -47,6 +54,8 @@ export class DocumentsService {
     private readonly repository: DocumentsRepository,
     @Inject(DOCUMENT_INTELLIGENCE_CLIENT)
     private readonly documentIntelligence: DocumentIntelligenceClient,
+    @Inject(CITATIONS_REPOSITORY)
+    private readonly citations: CitationsRepository,
   ) {
     this.warn = (event, meta) => this.logger.warn(`[contract] ${event}`, meta);
   }
@@ -55,10 +64,11 @@ export class DocumentsService {
     let doc = await this.repository.getById(id);
     if (!doc) throw new NotFoundException(`Document ${id} not found`);
 
-    const [sections, citations] = await Promise.all([
+    const [sections, indexedCitations] = await Promise.all([
       this.repository.getSections(id),
       this.repository.getCitations(id),
     ]);
+    const citations = await this.joinUnresolvedCitations(indexedCitations);
 
     // The projection already indexes the body as `content`, so the Document
     // Service is a fallback for the one case the index cannot cover: a
@@ -80,6 +90,56 @@ export class DocumentsService {
 
   async getSections(documentId: string) {
     return this.repository.getSections(documentId);
+  }
+
+  /**
+   * Join citations that carry a canonical key but no `target_document_id`.
+   *
+   * `target_document_id` is a WRITE-time denormalization: it is null whenever
+   * the cited norm had not yet been projected when the citing document was.
+   * Project the BV after a law that cites it and that edge is missing forever,
+   * with no error anywhere — which is why `citation-graph-index.mapping.ts`
+   * calls `normalized_reference` the only order-independent way to traverse.
+   *
+   * Document detail nonetheless built its reference links from
+   * `target_document_id` alone (`document-detail.mapper.ts`), so every
+   * out-of-order pair rendered as an unlinked string. This closes that at read
+   * time, using the SAME rule the write path and `/v1/citations/resolve` use —
+   * so an ambiguous key stays unlinked here too rather than acquiring an href
+   * to an arbitrary norm.
+   *
+   * A failed lookup leaves the rows exactly as indexed: unknown is not an
+   * empty corpus.
+   */
+  private async joinUnresolvedCitations(citations: CitationEntity[]): Promise<CitationEntity[]> {
+    const pending = citations.filter((c) => !c.target_document_id && c.normalized_reference);
+    if (pending.length === 0) return citations;
+
+    let candidates: Map<string, CitationTarget[]>;
+    try {
+      candidates = await this.citations.findTargetsByKeys([
+        ...new Set(pending.map((c) => c.normalized_reference as string)),
+      ]);
+    } catch (err) {
+      this.logger.warn('citation_read_join_failed', err as Error);
+      return citations;
+    }
+
+    return citations.map((c) => {
+      if (c.target_document_id || !c.normalized_reference) return c;
+      const resolution = resolveAgainstTargets(
+        c.normalized_reference,
+        candidates.get(c.normalized_reference) ?? [],
+      );
+      if (resolution.status === 'unresolved') return c;
+      return {
+        ...c,
+        target_document_id: resolution.target.document_id,
+        target_title: c.target_title ?? resolution.target.title,
+        target_document_type: c.target_document_type ?? resolution.target.document_type,
+        resolved: true,
+      };
+    });
   }
 
   async getCitedBy(documentId: string) {

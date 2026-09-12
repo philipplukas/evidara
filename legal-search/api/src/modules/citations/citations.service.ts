@@ -7,6 +7,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { normalizeCitationText } from './citation-key';
+import { resolveAgainstTargets } from './citation-resolution';
 import {
   CITATIONS_REPOSITORY,
   type CitationEdge,
@@ -94,34 +95,20 @@ export class CitationsService {
 
     const targets = await this.repository.findTargetsByKey(normalized);
 
-    if (targets.length === 0) {
-      this.metrics.recordCitationResolution(false, 'no_target_in_corpus');
-      return {
-        query,
-        normalized_reference: normalized,
-        resolved: false,
-        unresolved_reason: 'no_target_in_corpus',
-        targets: [],
-      };
-    }
+    // The AMBIGUITY REFUSAL and the coverage-gap distinction both live in
+    // `resolveAgainstTargets` — the single rule the projection write path now
+    // shares. Re-deciding either of them here is what let the two copies drift
+    // (see `citation-resolution.ts`).
+    const resolution = resolveAgainstTargets(normalized, targets);
 
-    // AMBIGUITY REFUSAL. A key that names several distinct documents has not
-    // been resolved — it has been narrowed. Returning the best-scoring one
-    // would be a guess wearing a resolved flag, and a wrong edge is worse than
-    // a missing one (ADR-0033). So we refuse and hand back the candidates.
-    //
-    // Multiplicity is counted over DOCUMENTS, not rows: one document can hold
-    // several rows for the same key (a statute and its article section), and
-    // that is not ambiguity.
-    const distinctDocuments = new Set(targets.map((t) => t.document_id));
-    if (distinctDocuments.size > 1) {
-      this.metrics.recordCitationResolution(false, 'ambiguous');
+    if (resolution.status === 'unresolved') {
+      this.metrics.recordCitationResolution(false, resolution.reason);
       return {
         query,
         normalized_reference: normalized,
         resolved: false,
-        unresolved_reason: 'ambiguous',
-        targets,
+        unresolved_reason: resolution.reason,
+        targets: resolution.candidates,
       };
     }
 

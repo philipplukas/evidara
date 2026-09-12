@@ -169,3 +169,39 @@ describe('CitationsOpenSearchAdapter', () => {
     });
   });
 });
+
+describe('CitationsOpenSearchAdapter.findTargetsByKeys (the read-time batch join)', () => {
+  it('groups every row per key and pages above one row per key', async () => {
+    const search = vi.fn().mockResolvedValue(
+      hits([
+        { document_id: 'doc_zh', identifier_type: 'abbrev_art', identifier_value: 'EG/1' },
+        { document_id: 'doc_be', identifier_type: 'abbrev_art', identifier_value: 'EG/1' },
+        { document_id: 'doc_bv', identifier_type: 'sr', identifier_value: '101' },
+      ]),
+    );
+
+    const result = await makeAdapter(search).findTargetsByKeys(['abbrev_art:EG/1', 'sr:101']);
+
+    expect(result.get('abbrev_art:EG/1')?.map((t) => t.document_id)).toEqual(['doc_zh', 'doc_be']);
+    expect(result.get('sr:101')?.map((t) => t.document_id)).toEqual(['doc_bv']);
+    const [{ index, body }] = search.mock.calls[0];
+    expect(index).toBe('citation-targets-test');
+    expect(body.size).toBeGreaterThan(2);
+  });
+
+  it('does not query at all when no key parses', async () => {
+    const search = vi.fn();
+    const result = await makeAdapter(search).findTargetsByKeys(['not-a-key']);
+    expect(search).not.toHaveBeenCalled();
+    expect(result.size).toBe(0);
+  });
+
+  // UNKNOWN must reach the caller. Swallowing the error here would make an
+  // OpenSearch outage read as "the corpus holds no such norm".
+  it('rejects when the lookup fails instead of returning an empty map', async () => {
+    const search = vi.fn().mockRejectedValue(new Error('connection refused'));
+    await expect(makeAdapter(search).findTargetsByKeys(['sr:101'])).rejects.toThrow(
+      'connection refused',
+    );
+  });
+});

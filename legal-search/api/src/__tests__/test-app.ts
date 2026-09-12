@@ -24,6 +24,10 @@ import {
   type DocumentIntelligenceClient,
   NoopDocumentIntelligenceClient,
 } from '../lib/document-intelligence/document-intelligence.client';
+import {
+  CITATIONS_REPOSITORY,
+  type CitationsRepository,
+} from '../modules/citations/citations.repository';
 import { DocumentsController } from '../modules/documents/documents.controller';
 import type { DocumentsRepository } from '../modules/documents/documents.repository';
 import { DOCUMENTS_REPOSITORY } from '../modules/documents/documents.repository';
@@ -107,6 +111,7 @@ export interface TestApp {
   searchRepo: SearchRepository;
   documentsRepo: DocumentsRepository;
   projectionsRepo: ProjectionRepository;
+  citationsRepo: CitationsRepository;
 }
 
 export async function createTestApp(overrides?: {
@@ -114,6 +119,7 @@ export async function createTestApp(overrides?: {
   documentsRepo?: Partial<DocumentsRepository>;
   projectionsRepo?: Partial<ProjectionRepository>;
   documentIntelligenceClient?: DocumentIntelligenceClient;
+  citationsRepo?: Partial<CitationsRepository>;
 }): Promise<TestApp> {
   const searchRepo: SearchRepository = {
     search: vi.fn().mockResolvedValue(SEARCH_WITH_RESULTS),
@@ -191,6 +197,19 @@ export async function createTestApp(overrides?: {
     resolveCitationTargets: vi.fn().mockResolvedValue(new Map()),
     ...overrides?.projectionsRepo,
   };
+  const citationsRepo: CitationsRepository = {
+    findTargetsByKey: vi.fn().mockResolvedValue([]),
+    findTargetsByKeys: vi.fn().mockResolvedValue(new Map()),
+    findTargetsByDocumentId: vi.fn().mockResolvedValue([]),
+    findCitingEdges: vi.fn().mockResolvedValue([]),
+    getResolutionStats: vi.fn().mockResolvedValue({
+      total: 0,
+      withNormalizedReference: 0,
+      resolvable: 0,
+      unresolvedByType: {},
+    }),
+    ...overrides?.citationsRepo,
+  };
 
   // Build the module explicitly — avoids decorator metadata issues
   // with vitest's oxc/esbuild transform which doesn't emit metadata.
@@ -210,6 +229,7 @@ export async function createTestApp(overrides?: {
       { provide: SEARCH_REPOSITORY, useValue: searchRepo },
       { provide: DOCUMENTS_REPOSITORY, useValue: documentsRepo },
       { provide: PROJECTION_REPOSITORY, useValue: projectionsRepo },
+      { provide: CITATIONS_REPOSITORY, useValue: citationsRepo },
       { provide: DOCUMENT_INTELLIGENCE_CLIENT, useValue: diClient },
       {
         provide: OPENSEARCH_CLIENT,
@@ -232,7 +252,7 @@ export async function createTestApp(overrides?: {
 
   await app.init();
 
-  return { app, searchRepo, documentsRepo, projectionsRepo };
+  return { app, searchRepo, documentsRepo, projectionsRepo, citationsRepo };
 }
 
 export { CONTEXT_AGGS, EMPTY_SEARCH, SEARCH_WITH_RESULTS };

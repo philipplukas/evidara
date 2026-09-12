@@ -1,3 +1,5 @@
+import type { CitationUnresolvedReason } from '../citations/citation-resolution';
+import type { CitationTarget } from '../citations/citations.repository';
 import type {
   DocumentProcessedEventDto,
   DocumentWithdrawnEventDto,
@@ -168,6 +170,16 @@ export type CitationProjection = {
   citation_type?: string;
   normalized_reference?: string;
   resolved: boolean;
+  /**
+   * Whether resolution was ATTEMPTED and what it concluded. Absent means never
+   * attempted (a row written before this field existed, or one that never went
+   * through `resolveCitations`) — which is a different state from "attempted
+   * and found nothing", and the index must be able to tell them apart
+   * (ADR-0052, #958).
+   */
+  resolution_status?: 'resolved' | 'unresolved';
+  /** Why `resolution_status: 'unresolved'`. Absent when resolved. */
+  unresolved_reason?: CitationUnresolvedReason;
   metadata?: Record<string, unknown>;
 };
 
@@ -184,11 +196,17 @@ export type CitationTargetEntry = {
   section_anchor?: string;
 };
 
-export type CitationTargetMatch = {
-  document_id: string;
-  title?: string;
-  document_type?: string;
-};
+/**
+ * The `citation-targets` rows a canonical key matched — ALL of them.
+ *
+ * Deliberately not narrowed to one match: choosing among several documents IS
+ * the resolution decision, and it belongs to `resolveAgainstTargets`
+ * (`modules/citations/citation-resolution.ts`), not to a repository adapter.
+ * The previous `Map<string, CitationTargetMatch>` shape made the adapter pick
+ * silently (last hit wins), which persisted an arbitrary `target_document_id`
+ * with `resolved: true` for every ambiguous key.
+ */
+export type CitationTargetCandidates = Map<string, CitationTarget[]>;
 
 /**
  * One indexed projection row, reduced to the identity a reconcile pass needs.
@@ -240,7 +258,8 @@ export interface ProjectionRepository {
   appendHistory(entry: ProjectionHistoryEntry): Promise<void>;
   queryHistory(query: ProjectionHistoryQuery): Promise<ProjectionHistoryPage>;
   getHistoryStats(): Promise<ProjectionHistoryStats>;
-  resolveCitationTargets(normalizedRefs: string[]): Promise<Map<string, CitationTargetMatch>>;
+  /** Every `citation-targets` row matching each key — unnarrowed. */
+  resolveCitationTargets(normalizedRefs: string[]): Promise<CitationTargetCandidates>;
 }
 
 export type ProjectionHistoryQuery = {

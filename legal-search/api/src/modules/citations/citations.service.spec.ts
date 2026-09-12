@@ -55,6 +55,7 @@ const BV_CITES_ZGB: CitationEdge = {
 function createRepositoryMock(): CitationsRepository {
   return {
     findTargetsByKey: vi.fn().mockResolvedValue([]),
+    findTargetsByKeys: vi.fn().mockResolvedValue(new Map()),
     findTargetsByDocumentId: vi.fn().mockResolvedValue([]),
     findCitingEdges: vi.fn().mockResolvedValue([]),
     getResolutionStats: vi.fn().mockResolvedValue({

@@ -142,6 +142,7 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
             target_document_type: src.target_document_type as string | undefined,
             citation_text: src.citation_text as string,
             citation_type: src.citation_type as string | undefined,
+            normalized_reference: src.normalized_reference as string | undefined,
             resolved: (src.resolved as boolean) ?? false,
           };
         });
@@ -177,6 +178,7 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
             target_document_type: src.target_document_type as string | undefined,
             citation_text: src.citation_text as string,
             citation_type: src.citation_type as string | undefined,
+            normalized_reference: src.normalized_reference as string | undefined,
             resolved: (src.resolved as boolean) ?? false,
           };
         });
