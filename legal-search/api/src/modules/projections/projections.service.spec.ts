@@ -1213,3 +1213,107 @@ describe('ProjectionsService', () => {
     });
   });
 });
+
+describe('ProjectionsService.resolveCitations (the write-path join)', () => {
+  const bvArticle = {
+    document_id: 'doc_bv',
+    identifier_type: 'abbrev_art',
+    identifier_value: 'BV/36',
+    title: 'Bundesverfassung',
+    document_type: 'law',
+    section_id: 'sec_36',
+    section_anchor: 'art_36',
+  };
+
+  function citation(overrides: Record<string, unknown> = {}) {
+    return {
+      citation_id: 'cit_1',
+      source_document_id: 'doc_src',
+      citation_text: 'Art. 36 BV',
+      citation_type: 'article',
+      normalized_reference: 'abbrev_art:BV/36',
+      resolved: false,
+      ...overrides,
+    };
+  }
+
+  function serviceWith(candidates: Map<string, unknown[]> | Error) {
+    const repository = createRepositoryMock();
+    (repository.resolveCitationTargets as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      candidates instanceof Error ? Promise.reject(candidates) : Promise.resolve(candidates),
+    );
+    return new ProjectionsService(repository, createDocumentIntelligenceMock());
+  }
+
+  // POSITIVE. A wrong implementation that resolves nothing fails here.
+  it('writes an edge when exactly one document answers the key', async () => {
+    const service = serviceWith(new Map([['abbrev_art:BV/36', [bvArticle]]]));
+
+    const [row] = await service.resolveCitations([citation()]);
+
+    expect(row.target_document_id).toBe('doc_bv');
+    expect(row.target_title).toBe('Bundesverfassung');
+    expect(row.resolved).toBe(true);
+    expect(row.resolution_status).toBe('resolved');
+    expect(row.unresolved_reason).toBeUndefined();
+  });
+
+  // THE GUARD. Before this change the projection adapter built a
+  // `Map<key, match>` and let the LAST search hit win, so this case was
+  // persisted as `resolved: true` pointing at one arbitrary document.
+  it('refuses to write an edge when several documents answer the key', async () => {
+    const service = serviceWith(
+      new Map([
+        [
+          'abbrev_art:EG/1',
+          [
+            { ...bvArticle, document_id: 'doc_zh', identifier_value: 'EG/1' },
+            { ...bvArticle, document_id: 'doc_be', identifier_value: 'EG/1' },
+          ],
+        ],
+      ]),
+    );
+
+    const [row] = await service.resolveCitations([
+      citation({ normalized_reference: 'abbrev_art:EG/1' }),
+    ]);
+
+    expect(row.target_document_id).toBeUndefined();
+    expect(row.resolved).toBe(false);
+    expect(row.resolution_status).toBe('unresolved');
+    expect(row.unresolved_reason).toBe('ambiguous');
+  });
+
+  // The three unresolved states must stay distinguishable on the persisted row.
+  it('records a coverage gap as no_target_in_corpus', async () => {
+    const service = serviceWith(new Map());
+
+    const [row] = await service.resolveCitations([citation({ normalized_reference: 'sr:210' })]);
+
+    expect(row.resolution_status).toBe('unresolved');
+    expect(row.unresolved_reason).toBe('no_target_in_corpus');
+  });
+
+  it('records an extractor gap as not_normalizable', async () => {
+    const service = serviceWith(new Map());
+
+    const [row] = await service.resolveCitations([
+      citation({ normalized_reference: undefined, citation_type: 'ch_paragraph' }),
+    ]);
+
+    expect(row.resolution_status).toBe('unresolved');
+    expect(row.unresolved_reason).toBe('not_normalizable');
+  });
+
+  // UNKNOWN is not "no target". A failed lookup must leave the row without a
+  // verdict rather than writing a coverage gap it did not observe (ADR-0052).
+  it('writes no verdict at all when the targets lookup fails', async () => {
+    const service = serviceWith(new Error('opensearch unavailable'));
+
+    const [row] = await service.resolveCitations([citation()]);
+
+    expect(row.resolution_status).toBeUndefined();
+    expect(row.unresolved_reason).toBeUndefined();
+    expect(row.resolved).toBe(false);
+  });
+});

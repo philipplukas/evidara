@@ -1,11 +1,28 @@
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
+import type { CitationsRepository } from '../citations/citations.repository';
 import type { DocumentsRepository } from './documents.repository';
 import { DocumentsService } from './documents.service';
 
 function createNoopDiClient(): DocumentIntelligenceClient {
   return { fetchLeanDocument: vi.fn().mockResolvedValue(null) };
+}
+
+function createMockCitationsRepo(overrides?: Partial<CitationsRepository>): CitationsRepository {
+  return {
+    findTargetsByKey: vi.fn().mockResolvedValue([]),
+    findTargetsByKeys: vi.fn().mockResolvedValue(new Map()),
+    findTargetsByDocumentId: vi.fn().mockResolvedValue([]),
+    findCitingEdges: vi.fn().mockResolvedValue([]),
+    getResolutionStats: vi.fn().mockResolvedValue({
+      total: 0,
+      withNormalizedReference: 0,
+      resolvable: 0,
+      unresolvedByType: {},
+    }),
+    ...overrides,
+  };
 }
 
 // ─── Mock Repository ───
@@ -49,7 +66,7 @@ function createMockRepo(overrides?: Partial<DocumentsRepository>): DocumentsRepo
 describe('DocumentsService', () => {
   it('should return a composed DetailView', async () => {
     const repo = createMockRepo();
-    const service = new DocumentsService(repo, createNoopDiClient());
+    const service = new DocumentsService(repo, createNoopDiClient(), createMockCitationsRepo());
 
     const detail = await service.getDetail('doc_001');
 
@@ -65,7 +82,7 @@ describe('DocumentsService', () => {
     const repo = createMockRepo({
       getById: vi.fn().mockResolvedValue(null),
     });
-    const service = new DocumentsService(repo, createNoopDiClient());
+    const service = new DocumentsService(repo, createNoopDiClient(), createMockCitationsRepo());
 
     await expect(service.getDetail('doc_missing')).rejects.toThrow(NotFoundException);
   });
@@ -84,7 +101,7 @@ describe('DocumentsService', () => {
       full_text: 'Test Law\n\nErste Erwägung.\n\nZweite Erwägung.',
     });
     const repo = createMockRepo();
-    const service = new DocumentsService(repo, { fetchLeanDocument });
+    const service = new DocumentsService(repo, { fetchLeanDocument }, createMockCitationsRepo());
 
     const detail = await service.getDetail('doc_001', undefined, 'corr-1');
 
@@ -94,7 +111,11 @@ describe('DocumentsService', () => {
 
   it('should leave content absent when the Document Service has no body either', async () => {
     const fetchLeanDocument = vi.fn().mockResolvedValue({ document_id: 'doc_001' });
-    const service = new DocumentsService(createMockRepo(), { fetchLeanDocument });
+    const service = new DocumentsService(
+      createMockRepo(),
+      { fetchLeanDocument },
+      createMockCitationsRepo(),
+    );
 
     const detail = await service.getDetail('doc_001');
 
@@ -116,7 +137,7 @@ describe('DocumentsService', () => {
         content: 'Der Volltext des Dokuments.',
       }),
     });
-    const service = new DocumentsService(repo, { fetchLeanDocument });
+    const service = new DocumentsService(repo, { fetchLeanDocument }, createMockCitationsRepo());
 
     const detail = await service.getDetail('doc_001');
 
@@ -131,7 +152,7 @@ describe('DocumentsService', () => {
       getSections: vi.fn().mockResolvedValue([]),
       getCitations: vi.fn().mockResolvedValue([]),
     });
-    const service = new DocumentsService(repo, createNoopDiClient());
+    const service = new DocumentsService(repo, createNoopDiClient(), createMockCitationsRepo());
 
     const detail = await service.getDetail('doc_001');
 
@@ -144,11 +165,95 @@ describe('DocumentsService', () => {
 
   it('should delegate getSections to repository', async () => {
     const repo = createMockRepo();
-    const service = new DocumentsService(repo, createNoopDiClient());
+    const service = new DocumentsService(repo, createNoopDiClient(), createMockCitationsRepo());
 
     const sections = await service.getSections('doc_001');
 
     expect(repo.getSections).toHaveBeenCalledWith('doc_001');
     expect(sections).toHaveLength(1);
+  });
+});
+
+describe('DocumentsService read-time citation join (order independence)', () => {
+  const unlinkedCitation = {
+    citation_id: 'cit_1',
+    source_document_id: 'doc_001',
+    citation_text: 'Art. 36 BV',
+    citation_type: 'article',
+    normalized_reference: 'abbrev_art:BV/36',
+    // Deliberately absent: the BV had not been projected when this document
+    // was, so the write-time denormalization never happened. Before the read
+    // join, that rendered as an unlinked string forever.
+    target_document_id: undefined,
+    resolved: false,
+  };
+
+  const bvTarget = {
+    document_id: 'doc_bv',
+    identifier_type: 'abbrev_art',
+    identifier_value: 'BV/36',
+    title: 'Bundesverfassung',
+    document_type: 'law',
+    section_id: 'sec_36',
+  };
+
+  // POSITIVE. An implementation that joins nothing fails here.
+  it('links a citation whose target was projected after it', async () => {
+    const repo = createMockRepo({
+      getCitations: vi.fn().mockResolvedValue([unlinkedCitation]),
+    });
+    const citations = createMockCitationsRepo({
+      findTargetsByKeys: vi.fn().mockResolvedValue(new Map([['abbrev_art:BV/36', [bvTarget]]])),
+    });
+
+    const detail = await new DocumentsService(repo, createNoopDiClient(), citations).getDetail(
+      'doc_001',
+    );
+
+    const items = detail.references.flatMap((group) => group.items);
+    expect(items[0].href).toBe('/documents/doc_bv');
+    expect(items[0].title).toBe('Bundesverfassung');
+  });
+
+  // THE REFUSAL, on the read side too — the same rule, not a second one.
+  it('leaves an ambiguous citation unlinked rather than picking a norm', async () => {
+    const repo = createMockRepo({
+      getCitations: vi.fn().mockResolvedValue([unlinkedCitation]),
+    });
+    const citations = createMockCitationsRepo({
+      findTargetsByKeys: vi
+        .fn()
+        .mockResolvedValue(
+          new Map([
+            [
+              'abbrev_art:BV/36',
+              [bvTarget, { ...bvTarget, document_id: 'doc_other', title: 'Other norm' }],
+            ],
+          ]),
+        ),
+    });
+
+    const detail = await new DocumentsService(repo, createNoopDiClient(), citations).getDetail(
+      'doc_001',
+    );
+
+    const items = detail.references.flatMap((group) => group.items);
+    expect(items[0].href).toBeUndefined();
+    expect(items[0].title).toBe('Art. 36 BV');
+  });
+
+  it('leaves citations as indexed when the targets lookup fails', async () => {
+    const repo = createMockRepo({
+      getCitations: vi.fn().mockResolvedValue([unlinkedCitation]),
+    });
+    const citations = createMockCitationsRepo({
+      findTargetsByKeys: vi.fn().mockRejectedValue(new Error('opensearch unavailable')),
+    });
+
+    const detail = await new DocumentsService(repo, createNoopDiClient(), citations).getDetail(
+      'doc_001',
+    );
+
+    expect(detail.references.flatMap((g) => g.items)[0].href).toBeUndefined();
   });
 });

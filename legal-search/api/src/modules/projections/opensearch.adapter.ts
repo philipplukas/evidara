@@ -3,10 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
+import type { CitationTarget } from '../citations/citations.repository';
 import type {
   CitationProjection,
+  CitationTargetCandidates,
   CitationTargetEntry,
-  CitationTargetMatch,
   IndexedDocumentEntry,
   IndexedDocumentPage,
   IndexedDocumentQuery,
@@ -22,6 +23,16 @@ import type {
 @Injectable()
 export class ProjectionOpenSearchAdapter implements ProjectionRepository {
   private readonly logger = new Logger(ProjectionOpenSearchAdapter.name);
+
+  /**
+   * Rows per key to fetch when resolving. One document legitimately publishes
+   * several rows for a key (statute + article section); several documents
+   * publishing the same key is ambiguity. Both need headroom above 1.
+   */
+  private static readonly MAX_TARGET_ROWS_PER_KEY = 10;
+  /** Hard ceiling on one resolution page, so a pathological key cannot page the index. */
+  private static readonly MAX_TARGET_ROWS = 1000;
+
   private readonly indexDocumentsWrite: string;
   private readonly indexSections: string;
   private readonly indexCitations: string;
@@ -470,10 +481,16 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
     }
   }
 
-  async resolveCitationTargets(
-    normalizedRefs: string[],
-  ): Promise<Map<string, CitationTargetMatch>> {
-    const result = new Map<string, CitationTargetMatch>();
+  /**
+   * Every `citation-targets` row matching each key, grouped by key.
+   *
+   * This adapter deliberately does NOT choose among them. It used to build a
+   * `Map<key, match>` and let the last search hit win, which silently turned an
+   * ambiguous key into one arbitrary resolved edge. Narrowing is the resolution
+   * decision and lives in `resolveAgainstTargets`.
+   */
+  async resolveCitationTargets(normalizedRefs: string[]): Promise<CitationTargetCandidates> {
+    const result: CitationTargetCandidates = new Map();
     if (normalizedRefs.length === 0) return result;
 
     const shouldClauses = normalizedRefs.map((ref) => {
@@ -494,7 +511,14 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
       const response = await this.client.search({
         index: this.indexCitationTargets,
         body: {
-          size: normalizedRefs.length,
+          // One hit per key is NOT enough. Ambiguity is "several documents
+          // answer this key", so a page sized to the number of keys truncates
+          // exactly the rival rows the refusal is computed from — turning an
+          // ambiguous key into a confident single match by page size alone.
+          size: Math.min(
+            normalizedRefs.length * ProjectionOpenSearchAdapter.MAX_TARGET_ROWS_PER_KEY,
+            ProjectionOpenSearchAdapter.MAX_TARGET_ROWS,
+          ),
           query: {
             bool: { should: shouldClauses, minimum_should_match: 1 },
           },
@@ -513,11 +537,19 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
         const normalizedRef = `${idType}:${idValue}`;
         if (!normalizedRefs.includes(normalizedRef)) continue;
 
-        result.set(normalizedRef, {
+        const target: CitationTarget = {
           document_id: src.document_id as string,
+          identifier_type: idType,
+          identifier_value: idValue,
           title: src.title as string | undefined,
           document_type: src.document_type as string | undefined,
-        });
+          jurisdiction: src.jurisdiction as string | undefined,
+          section_id: src.section_id as string | undefined,
+          section_anchor: src.section_anchor as string | undefined,
+        };
+        const existing = result.get(normalizedRef);
+        if (existing) existing.push(target);
+        else result.set(normalizedRef, [target]);
       }
     } catch (err) {
       this.logger.warn('Failed to resolve citation targets', err as Error);

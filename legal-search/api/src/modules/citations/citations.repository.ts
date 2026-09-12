@@ -61,6 +61,15 @@ export interface CitationsRepository {
   /** Look up the norm(s) a canonical key addresses. */
   findTargetsByKey(normalizedReference: string): Promise<CitationTarget[]>;
 
+  /**
+   * The batch form, for resolving a whole document's citations in one round
+   * trip. Returns EVERY row per key — narrowing is `resolveAgainstTargets`'s
+   * job, not a repository's. A key with no rows is absent from the map, which
+   * is `no_target_in_corpus`; a key the map never saw because the lookup threw
+   * is a different state and is signalled by the call rejecting.
+   */
+  findTargetsByKeys(normalizedReferences: string[]): Promise<Map<string, CitationTarget[]>>;
+
   /** The canonical keys a document IS — e.g. the BV is `sr:101`. */
   findTargetsByDocumentId(documentId: string): Promise<CitationTarget[]>;
 

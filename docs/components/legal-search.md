@@ -260,8 +260,29 @@ edge is worse than a missing one.**
 key, not on the `target_document_id` written onto a citation at projection time. That field
 is only set if the cited document already existed when the citing document was projected —
 so a graph traversed through it silently loses every edge whose endpoints arrived in the
-wrong order. (`GET /v1/documents/{id}/cited_by` still reads `target_document_id`, and is
-correspondingly order-dependent.)
+wrong order.
+
+`GET /v1/documents/{id}` no longer depends on it either (#990). Document detail used to build
+its reference links from `target_document_id` alone, so an out-of-order pair rendered as an
+unlinked string forever; `DocumentsService.joinUnresolvedCitations` now re-joins any citation
+that carries a key but no target, at read time, through the same `citation-targets` port
+`/v1/citations/resolve` uses. (`GET /v1/documents/{id}/cited_by` still reads
+`target_document_id` and is correspondingly order-dependent — use `/v1/citations/citing`.)
+
+**One resolution rule, two callers.** The decision "does this key name exactly one norm?"
+lives once, in `modules/citations/citation-resolution.ts`, and the write path
+(`ProjectionsService.resolveCitations`), the read join and `/v1/citations/resolve` all call
+it. It previously existed twice and the copies disagreed: the read path refused an ambiguous
+key, while the projection adapter built a `Map<key, match>` and let the last search hit win —
+persisting one arbitrarily chosen `target_document_id` with `resolved: true`. That is a wrong
+edge, written into the index and thereafter indistinguishable from a real one.
+
+**A citation row records whether resolution was attempted.** `resolution_status`
+(`resolved` | `unresolved`) and `unresolved_reason` (`not_normalizable` |
+`no_target_in_corpus` | `ambiguous`) are written alongside `resolved`. An **absent**
+`resolution_status` means resolution was never attempted — a row written before the field
+existed, or one whose lookup against `citation-targets` failed. An outage is *unknown*, not
+*no target*, and the index must be able to say which (ADR-0052).
 
 **The resolution rate is part of the contract.** `GET /v1/citations/stats` reports what
 share of extracted citations actually resolve, and attributes the remainder:
@@ -270,6 +291,9 @@ share of extracted citations actually resolve, and attributes the remainder:
   reference, or `§ 4 Hundegesetz` — a spelled-out cantonal title is not yet an identifier).
   An **extractor** gap.
 - `unresolved_target` — the key is valid but names a norm not in the corpus. A **coverage** gap.
+- `ambiguous` — several *different* documents are addressable by the key. Refused rather than
+  guessed; `/v1/citations/resolve` returns the rivals unranked so the caller can disambiguate
+  on evidence the corpus does not hold.
 
 These are reported rather than hidden because an unresolved citation is a *broken edge*, and
 consumers read a missing edge as "no such relation exists" (see [ADR-0032](../adr/0032-pipeline-observability.md)).

@@ -11,5 +11,8 @@ import { CitationsOpenSearchAdapter } from './opensearch.adapter';
     CitationsService,
     { provide: CITATIONS_REPOSITORY, useClass: CitationsOpenSearchAdapter },
   ],
+  // The documents module resolves a document's citations at READ time through
+  // this same port, so the target lookup has exactly one implementation.
+  exports: [CITATIONS_REPOSITORY],
 })
 export class CitationsModule {}

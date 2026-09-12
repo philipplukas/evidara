@@ -22,6 +22,8 @@ describe('citation graph index mappings', () => {
       'citation_type',
       'normalized_reference',
       'resolved',
+      'resolution_status',
+      'unresolved_reason',
     ]) {
       expect(CITATIONS_INDEX_PROPERTIES).toHaveProperty(field);
     }

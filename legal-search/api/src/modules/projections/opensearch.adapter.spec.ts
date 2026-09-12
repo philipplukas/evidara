@@ -102,3 +102,57 @@ describe('ProjectionOpenSearchAdapter.listIndexedDocuments', () => {
     });
   });
 });
+
+/**
+ * The candidate lookup is where ambiguity is either preserved or destroyed. It
+ * used to return `Map<key, match>` and let the LAST hit win, and it used to
+ * page `size: normalizedRefs.length` — one row per key — which truncates the
+ * rival rows an ambiguity refusal is computed from. Both defects are invisible
+ * downstream: the caller just sees a single confident match.
+ */
+describe('ProjectionOpenSearchAdapter.resolveCitationTargets', () => {
+  it('returns EVERY row a key matched, so ambiguity survives the lookup', async () => {
+    const search = vi.fn().mockResolvedValue(
+      page([
+        { document_id: 'doc_zh', identifier_type: 'abbrev_art', identifier_value: 'EG/1' },
+        { document_id: 'doc_be', identifier_type: 'abbrev_art', identifier_value: 'EG/1' },
+      ]),
+    );
+
+    const result = await makeAdapter(search).resolveCitationTargets(['abbrev_art:EG/1']);
+
+    expect(result.get('abbrev_art:EG/1')?.map((t) => t.document_id)).toEqual(['doc_zh', 'doc_be']);
+  });
+
+  it('requests more rows than there are keys', async () => {
+    const search = vi.fn().mockResolvedValue(page([]));
+
+    await makeAdapter(search).resolveCitationTargets(['sr:210', 'sr:220']);
+
+    const [{ body }] = search.mock.calls[0];
+    // A page sized to the key count can only ever return one row per key, which
+    // makes every ambiguous key look unique.
+    expect(body.size).toBeGreaterThan(2);
+  });
+
+  it('carries the section fields, so a provision-level target stays provision-level', async () => {
+    const search = vi.fn().mockResolvedValue(
+      page([
+        {
+          document_id: 'doc_bv',
+          identifier_type: 'abbrev_art',
+          identifier_value: 'BV/36',
+          section_id: 'sec_36',
+          section_anchor: 'art_36',
+        },
+      ]),
+    );
+
+    const result = await makeAdapter(search).resolveCitationTargets(['abbrev_art:BV/36']);
+
+    expect(result.get('abbrev_art:BV/36')?.[0]).toMatchObject({
+      section_id: 'sec_36',
+      section_anchor: 'art_36',
+    });
+  });
+});

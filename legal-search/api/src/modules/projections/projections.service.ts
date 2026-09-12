@@ -9,14 +9,15 @@ import {
 // a node the resolver's key format cannot address is the drift that silently
 // loses edges.
 import { isLegalAbbreviation } from '../citations/citation-key';
+import { resolveAgainstTargets } from '../citations/citation-resolution';
 import type {
   DocumentProcessedEventDto,
   DocumentWithdrawnEventDto,
 } from './dto/projection-events.dto';
 import {
   type CitationProjection,
+  type CitationTargetCandidates,
   type CitationTargetEntry,
-  type CitationTargetMatch,
   type CommentaryInsightInput,
   type IndexedDocumentPage,
   type IndexedDocumentQuery,
@@ -1252,29 +1253,66 @@ export class ProjectionsService {
     return undefined;
   }
 
+  /**
+   * Decide, for every citation on this document, whether an EDGE exists.
+   *
+   * The decision itself is `resolveAgainstTargets` — the same function
+   * `/v1/citations/resolve` uses. This method only supplies candidates and
+   * writes the verdict onto the row; it must not re-decide anything, because
+   * this is the path that used to disagree with the read path and win
+   * (see `citations/citation-resolution.ts`).
+   *
+   * Every citation that carries a key leaves here with a `resolution_status`,
+   * so "attempted and found nothing" is distinguishable from "never
+   * attempted". A key-less citation is `not_normalizable`, which is an
+   * extractor gap rather than a corpus gap — also recorded, not inferred from
+   * a bare `resolved: false`.
+   *
+   * The one case that records NOTHING is a failed lookup: if the targets index
+   * is unreachable we do not know, and `unknown` must not be written as
+   * `no_target_in_corpus` (ADR-0052).
+   */
   async resolveCitations(citations: CitationProjection[]): Promise<CitationProjection[]> {
-    const resolvable = citations.filter((c) => c.normalized_reference && !c.resolved);
-    if (resolvable.length === 0) return citations;
+    const unattempted = citations.filter((c) => !c.resolved);
+    if (unattempted.length === 0) return citations;
 
-    const refs = [...new Set(resolvable.map((c) => c.normalized_reference!))];
-    let resolved: Map<string, CitationTargetMatch>;
+    const refs = [
+      ...new Set(unattempted.map((c) => c.normalized_reference).filter(Boolean)),
+    ] as string[];
+
+    let candidates: CitationTargetCandidates;
     try {
-      resolved = await this.repository.resolveCitationTargets(refs);
+      candidates =
+        refs.length === 0 ? new Map() : await this.repository.resolveCitationTargets(refs);
     } catch {
+      // UNKNOWN, not empty. Leaving the rows untouched keeps them free of a
+      // `resolution_status` they have not earned.
       this.logger.warn('citation_resolution_failed_fallback_unresolved');
       return citations;
     }
-    if (resolved.size === 0) return citations;
 
     return citations.map((c) => {
-      if (!c.normalized_reference || c.resolved) return c;
-      const match = resolved.get(c.normalized_reference);
-      if (!match) return c;
+      if (c.resolved) return c;
+
+      const resolution = resolveAgainstTargets(
+        c.normalized_reference,
+        candidates.get(c.normalized_reference ?? '') ?? [],
+      );
+
+      if (resolution.status === 'unresolved') {
+        return {
+          ...c,
+          resolution_status: 'unresolved' as const,
+          unresolved_reason: resolution.reason,
+        };
+      }
+
       return {
         ...c,
-        target_document_id: match.document_id,
-        target_title: match.title,
+        target_document_id: resolution.target.document_id,
+        target_title: resolution.target.title,
         resolved: true,
+        resolution_status: 'resolved' as const,
       };
     });
   }
