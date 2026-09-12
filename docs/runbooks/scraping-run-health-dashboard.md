@@ -107,8 +107,17 @@ When a panel degrades, use this sequence:
    - **Why did nothing happen?** A named stall cause from the same vocabulary
      `evidara workflow coverage` prints — `no_dispatch_worker`, `publish_path_disabled`,
      `di_consumer_silent`, `projection_stalled`, `search_projection_pending`,
-     `run_refused_by_lock`. `publish_path_disabled` is the one that hides behind a *green*
-     run.
+     `run_refused_by_lock`, `run_failed`. `publish_path_disabled` is the one that hides
+     behind a *green* run, and `run_failed` quotes the run's own `failure_reason` rather
+     than deriving a cause from stage state.
+
+     Two of the outcomes are **not** findings and must not be actioned as one:
+     `too_early_to_diagnose` (the run is still acquiring, so its downstream stages are
+     pending by construction) and `unknown` (nothing matched, or pipeline health could not
+     be read). Both are "no answer yet", not "nothing is wrong" — ADR-0052. Until #950 the
+     first of those was reported as `projection_stalled`, which sent operators to debug a
+     bridge that was not involved, and a failed run with a recorded reason was reported as
+     `unknown`.
    - **What did it capture, publish and refuse?** A capture ledger with `captured` and
      `published` as separate numbers, the per-resource refusal slugs grouped by reason, and
      the mirror-fidelity spot check. Anything the provider did not record renders as `—`,

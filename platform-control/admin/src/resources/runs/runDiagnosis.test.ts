@@ -11,8 +11,10 @@ import {
   STALL_NO_DISPATCH_WORKER,
   STALL_PROJECTION_STALLED,
   STALL_PUBLISH_PATH_DISABLED,
+  STALL_RUN_FAILED,
   STALL_RUN_REFUSED,
   STALL_SEARCH_PENDING,
+  STALL_TOO_EARLY,
   STALL_UNKNOWN,
 } from "./runDiagnosis";
 
@@ -87,6 +89,115 @@ describe("diagnoseRunStall", () => {
         health({ stages: [{ stage: "search", status: "pending" }] }),
       ).cause,
     ).toBe(STALL_SEARCH_PENDING);
+  });
+
+  // -------------------------------------------------------------------------
+  // #950: wrong in both directions — a cause that cannot be true on a healthy
+  // running run, and an abstention on a failed run that recorded its reason.
+  // -------------------------------------------------------------------------
+
+  /**
+   * `run_demo_running` as the demo seed writes it
+   * (`platform-control/src/platform_control/seed_demo_runs.py:117-123`):
+   * acquisition in flight, everything downstream pending, no events yet.
+   *
+   * This shape is the *whole* point of the test below — it is exactly the input
+   * the old `lifecycleEvents === 0 && projection === "pending"` branch fired on.
+   * The assertion right underneath pins that, so the fixture cannot quietly drift
+   * into one that never reaches the branch at all.
+   */
+  const youngRunningHealth = () =>
+    health({
+      stages: [
+        { stage: "acquisition", status: "in_progress" },
+        { stage: "document_intelligence", status: "pending" },
+        { stage: "projection", status: "pending" },
+        { stage: "search", status: "pending" },
+      ],
+      processing_status_event_count: 0,
+      document_lifecycle_event_count: 0,
+    });
+
+  it("refuses to diagnose a running run that has not reached DI yet", () => {
+    const snapshot = youngRunningHealth();
+
+    // The fixture really is the one the false positive was derived from: zero
+    // lifecycle events with the projection stage pending. If this ever stops
+    // holding, the assertion below would pass for the wrong reason.
+    expect(snapshot.document_lifecycle_event_count).toBe(0);
+    expect(snapshot.stages.find((s) => s.stage === "projection")?.status).toBe("pending");
+
+    const diagnosis = diagnoseRunStall({ status: "running" }, snapshot);
+    expect(diagnosis.cause).toBe(STALL_TOO_EARLY);
+    expect(diagnosis.isDiagnosed).toBe(false);
+    // The specific wrong answer #950 reported, named so the regression is legible.
+    expect(diagnosis.cause).not.toBe(STALL_PROJECTION_STALLED);
+    expect(diagnosis.detail).not.toContain("projection bridge");
+    // "Too early" is not "nothing is wrong" (ADR-0052).
+    expect(diagnosis.detail).toContain("not a stall");
+  });
+
+  it("names the recorded failure reason instead of abstaining", () => {
+    const reason =
+      "provider returned HTTP 503 for 2 of 2 captured resources, after 3 retries against the upstream host";
+    const diagnosis = diagnoseRunStall({ status: "failed", failure_reason: reason }, health());
+    expect(diagnosis.cause).toBe(STALL_RUN_FAILED);
+    expect(diagnosis.cause).not.toBe(STALL_UNKNOWN);
+    expect(diagnosis.isDiagnosed).toBe(true);
+    expect(diagnosis.detail).toContain(reason);
+  });
+
+  it("says a failure reason is unrecorded rather than inventing a stage cause", () => {
+    // Absent is not zero and not unknown: nobody wrote a reason down, and the
+    // panel says so instead of reading the stages for a cause they cannot carry.
+    const diagnosis = diagnoseRunStall({ status: "failed", failure_reason: null }, health());
+    expect(diagnosis.cause).toBe(STALL_RUN_FAILED);
+    expect(diagnosis.detail).toContain("no failure reason was recorded");
+    expect(diagnosis.detail).toContain("not absent");
+  });
+
+  it("keeps the lock refusal ahead of the plain failure branch", () => {
+    // A refusal is persisted as FAILED with `refused: true`; it must keep naming
+    // the key, not the generic failure.
+    expect(
+      diagnoseRunStall(
+        { status: "failed", refused: true, failure_reason: "config key not set" },
+        health(),
+      ).cause,
+    ).toBe(STALL_RUN_REFUSED);
+  });
+
+  it("needs no health snapshot to diagnose a failed run", () => {
+    expect(diagnoseRunStall({ status: "failed", failure_reason: "boom" }, null).cause).toBe(
+      STALL_RUN_FAILED,
+    );
+  });
+
+  it("will not claim a projection stall when DI never reported processing", () => {
+    // The `projection_stalled` sentence says "DI reported processing but no
+    // document-lifecycle events were projected". With zero processing events
+    // that claim is false, so the honest answer is that nothing matched.
+    const diagnosis = diagnoseRunStall(
+      { status: "cancelled" },
+      health({
+        stages: [
+          { stage: "projection", status: "pending" },
+          { stage: "search", status: "pending" },
+        ],
+        processing_status_event_count: 0,
+        document_lifecycle_event_count: 0,
+      }),
+    );
+    expect(diagnosis.cause).toBe(STALL_UNKNOWN);
+    expect(diagnosis.cause).not.toBe(STALL_PROJECTION_STALLED);
+    // …and not the next branch down either: "projection has run" is equally false.
+    expect(diagnosis.cause).not.toBe(STALL_SEARCH_PENDING);
+    expect(diagnosis.isDiagnosed).toBe(false);
+  });
+
+  it("marks a named cause as diagnosed and an abstention as not", () => {
+    expect(diagnoseRunStall({ status: "pending" }, health()).isDiagnosed).toBe(true);
+    expect(diagnoseRunStall({ status: "completed" }, null).isDiagnosed).toBe(false);
   });
 
   it("degrades to unknown when pipeline health could not be read", () => {

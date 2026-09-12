@@ -24,6 +24,11 @@
  * (`classification_disagrees_with_server`, `coverage.py:452`). Until that lands,
  * this port is the panel's only access to it, and the tests beside this file pin
  * it to the CLI's behaviour rather than to a UI expectation.
+ *
+ * #950 changed the diagnosis on **both** sides together, for that reason: the two
+ * new causes (`run_failed`, `too_early_to_diagnose`) and the three tightened
+ * branches exist verbatim in `coverage.py` as well. A fix landed here alone would
+ * have created exactly the drift this header warns about.
  */
 
 // ---------------------------------------------------------------------------
@@ -36,6 +41,22 @@ export const STALL_PUBLISH_PATH_DISABLED = "publish_path_disabled";
 export const STALL_DI_CONSUMER_SILENT = "di_consumer_silent";
 export const STALL_PROJECTION_STALLED = "projection_stalled";
 export const STALL_SEARCH_PENDING = "search_projection_pending";
+/**
+ * The run failed on its own terms and recorded why. Not a stall signature derived
+ * from stage state — the run's own `failure_reason`, which the panel already
+ * renders 200px above and the diagnosis used to ignore (#950).
+ */
+export const STALL_RUN_FAILED = "run_failed";
+/**
+ * No cause can be named yet, and that is different from "nothing is wrong".
+ *
+ * A run still in flight has downstream stages `pending` because nothing has asked
+ * them to do anything, not because a bridge is broken. Distinguishing "not yet"
+ * from "stuck" needs elapsed time, which this snapshot does not carry — so the
+ * honest answer is that the question is premature (ADR-0052: a diagnosis that
+ * cannot be made is not a clean bill of health).
+ */
+export const STALL_TOO_EARLY = "too_early_to_diagnose";
 export const STALL_UNKNOWN = "unknown";
 
 export type StallCause =
@@ -45,6 +66,8 @@ export type StallCause =
   | typeof STALL_DI_CONSUMER_SILENT
   | typeof STALL_PROJECTION_STALLED
   | typeof STALL_SEARCH_PENDING
+  | typeof STALL_RUN_FAILED
+  | typeof STALL_TOO_EARLY
   | typeof STALL_UNKNOWN;
 
 const STALL_DETAIL: Record<StallCause, string> = {
@@ -60,6 +83,10 @@ const STALL_DETAIL: Record<StallCause, string> = {
     "DI reported processing but no document-lifecycle events were projected. Check the projection bridge between DI and legal-search.",
   [STALL_SEARCH_PENDING]:
     "Projection has run but the search stage has not reported. Give the index a moment, then assert searchability directly.",
+  [STALL_RUN_FAILED]:
+    "The run failed and was not refused by the two-key lock, and no failure reason was recorded. That is unrecorded, not absent — read the run's provider jobs and the dispatcher logs. The stages below say how far it got, not why it stopped.",
+  [STALL_TOO_EARLY]:
+    "The run is still executing, so the stages after acquisition are pending because nothing has asked them to do anything yet. That is the expected shape of a run in flight, not a stall — no downstream cause can be named while acquisition is still going, because telling “not yet” from “stuck” needs elapsed time this snapshot does not carry. Watch the acquisition stage and read this panel again once the run reaches a terminal state.",
   [STALL_UNKNOWN]: "No known stall signature matched. Inspect the pipeline-health stages directly.",
 };
 
@@ -71,6 +98,8 @@ const STALL_LABEL: Record<StallCause, string> = {
   [STALL_DI_CONSUMER_SILENT]: "DI consumer silent",
   [STALL_PROJECTION_STALLED]: "Projection stalled",
   [STALL_SEARCH_PENDING]: "Search projection pending",
+  [STALL_RUN_FAILED]: "Run failed",
+  [STALL_TOO_EARLY]: "Too early to say",
   [STALL_UNKNOWN]: "Unknown",
 };
 
@@ -78,6 +107,15 @@ export interface StallDiagnosis {
   cause: StallCause;
   label: string;
   detail: string;
+  /**
+   * True when the cause names something to act on.
+   *
+   * False for `too_early_to_diagnose` and `unknown` — the two outcomes that are
+   * *not* a finding. A caller must render neither as a defect and neither as
+   * health: "no answer yet" is a third state beside "absent" and "zero"
+   * (ADR-0052).
+   */
+  isDiagnosed: boolean;
 }
 
 interface StallHealthInput {
@@ -89,6 +127,12 @@ interface StallHealthInput {
 interface StallRunInput {
   status: string;
   refused?: boolean;
+  /**
+   * The run's own recorded reason for failing. Absent/`null` is a real
+   * distinction from a recorded reason: it means nobody wrote one down, and the
+   * diagnosis says exactly that rather than implying there was nothing to say.
+   */
+  failure_reason?: string | null;
 }
 
 const stageStatus = (health: StallHealthInput | null, name: string): string | null =>
@@ -113,6 +157,12 @@ export const diagnoseRunStall = (
     if (status === "pending") {
       return STALL_NO_DISPATCH_WORKER;
     }
+    if (status === "failed") {
+      // Ask what the run's own status already says before deriving anything from
+      // stage state. Doing it the other way round is what rendered a recorded
+      // `failure_reason` as `unknown` (#950). No health snapshot is needed here.
+      return STALL_RUN_FAILED;
+    }
     if (!health) {
       // No health snapshot: every branch below reads it, and reading zeros off a
       // failed fetch would name `publish_path_disabled` on a healthy run.
@@ -123,21 +173,46 @@ export const diagnoseRunStall = (
     if (status === "completed" && processingEvents === 0) {
       return STALL_PUBLISH_PATH_DISABLED;
     }
+    if (status === "running" || status === "in_progress") {
+      // The run has not finished, so every stage after acquisition is pending by
+      // construction. Reading those pendings as a downstream cause is how a
+      // healthy young run got sent to debug the projection bridge (#950).
+      return STALL_TOO_EARLY;
+    }
     const di = stageStatus(health, "document_intelligence");
     if ((di === "pending" || di === "in_progress") && processingEvents > 0) {
       return STALL_DI_CONSUMER_SILENT;
     }
     const projection = stageStatus(health, "projection");
-    if (lifecycleEvents === 0 && (projection === "pending" || projection === "in_progress")) {
+    if (
+      processingEvents > 0 &&
+      lifecycleEvents === 0 &&
+      (projection === "pending" || projection === "in_progress")
+    ) {
+      // `processingEvents > 0` is what this cause's own sentence has always
+      // claimed — "DI reported processing but no document-lifecycle events were
+      // projected" — and what the branch never actually checked.
       return STALL_PROJECTION_STALLED;
     }
-    if (stageStatus(health, "search") === "pending") {
+    if (lifecycleEvents > 0 && stageStatus(health, "search") === "pending") {
+      // Likewise: "Projection has run but the search stage has not reported" is
+      // only true if projection emitted something.
       return STALL_SEARCH_PENDING;
     }
     return STALL_UNKNOWN;
   })();
 
-  return { cause, label: STALL_LABEL[cause], detail: STALL_DETAIL[cause] };
+  const recordedFailure = cause === STALL_RUN_FAILED ? (run.failure_reason ?? "").trim() : "";
+  const detail = recordedFailure
+    ? `The run failed and recorded why: “${recordedFailure}”. That is the diagnosis — read it before reading the stages, which say how far the run got, not why it stopped.`
+    : STALL_DETAIL[cause];
+
+  return {
+    cause,
+    label: STALL_LABEL[cause],
+    detail,
+    isDiagnosed: cause !== STALL_TOO_EARLY && cause !== STALL_UNKNOWN,
+  };
 };
 
 // ---------------------------------------------------------------------------
