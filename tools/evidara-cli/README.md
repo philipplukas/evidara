@@ -52,6 +52,8 @@ evidara workflow coverage queue --actor agent
 evidara workflow coverage templates --blocker provider_awaiting_evidence
 evidara workflow coverage preflight --overlay ch --template <template_id>
 evidara workflow coverage watch --run-id <run_id> --until processed
+evidara workflow coverage drive --source-id <id> --source-version-id <id> \
+  --requests-per-attempt 60 --max-attempts 3 --max-upstream-requests 500 --preflight-only
 evidara workflow run evidence --run-id <run_id>
 evidara workflow coverage enable --overlay ch --template <template_id> --evidence-run-id <run_id>
 
@@ -205,6 +207,51 @@ failure modes that actually cost time driving the loop — notably
 `completed` having published nothing.
 
 `--until run` waits for a terminal run status; `--timeout 0` polls once and reports.
+
+### `coverage drive` — the loop itself, inside a budget
+
+```bash
+uv run evidara workflow coverage drive \
+  --source-id <source_id> --source-version-id <source_version_id> \
+  --requests-per-attempt 60 --max-attempts 3 --max-upstream-requests 500 --human
+```
+
+Composes pre-flight → launch (`mode=acceptance`) → watch → diagnose → stop, and returns a
+**journal**: what it did, what it spent, and why it stopped. It is the only command here
+that dispatches a run on its own, so the budget is not optional and is stated on the
+command line rather than hidden in agent code.
+
+`--preflight-only` reports the budget and the readiness verdict and launches nothing. Use
+it first against any source you have not driven before — it makes no upstream request.
+
+**The three bounds, and why each is where it is:**
+
+| Bound | Flag | What it stops |
+|---|---|---|
+| Attempts per source | `--max-attempts` (3) | "Retry until it works". N launches, then stop and report. |
+| Upstream requests, whole loop | `--max-upstream-requests` (1000) | The bound a per-attempt cap misses — 10 bounded attempts is still an unbounded loop. |
+| Backoff | `--backoff` (30s), `--backoff-factor` (2), `--max-backoff` (300s) | Bursting a portal that is already struggling. |
+
+`--requests-per-attempt` is **required and has no default**: platform-control does not
+report how many upstream requests a run made (`estimated_request_count` is computed when a
+provider plans and is never persisted or serialised), so the ceiling can only charge a cost
+the caller declares from the spec. It is reconciled **upward** after each attempt against
+the run's captured/artifact counts — a lower bound on what was fetched — and never
+downward.
+
+**What it will not do**, each with a test that fails if the property is removed:
+
+- **retry a refusal** — pre-flight, launch or diagnosis; the loop stops with attempts and
+  ceiling unspent. No server-side check can catch a retried refusal: it is an ordinary
+  request.
+- **rewrite the spec.** `POST /v1/sources/{id}/versions` is reachable and unused — a new
+  spec is exactly what the declared per-attempt cost cannot bound.
+- **flip `enabled: true`.** ADR-0030's second key is a human's (#854); `coverage enable`
+  below is an operator command.
+
+It only ever answers a **failed run** with another attempt. An environment defect
+(`no_dispatch_worker`, `publish_path_disabled`) or downstream backlog is reported, because
+another run would add load and no information.
 
 ### `workflow run evidence` — the ADR-0030 acceptance verdict
 
