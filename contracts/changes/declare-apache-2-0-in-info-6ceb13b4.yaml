@@ -1,0 +1,4 @@
+bump: patch
+additive: true
+summary: >-
+  Declare Apache-2.0 in info.license on the legal-search and document-intelligence specs; the licence decision the blocks deferred has been made

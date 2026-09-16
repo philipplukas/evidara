@@ -1,8 +1,10 @@
 # Runbook — learned-sparse embedding backfill (ADR-0054)
 
 Owner: Platform team
-Last reviewed: 2026-09-10
-Last verified: **2026-09-05 (backfill write) / 2026-09-10 (gate probe), workstation path only — see [Status](#status)**
+Last reviewed: 2026-09-16
+Last verified: **2026-09-16 — whole-corpus backfill (882/889) and the first gate probe against a
+real corpus, workstation path only. The gate no longer separates; see
+[Step 7](#step-7--the-first-run-against-a-real-corpus-2026-09-16) before serving anything.**
 Applies to: prod (self-hosted Hetzner k3s, ADR-0029)
 
 ## Status
@@ -19,8 +21,9 @@ What was proven on 2026-09-05, plus the two gate rows re-measured on 2026-09-10 
 | BGE-M3 loads and encodes on that GPU | 76 chunks over 2 documents, 20.6s including model load |
 | `rank_features` accepts the vectors | 2 documents updated, 0 failed, 3,671 features each |
 | A sparse query retrieves them | see [Step 5](#step-5--verify) |
-| Sparse retrieval never abstains | 24/24 queries returned every searchable document — [Step 6](#step-6--the-abstention-gate-adr-0054-d4) |
-| The D4 gate refuses on the measured floor | 10 of 12 out-of-corpus queries refused, 12 of 12 in-corpus admitted (2026-09-10) |
+| Sparse retrieval never abstains | 24/24 queries returned every searchable document — [Step 6](#step-6--the-abstention-gate-adr-0054-d4); re-confirmed at corpus scale, `sparse_hits=10` for all 24 |
+| The D4 gate refuses on the measured floor | **Superseded.** True on the 2026-09-10 corpus (3 copies of 1 document). Against the real 882-document corpus the in- and out-of-corpus populations overlap and no floor separates them — [Step 7](#step-7--the-first-run-against-a-real-corpus-2026-09-16) |
+| The representation covers the corpus | 882 of 889 documents, 0 failures, 7 skipped for empty `content` (2026-09-16) |
 | GPU scheduling works in-cluster | a smoke pod printed `NVIDIA GeForce RTX 5090, 32607 MiB` |
 | The Job manifest is correct | **not proven** — no image, so it has never been applied |
 
@@ -275,6 +278,74 @@ Two things this table is deliberately honest about:
 you see what a floor change would decide before changing it. The knobs and their
 version live in `document_intelligence/embeddings/gating.py` (`GateConfig`,
 `RETRIEVAL_CONFIG_VERSION`) per ADR-0054 D2.
+
+## Step 7 — the first run against a real corpus (2026-09-16)
+
+Everything above was measured when the serving index held **2 embedded documents** out of 6, and
+the D4 floor was calibrated when it was three copies of one document (#806). This step is the first
+time either was exercised against a corpus worth the name.
+
+### The backfill
+
+```
+scanned: 889   embedded: 882   updated: 882   failed: 0   elapsed: 87.42s
+skipped_no_content: 7
+```
+
+Whole production corpus (`documents-write` → `documents-read-20260729111140`), RTX 5090,
+`--batch-size 16`. The 7 skips are documents with no `content` field; they are listed by id in the
+report rather than folded into a success count.
+
+### The gate, re-measured — and it no longer separates
+
+Re-running Step 6's probe against that corpus, with the **unchanged**
+`coverage_floor = 0.08`:
+
+| | result |
+|---|---|
+| In-corpus queries withheld | **0 of 12** — the floor admits every real hit |
+| Out-of-corpus queries admitted | **4 of 12** |
+
+Two of those four are **stale labels, not gate failures**:
+`darf ich meinen Hund im Restaurant mitnehmen` and
+`welche Bewilligung brauche ich fuer einen Kampfhund in Zuerich` are labelled `OUT` in
+`sparse_gate_calibration.json` because, when that fixture was written, the corpus could not answer
+them. The ZH Hundegesetz is in the corpus now. Admitting them is right; the fixture is what is
+wrong, and re-labelling it is a prerequisite for the next calibration rather than a cosmetic fix.
+
+The other two are real, and they are why sparse retrieval **must not be served yet**:
+
+```
+ADMIT   coverage=0.12176  'Aufstellung Champions League Finale 1999'
+ADMIT   coverage=0.09911  'Reparaturanleitung Waschmaschine Trommellager'
+```
+
+against an in-corpus range of **0.111 – 0.236**. The lowest genuine hit (0.111, *"Wer waehlt die
+Bundesrichter?"*) scores **below** the Champions League query (0.122). No absolute floor separates
+these populations — raising it to exclude the football query withholds a real constitutional
+answer. This is the same overlap #891 found in the raw scores, reappearing in the ratio that was
+introduced to fix it, now that there is a corpus to measure against.
+
+`sparse_hits` is **10 for every one of the 24 queries**, including
+`python pandas groupby multiple columns example`, whose BM25 arm returns 0. That is ADR-0054's
+stated failure mode observed directly: the lexical retriever abstains for free and the sparse one
+never does.
+
+### What this changes
+
+- **The floor is not a knob to re-tune here.** Two overlapping populations do not separate at any
+  threshold. The next move is the *margin* rule D4 shipped inactive, or D1 fusion where the
+  abstaining lexical arm gates the non-abstaining sparse one — note BM25 correctly returned 0 hits
+  for the Waschmaschine query, so a hybrid gate would already refuse one of the two leaks.
+- **`sparse_gate_calibration.json` needs re-labelling against the current corpus** before any
+  floor derived from it means anything.
+- Serving is still blocked on a second thing, independent of the gate: **query-side encoding has no
+  home in production.** Measured 2026-09-16, BGE-M3's query features are a strict subset of its
+  tokenizer's ids (10 of 10 overlap, 0 model-only), so a tokenizer-only query path is *feasible* —
+  but the model's weights are what make it correct. It scores `Zürich` 0.261 and `Hund` 0.235
+  against `meinen` 0.050, whereas uniform or corpus-IDF weighting rewards `meinen` precisely
+  because it is rare in statutes. That is #973 rebuilt in the sparse arm. A query encoder therefore
+  needs the model, and no deployed image carries torch.
 
 ## What this does not prove
 

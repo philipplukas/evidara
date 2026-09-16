@@ -1,0 +1,61 @@
+# Secret-scanning configuration (gitleaks).
+#
+# Why this file exists: the repository is going public, and its 1,245-commit
+# history goes with it. A scan that nobody runs is not a control, and a scan
+# whose output is eight known false positives is a scan people learn to ignore —
+# so the noise is suppressed HERE, narrowly and with a reason each, rather than
+# by lowering the bar.
+#
+# Baseline measured 2026-09-16 over the full history (1,782 commits scanned by
+# gitleaks, ~52.8MB): eight findings, all false positives, every one of them a
+# secret *name* rather than a secret *value*. They are allowlisted below. Any
+# NEW finding is therefore a real signal, which is the whole point.
+#
+# Verify a change to this file the way AGENTS.md requires of any guard — plant a
+# obviously-fake credential, confirm the scan goes red, remove it:
+#
+#   echo 'aws_secret_access_key = "AKIAIOSFODNN7EXAMPLE0000"' > /tmp/leak.tf
+#   gitleaks dir --config .gitleaks.toml /tmp/leak.tf   # must exit non-zero
+
+[extend]
+# Start from gitleaks' bundled rule set rather than re-deriving ~170 provider
+# rules by hand, then subtract below. Replacing it wholesale is how a scanner
+# quietly stops covering the provider you actually use.
+useDefault = true
+
+[allowlist]
+description = "Known-good matches, each one a secret's NAME and not its value"
+
+paths = [
+  # Terraform variable defaults that map logical names to GCP Secret Manager
+  # secret IDs — `opensearch_password = "opensearch-password"`. The rule
+  # `hashicorp-tf-password` fires on the assignment's left-hand side; the
+  # right-hand side is an identifier the value is fetched BY, at deploy time.
+  # Three commits in 2026-04 carry it.
+  '''infra/terraform/gcp/runtime_stack/variables\.tf''',
+
+  # `"k8s_secret": "evidara-s3-di-consumer"` and siblings — the names of
+  # Kubernetes Secrets that `provision-minio-users.sh` creates. The credentials
+  # themselves are generated at provisioning time and never enter git
+  # (ADR-0049). This file is platform-owned and frozen; see infra/hetzner/OWNERSHIP.md.
+  '''infra/hetzner/minio-policies/accounts\.json''',
+
+  # The vendored copy of the same mapping, published so a product repo can check
+  # its manifests without vendoring the policies. Same `secret: <name>` shape.
+  '''vendor/platform-contract\.yaml''',
+]
+
+# NOTE: these match against the CAPTURED SECRET, not the surrounding line. An
+# earlier draft allowlisted '''REPOSITORY CREDENTIAL''' — the prose that
+# precedes the match — and it suppressed nothing, because that text is not what
+# the rule captured. Confirmed by re-running the history scan: still 2 findings.
+regexes = [
+  # A prose comment in the (platform-owned) deploy-argocd.sh reads:
+  #   "REPOSITORY CREDENTIAL: `philipplukas/evidara` is PRIVATE, so Argo CD
+  #    cannot read it without one."
+  # `generic-api-key` captured the backticked repository slug. That slug is a
+  # public identifier — it is in this file, in the README and in every clone
+  # URL. The credential the sentence describes is a read-only GitHub deploy key
+  # created by hand in a browser and never committed.
+  '''philipplukas/evidara''',
+]

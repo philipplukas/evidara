@@ -36,6 +36,27 @@ repos:
 
   - repo: local
     hooks:
+      # Secret scan on the staged worktree. Scoped to what is being committed,
+      # not to history — the full-history sweep is a CI job
+      # (.github/workflows/secret-scan.yml), because it costs ~10s over 1,782
+      # commits and nobody should pay that per commit.
+      #
+      # `language: system` to match every other hook here: this repo installs
+      # CLIs with the OS package manager and deliberately has no repo-managed
+      # tool provider (AGENTS.md). If gitleaks is absent the hook fails loudly
+      # rather than skipping, which is the point — a secret scan that silently
+      # does not run is worse than none, because the commit looks scanned.
+      - id: gitleaks
+        name: Scan staged files for secrets
+        # `git --staged`, not `protect`: the `protect` subcommand was removed in
+        # gitleaks v8.19 and this binary does not have it (`gitleaks --help`
+        # lists only dir/git/stdin). A hook entry naming it fails on every
+        # commit with "unknown command", which reads as a broken repo rather
+        # than as a leak.
+        entry: gitleaks git --staged --redact --config .gitleaks.toml
+        language: system
+        pass_filenames: false
+
       - id: validate-openapi-contracts
         name: Validate OpenAPI contracts
         entry: python scripts/validate_openapi.py

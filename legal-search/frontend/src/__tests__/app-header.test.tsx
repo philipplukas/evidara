@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import type { UrlUpdateEvent } from "nuqs/adapters/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { REPOSITORY_URL } from "@/components/layout/RepositoryLink";
 import { searchResults } from "@/lib/mock-data";
 import { DEFAULT_SEARCH_QUERY } from "@/lib/search-params";
 import { useWorkspace } from "@/lib/workspace-store";
@@ -207,5 +208,28 @@ describe("AppHeader", () => {
     expect(input).not.toHaveFocus();
 
     textarea.remove();
+  });
+
+  // The mark is hand-authored SVG because lucide-react v1 dropped its brand
+  // icons: `<Github />` would resolve to `undefined` and render nothing at all.
+  // So this asserts the rendered geometry, not just the anchor — an empty link
+  // is the failure this guards, and an href-only assertion would pass for one.
+  it("links to the public source repository, with the mark actually drawn", () => {
+    renderWithProviders(<AppHeader controlPanelUrl={undefined} showControlPlaneEntry={true} />);
+
+    const repoLink = screen.getByRole("link", { name: "Quellcode auf GitHub" });
+
+    expect(repoLink).toHaveAttribute("href", REPOSITORY_URL);
+    expect(repoLink).toHaveAttribute("target", "_blank");
+    // Both halves matter on an external `target="_blank"`: `noopener` denies the
+    // opened page a handle on `window.opener`, `noreferrer` withholds the URL
+    // the visitor came from.
+    const rel = repoLink.getAttribute("rel") ?? "";
+    expect(rel).toContain("noopener");
+    expect(rel).toContain("noreferrer");
+
+    const path = repoLink.querySelector("svg path");
+    expect(path).not.toBeNull();
+    expect(path?.getAttribute("d") ?? "").not.toHaveLength(0);
   });
 });
