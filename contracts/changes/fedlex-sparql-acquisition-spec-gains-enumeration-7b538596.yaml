@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  fedlex_sparql acquisition spec gains enumeration=sr_collection and max_works, so the provider can walk the Systematic Collection instead of only hand-pasted seed_urls

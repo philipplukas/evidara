@@ -13,14 +13,20 @@ added under `contracts/schemas/` when the on-wire subset is frozen.
 
  * OpenAPI spec version: 0.2.0
  */
-import type { DocumentRevisionParameter } from './documentRevisionParameter';
 
-export type GetDocumentLeanParams = {
-/**
- * Optional explicit revision. When omitted, the implementation returns the latest published
-revision the caller is allowed to see.
+export interface QuerySparseRequest {
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  query: string;
+  /**
+   * Features sent as `rank_feature` clauses. The default matches the vector the
+ADR-0054 D4 floor was calibrated against; a ratio computed over a
+differently sized vector is not comparable to it.
 
- * @minimum 1
- */
-document_revision?: DocumentRevisionParameter;
-};
+   * @minimum 1
+   * @maximum 2048
+   */
+  max_features?: number;
+}

@@ -104,7 +104,7 @@ API_TITLE = "Platform Control API"
 # because the endpoint had no caller and, with `wizard_orchestrator_backend` at
 # `in_memory` everywhere (ADR-0031), no effect. The gate's real path is unchanged:
 # `POST /v1/wizard/runs/{run_id}/approve` and `.../reject`.
-API_VERSION = "0.31.0"
+API_VERSION = "0.32.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

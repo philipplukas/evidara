@@ -11,7 +11,7 @@ detail (not a handoff into parsing or pipeline jobs). See ADR-0010
 Wire format: IBM Docling `DoclingDocument` serialized as JSON. A dedicated JSON Schema may be
 added under `contracts/schemas/` when the on-wire subset is frozen.
 
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export * from './correlationIdParameter';
@@ -21,3 +21,6 @@ export * from './errorResponse';
 export * from './getDocumentFullParams';
 export * from './getDocumentLeanParams';
 export * from './getDocumentPlainTextParams';
+export * from './querySparseRequest';
+export * from './querySparseResponse';
+export * from './querySparseResponseFeatures';

@@ -13,14 +13,19 @@ added under `contracts/schemas/` when the on-wire subset is frozen.
 
  * OpenAPI spec version: 0.2.0
  */
-import type { DocumentRevisionParameter } from './documentRevisionParameter';
+import type { QuerySparseResponseFeatures } from './querySparseResponseFeatures';
 
-export type GetDocumentLeanParams = {
-/**
- * Optional explicit revision. When omitted, the implementation returns the latest published
-revision the caller is allowed to see.
-
- * @minimum 1
+export interface QuerySparseResponse {
+  /** `t<token-id>` -> weight. Token ids, never decoded strings: a multilingual
+vocabulary contains `.`, which OpenSearch reads as object nesting.
  */
-document_revision?: DocumentRevisionParameter;
-};
+  features: QuerySparseResponseFeatures;
+  feature_count: number;
+  features_before_truncation: number;
+  /** Mass of the features returned, NOT of the untruncated vector. ADR-0054 D4's
+coverage ratio divides by this, and it must describe the query actually issued.
+ */
+  weight_mass: number;
+  truncated: boolean;
+  model: string;
+}

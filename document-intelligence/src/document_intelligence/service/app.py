@@ -9,7 +9,14 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
+from pydantic import BaseModel, Field
 
+from document_intelligence.embeddings.query_encoding import (
+    DEFAULT_MAX_FEATURES,
+    MAX_FEATURES_CEILING,
+    QueryEncoderUnavailable,
+    encode_query,
+)
 from document_intelligence.http_observability import install_http_observability
 from document_intelligence.service.lean import to_lean_dict, to_plain_text
 from document_intelligence.service.store import (
@@ -40,6 +47,27 @@ def verify_bearer(
     token = authorization.removeprefix("Bearer ").strip()
     if token != expected:
         raise HTTPException(status_code=401, detail="Invalid bearer token")
+
+
+class QuerySparseRequest(BaseModel):
+    """A query to encode into the `content_sparse` feature space (ADR-0054)."""
+
+    query: str = Field(min_length=1, max_length=2000)
+    max_features: int = Field(default=DEFAULT_MAX_FEATURES, ge=1, le=MAX_FEATURES_CEILING)
+
+
+class QuerySparseResponse(BaseModel):
+    #: `t<token-id>` -> weight, ready to send as `rank_feature` clauses. Token ids,
+    #: never decoded strings: a multilingual vocabulary contains `.`, which OpenSearch
+    #: reads as object nesting (see embeddings/sparse.py).
+    features: dict[str, float]
+    feature_count: int
+    features_before_truncation: int
+    #: Mass of the features ABOVE, not of the untruncated vector — ADR-0054 D4's
+    #: coverage denominator has to describe the query that was actually issued.
+    weight_mass: float
+    truncated: bool
+    model: str
 
 
 def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
@@ -136,6 +164,41 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="Document revision not found")
         text = to_plain_text(body)
         return PlainTextResponse(content=text or "", media_type="text/plain; charset=utf-8")
+
+    @app.post(
+        "/v1/embeddings/query-sparse",
+        tags=["embeddings"],
+        response_model=QuerySparseResponse,
+        responses={503: {"description": "This image does not carry the sparse encoder."}},
+    )
+    async def encode_query_sparse(
+        payload: QuerySparseRequest,
+        _auth: None = Depends(verify_bearer),
+    ) -> QuerySparseResponse:
+        """Encode a query so the search path can query `content_sparse`.
+
+        503, not 500, when the encoder is absent: "this image has no model" and "this
+        query is unanswerable" are different facts, and a search path that cannot tell
+        them apart is the #958 defect at a service boundary. The named `reason` is in
+        the detail so a caller can branch on it.
+        """
+        try:
+            result = encode_query(payload.query, max_features=payload.max_features)
+        except QueryEncoderUnavailable as exc:
+            raise HTTPException(
+                status_code=503,
+                detail={"reason": exc.reason, "message": exc.detail},
+            ) from exc
+        except ValueError as exc:
+            raise _bad_id(str(exc)) from exc
+        return QuerySparseResponse(
+            features=result.features,
+            feature_count=len(result.features),
+            features_before_truncation=result.features_before_truncation,
+            weight_mass=result.weight_mass,
+            truncated=result.truncated,
+            model=result.model,
+        )
 
     @app.get("/health", include_in_schema=False)
     async def health() -> dict[str, str]:

@@ -10,7 +10,7 @@ info:
 
     Wire format: IBM Docling `DoclingDocument` serialized as JSON. A dedicated JSON Schema may be
     added under `contracts/schemas/` when the on-wire subset is frozen.
-  version: 0.1.0
+  version: 0.2.0
   contact:
     name: Evidara Team
   license:
@@ -146,6 +146,57 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /v1/embeddings/query-sparse:
+    post:
+      operationId: encodeQuerySparse
+      summary: Encode a query into the learned-sparse feature space
+      description: |
+        Encodes a search query with the same BGE-M3 model that wrote `content_sparse`
+        (ADR-0054), so the search path can issue `rank_feature` clauses against it.
+
+        The model is required, not just its tokenizer. Measured 2026-09-16, BGE-M3's
+        query features are a strict subset of the tokenizer's ids (overlap 10, model-only
+        0), so a tokenizer-only encoder reaches the same feature SPACE — but not the
+        weights, and the weights are the point: `Zürich` 0.261 and `Hund` 0.235 against
+        `meinen` 0.050. Uniform or corpus-IDF weighting rewards `meinen`, because
+        colloquial first-person German is rarer in statutes than the legal subject. That
+        is #973 rebuilt in the sparse arm.
+
+        Intended as a COLD path: BM25 answers ~85% of realistic queries, so this is for
+        the remainder. That is what makes a CPU-bound encode acceptable.
+      tags: [embeddings]
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuerySparseRequest"
+      responses:
+        "200":
+          description: The encoded query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuerySparseResponse"
+        "422":
+          description: Empty query, or `max_features` out of range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: |
+            This image does not carry the sparse encoder. `503` and not `500`
+            deliberately: "no model here" and "this query is unanswerable" are different
+            facts, and a search path that cannot tell them apart is #958 at a service
+            boundary. `detail.reason` is `embeddings_extra_not_installed`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   parameters:
     DocumentId:
@@ -174,6 +225,47 @@ components:
       description: Propagated for tracing across BFF → Document Service → data plane.
 
   schemas:
+    QuerySparseRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        max_features:
+          type: integer
+          minimum: 1
+          maximum: 2048
+          default: 512
+          description: |
+            Features sent as `rank_feature` clauses. The default matches the vector the
+            ADR-0054 D4 floor was calibrated against; a ratio computed over a
+            differently sized vector is not comparable to it.
+    QuerySparseResponse:
+      type: object
+      required: [features, feature_count, features_before_truncation, weight_mass, truncated, model]
+      properties:
+        features:
+          type: object
+          additionalProperties:
+            type: number
+          description: |
+            `t<token-id>` -> weight. Token ids, never decoded strings: a multilingual
+            vocabulary contains `.`, which OpenSearch reads as object nesting.
+        feature_count:
+          type: integer
+        features_before_truncation:
+          type: integer
+        weight_mass:
+          type: number
+          description: |
+            Mass of the features returned, NOT of the untruncated vector. ADR-0054 D4's
+            coverage ratio divides by this, and it must describe the query actually issued.
+        truncated:
+          type: boolean
+        model:
+          type: string
     DoclingDocumentJson:
       type: object
       description: |
@@ -195,3 +287,7 @@ components:
 tags:
   - name: documents
     description: Published document body reads
+  - name: embeddings
+    description: |
+      Query-side encoding into the learned-sparse feature space the projection
+      writes (ADR-0054). Read-only and stateless — it encodes, it does not search.
