@@ -13,14 +13,10 @@ added under `contracts/schemas/` when the on-wire subset is frozen.
 
  * OpenAPI spec version: 0.2.0
  */
-import type { DocumentRevisionParameter } from './documentRevisionParameter';
 
-export type GetDocumentLeanParams = {
 /**
- * Optional explicit revision. When omitted, the implementation returns the latest published
-revision the caller is allowed to see.
+ * `t<token-id>` -> weight. Token ids, never decoded strings: a multilingual
+vocabulary contains `.`, which OpenSearch reads as object nesting.
 
- * @minimum 1
  */
-document_revision?: DocumentRevisionParameter;
-};
+export type QuerySparseResponseFeatures = {[key: string]: number};
