@@ -15,6 +15,7 @@ applicable to this template)" — which is a false statement about the second.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 import unittest
@@ -22,6 +23,61 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE_LIB = REPO_ROOT / "scripts" / "fast-loop-evidence.sh"
+
+
+#: A wrapper is a fast-loop script that does not implement the loop: it `exec`s
+#: another one with corpus defaults filled in (scripts/ch-lexfind-fast-loop.sh).
+#: The guards below are about the harness that RUNS the loop, so a wrapper has
+#: nothing to satisfy — but it must actually delegate, and to a real harness.
+#:
+#: Detected by its `exec`, never by a name allowlist. An allowlist would let a real
+#: harness escape every guard in this file by being added to it, which is the
+#: opposite of what these tests are for.
+_WRAPPER_EXEC = re.compile(r'^\s*exec\s+"?\$\{?SCRIPT_DIR\}?"?/([A-Za-z0-9_.-]*fast-loop\.sh)', re.M)
+
+
+def delegate_of(script: Path) -> Path | None:
+    """The harness this script execs, or None when it implements the loop itself."""
+    match = _WRAPPER_EXEC.search(script.read_text(encoding="utf-8"))
+    return script.parent / match.group(1) if match else None
+
+
+def all_fast_loop_scripts() -> list[Path]:
+    return sorted((REPO_ROOT / "scripts").glob("*-fast-loop.sh"))
+
+
+def harness_scripts() -> list[Path]:
+    """Fast-loop scripts that implement the loop — wrappers excluded."""
+    return [s for s in all_fast_loop_scripts() if delegate_of(s) is None]
+
+
+class WrappersDelegateToARealHarness(unittest.TestCase):
+    """A wrapper may skip the harness guards; it may not skip being a wrapper.
+
+    Without this, `delegate_of` would be an escape hatch: any script could drop an
+    `exec …fast-loop.sh` line into a comment and stop being checked by everything
+    below.
+    """
+
+    def test_every_wrapper_execs_a_harness_that_exists_and_is_itself_checked(self) -> None:
+        wrappers = [s for s in all_fast_loop_scripts() if delegate_of(s) is not None]
+        harnesses = set(harness_scripts())
+        offenders = []
+        for wrapper in wrappers:
+            target = delegate_of(wrapper)
+            if target is None or not target.exists():
+                offenders.append(f"{wrapper.name}: execs {target} which does not exist")
+            elif target not in harnesses:
+                offenders.append(
+                    f"{wrapper.name}: execs {target.name}, which is not a harness "
+                    "(a wrapper chain would let both ends skip these guards)"
+                )
+        self.assertEqual(offenders, [], "; ".join(offenders))
+
+    def test_the_harness_set_is_not_empty(self) -> None:
+        """If a refactor ever made every script a wrapper, every guard below would
+        pass over an empty set and report green."""
+        self.assertGreaterEqual(len(harness_scripts()), 6, "fast-loop harnesses disappeared")
 
 
 def render(summary: dict) -> str:
@@ -227,10 +283,7 @@ class EveryHarnessThatReportsCoverageSaysWhy(unittest.TestCase):
     """
 
     def test_no_harness_emits_skipped_gates_without_gate_coverage(self) -> None:
-        scripts_dir = REPO_ROOT / "scripts"
-        harnesses = sorted(
-            [*scripts_dir.glob("*-fast-loop.sh"), scripts_dir / "ch-fedlex-compose-e2e.sh"]
-        )
+        harnesses = [*harness_scripts(), REPO_ROOT / "scripts" / "ch-fedlex-compose-e2e.sh"]
         self.assertGreaterEqual(len(harnesses), 6, "fast-loop harnesses disappeared")
 
         offenders = []
@@ -399,7 +452,7 @@ class EveryHarnessResolvesRatherThanCreates(unittest.TestCase):
 
     def test_no_fast_loop_script_posts_with_version_directly(self) -> None:
         offenders = []
-        for script in sorted((REPO_ROOT / "scripts").glob("*-fast-loop.sh")):
+        for script in harness_scripts():
             body = script.read_text(encoding="utf-8")
             if "resolve_fast_loop_source" not in body:
                 offenders.append(f"{script.name}: never calls resolve_fast_loop_source")
@@ -428,10 +481,7 @@ class IndexedTitleIsAsserted(unittest.TestCase):
     }
 
     def _harnesses(self):
-        scripts_dir = REPO_ROOT / "scripts"
-        return sorted(
-            [*scripts_dir.glob("*-fast-loop.sh"), scripts_dir / "ch-fedlex-compose-e2e.sh"]
-        )
+        return [*harness_scripts(), REPO_ROOT / "scripts" / "ch-fedlex-compose-e2e.sh"]
 
     def test_a_harness_that_checks_language_also_checks_title(self) -> None:
         offenders = []
@@ -489,7 +539,10 @@ class EveryHarnessRunsOnTheSelfHostedRuntime(unittest.TestCase):
     """
 
     def _harnesses(self) -> list[Path]:
-        found = sorted((REPO_ROOT / "scripts").glob("*-fast-loop.sh"))
+        # Wrappers excluded: they exec a harness rather than making requests, so they
+        # have no --api-key flag and no header of their own. `WrappersDelegateToARealHarness`
+        # is what stops that being an escape hatch.
+        found = harness_scripts()
         # Guard the glob itself: an empty list would make every check below vacuous.
         self.assertGreaterEqual(len(found), 6, "fast-loop harnesses disappeared from scripts/")
         return found

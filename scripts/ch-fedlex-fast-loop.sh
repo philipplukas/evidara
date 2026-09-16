@@ -27,6 +27,14 @@ AUTHORITY_ID="auth_fedlex"
 SOURCE_NAME="CH Fedlex SPARQL fast-loop source"
 CORPUS_SLUG="ch-fedlex"
 CORPUS_LABEL="CH Fedlex"
+# Explicit corpus expectations, empty by default (#744). Empty => fall back to the
+# template-id derivation below, so the nightly Fedlex canary is bit-for-bit
+# unchanged. Set => the gate RUNS and reports `*_checked=1`, which is the whole
+# point: without these two flags a non-Fedlex template could not make the title or
+# language gate run at all, and a run that asserts neither is not evidence about
+# either (the `excluded` vs `not_evaluated` split in the acceptance verdict).
+EXPECT_TITLE=""
+EXPECT_LANGUAGE=""
 # Which ADR-0030 keys the run needs. `preview` is the default so the Fedlex
 # nightly asserts exactly what it always did. `acceptance` is the mode an
 # operator uses for a provider whose readiness is `awaiting_evidence`: it reaches
@@ -76,6 +84,12 @@ Options:
   --authority-id <id>            authority_id for the created source (default: auth_fedlex)
   --source-name <name>           name for the created source
                                  (default: "CH Fedlex SPARQL fast-loop source")
+  --expect-title <regex>         Title the indexed document must match. Unset => derived
+                                 from the template id, and for an unknown template the
+                                 gate does NOT run (reported title_checked=0).
+  --expect-language <code>       Language the indexed document must carry. Unset => derived
+                                 from the template's _de/_fr/_it suffix; a template with
+                                 no suffix leaves the gate excluded.
   --corpus-slug <slug>           Slug used in the --copy-evidence filename (default: ch-fedlex)
   --corpus-label <label>         Human corpus name in the evidence markdown (default: CH Fedlex)
   --mode <preview|acceptance|production>
@@ -124,6 +138,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --source-name)
       SOURCE_NAME="${2:?missing value for --source-name}"
+      shift 2
+      ;;
+    --expect-title)
+      EXPECT_TITLE="${2:?missing value for --expect-title}"
+      shift 2
+      ;;
+    --expect-language)
+      EXPECT_LANGUAGE="${2:?missing value for --expect-language}"
       shift 2
       ;;
     --corpus-slug)
@@ -301,6 +323,10 @@ log() {
 # DE/FR/IT expressions and the templates are per-language, so the template suffix
 # IS the expected language of the indexed document (#572).
 expected_language() {
+  if [[ -n "${EXPECT_LANGUAGE}" ]]; then
+    printf '%s' "${EXPECT_LANGUAGE}"
+    return
+  fi
   case "${TEMPLATE_ID}" in
     *_de) printf '%s' 'de' ;;
     *_fr) printf '%s' 'fr' ;;
@@ -310,6 +336,10 @@ expected_language() {
 }
 
 expected_title_regex() {
+  if [[ -n "${EXPECT_TITLE}" ]]; then
+    printf '%s' "${EXPECT_TITLE}"
+    return
+  fi
   case "${TEMPLATE_ID}" in
     fedlex_sparql_constitution_de)
       printf '%s' 'Bundesverfassung'
@@ -334,6 +364,10 @@ expected_title_regex() {
 # can self-skip carries a companion `<gate>_checked` value. The skip does NOT change
 # whether the gate blocks the verdict; it only stops a non-check being read as a pass.
 title_gate_checked() {
+  if [[ -n "${EXPECT_TITLE}" ]]; then
+    printf '%s' '1'
+    return
+  fi
   case "${TEMPLATE_ID}" in
     fedlex_sparql_constitution_de|fedlex_sparql_vwvg_de|fedlex_sparql_federal_law_batch_de)
       printf '%s' '1'
@@ -367,7 +401,11 @@ poll_terminal_run_status() {
   return 0
 }
 
-log "==> CH Fedlex fast loop"
+# Names the corpus actually being driven, not the script. This runs non-Fedlex
+# corpora too (scripts/ch-lexfind-fast-loop.sh delegates here), and a banner that
+# says "CH Fedlex" over a LexFind run is a small lie in the one place an operator
+# looks to confirm they launched what they meant to.
+log "==> ${CORPUS_LABEL} fast loop"
 log "    environment=${ENVIRONMENT}"
 log "    project=${PROJECT_ID}"
 log "    region=${REGION}"
