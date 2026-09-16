@@ -31,7 +31,14 @@ def _load_blueprints() -> dict[str, Any]:
 #                 see BlueprintEnablementService, #632)
 # - `extractor_profile_id` -> resolve_blueprint_extractor_profile_id
 #                 (source-version default applied by source_service)
-_NON_SPEC_TEMPLATE_KEYS = frozenset({"enabled", "extractor_profile_id"})
+# - `jurisdiction_id` -> resolve_blueprint_jurisdiction_id
+#                 (WHICH jurisdiction this template is for. Not acquisition config:
+#                 the provider never reads it, and putting it on the spec would
+#                 persist it onto every source version as if it were a fetch
+#                 parameter. It answers a question nothing else could — "is there a
+#                 template that could serve jurisdiction X" — which is what decides
+#                 whether registering a source is an API call or a repo edit.)
+_NON_SPEC_TEMPLATE_KEYS = frozenset({"enabled", "extractor_profile_id", "jurisdiction_id"})
 
 
 # The only blueprint spec keys an operator may supply per source version — the
@@ -182,6 +189,21 @@ def is_source_blueprint_default_enabled(overlay_id: str, provider_template_id: s
     """
     template_payload = _resolve_template(overlay_id, provider_template_id)
     return template_payload.get("enabled") is True
+
+
+def resolve_blueprint_jurisdiction_id(overlay_id: str, provider_template_id: str) -> str | None:
+    """Return the jurisdiction this template acquires for, or None if it declares none.
+
+    None is a real answer, not a gap to paper over. Three templates cannot declare
+    one because the jurisdiction does not exist in the seed: `ris_ogd_lgbl_wien` and
+    `ris_ogd_lgbl_noe` (no Austrian Länder) and `regione_http_lombardia` (no Italian
+    regions) — the seed carries sub-national entries for CH and DE only. A caller
+    deciding whether a jurisdiction is servable by an existing template must read
+    None as "no", never as "unknown, assume yes".
+    """
+    template_payload = _resolve_template(overlay_id, provider_template_id)
+    value = template_payload.get("jurisdiction_id")
+    return value if isinstance(value, str) and value.strip() else None
 
 
 def resolve_blueprint_extractor_profile_id(

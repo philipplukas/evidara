@@ -16,6 +16,31 @@ _SUPPORTED = {"AT", "DE", "FR", "IT", "CH", "EU"}
 _TEMPLATE_ID_RE = re.compile(r"^[a-z0-9]+_[a-z0-9_]+$")
 
 
+_JURISDICTIONS_PATH = (
+    ROOT / "platform-control" / "src" / "platform_control" / "seeds" / "reference" / "jurisdictions.yaml"
+)
+
+
+def _known_jurisdiction_ids() -> set[str]:
+    """Every jurisdiction_id the canonical seed declares.
+
+    Read from the seed rather than from a list here, so adding a canton in one
+    place is enough. Cached on the function so a 2,169-entry file is parsed once
+    per process rather than once per template.
+    """
+    cached = getattr(_known_jurisdiction_ids, "_cache", None)
+    if cached is None:
+        with _JURISDICTIONS_PATH.open("r", encoding="utf-8") as handle:
+            payload = yaml.safe_load(handle) or {}
+        cached = {
+            str(item.get("jurisdiction_id"))
+            for item in (payload.get("items") or [])
+            if isinstance(item, dict) and item.get("jurisdiction_id")
+        }
+        _known_jurisdiction_ids._cache = cached  # type: ignore[attr-defined]
+    return cached
+
+
 def _load_blueprints() -> dict:
     with _BLUEPRINTS_PATH.open("r", encoding="utf-8") as handle:
         payload = yaml.safe_load(handle) or {}
@@ -89,6 +114,30 @@ def _validate_template(
         return [
             f"Overlay '{overlay_id}' template '{template_id}' must start with '{provider}_'."
         ]
+
+    # `jurisdiction_id` is OPTIONAL but, when declared, must name a jurisdiction the
+    # seed actually has. A typo here is worse than an omission: an absent id reads as
+    # "no template serves this jurisdiction" and fails closed, while a misspelt one
+    # claims to serve a jurisdiction that does not exist and can never match anything.
+    #
+    # Three templates legitimately declare none — ris_ogd_lgbl_wien, ris_ogd_lgbl_noe
+    # and regione_http_lombardia — because the seed carries sub-national entries for
+    # CH and DE only. That is a gap in the seed, recorded rather than papered over
+    # with the country-level id, which would claim Vienna's Landesrecht is federal
+    # Austrian law.
+    declared_jurisdiction = payload.get("jurisdiction_id")
+    if declared_jurisdiction is not None:
+        if not _has_nonempty_str(declared_jurisdiction):
+            return [
+                f"Overlay '{overlay_id}' template '{template_id}' jurisdiction_id must be "
+                "a non-empty string when present (omit the key instead)."
+            ]
+        if declared_jurisdiction not in _known_jurisdiction_ids():
+            return [
+                f"Overlay '{overlay_id}' template '{template_id}' declares "
+                f"jurisdiction_id '{declared_jurisdiction}', which is not in "
+                "seeds/reference/jurisdictions.yaml."
+            ]
 
     if provider == "firecrawl":
         mode = payload.get("mode", "crawl")
