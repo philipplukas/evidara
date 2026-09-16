@@ -28,6 +28,17 @@ The tolerance is gone. Two things keep it gone:
    allows zero differing pixels. A wrong baseline now fails on a clean runner.
 2. **This ledger** — `scripts/check_visual_baseline_provenance.py` fails CI and
    pre-commit if a `*.png` here changes without a matching entry below.
+3. **The `Reason:` line is enforced, not merely requested.** The same guard fails
+   when the **newest** entry still carries the refresh job's placeholder, and
+   `scripts/tests/` asserts that against the committed ledger too — so a refresh
+   cannot merge un-explained. Both fired on PR #995 (`Legal Search gate`,
+   `Platform Control gate`, `contract-validation`) until the reason was written.
+
+   Only the newest entry is checked, which is why older entries below still show
+   the placeholder. That is a deliberate bound, not a gap: re-litigating historical
+   reasons would block unrelated work. But do not read those older placeholders as
+   evidence that the rule is unenforced — it is, at exactly the point where it
+   matters.
 
 ## How to regenerate
 
