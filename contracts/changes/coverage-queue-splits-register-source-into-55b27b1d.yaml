@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  coverage queue splits register_source into register_source_from_template (agent-actionable) and register_source (needs a repo edit), with a matching no_source_template_available reason

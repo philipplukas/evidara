@@ -37,6 +37,7 @@ from platform_control.models.document_lifecycle_event import DocumentLifecycleEv
 from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.run import Run
 from platform_control.models.source import Source
+from platform_control.services.source_blueprints import jurisdiction_ids_with_a_template
 
 MAX_PAGE_SIZE = 500
 
@@ -55,6 +56,7 @@ UNMEASURED_STAGES = ["indexed"]
 _WORK_REASON_ORDER = (
     CoverageWorkReason.NO_DENOMINATOR,
     CoverageWorkReason.NO_SOURCE,
+    CoverageWorkReason.NO_SOURCE_TEMPLATE_AVAILABLE,
     CoverageWorkReason.NEVER_ACQUIRED,
     CoverageWorkReason.HOLDINGS_EXCEED_DENOMINATOR,
     CoverageWorkReason.ACQUISITION_GAP,
@@ -262,11 +264,20 @@ class CoverageService:
             if jurisdiction_id:
                 source_ids.setdefault(jurisdiction_id, []).append(source_id)
 
+        # Which jurisdictions a blueprint template already names. Read once: the
+        # answer is the same for every row, and it decides whether a sourceless
+        # jurisdiction is an API call or a repo edit.
+        templated_jurisdictions = jurisdiction_ids_with_a_template()
+
         items: list[dict[str, Any]] = []
         without_a_source = 0
         for entry in entries:
             sources = source_ids.get(entry["jurisdiction_id"], [])
-            reasons = self._work_reasons(entry, has_source=bool(sources))
+            reasons = self._work_reasons(
+                entry,
+                has_source=bool(sources),
+                template_available=entry["jurisdiction_id"] in templated_jurisdictions,
+            )
             if not reasons:
                 continue
             # A jurisdiction with no source is REPORTED AS A COUNT, not as a row.
@@ -280,6 +291,11 @@ class CoverageService:
             # Counted rather than dropped: `jurisdictions_without_a_source` is the
             # honest form of the same fact, and a caller that wants the list has the
             # ledger.
+            # Only the NO-TEMPLATE case is counted out. A sourceless jurisdiction a
+            # template already names is actionable work — an API call against a
+            # blueprint someone wrote — so it belongs IN the queue, which is the
+            # whole point of splitting the reason. The excluded case is still the
+            # one whose remedy is a repo edit no queue action can express (#736).
             if CoverageWorkReason.NO_SOURCE in reasons:
                 without_a_source += 1
                 continue
@@ -325,7 +341,9 @@ class CoverageService:
         }
 
     @staticmethod
-    def _work_reasons(entry: dict[str, Any], *, has_source: bool) -> list[CoverageWorkReason]:
+    def _work_reasons(
+        entry: dict[str, Any], *, has_source: bool, template_available: bool = False
+    ) -> list[CoverageWorkReason]:
         """Every reason true of one ledger entry.
 
         Each test mirrors a validator on `CoverageWorkItem`, so a reason that this
@@ -336,7 +354,11 @@ class CoverageService:
             # Short-circuit on purpose. A sourceless jurisdiction trivially also has
             # no denominator and has never been acquired, and emitting all three
             # would make it look like three problems when it is one.
-            return [CoverageWorkReason.NO_SOURCE]
+            return [
+                CoverageWorkReason.NO_SOURCE_TEMPLATE_AVAILABLE
+                if template_available
+                else CoverageWorkReason.NO_SOURCE
+            ]
 
         reasons: list[CoverageWorkReason] = []
         acquired_gap = entry["acquired_gap"]

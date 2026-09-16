@@ -7,10 +7,27 @@
 # is treated as disabled, so a new template is inert until an operator captures
 # acceptance-run evidence and turns it on. Every template therefore states its
 # value explicitly (enforced by tests/unit/test_blueprint_provider_parity.py).
+#
+# `jurisdiction_id` names WHICH jurisdiction a template acquires for. It is
+# template metadata, not acquisition config: the provider never reads it, and it is
+# stripped before AcquisitionSpec parsing (`_NON_SPEC_TEMPLATE_KEYS`), because
+# persisting it onto every source version's spec would state it as a fetch
+# parameter. It answers the one question nothing else could — "is there a template
+# that could serve jurisdiction X" — which is what separates registering a source as
+# an API call from registering it as a repo edit and a deploy.
+#
+# It is OPTIONAL, and three templates legitimately omit it: `ris_ogd_lgbl_wien`,
+# `ris_ogd_lgbl_noe` and `regione_http_lombardia`. The jurisdiction seed carries
+# sub-national entries for CH and DE only, so there is no Austrian Land or Italian
+# region to point at. Omitted is the honest answer; pointing them at `jur_at` /
+# `jur_it` would claim Vienna's Landesrecht is federal Austrian law. A consumer must
+# read an absent id as "no", never as "unknown, assume yes".
+# `scripts/check_country_overlay.py` rejects a declared id the seed does not have.
 overlays:
   at:
     provider_templates:
       ris_ogd_bundesrecht:
+        jurisdiction_id: jur_at
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
         preferred_formats: [Xml, Html]
@@ -25,6 +42,7 @@ overlays:
         document_type_hint: decision
         enabled: true
       ris_ogd_bundesrecht_narrow_html:
+        jurisdiction_id: jur_at
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
         applikation: BrKons
@@ -41,6 +59,7 @@ overlays:
         document_type_hint: legislation
         enabled: true
       ris_ogd_bundesrecht_small_batch_html:
+        jurisdiction_id: jur_at
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
         applikation: BrKons
@@ -57,6 +76,7 @@ overlays:
         document_type_hint: legislation
         enabled: true
       firecrawl_justice_portal:
+        jurisdiction_id: jur_at
         provider: firecrawl
         mode: crawl
         seed_url: https://www.ris.bka.gv.at/
@@ -112,6 +132,7 @@ overlays:
   de:
     provider_templates:
       deterministic_http_bundesrecht:
+        jurisdiction_id: jur_de
         provider: deterministic_http
         seed_urls:
           - https://www.gesetze-im-internet.de/
@@ -127,6 +148,7 @@ overlays:
       # Index pages give abbreviated titles ("StGB - nichtamtliches
       # Inhaltsverzeichnis"); BJNR pages give full law names.
       deterministic_http_bundesrecht_codes:
+        jurisdiction_id: jur_de
         provider: deterministic_http
         seed_urls:
           - https://www.gesetze-im-internet.de/gg/BJNR000010949.html      # Grundgesetz
@@ -160,6 +182,7 @@ overlays:
       # Sub-federal: Länder template. Provider scaffold; live adapter
       # lands per-state alongside its first acceptance run.
       bundesland_http_bayern:
+        jurisdiction_id: jur_de_by
         provider: bundesland_http
         bundesland: DE-BY
         seed_url: https://www.gesetze-bayern.de/
@@ -174,6 +197,7 @@ overlays:
   ch:
     provider_templates:
       deterministic_http_fedlex_legislation:
+        jurisdiction_id: jur_ch_federal
         provider: deterministic_http
         seed_urls:
           - https://www.fedlex.admin.ch/
@@ -187,6 +211,7 @@ overlays:
         document_type_hint: legislation
         enabled: true
       fedlex_sparql_constitution_de:
+        jurisdiction_id: jur_ch_federal
         provider: fedlex_sparql
         seed_url: https://fedlex.data.admin.ch/eli/cc/1999/404
         sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
@@ -203,6 +228,7 @@ overlays:
         document_type_hint: legislation
         enabled: true
       fedlex_sparql_vwvg_de:
+        jurisdiction_id: jur_ch_federal
         provider: fedlex_sparql
         seed_url: https://fedlex.data.admin.ch/eli/cc/1969/737_757_755
         sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
@@ -219,6 +245,7 @@ overlays:
         document_type_hint: legislation
         enabled: true
       fedlex_sparql_federal_law_batch_de:
+        jurisdiction_id: jur_ch_federal
         provider: fedlex_sparql
         seed_urls:
           - https://fedlex.data.admin.ch/eli/cc/1999/404
@@ -269,6 +296,7 @@ overlays:
         document_type_hint: legislation
         enabled: false
       fedlex_sparql_federal_codes_de:
+        jurisdiction_id: jur_ch_federal
         provider: fedlex_sparql
         seed_urls:
           - https://fedlex.data.admin.ch/eli/cc/1999/404              # BV (Bundesverfassung)
@@ -308,6 +336,7 @@ overlays:
       # `/eli/cc/1981/572_572_572` with enforcement-status/3 — selecting by SR
       # number alone picks up repealed law, which is #628's named trap.
       fedlex_sparql_tierschutz_de:
+        jurisdiction_id: jur_ch_federal
         provider: fedlex_sparql
         seed_urls:
           - https://fedlex.data.admin.ch/eli/cc/2008/414   # TSchG (SR 455), 16.12.2005
@@ -339,6 +368,7 @@ overlays:
       # to minimise merge conflict with the cantonal section added by #531.
       # ───────────────────────────────────────────────────────────────
       ch_court_decisions_bger:
+        jurisdiction_id: jur_ch_federal
         provider: ch_court_decisions
         seed_urls:
           - https://www.bger.ch/
@@ -352,6 +382,7 @@ overlays:
         document_type_hint: decision
         enabled: false
       ch_court_decisions_bvger:
+        jurisdiction_id: jur_ch_federal
         provider: ch_court_decisions
         seed_urls:
           - https://www.bvger.ch/
@@ -381,6 +412,7 @@ overlays:
       # minimise merge conflict with the federal court block above.
       # ───────────────────────────────────────────────────────────────
       ch_court_decisions_zh:
+        jurisdiction_id: jur_ch_zh
         provider: ch_court_decisions
         index_urls:
           - https://entscheidsuche.ch/list/ZH
@@ -394,6 +426,7 @@ overlays:
         document_type_hint: decision
         enabled: false
       ch_court_decisions_be:
+        jurisdiction_id: jur_ch_be
         provider: ch_court_decisions
         index_urls:
           - https://entscheidsuche.ch/list/BE
@@ -407,6 +440,7 @@ overlays:
         document_type_hint: decision
         enabled: false
       ch_court_decisions_bs:
+        jurisdiction_id: jur_ch_bs
         provider: ch_court_decisions
         index_urls:
           - https://entscheidsuche.ch/list/BS
@@ -436,6 +470,7 @@ overlays:
       # live-enablement. Kept as a trailing block to minimise merge conflict.
       # ───────────────────────────────────────────────────────────────
       canton_http_zh:
+        jurisdiction_id: jur_ch_zh
         provider: canton_http
         canton_code: CH-ZH
         seed_urls:
@@ -449,6 +484,7 @@ overlays:
         document_type_hint: legislation
         enabled: false
       canton_http_be:
+        jurisdiction_id: jur_ch_be
         provider: canton_http
         canton_code: CH-BE
         seed_urls:
@@ -462,6 +498,7 @@ overlays:
         document_type_hint: legislation
         enabled: false
       canton_http_bs:
+        jurisdiction_id: jur_ch_bs
         provider: canton_http
         canton_code: CH-BS
         seed_urls:
@@ -527,6 +564,7 @@ overlays:
       # Do not read "3 cantons onboarded" as "3 cantons held".
       # ───────────────────────────────────────────────────────────────
       lexfind_api_zh_tierschutz:
+        jurisdiction_id: jur_ch_zh
         provider: lexfind_api
         search_text: "554"
         entity_ids: [26]           # ZH
@@ -555,6 +593,7 @@ overlays:
       #
       # Both verified live 2026-07-22 against the entity ids below.
       lexfind_api_be_hunde:
+        jurisdiction_id: jur_ch_be
         provider: lexfind_api
         search_text: "Hund"
         entity_ids: [4]            # BE — returns 916.31 Hundegesetz,
@@ -578,6 +617,7 @@ overlays:
       # Zürich Gemeindeerlasse. Relevant to #584 as a per-canton opportunity, not
       # a solution.
       lexfind_api_bs_hunde:
+        jurisdiction_id: jur_ch_bs
         provider: lexfind_api
         search_text: "Hund"
         entity_ids: [6]            # BS — returns 365.100 / 365.110 / 365.101
@@ -618,6 +658,7 @@ overlays:
       # law, and reconciling against the active count (944) would look right while
       # dropping a third of the corpus.
       lexfind_api_zh_full:
+        jurisdiction_id: jur_ch_zh
         provider: lexfind_api
         enumeration: systematic_digit_union
         entity_ids: [26]           # ZH — 1377 total / 944 active
@@ -666,6 +707,7 @@ overlays:
       # accepted. See #735 and #628.
       # ───────────────────────────────────────────────────────────────
       gemeinde_http_zh_stadt_hundevorschriften:
+        jurisdiction_id: jur_ch_gemeinde_261
         provider: gemeinde_http
         bfs_number: 261
         seed_urls:
@@ -682,6 +724,7 @@ overlays:
   fr:
     provider_templates:
       legifrance_codes:
+        jurisdiction_id: jur_fr
         provider: legifrance
         code_ids:
           - LEGITEXT000006070721   # Code civil
@@ -700,6 +743,7 @@ overlays:
   it:
     provider_templates:
       deterministic_http_normattiva_legislation:
+        jurisdiction_id: jur_it
         provider: deterministic_http
         seed_urls:
           - https://www.normattiva.it/
@@ -732,6 +776,7 @@ overlays:
     # templates are enabled for acceptance-run evidence capture.
     provider_templates:
       eur_lex_sparql_regulation_en:
+        jurisdiction_id: jur_eu
         provider: eur_lex_sparql
         seed_url: http://data.europa.eu/eli/reg/2016/679/oj
         sparql_endpoint: http://publications.europa.eu/webapi/rdf/sparql
@@ -747,6 +792,7 @@ overlays:
         document_type_hint: legislation
         enabled: true
       eur_lex_sparql_directive_en:
+        jurisdiction_id: jur_eu
         provider: eur_lex_sparql
         seed_url: http://data.europa.eu/eli/dir/2019/790/oj
         sparql_endpoint: http://publications.europa.eu/webapi/rdf/sparql

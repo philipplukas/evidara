@@ -285,11 +285,16 @@ class CoverageWorkReason(StrEnum):
     reasons that are true of it, the counts behind them travel alongside, and the caller
     decides what matters.
 
-    NO_SOURCE         no source exists for this jurisdiction at all, so there is
-                      nothing to act *through*. Every other reason presumes a source
-                      to enumerate or acquire with; this one does not, and the work it
-                      implies — registering a source — is a repo edit and a deploy
-                      (#736), not something this queue's actions can express.
+    NO_SOURCE         no source exists for this jurisdiction AND no blueprint
+                      template names it, so registering one is a repo edit and a
+                      deploy (#736) — not something this queue's actions can express.
+    NO_SOURCE_TEMPLATE_AVAILABLE
+                      no source exists, but a template DOES name this jurisdiction, so
+                      registering one is an API call against a blueprint an author
+                      already wrote. The distinction is the whole of the difference
+                      between work an agent may do and work that needs a person: the
+                      judgement — which portal, which provider, which trust tier — was
+                      made when the template was authored, not now.
     NO_DENOMINATOR    a source exists but nothing has told us how much this
                       jurisdiction publishes, so no claim about coverage is possible.
                       It blocks every other answer *about that jurisdiction*, which is
@@ -308,6 +313,7 @@ class CoverageWorkReason(StrEnum):
     """
 
     NO_SOURCE = "no_source"
+    NO_SOURCE_TEMPLATE_AVAILABLE = "no_source_template_available"
     NO_DENOMINATOR = "no_denominator"
     NEVER_ACQUIRED = "never_acquired"
     ACQUISITION_GAP = "acquisition_gap"
@@ -327,8 +333,13 @@ class CoverageWorkAction(StrEnum):
     panel read it (ADR-0056 constraint 1). The values are unchanged from the CLI's,
     so nothing consuming them has to relearn a vocabulary.
 
-    REGISTER_SOURCE       no source exists, so there is nothing to act through.
+    REGISTER_SOURCE       no source exists and no template names this jurisdiction.
                           Registering one is a repo edit and a deploy (#736).
+    REGISTER_SOURCE_FROM_TEMPLATE
+                          no source exists, but a template does. Creating one is an
+                          API call that produces a DRAFT source version — which a
+                          person still approves before any production run, so the
+                          agent's reach ends well short of acquiring anything.
     ENUMERATE_DENOMINATOR nothing has told us how much this jurisdiction publishes.
                           Every other answer about it is unstatable until this exists.
     RUN_ACCEPTANCE        a denominator exists and we hold less than it. An acceptance
@@ -343,6 +354,7 @@ class CoverageWorkAction(StrEnum):
     """
 
     REGISTER_SOURCE = "register_source"
+    REGISTER_SOURCE_FROM_TEMPLATE = "register_source_from_template"
     ENUMERATE_DENOMINATOR = "enumerate_denominator"
     RUN_ACCEPTANCE = "run_acceptance"
     AWAIT_PIPELINE = "await_pipeline"
@@ -372,6 +384,14 @@ class CoverageWorkActor(StrEnum):
 #: operator stops traffic at a portal when an authority complains about load — and
 #: holdings above a denominator is a measurement problem no run resolves.
 #: `register_source` needs a deploy, which no queue action can express.
+#:
+#: `register_source_from_template` is deliberately NOT here. It was the same action
+#: until templates declared a jurisdiction, and the sentence above is exactly why the
+#: two had to split: "needs a deploy" is true with no template and false with one.
+#: What the agent may then do is bounded three ways that do not depend on this set —
+#: it creates a DRAFT source version, a person approves the version before any
+#: production run (ADR-0030), and the two-key lock still refuses a run whose provider
+#: or config key is not ready.
 HUMAN_ONLY_ACTIONS: frozenset[CoverageWorkAction] = frozenset(
     {
         CoverageWorkAction.RESOLVE_REFUSAL,
@@ -398,6 +418,10 @@ HUMAN_ONLY_ACTIONS: frozenset[CoverageWorkAction] = frozenset(
 #: order decides only which action is NAMED.
 REASON_ACTION_PRIORITY: tuple[tuple[CoverageWorkReason, CoverageWorkAction], ...] = (
     (CoverageWorkReason.NO_SOURCE, CoverageWorkAction.REGISTER_SOURCE),
+    (
+        CoverageWorkReason.NO_SOURCE_TEMPLATE_AVAILABLE,
+        CoverageWorkAction.REGISTER_SOURCE_FROM_TEMPLATE,
+    ),
     (CoverageWorkReason.NO_DENOMINATOR, CoverageWorkAction.ENUMERATE_DENOMINATOR),
     (CoverageWorkReason.REFUSALS_OUTSTANDING, CoverageWorkAction.RESOLVE_REFUSAL),
     (

@@ -31,7 +31,14 @@ def _load_blueprints() -> dict[str, Any]:
 #                 see BlueprintEnablementService, #632)
 # - `extractor_profile_id` -> resolve_blueprint_extractor_profile_id
 #                 (source-version default applied by source_service)
-_NON_SPEC_TEMPLATE_KEYS = frozenset({"enabled", "extractor_profile_id"})
+# - `jurisdiction_id` -> resolve_blueprint_jurisdiction_id
+#                 (WHICH jurisdiction this template is for. Not acquisition config:
+#                 the provider never reads it, and putting it on the spec would
+#                 persist it onto every source version as if it were a fetch
+#                 parameter. It answers a question nothing else could — "is there a
+#                 template that could serve jurisdiction X" — which is what decides
+#                 whether registering a source is an API call or a repo edit.)
+_NON_SPEC_TEMPLATE_KEYS = frozenset({"enabled", "extractor_profile_id", "jurisdiction_id"})
 
 
 # The only blueprint spec keys an operator may supply per source version — the
@@ -169,6 +176,44 @@ def spec_is_blueprint_output(
     return bool(allowed) and bool(actual) and actual <= allowed
 
 
+def jurisdiction_ids_with_a_template() -> frozenset[str]:
+    """Jurisdictions that some blueprint template declares itself for.
+
+    This is what separates the two halves of `register_source`: with a template,
+    creating a source is an API call; without one it is a repo edit and a deploy
+    (#736). The coverage queue reads it to decide which of those a sourceless
+    jurisdiction needs.
+
+    DELIBERATELY A PURE DATA LOOKUP. It does not consult provider readiness, and an
+    earlier draft that did was wrong twice over. It duplicated a rule the ADR-0030
+    two-key lock already owns (ADR-0050: one rule, one enforcement point) — a
+    SCAFFOLD provider's run is refused there, and that refusal reaches the queue as
+    `refusals_outstanding`, which is human-owned. And it needed the provider
+    registry, which needs full app settings, so it failed closed to "every provider
+    is scaffold" whenever settings were absent: the queue would silently stop
+    proposing registration at all, with nothing to see.
+
+    It does not consult `enabled` either. That key fails closed by design and an
+    acceptance run is allowed to precede it (ADR-0030 §6), so a disabled template is
+    still a template someone can earn evidence with.
+
+    So the answer is narrow and honest: a template EXISTS that names this
+    jurisdiction. Whether a run through it may dispatch is the lock's question.
+    """
+    ids: set[str] = set()
+    payload = _load_blueprints()
+    for overlay in (payload.get("overlays") or {}).values():
+        if not isinstance(overlay, dict):
+            continue
+        for template in (overlay.get("provider_templates") or {}).values():
+            if not isinstance(template, dict):
+                continue
+            jurisdiction_id = template.get("jurisdiction_id")
+            if isinstance(jurisdiction_id, str) and jurisdiction_id.strip():
+                ids.add(jurisdiction_id.strip())
+    return frozenset(ids)
+
+
 def is_source_blueprint_default_enabled(overlay_id: str, provider_template_id: str) -> bool:
     """Return the template's *shipped default* enablement (ADR-0030 config key).
 
@@ -182,6 +227,21 @@ def is_source_blueprint_default_enabled(overlay_id: str, provider_template_id: s
     """
     template_payload = _resolve_template(overlay_id, provider_template_id)
     return template_payload.get("enabled") is True
+
+
+def resolve_blueprint_jurisdiction_id(overlay_id: str, provider_template_id: str) -> str | None:
+    """Return the jurisdiction this template acquires for, or None if it declares none.
+
+    None is a real answer, not a gap to paper over. Three templates cannot declare
+    one because the jurisdiction does not exist in the seed: `ris_ogd_lgbl_wien` and
+    `ris_ogd_lgbl_noe` (no Austrian Länder) and `regione_http_lombardia` (no Italian
+    regions) — the seed carries sub-national entries for CH and DE only. A caller
+    deciding whether a jurisdiction is servable by an existing template must read
+    None as "no", never as "unknown, assume yes".
+    """
+    template_payload = _resolve_template(overlay_id, provider_template_id)
+    value = template_payload.get("jurisdiction_id")
+    return value if isinstance(value, str) and value.strip() else None
 
 
 def resolve_blueprint_extractor_profile_id(

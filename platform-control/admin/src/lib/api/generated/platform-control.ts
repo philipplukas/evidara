@@ -2140,8 +2140,13 @@ export interface components {
          *     panel read it (ADR-0056 constraint 1). The values are unchanged from the CLI's,
          *     so nothing consuming them has to relearn a vocabulary.
          *
-         *     REGISTER_SOURCE       no source exists, so there is nothing to act through.
+         *     REGISTER_SOURCE       no source exists and no template names this jurisdiction.
          *                           Registering one is a repo edit and a deploy (#736).
+         *     REGISTER_SOURCE_FROM_TEMPLATE
+         *                           no source exists, but a template does. Creating one is an
+         *                           API call that produces a DRAFT source version — which a
+         *                           person still approves before any production run, so the
+         *                           agent's reach ends well short of acquiring anything.
          *     ENUMERATE_DENOMINATOR nothing has told us how much this jurisdiction publishes.
          *                           Every other answer about it is unstatable until this exists.
          *     RUN_ACCEPTANCE        a denominator exists and we hold less than it. An acceptance
@@ -2155,7 +2160,7 @@ export interface components {
          *                           person decides what happens next.
          * @enum {string}
          */
-        CoverageWorkAction: "register_source" | "enumerate_denominator" | "run_acceptance" | "await_pipeline" | "investigate_holdings" | "resolve_refusal";
+        CoverageWorkAction: "register_source" | "register_source_from_template" | "enumerate_denominator" | "run_acceptance" | "await_pipeline" | "investigate_holdings" | "resolve_refusal";
         /**
          * CoverageWorkActor
          * @description Who may carry out a queue item's action.
@@ -2274,11 +2279,16 @@ export interface components {
          *     reasons that are true of it, the counts behind them travel alongside, and the caller
          *     decides what matters.
          *
-         *     NO_SOURCE         no source exists for this jurisdiction at all, so there is
-         *                       nothing to act *through*. Every other reason presumes a source
-         *                       to enumerate or acquire with; this one does not, and the work it
-         *                       implies — registering a source — is a repo edit and a deploy
-         *                       (#736), not something this queue's actions can express.
+         *     NO_SOURCE         no source exists for this jurisdiction AND no blueprint
+         *                       template names it, so registering one is a repo edit and a
+         *                       deploy (#736) — not something this queue's actions can express.
+         *     NO_SOURCE_TEMPLATE_AVAILABLE
+         *                       no source exists, but a template DOES name this jurisdiction, so
+         *                       registering one is an API call against a blueprint an author
+         *                       already wrote. The distinction is the whole of the difference
+         *                       between work an agent may do and work that needs a person: the
+         *                       judgement — which portal, which provider, which trust tier — was
+         *                       made when the template was authored, not now.
          *     NO_DENOMINATOR    a source exists but nothing has told us how much this
          *                       jurisdiction publishes, so no claim about coverage is possible.
          *                       It blocks every other answer *about that jurisdiction*, which is
@@ -2296,7 +2306,7 @@ export interface components {
          *                       a decision waiting for an operator, not a failure to retry.
          * @enum {string}
          */
-        CoverageWorkReason: "no_source" | "no_denominator" | "never_acquired" | "acquisition_gap" | "processing_gap" | "holdings_exceed_denominator" | "refusals_outstanding";
+        CoverageWorkReason: "no_source" | "no_source_template_available" | "no_denominator" | "never_acquired" | "acquisition_gap" | "processing_gap" | "holdings_exceed_denominator" | "refusals_outstanding";
         /** CreateAuthorityRequest */
         CreateAuthorityRequest: {
             /** Jurisdiction Id */

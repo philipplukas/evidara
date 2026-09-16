@@ -182,12 +182,28 @@ jobs:
         working-directory: .
         run: bash scripts/check-e2e-spec-coverage.sh
 
-      - name: Upload Playwright report on failure
+      # `test-results/` FIRST, and it is the one that matters. playwright.config.ts
+      # sets `screenshot: only-on-failure` and `trace: retain-on-failure`, which
+      # Playwright writes to `outputDir` — `test-results/` by default. No HTML
+      # reporter is configured, so `playwright-report/` is never written at all:
+      # this step uploaded a directory that does not exist, `if-no-files-found`
+      # defaulted to `warn`, and every admin-e2e failure in CI produced ZERO
+      # artifacts. The sibling visual-regression job below always had it right.
+      #
+      # Measured on PR #1000: two consecutive failures of one spec, a screenshot and
+      # a trace captured on the runner both times, and nothing retrievable — the
+      # failure could not be diagnosed from CI at all (#1001).
+      - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: admin-playwright-report
-          path: platform-control/admin/playwright-report/
+          name: admin-playwright-failure-${{ github.run_id }}
+          path: |
+            platform-control/admin/test-results
+            platform-control/admin/playwright-report
+          # Loud, not silent: if this uploads nothing again, the next person should
+          # see that rather than infer it from an empty artifact list.
+          if-no-files-found: warn
           retention-days: 7
 
   # ─── Baseline provenance ───

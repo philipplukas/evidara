@@ -303,3 +303,46 @@ class TestServerOwnsTheMapping:
         """
         action = agent_loop.action_for(["never_acquired", "refusals_outstanding"])
         assert agent_loop.actor_for(action) == "human"
+
+
+class TestRegisterSourceSplitMirrorsTheServer:
+    """The CLI mirrors the server's vocabulary; #964 is what happens when it drifts.
+
+    `register_source` was one action doing two jobs. With no blueprint template it
+    needs a repo edit and a deploy (#736) and stays human. With one, creating a
+    source is an API call against a blueprint an author already wrote.
+    """
+
+    def test_the_template_variant_is_agent_actionable(self) -> None:
+        assert AgentAction.REGISTER_SOURCE_FROM_TEMPLATE in AGENT_ACTIONABLE
+        assert actor_for(AgentAction.REGISTER_SOURCE_FROM_TEMPLATE) == "agent"
+
+    def test_the_deploy_variant_stays_human(self) -> None:
+        assert AgentAction.REGISTER_SOURCE in HUMAN_ONLY
+        assert actor_for(AgentAction.REGISTER_SOURCE) == "human"
+
+    def test_the_server_reason_maps_without_falling_through_to_unplannable(self) -> None:
+        """An action the server names and this client has not learned lands in
+        `unplannable_items`, so the mapping is what makes the split usable at all."""
+        payload = {
+            "data": [{"jurisdiction_id": "jur_ch_be", "reasons": ["no_source_template_available"]}]
+        }
+        assert unplannable_items(payload) == []
+        plan = plan_from_queue(payload)
+        assert len(plan) == 1
+        assert plan[0].action is AgentAction.REGISTER_SOURCE_FROM_TEMPLATE
+        assert plan[0].actor == "agent"
+
+    def test_a_sourceless_jurisdiction_with_no_template_is_still_human(self) -> None:
+        plan = plan_from_queue(
+            {"data": [{"jurisdiction_id": "jur_ch_gemeinde_1", "reasons": ["no_source"]}]}
+        )
+        assert plan[0].action is AgentAction.REGISTER_SOURCE
+        assert plan[0].actor == "human"
+
+    def test_every_action_is_classified(self) -> None:
+        """`actor_for` is total and raises for an unclassified action, so a member
+        added without a deliberate classification fails loudly rather than
+        inheriting autonomy."""
+        for action in AgentAction:
+            assert actor_for(action) in {"agent", "human"}
