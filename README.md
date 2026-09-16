@@ -76,7 +76,22 @@ expected → discovered → acquired → processed per jurisdiction and refuses 
 score; legal-search serves the corpus-side `/v1/coverage` (ADR-0042, ADR-0048). A run that an
 operator deliberately capped reports a truncated denominator rather than a fake coverage failure.
 
-**Not built:** hybrid retrieval, and the MCP server that would sit on it.
+**Semantic retrieval is indexed but not served.** As of 2026-09-16 the learned-sparse
+representation (ADR-0054, BGE-M3 lexical weights in a `rank_features` field) covers **882 of 889**
+documents in the production index — the remaining 7 carry no `content` and are reported as skipped
+rather than silently passed. **No query uses it.** `opensearch.adapter.ts` is still pure BM25, and
+that is deliberate: ADR-0054's D4 abstention gate was calibrated when the serving corpus was three
+copies of one document (#806), and re-measuring it against the real corpus shows the floor no longer
+separates. In-corpus coverage runs 0.111–0.236 while an out-of-corpus query
+(*"Aufstellung Champions League Finale 1999"*) scores **0.122** — above the lowest genuine hit. Every
+query returns exactly 10 sparse candidates, including `python pandas groupby multiple columns
+example`, because a sparse retriever does not abstain.
+
+Serving it before that gate separates would trade a search that honestly finds one result for one
+that confidently finds ten wrong ones — the failure ADR-0039 names as worse than having no product.
+The measurement is the deliverable; see [the runbook](docs/runbooks/sparse-embedding-backfill.md).
+
+**Not built:** hybrid retrieval in the query path, and the MCP server that would sit on it.
 
 ### Direct from the source, and where that is qualified
 
@@ -255,3 +270,25 @@ cluster by `contracts/check-platform-contract.py` upstream.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). This is primarily a
 single-author project — issues and discussion are more useful than large unsolicited pull requests.
+
+## Licence
+
+[Apache License 2.0](LICENSE) — permissive, with an express patent grant.
+
+Two things the licence does not cover, because they are not this repository's to give:
+
+- **The legal corpus is not licensed here.** Evidara acquires primary law from the bodies that
+  issue it, and each source carries its own terms. A Swiss federal act mirrored through LexFind is
+  redistributable on the Confederation's terms, not on Apache-2.0's. The licence covers the
+  platform; provenance on every record is how you find out what covers the content.
+- **Third-party material keeps its own licence.**
+  [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) covers what is *copied into this tree* and the
+  data redistributed in it; by its own scope it does not list dependencies merely installed from a
+  registry. **Model weights are in that second category** and are not vendored here: the
+  learned-sparse encoder pulls `BAAI/bge-m3` (MIT) from HuggingFace at run time.
+  [ADR-0054 §D10](docs/adr/0054-semantic-retrieval-as-a-measured-cascade.md) is where model
+  licensing is reasoned about — it rules out `jina-embeddings-v3` as CC-BY-NC (non-commercial) and
+  names it explicitly so nobody benchmarks it first and finds that out second.
+
+**Not legal advice.** Evidara is a retrieval and provenance platform. It returns documents and
+says where they came from; it does not tell you what the law means for your situation.

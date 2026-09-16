@@ -98,6 +98,12 @@ jobs:
       - name: Check Hetzner image pins roll together
         run: python scripts/check_hetzner_image_pins.py
 
+      - name: Check DI surface config can actually retract
+        # Pairs the explicit DI_PUBLISHED_* URIs with DI_CANONICAL_RETRACTIONS_URI.
+        # Production shipped ADR-0057's retraction job for six days without the
+        # ledger key it reads, so the job could not remove #806's known-wrong rows.
+        run: python scripts/check_di_surface_config.py
+
       - name: Enforce contract changeset on locked contract changes
         # Was "enforce a manifest version bump" until #913. A per-PR edit of one
         # shared scalar serialised every contract PR; each PR now declares itself
