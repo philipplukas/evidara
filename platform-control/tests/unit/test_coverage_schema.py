@@ -13,11 +13,14 @@ import pytest
 from pydantic import ValidationError
 
 from platform_control.domain import (
+    HUMAN_ONLY_ACTIONS,
     REASON_ACTION_PRIORITY,
+    CoverageWorkAction,
     CoverageWorkActor,
     CoverageWorkReason,
     DenominatorTier,
     NormLevel,
+    resolve_work_action,
     resolve_work_actor,
 )
 from platform_control.schemas.coverage import AcquisitionCoverageEntry
@@ -232,3 +235,48 @@ class TestWorkActionAndActor:
         assert set(_WORK_REASON_ORDER) == set(action_order), (
             "they may order differently, but neither may omit a reason"
         )
+
+
+class TestRegisterSourceSplit:
+    """`register_source` was one action doing two jobs.
+
+    The rationale in `HUMAN_ONLY_ACTIONS` said it "needs a deploy, which no queue
+    action can express" — true when no blueprint template names the jurisdiction, and
+    false when one does, where creating a source is an API call against a blueprint an
+    author already wrote. The judgement (which portal, which provider, which trust
+    tier) was made at authoring time, not at registration time.
+    """
+
+    def test_no_template_stays_human(self):
+        assert (
+            resolve_work_action([CoverageWorkReason.NO_SOURCE])
+            is CoverageWorkAction.REGISTER_SOURCE
+        )
+        assert resolve_work_actor([CoverageWorkReason.NO_SOURCE]) is CoverageWorkActor.HUMAN
+
+    def test_a_template_makes_it_agent_work(self):
+        reasons = [CoverageWorkReason.NO_SOURCE_TEMPLATE_AVAILABLE]
+        assert resolve_work_action(reasons) is CoverageWorkAction.REGISTER_SOURCE_FROM_TEMPLATE
+        assert resolve_work_actor(reasons) is CoverageWorkActor.AGENT
+
+    def test_the_agent_never_gets_the_deploy_variant(self):
+        """The half that needs a repo edit must stay human however it is combined."""
+        assert CoverageWorkAction.REGISTER_SOURCE in HUMAN_ONLY_ACTIONS
+        assert CoverageWorkAction.REGISTER_SOURCE_FROM_TEMPLATE not in HUMAN_ONLY_ACTIONS
+
+    def test_a_human_only_reason_alongside_still_wins(self):
+        """The actor folds over EVERY reason (#964), so the new agent-actionable
+        reason cannot launder a refusal into agent work by being named first."""
+        reasons = [
+            CoverageWorkReason.NO_SOURCE_TEMPLATE_AVAILABLE,
+            CoverageWorkReason.REFUSALS_OUTSTANDING,
+        ]
+        assert resolve_work_actor(reasons) is CoverageWorkActor.HUMAN
+
+    def test_both_halves_are_mapped(self):
+        """`resolve_work_action` raises for an unmapped reason rather than guessing,
+        so an unmapped new reason would fail loudly — asserted here anyway because
+        the pair is the point of this change."""
+        mapped = {reason for reason, _ in REASON_ACTION_PRIORITY}
+        assert CoverageWorkReason.NO_SOURCE in mapped
+        assert CoverageWorkReason.NO_SOURCE_TEMPLATE_AVAILABLE in mapped

@@ -71,6 +71,12 @@ class AgentAction(StrEnum):
     Mapped so that if it ever arrives it is classified deliberately rather than
     landing in `unplannable` as though this client were out of date."""
 
+    REGISTER_SOURCE_FROM_TEMPLATE = "register_source_from_template"
+    """There is no source, but a blueprint template already names this jurisdiction.
+    Creating one is an API call, not a repo edit — and it produces a DRAFT source
+    version a person still approves before any production run, so the agent's reach
+    ends well short of acquiring anything."""
+
 
 #: Actions the agent may carry out on its own.
 AGENT_ACTIONABLE: frozenset[AgentAction] = frozenset(
@@ -78,6 +84,10 @@ AGENT_ACTIONABLE: frozenset[AgentAction] = frozenset(
         AgentAction.ENUMERATE_DENOMINATOR,
         AgentAction.RUN_ACCEPTANCE,
         AgentAction.AWAIT_PIPELINE,
+        # Bounded by three things outside this set: it creates a DRAFT, a person
+        # approves the version before any production run (ADR-0030), and the two-key
+        # lock still refuses a run whose provider or config key is not ready.
+        AgentAction.REGISTER_SOURCE_FROM_TEMPLATE,
     }
 )
 
@@ -104,6 +114,7 @@ FORBIDDEN_ENDPOINT = "/enablement"
 # `_WORK_REASON_ORDER`; the first reason that matches decides the action.
 _REASON_TO_ACTION: tuple[tuple[str, AgentAction], ...] = (
     ("no_source", AgentAction.REGISTER_SOURCE),
+    ("no_source_template_available", AgentAction.REGISTER_SOURCE_FROM_TEMPLATE),
     ("no_denominator", AgentAction.ENUMERATE_DENOMINATOR),
     ("refusals_outstanding", AgentAction.RESOLVE_REFUSAL),
     ("holdings_exceed_denominator", AgentAction.INVESTIGATE_HOLDINGS),

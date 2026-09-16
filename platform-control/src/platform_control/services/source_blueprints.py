@@ -176,6 +176,44 @@ def spec_is_blueprint_output(
     return bool(allowed) and bool(actual) and actual <= allowed
 
 
+def jurisdiction_ids_with_a_template() -> frozenset[str]:
+    """Jurisdictions that some blueprint template declares itself for.
+
+    This is what separates the two halves of `register_source`: with a template,
+    creating a source is an API call; without one it is a repo edit and a deploy
+    (#736). The coverage queue reads it to decide which of those a sourceless
+    jurisdiction needs.
+
+    DELIBERATELY A PURE DATA LOOKUP. It does not consult provider readiness, and an
+    earlier draft that did was wrong twice over. It duplicated a rule the ADR-0030
+    two-key lock already owns (ADR-0050: one rule, one enforcement point) — a
+    SCAFFOLD provider's run is refused there, and that refusal reaches the queue as
+    `refusals_outstanding`, which is human-owned. And it needed the provider
+    registry, which needs full app settings, so it failed closed to "every provider
+    is scaffold" whenever settings were absent: the queue would silently stop
+    proposing registration at all, with nothing to see.
+
+    It does not consult `enabled` either. That key fails closed by design and an
+    acceptance run is allowed to precede it (ADR-0030 §6), so a disabled template is
+    still a template someone can earn evidence with.
+
+    So the answer is narrow and honest: a template EXISTS that names this
+    jurisdiction. Whether a run through it may dispatch is the lock's question.
+    """
+    ids: set[str] = set()
+    payload = _load_blueprints()
+    for overlay in (payload.get("overlays") or {}).values():
+        if not isinstance(overlay, dict):
+            continue
+        for template in (overlay.get("provider_templates") or {}).values():
+            if not isinstance(template, dict):
+                continue
+            jurisdiction_id = template.get("jurisdiction_id")
+            if isinstance(jurisdiction_id, str) and jurisdiction_id.strip():
+                ids.add(jurisdiction_id.strip())
+    return frozenset(ids)
+
+
 def is_source_blueprint_default_enabled(overlay_id: str, provider_template_id: str) -> bool:
     """Return the template's *shipped default* enablement (ADR-0030 config key).
 
