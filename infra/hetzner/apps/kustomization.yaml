@@ -92,6 +92,52 @@ resources:
 # package (Package settings → Manage Actions access → `philipplukas/evidara`,
 # Write). See #884.
 #
+# 444115ad (#1000) is `main`'s tip at the time of this pin. runtime-images.yml is green
+# and all SEVEN tags below were confirmed present in GHCR before this pin was written —
+# the run's conclusion is necessary but it is not what this file depends on:
+#
+#   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
+#            document-intelligence-document-service document-intelligence-consumer marketing; do
+#     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"444115ad918840700f6c72445a08ac9d0db7a2a0\")]|length"
+#   done   # all returned 1
+#
+# WHAT THIS PIN ADDS over 63bd639e. Four merged PRs:
+#   - #995: Apache-2.0, a gitleaks guard on staged files and full history, and a repository
+#     link in the search header. Also DI_CANONICAL_RETRACTIONS_URI in configmap.yaml, WITHOUT
+#     which ADR-0057's canonical_retract cannot run at all — the explicit-surface branch of
+#     RuntimeSettings reads that key directly and leaves the ledger None when it is absent,
+#     so the job raised `missing_retraction_ledger_config` and removed nothing. Applying this
+#     pin is what puts that key in the cluster.
+#   - #997: `fedlex_sparql` can ENUMERATE the Systematic Collection instead of only acquiring
+#     hand-pasted seed_urls (16,965 works), and document-service gains
+#     POST /v1/embeddings/query-sparse. The enumerating template ships `enabled: false`.
+#   - #999: scripts only — a LexFind deployed-environment loop driver. No image effect.
+#   - #1000: blueprint templates declare `jurisdiction_id`, and the coverage queue splits
+#     `register_source` into an agent-actionable `register_source_from_template` and a
+#     human-owned `register_source`. Sourceless jurisdictions a template already names now
+#     ENTER the queue instead of being counted out.
+#
+# CONTRACT: `apis.platform_control.version` moved 0.31.0 -> 0.33.0 in this range (two
+# additive changes; 0.32.0 and 0.33.0 were taken separately rather than collapsed, see
+# contracts/manifest.yaml). The document-intelligence spec moved 0.1.0 -> 0.2.0 for the new
+# embeddings path. Both additive: a reader that ignores the new fields and enum values sees
+# what it saw before.
+#
+# NOT DEPLOYED BY THIS PIN, deliberately: nothing serves the sparse representation. 882 of
+# 897 documents carry `content_sparse` and the query path is still pure BM25, because
+# ADR-0054's D4 gate does not separate on the real corpus (measured 2026-09-16).
+#
+# ZERO alembic delta, verified rather than assumed:
+#
+#   $ git diff --name-only --diff-filter=AMD 63bd639e origin/main -- platform-control/alembic/
+#   (empty)
+#
+# migrate-job.yaml is bumped to this same SHA in this change; keep the two in lockstep,
+# since the `images:` transformer below deliberately does not reach it.
+#
+# ── prior pins, newest first ──
+#
 # 2ce8c720 (#937) is `main`'s tip at the time of this pin. Run 34211402824 is green,
 # and all SEVEN tags below were confirmed present in GHCR before this pin was written:
 #
@@ -226,16 +272,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
+    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
+    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
+    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
+    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
+    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
+    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: 63bd639efb9ed79af39eeb80bfd33c72ec7a9a4d
+    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
