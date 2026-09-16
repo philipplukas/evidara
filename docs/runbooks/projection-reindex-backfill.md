@@ -635,6 +635,35 @@ PY
 > tokenises the escape differently, and the query returns 0 while the corruption is
 > present. Scan the `_source`, not the inverted index.
 
+#### Outcome (executed 2026-09-16)
+
+Retraction, then reconcile, in that order:
+
+```
+canonical_retract --retract   requested=2 retracted=2 not_found=0 failed=false
+  ret_4a56qvywa199wt8hjjtq9gm6k1  doc_3jj0ak7a3vzrybdw06c14phv52
+  ret_2cbeckfeax9agskrkgy7d1559w  doc_5rsf5hby4dwhmza7zyb9f5r0yv
+  restore points: published_documents 888->890, published_sections 888->890
+
+projection_reconcile --delete-orphans   indexed_scanned=889 orphaned=2 deleted=2 rejected=0
+```
+
+Verified afterwards: the index holds **887** documents, the `_source` scan reports
+**`affected: 0`**, the ledger reads back **2 rows** with reason, operator and timestamp, and
+`search.evidara.veyo.dev` returns the surviving row first with `Übergangsbestimmungen`
+rendering correctly.
+
+Two things worth carrying forward:
+
+- **The index was wrong for longer than canonical was.** Between the retraction and the
+  reconcile, canonical held 887 while the index still served 889 — and the two corrupt rows
+  *outranked* the clean one for `q=Bundesverfassung`. That window is unavoidable (ADR-0005
+  makes the index derived, so truth must move first), but on a public surface it is a window
+  where the wrong answer is the top answer. Run the pair back to back.
+- **Reconcile logs `reconcile_dry_run_orphan` even on a mutating run**, immediately before
+  `reconcile_deleted`. The line is not evidence that `--delete-orphans` was missing; read the
+  summary's `deleted` count, not the log prefix.
+
 ### Step 3: Reconcile, then verify
 
 The search index still holds the retracted document. Run
