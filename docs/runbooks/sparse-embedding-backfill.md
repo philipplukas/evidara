@@ -331,6 +331,49 @@ introduced to fix it, now that there is a corpus to measure against.
 stated failure mode observed directly: the lexical retriever abstains for free and the sparse one
 never does.
 
+### The other half: what the representation demonstrably buys
+
+The gate result above is a reason not to *serve* sparse retrieval yet. It is not evidence that the
+representation is worthless, and one measured case says the opposite clearly.
+
+`Religionsfreiheit` — one word, the one a non-lawyer would type:
+
+| arm | result |
+|---|---|
+| BM25 (what production serves today) | **0 hits** |
+| Sparse | 10 candidates, `coverage=0.20282` — inside the in-corpus band, so D4 admits it |
+
+and the sparse candidates are right:
+
+```
+0.0842  Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999
+0.0835  Bundesverfassung …            (#806 duplicate)
+0.0835  Bundesverfassung …            (#806 duplicate)
+0.0638  Kantonsverfassung 101
+0.0526  Universitätsordnung der Universität Zürich (UniO) 415.111
+```
+
+The Federal Constitution never uses the word. Art. 15 is
+*"Glaubens- und Gewissensfreiheit"*. Confirmed against the live API:
+
+```
+Religionsfreiheit                  0 results
+Glaubensfreiheit                   1 result   (the BV)
+Glaubens- und Gewissensfreiheit    4 results
+```
+
+**The mechanism is subword overlap, not semantic expansion** — worth stating precisely, because the
+stronger claim is the tempting one. BGE-M3's sparse head weights tokens that are *present*; it does
+not invent vocabulary (measured: its query features are a strict subset of the tokenizer's ids, 0
+model-only). What bridges the gap is that `Religionsfreiheit` tokenises into pieces that occur in
+`…freiheit` and in the article's religious vocabulary, whereas BM25 sees one unmatched token —
+`german_normalization` does not decompound German compounds.
+
+So the honest summary is that the sparse arm fixes a **false refusal**: today the platform says
+"nothing" about a question its corpus can answer. Against that, D4 currently admits
+`Aufstellung Champions League Finale 1999`. Which error is worse is a product decision, not a
+measurement — but both numbers are now on the table instead of neither.
+
 ### What this changes
 
 - **The floor is not a knob to re-tune here.** Two overlapping populations do not separate at any
