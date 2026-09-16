@@ -593,7 +593,18 @@ export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<Acquis
   const preserved =
     specProvider(original) === state.provider ? original : pickBaseSpecFields(original);
 
-  return { ...preserved, ...edited };
+  // The cast is a TypeScript limitation, not a loosened invariant. `preserved` is
+  // typed `Partial<AcquisitionSpec>` — a Partial of the *whole* discriminated union —
+  // so the spread's `provider` widens to every provider at once and no single member
+  // of the union accepts it. The merge is correct by construction: `preserved` is
+  // either the SAME provider's original spec, or only the provider-independent base
+  // fields, which the line above guarantees.
+  //
+  // It only started failing to compile when `fedlex_sparql` gained `enumeration` /
+  // `max_works`: the union members' shapes overlap differently, so TS picked a
+  // different (and unassignable) candidate. Narrowing here rather than widening the
+  // return type keeps the compiler checking every call site of this function.
+  return { ...preserved, ...edited } as Partial<AcquisitionSpec>;
 };
 
 /**

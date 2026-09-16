@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  document-intelligence gains POST /v1/embeddings/query-sparse so the search path can encode a query into the content_sparse feature space (ADR-0054)

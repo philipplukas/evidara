@@ -21,6 +21,7 @@ import { useQueryState } from "nuqs";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
 import { PreferencesDialog } from "@/components/layout/PreferencesDialog";
+import { RepositoryLink } from "@/components/layout/RepositoryLink";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { ShareButton } from "@/components/ui/ShareButton";
@@ -478,6 +479,8 @@ export function AppHeader({
               >
                 <HelpCircle className="h-4 w-4" />
               </button>
+
+              <RepositoryLink />
 
               {/* Locale Switcher */}
               {/* biome-ignore lint/a11y/useSemanticElements: fieldset would break flex layout styling */}

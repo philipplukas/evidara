@@ -2,8 +2,9 @@
 
 This repository stores copies of material authored by third parties. Their licences require that
 the notices below travel with those copies. **These obligations come from the third parties'
-licences, not from this project's own** — they hold whatever licence this repository eventually
-carries, and nothing here states or implies one.
+licences, not from this project's own** — they hold regardless of what this repository is licensed
+under, and are unaffected by it. (That licence is now [Apache-2.0](LICENSE), chosen 2026-09-16;
+this sentence used to say the repository carried no licence yet.)
 
 Scope: material **copied into this tree**, and **data redistributed in this tree**. Dependencies
 that are merely installed from a registry are not listed here; their obligations attach to a built

@@ -21,7 +21,8 @@
     "removeSavedSearch": "Gespeicherte Suche entfernen",
     "restoreSavedSearch": "Gespeicherte Suche wiederherstellen",
     "openSettings": "Einstellungen",
-    "openKeyboardShortcuts": "Tastenkombinationen anzeigen"
+    "openKeyboardShortcuts": "Tastenkombinationen anzeigen",
+    "repository": "Quellcode auf GitHub"
   },
   "help": {
     "shortcuts": {

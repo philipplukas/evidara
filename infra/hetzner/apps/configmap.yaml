@@ -36,6 +36,19 @@ data:
   DI_PUBLISHED_DOCUMENTS_URI: "s3://evidara-lakehouse/canonical/published_documents"
   DI_PUBLISHED_SECTIONS_URI: "s3://evidara-lakehouse/canonical/published_sections"
   DI_PROCESSING_MANIFESTS_URI: "s3://evidara-lakehouse/canonical/processing_manifests"
+  # The ADR-0057 retraction ledger. REQUIRED for canonical_retract to run at all, and it
+  # is required *because* the three keys above are set: `RuntimeSettings` takes the
+  # explicit-URI branch when any published surface URI is present, and that branch reads
+  # this key directly rather than deriving it (config/runtime.py:183-192). Only the
+  # DI_SURFACES_ROOT_URI branch derives it from a root.
+  #
+  # Without it the job raises `missing_retraction_ledger_config` and removes nothing —
+  # so between #971 (which shipped ADR-0057) and this line, production carried the
+  # retraction capability and could not use it. That is ADR-0052's "declared means
+  # produced" read from the config side, and #806 is what went unfixed in the meantime:
+  # two stale 2026-07-29 Bundesverfassung rows that a 2026-09-05 reprocessing had already
+  # superseded, still served, still wrong.
+  DI_CANONICAL_RETRACTIONS_URI: "s3://evidara-lakehouse/canonical/canonical_retractions"
   # legal-search API base for the NATS->projection bridge (document_intelligence_projection_bridge, M0.2)
   LEGAL_SEARCH_API_URL: "http://legal-search-api.evidara.svc:8080"
   # legal-search

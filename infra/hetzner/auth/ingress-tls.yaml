@@ -40,13 +40,39 @@ spec:
                 port:
                   number: 8080
 ---
+# The search UI is the one PUBLIC surface in this file, and the absence of a
+# `router.middlewares` annotation below is deliberate — not an omission.
+#
+# `admin-tls` above keeps `evidara-basicauth`. That asymmetry IS the access
+# model: the operator panel is where an agent's work is approved (ADR-0022,
+# ADR-0056) and it stays behind the shared password; the corpus is readable by
+# anyone.
+#
+# What removing the middleware does NOT expose:
+#   - `legal-search-api` is not routed here at all. It has no public Ingress —
+#     only `legal-search-api.ts.veyo.dev` on the tailnet — and it independently
+#     enforces `X-API-Key` (verified 2026-09-16: a keyless request to the tailnet
+#     host returns 401 `Missing API key`).
+#   - The browser therefore never holds a key. `legal-search-frontend` proxies
+#     `/v1/*` server-side and injects `LEGAL_SEARCH_API_KEY` from the
+#     `evidara-auth` Secret, so the credential stays in the pod.
+#
+# What it DOES expose, stated plainly: every read the search UI can make, the
+# public can now make through that same server-side proxy — search, facets,
+# document detail and the coverage endpoints, at whatever rate they like. There
+# is no rate limit on this path today. That is an accepted consequence of
+# publishing a read-only corpus, not an oversight; if it is abused, a Traefik
+# rate-limit Middleware belongs here rather than a password.
+#
+# The marketing page (`infra/hetzner/marketing/ingress-tls.yaml`) is NOT covered
+# by this change and stays behind basicauth — ADR-0039 D4, amended 2026-09-07,
+# keeps it private until its form posts somewhere.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: search-tls
   namespace: evidara
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik

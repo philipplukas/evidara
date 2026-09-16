@@ -5885,6 +5885,19 @@ components:
           minimum: 1.0
           title: Max Expressions
           default: 1
+        enumeration:
+          anyOf:
+          - type: string
+            const: sr_collection
+          - type: 'null'
+          title: Enumeration
+        max_works:
+          anyOf:
+          - type: integer
+            maximum: 50000.0
+            minimum: 1.0
+          - type: 'null'
+          title: Max Works
       additionalProperties: false
       type: object
       title: FedlexSparqlAcquisitionSpec

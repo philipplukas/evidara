@@ -11,14 +11,16 @@ detail (not a handoff into parsing or pipeline jobs). See ADR-0010
 Wire format: IBM Docling `DoclingDocument` serialized as JSON. A dedicated JSON Schema may be
 added under `contracts/schemas/` when the on-wire subset is frozen.
 
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type {
   DoclingDocumentJson,
   ErrorResponse,
   GetDocumentFullParams,
   GetDocumentLeanParams,
-  GetDocumentPlainTextParams
+  GetDocumentPlainTextParams,
+  QuerySparseRequest,
+  QuerySparseResponse
 } from './model';
 
 import { documentIntelligenceFetch } from '../document-intelligence-mutator';
@@ -196,6 +198,69 @@ export const getDocumentPlainText = async (documentId: string,
     method: 'GET'
     
     
+  }
+);}
+
+
+
+/**
+ * Encodes a search query with the same BGE-M3 model that wrote `content_sparse`
+(ADR-0054), so the search path can issue `rank_feature` clauses against it.
+
+The model is required, not just its tokenizer. Measured 2026-09-16, BGE-M3's
+query features are a strict subset of the tokenizer's ids (overlap 10, model-only
+0), so a tokenizer-only encoder reaches the same feature SPACE — but not the
+weights, and the weights are the point: `Zürich` 0.261 and `Hund` 0.235 against
+`meinen` 0.050. Uniform or corpus-IDF weighting rewards `meinen`, because
+colloquial first-person German is rarer in statutes than the legal subject. That
+is #973 rebuilt in the sparse arm.
+
+Intended as a COLD path: BM25 answers ~85% of realistic queries, so this is for
+the remainder. That is what makes a CPU-bound encode acceptable.
+
+ * @summary Encode a query into the learned-sparse feature space
+ */
+export type encodeQuerySparseResponse200 = {
+  data: QuerySparseResponse
+  status: 200
+}
+
+export type encodeQuerySparseResponse422 = {
+  data: ErrorResponse
+  status: 422
+}
+
+export type encodeQuerySparseResponse503 = {
+  data: ErrorResponse
+  status: 503
+}
+    
+export type encodeQuerySparseResponseSuccess = (encodeQuerySparseResponse200) & {
+  headers: Headers;
+};
+export type encodeQuerySparseResponseError = (encodeQuerySparseResponse422 | encodeQuerySparseResponse503) & {
+  headers: Headers;
+};
+
+export type encodeQuerySparseResponse = (encodeQuerySparseResponseSuccess | encodeQuerySparseResponseError)
+
+export const getEncodeQuerySparseUrl = () => {
+
+
+  
+
+  return `/v1/embeddings/query-sparse`
+}
+
+export const encodeQuerySparse = async (querySparseRequest: QuerySparseRequest, options?: RequestInit): Promise<encodeQuerySparseResponse> => {
+  
+  return documentIntelligenceFetch<encodeQuerySparseResponse>(getEncodeQuerySparseUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      querySparseRequest,)
   }
 );}
 

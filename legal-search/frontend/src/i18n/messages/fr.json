@@ -21,7 +21,8 @@
     "removeSavedSearch": "Supprimer la recherche enregistr\u00e9e",
     "restoreSavedSearch": "Restaurer la recherche enregistr\u00e9e",
     "openSettings": "Param\u00e8tres",
-    "openKeyboardShortcuts": "Afficher les raccourcis clavier"
+    "openKeyboardShortcuts": "Afficher les raccourcis clavier",
+    "repository": "Code source sur GitHub"
   },
   "help": {
     "shortcuts": {

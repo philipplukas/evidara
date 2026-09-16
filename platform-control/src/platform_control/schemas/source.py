@@ -100,16 +100,38 @@ class FedlexSparqlAcquisitionSpec(BaseAcquisitionSpec):
     preferred_languages: list[LanguageCode] = Field(default_factory=list)
     query_mode: Literal["work_to_expression"] = "work_to_expression"
     max_expressions: int = Field(default=1, ge=1, le=10)
-    # Federal seed mode only. A `scope_kind: canton` discovery mode existed here
+    # FEDERAL only, still. A `scope_kind: canton` discovery mode existed here
     # until #716; it was removed because `jolux:CantonOfOrigin` does not exist
     # and Fedlex publishes no cantonal law at all (measured — see the SCOPE note
     # in services/fedlex_sparql_provider.py). Cantonal coverage needs a
-    # per-canton provider, not a field on this spec.
+    # per-canton provider, not a field on this spec. `enumeration` below does not
+    # reopen that: it walks the federal Systematic Collection and nothing else.
+    #
+    # `sr_collection` resolves the seed works from the endpoint at run start
+    # instead of from `seed_urls`. Without it this provider can only acquire what
+    # an operator pasted in, which is why five enabled federal templates named 16
+    # URIs between them.
+    enumeration: Literal["sr_collection"] | None = None
+    # Bounds an enumerating run. None means unbounded — ~17k works, so set it
+    # deliberately. The provider reports whether the walk exhausted the collection
+    # or stopped on this cap, so a truncated run is never read as the whole SR.
+    max_works: int | None = Field(default=None, ge=1, le=50_000)
 
     @model_validator(mode="after")
     def validate_fedlex_sparql_config(self) -> FedlexSparqlAcquisitionSpec:
+        # Seeds OR enumeration — never neither. An enumerating spec that also
+        # carried seeds would silently ignore them at run start, so requiring
+        # exactly one keeps the spec honest about what it will fetch.
+        if self.enumeration is not None:
+            if self.seed_url is not None or self.seed_urls:
+                raise ValueError(
+                    "fedlex_sparql enumeration resolves its own works; remove seed_url/seed_urls"
+                )
+            return self
         if self.seed_url is None and not self.seed_urls:
-            raise ValueError("fedlex_sparql provider requires seed_url or seed_urls")
+            raise ValueError(
+                "fedlex_sparql provider requires seed_url or seed_urls, or enumeration"
+            )
         return self
 
 

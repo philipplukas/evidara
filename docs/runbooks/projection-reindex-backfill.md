@@ -486,13 +486,51 @@ the order is **retract → reconcile**, never the reverse.
 
 ### Step 0: Preconditions
 
+There are **two** ways to point the retractor at canonical, and only one of them gives you
+a ledger for free. Getting this wrong is not a subtle failure, but it is a late one — the
+job refuses at the moment you try to retract, which is the worst time to discover it.
+
 ```bash
-# The retractor derives all three surfaces from the root, including the ledger.
+# (a) ROOT branch — derives every surface from one root, INCLUDING the ledger.
 export DI_SURFACES_ROOT_URI=s3://evidara-canonical/surfaces
 # ...plus the usual DI_S3_* credentials for that bucket.
+```
 
+```bash
+# (b) EXPLICIT branch — what PRODUCTION uses (infra/hetzner/apps/configmap.yaml).
+# Setting ANY of the three published URIs selects this branch, and it does NOT derive
+# the ledger: `canonical_retractions_uri` is read from its own key and is None without it.
+export DI_PUBLISHED_DOCUMENTS_URI=s3://evidara-lakehouse/canonical/published_documents
+export DI_PUBLISHED_SECTIONS_URI=s3://evidara-lakehouse/canonical/published_sections
+export DI_PROCESSING_MANIFESTS_URI=s3://evidara-lakehouse/canonical/processing_manifests
+export DI_CANONICAL_RETRACTIONS_URI=s3://evidara-lakehouse/canonical/canonical_retractions  # ← required here
+```
+
+Without that last line the job raises `missing_retraction_ledger_config` and removes
+nothing — which is correct behaviour (ADR-0057 refuses an unrecorded retraction) but reads
+as a broken tool. Production shipped ADR-0057 in #971 **without** that key and therefore
+could not retract anything until 2026-09-16; `scripts/check_di_surface_config.py` now
+fails the build if the pairing is ever broken again.
+
+The ledger table does not need creating: the append is `write_deltalake(mode="append")`,
+which creates it on first write.
+
+```bash
 # Confirm canonical is readable and non-empty before planning anything: an enumerated
 # count of 0 is a refusal, not an empty corpus.
+```
+
+#### Running it against the production cluster
+
+The workstation cannot reach `minio.evidara.svc`, and the scoped credentials live in the
+`evidara-s3-di-consumer` Secret rather than in anyone's shell. Run it as a Job so it picks
+up exactly the production config, and so no credential is copied anywhere:
+
+```bash
+IMG=$(kubectl -n evidara get deploy di-consumer -o jsonpath='{.spec.template.spec.containers[0].image}')
+# Job spec: envFrom [configMapRef: evidara-config, secretRef: evidara-s3-di-consumer],
+# command: ["document_intelligence_canonical_retract"], args as in Step 1 below.
+# restartPolicy: Never, backoffLimit: 0 — a retraction must not be retried blindly.
 ```
 
 ### Step 1: Dry run (this is the default)
@@ -540,6 +578,91 @@ interrupted run never leaves a document row that answers a detail read with no p
 
 The summary JSON carries `retraction_ids`, `retracted_document_ids` and, per surface,
 `rows_matched` / `rows_removed` / `version_before` / `version_after`. Keep it.
+
+### Worked case — #806, the two stale Bundesverfassung rows (diagnosed 2026-09-16)
+
+The live instance of this procedure, with the evidence that identified it. Three Fedlex
+documents existed, all the same norm:
+
+| `document_id` | processed | sections | `len(content)` | state |
+|---|---|---|---|---|
+| `doc_3jj0ak7a3vzrybdw06c14phv52` | 2026-07-29 | 2 | 213,735 | retract |
+| `doc_5rsf5hby4dwhmza7zyb9f5r0yv` | 2026-07-29 | 2 | 213,735 | retract |
+| `doc_6b1pb4dzqrpyspdrzdgvrs00bq` | 2026-09-05 | **260** | 201,151 | **survivor** |
+
+Two independent defects, both only in the July rows, and each one identifies them on its
+own:
+
+- **Double-encoded unicode.** `content` and section titles carry the literal six
+  characters `ä` where `ä` belongs — `Präambel`, `Allmächtigen`. The
+  12,584-character excess over the survivor is the escape overhead (5 extra chars per
+  non-ASCII character ≈ 2,517 of them). This was reaching users: the snippet on the public
+  search page rendered the escape sequences literally.
+- **Sectionisation collapsed.** 2 sections for a 213k-character constitution of ~200
+  articles, against 260 for the survivor.
+
+Both were already fixed by the 2026-09-05 reprocessing. The July rows persisted because
+neither existing mechanism converges on them, exactly as ADR-0057 predicts: reconcile only
+removes index-minus-canonical and these still have canonical rows, and re-acquiring mints
+a *third* id under the post-#652 locator key rather than replacing them.
+
+Scan that finds them, and that should return `affected: 0` afterwards:
+
+```bash
+# over documents-read: literal backslash-u sequences in stored content
+python3 - <<'PY'
+import json, urllib.request
+OS = "http://<opensearch>:9200"
+after, affected = None, []
+while True:
+    body = {"size": 100, "_source": ["document_id", "content"],
+            "query": {"match_all": {}}, "sort": [{"document_id": "asc"}]}
+    if after: body["search_after"] = after
+    req = urllib.request.Request(f"{OS}/documents-read/_search", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    hits = json.loads(urllib.request.urlopen(req, timeout=120).read())["hits"]["hits"]
+    if not hits: break
+    for h in hits:
+        c = h["_source"].get("content") or ""
+        if "\\u00" in c or "\\u20" in c: affected.append(h["_source"]["document_id"])
+    after = hits[-1]["sort"]
+    if len(hits) < 100: break
+print("affected:", len(affected), affected)
+PY
+```
+
+> A `match_phrase` for `u00e4` does **not** find these — the `legal_text` analyser
+> tokenises the escape differently, and the query returns 0 while the corruption is
+> present. Scan the `_source`, not the inverted index.
+
+#### Outcome (executed 2026-09-16)
+
+Retraction, then reconcile, in that order:
+
+```
+canonical_retract --retract   requested=2 retracted=2 not_found=0 failed=false
+  ret_4a56qvywa199wt8hjjtq9gm6k1  doc_3jj0ak7a3vzrybdw06c14phv52
+  ret_2cbeckfeax9agskrkgy7d1559w  doc_5rsf5hby4dwhmza7zyb9f5r0yv
+  restore points: published_documents 888->890, published_sections 888->890
+
+projection_reconcile --delete-orphans   indexed_scanned=889 orphaned=2 deleted=2 rejected=0
+```
+
+Verified afterwards: the index holds **887** documents, the `_source` scan reports
+**`affected: 0`**, the ledger reads back **2 rows** with reason, operator and timestamp, and
+`search.evidara.veyo.dev` returns the surviving row first with `Übergangsbestimmungen`
+rendering correctly.
+
+Two things worth carrying forward:
+
+- **The index was wrong for longer than canonical was.** Between the retraction and the
+  reconcile, canonical held 887 while the index still served 889 — and the two corrupt rows
+  *outranked* the clean one for `q=Bundesverfassung`. That window is unavoidable (ADR-0005
+  makes the index derived, so truth must move first), but on a public surface it is a window
+  where the wrong answer is the top answer. Run the pair back to back.
+- **Reconcile logs `reconcile_dry_run_orphan` even on a mutating run**, immediately before
+  `reconcile_deleted`. The line is not evidence that `--delete-orphans` was missing; read the
+  summary's `deleted` count, not the log prefix.
 
 ### Step 3: Reconcile, then verify
 

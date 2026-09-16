@@ -156,12 +156,34 @@ def _validate_template(
         return []
 
     if provider in {"deterministic_http", "fedlex_sparql", "eur_lex_sparql"}:
+        # `fedlex_sparql` has a second way to obtain its works: `enumeration`
+        # resolves them from the SPARQL endpoint at run start, so a template using
+        # it carries no seeds BY DESIGN and must not carry any — the spec model
+        # (schemas/source.py) refuses seeds-plus-enumeration outright, because an
+        # enumerating run would silently ignore them.
+        #
+        # This rule lives in two places, which is the shape AGENTS.md warns about:
+        # here, and in `FedlexSparqlAcquisitionSpec.validate_fedlex_sparql_config`.
+        # They are not redundant — this one runs over the overlay YAML with no
+        # platform-control import available, and it is what actually caught the
+        # mismatch when only the Pydantic side was updated. Keep them in step.
+        if _has_nonempty_str(payload.get("enumeration")):
+            if _has_nonempty_str(payload.get("seed_url")) or _has_nonempty_str_list(
+                payload.get("seed_urls")
+            ):
+                return [
+                    f"Overlay '{overlay_id}' template '{template_id}' {provider} sets "
+                    "enumeration AND seeds; enumeration resolves its own works, so the "
+                    "seeds would be silently ignored."
+                ]
+            return []
         if not (
             _has_nonempty_str(payload.get("seed_url"))
             or _has_nonempty_str_list(payload.get("seed_urls"))
         ):
             return [
-                f"Overlay '{overlay_id}' template '{template_id}' {provider} requires seed_url or seed_urls."
+                f"Overlay '{overlay_id}' template '{template_id}' {provider} requires "
+                "seed_url, seed_urls, or enumeration."
             ]
         return []
 

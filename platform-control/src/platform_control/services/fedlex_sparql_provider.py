@@ -185,6 +185,56 @@ WHERE {{
 LIMIT 1
 """.strip()
 
+    # ── Enumeration of the Systematic Collection (SR) ──────────────────────────
+    #
+    # Until this existed the provider could only acquire works an operator had
+    # pasted into `seed_urls`, so the five enabled federal templates between them
+    # named 16 URIs and the deployed corpus held ONE federal document. Breadth was
+    # a typing exercise.
+    #
+    # WHY `isMemberOf` AND NOT A URI PATTERN. The obvious enumeration —
+    # "every jolux:Work whose URI starts with /eli/cc/" — returns **73,680**, because
+    # that set mixes abstract works (`/eli/cc/24/233_245_233`, the ZGB) with every
+    # dated consolidation of them (`/eli/cc/2017/832/20180209`). Acquiring the dated
+    # form would mint a new `document_id` per consolidation across the whole federal
+    # corpus, which is the #850 defect the `identity_locator` comment below exists to
+    # prevent. Filtering by URI shape would work today and is a string hack against a
+    # URI scheme Fedlex is free to change.
+    #
+    # `?member jolux:isMemberOf ?work` says the same thing in the graph's own terms:
+    # a consolidation declares the abstract work it belongs to, so the objects of that
+    # predicate ARE the act-level identities, by construction. Measured against the
+    # live endpoint 2026-09-16: **16,965** distinct works, every sampled one in
+    # abstract form, of which 12,972 also carry `jolux:inForceStatus`.
+    #
+    # Note `a jolux:Work` and NOT `a jolux:Act`: the ELI node is typed `Work`.
+    # Counting `Act` instead is how a survey of this graph reports 245 acts with a
+    # temporal status and concludes the metadata is missing — it is not, it is on the
+    # other class.
+    _ENUMERATION_SR_COLLECTION = "sr_collection"
+
+    #: Abstract SR works, paged. `ORDER BY` is required, not cosmetic: LIMIT/OFFSET
+    #: over an unordered result set may repeat or skip rows between pages.
+    _SR_ENUMERATION_QUERY = """
+PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
+SELECT DISTINCT ?work
+WHERE {{
+  ?member jolux:isMemberOf ?work .
+  FILTER(STRSTARTS(STR(?work), "{collection_prefix}"))
+}}
+ORDER BY STR(?work)
+LIMIT {limit}
+OFFSET {offset}
+""".strip()
+
+    #: Rows per enumeration request. The endpoint answered a 16,965-row COUNT in
+    #: 4.2s, so this is about bounding one response, not about its patience.
+    _SR_ENUMERATION_PAGE_SIZE = 1000
+
+    #: Pages an enumeration may walk before it stops and says so. A run that silently
+    #: truncates its own corpus reports a denominator it did not measure (ADR-0042).
+    _SR_ENUMERATION_MAX_PAGES = 40
+
     async def start_run(
         self,
         source: Source,
@@ -213,7 +263,22 @@ LIMIT 1
         skipped: list[dict[str, Any]] = []
 
         async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
-            work_uris = self._seed_work_uris(acquisition_spec)
+            enumeration = self._enumeration_strategy(acquisition_spec)
+            enumeration_exhausted: bool | None = None
+            if enumeration is not None:
+                max_works = acquisition_spec.get("max_works")
+                work_uris, enumeration_exhausted = await self._enumerate_sr_work_uris(
+                    client=client,
+                    sparql_endpoint=sparql_endpoint,
+                    limit=int(max_works) if max_works else None,
+                )
+                if not work_uris:
+                    raise ProviderConfigurationError(
+                        "fedlex_sparql enumeration returned no works — refusing rather than "
+                        "reporting an empty federal corpus as a successful run."
+                    )
+            else:
+                work_uris = self._seed_work_uris(acquisition_spec)
 
             for work_uri in work_uris:
                 try:
@@ -398,6 +463,10 @@ LIMIT 1
             external_job_id=f"fedlexsparql_{run.run_id}",
             request_payload={
                 "work_uris": work_uris,
+                "enumeration": enumeration,
+                # False means the walk stopped on a cap, so `requested` is a floor and
+                # not the corpus. Recorded rather than inferred (ADR-0042).
+                "enumeration_exhausted": enumeration_exhausted,
                 "sparql_endpoint": sparql_endpoint,
                 "preferred_languages": preferred_languages,
                 "max_expressions": max_expressions,
@@ -420,15 +489,30 @@ LIMIT 1
         sparql_endpoint = str(
             acquisition_spec.get("sparql_endpoint") or f"https://{_FEDLEX_HOST}/sparqlendpoint"
         )
-        work_uris = self._seed_work_uris(acquisition_spec)
+        enumeration = self._enumeration_strategy(acquisition_spec)
+        extra_notes: list[str] = []
+        if enumeration is None:
+            work_uris = self._seed_work_uris(acquisition_spec)
+            estimated = len(work_uris) * max_expressions
+        else:
+            # plan() is sync and enumeration is a network walk, so the count cannot
+            # be resolved here. Say that, rather than reporting 0 seeds as a plan.
+            work_uris = []
+            max_works = acquisition_spec.get("max_works")
+            estimated = int(max_works) * max_expressions if max_works else 0
+            extra_notes.append(
+                f"enumeration={enumeration}: seed works are resolved from the SPARQL "
+                "endpoint at run start, not from acquisition_spec.seed_urls. "
+                f"max_works={max_works or 'unbounded'}"
+            )
         return ProviderPlan(
             provider=self.provider_name,
             mode="work_to_expression",
             seed_urls=work_uris,
-            estimated_request_count=len(work_uris) * max_expressions,
+            estimated_request_count=estimated,
             user_agent=acquisition_spec.get("user_agent"),
             request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 30.0),
-            notes=[f"sparql_endpoint={sparql_endpoint}"],
+            notes=[f"sparql_endpoint={sparql_endpoint}", *extra_notes],
             raw=dict(acquisition_spec),
         )
 
@@ -662,6 +746,73 @@ LIMIT 1
             if isinstance(expr, str) and expr.startswith(f"https://{_FEDLEX_HOST}/"):
                 expression_uris.append(expr)
         return expression_uris
+
+    async def _enumerate_sr_work_uris(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        sparql_endpoint: str,
+        limit: int | None,
+    ) -> tuple[list[str], bool]:
+        """Every abstract SR work, paged. Returns `(uris, exhausted)`.
+
+        `exhausted` is False when the walk stopped on `limit` or on
+        `_SR_ENUMERATION_MAX_PAGES` rather than on an empty page — the caller
+        records it so a truncated enumeration is never reported as a whole corpus.
+        """
+        collected: list[str] = []
+        seen: set[str] = set()
+        exhausted = False
+        prefix = f"https://{_FEDLEX_HOST}/eli/cc/"
+
+        for page in range(self._SR_ENUMERATION_MAX_PAGES):
+            response = await limited_get(
+                client,
+                sparql_endpoint,
+                params={
+                    "query": self._SR_ENUMERATION_QUERY.format(
+                        collection_prefix=prefix,
+                        limit=self._SR_ENUMERATION_PAGE_SIZE,
+                        offset=page * self._SR_ENUMERATION_PAGE_SIZE,
+                    ),
+                    "format": "application/sparql-results+json",
+                },
+                headers={"Accept": "application/sparql-results+json"},
+            )
+            response.raise_for_status()
+            bindings = response.json().get("results", {}).get("bindings", [])
+            if not bindings:
+                exhausted = True
+                break
+
+            for binding in bindings:
+                work = binding.get("work", {}).get("value")
+                if not isinstance(work, str) or not work.startswith(prefix):
+                    continue
+                if work in seen:
+                    continue
+                seen.add(work)
+                collected.append(work)
+                if limit is not None and len(collected) >= limit:
+                    return collected[:limit], False
+
+            if len(bindings) < self._SR_ENUMERATION_PAGE_SIZE:
+                exhausted = True
+                break
+
+        return collected, exhausted
+
+    def _enumeration_strategy(self, acquisition_spec: dict[str, object]) -> str | None:
+        raw = acquisition_spec.get("enumeration")
+        strategy = str(raw).strip() if raw is not None else ""
+        if not strategy:
+            return None
+        if strategy != self._ENUMERATION_SR_COLLECTION:
+            raise ProviderConfigurationError(
+                f"fedlex_sparql provider does not support enumeration={strategy!r}; "
+                f"the only strategy is {self._ENUMERATION_SR_COLLECTION!r}."
+            )
+        return strategy
 
     def _select_expression_uris(
         self,

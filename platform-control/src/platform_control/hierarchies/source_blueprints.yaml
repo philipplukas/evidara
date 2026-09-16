@@ -265,6 +265,36 @@ overlays:
         enabled: true
       # Broad Swiss federal law corpus — major codes and statutes.
       # ELI URIs verified against fedlex.data.admin.ch SPARQL ASK (2026-04-21).
+      # The whole Systematic Collection, enumerated rather than hand-seeded.
+      # Every other fedlex template names its works in `seed_urls`; between them
+      # the five enabled ones list 16 URIs, which is why the deployed corpus held
+      # one federal document. `enumeration: sr_collection` resolves the seed set
+      # from the SPARQL endpoint at run start instead — 16,965 abstract SR works,
+      # measured live 2026-09-16.
+      #
+      # `enabled: false` and it stays that way until an acceptance run earns it
+      # (ADR-0030's two-key lock fails closed). `max_works` is deliberately set:
+      # an unbounded first run would fetch ~17k manifestations, and the run report
+      # distinguishes a capped walk from an exhausted one, so a truncated corpus is
+      # never reported as the whole SR (ADR-0042).
+      fedlex_sparql_sr_full_de:
+        provider: fedlex_sparql
+        enumeration: sr_collection
+        max_works: 500
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        preferred_languages: [de]
+        query_mode: work_to_expression
+        max_expressions: 1
+        request_timeout_seconds: 30.0
+        max_content_bytes: 2000000
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_fedlex_sr
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
       fedlex_sparql_federal_codes_de:
         jurisdiction_id: jur_ch_federal
         provider: fedlex_sparql

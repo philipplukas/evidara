@@ -8,6 +8,7 @@ import pytest
 
 from acquisition_core.identity import upstream_locator
 from acquisition_core.normalization import ArtifactPipeline
+from platform_control.errors import ProviderConfigurationError
 from platform_control.services.fedlex_sparql_provider import (
     FedlexSparqlProvider,
     _ConsolidationMember,
@@ -824,3 +825,117 @@ async def test_two_consolidations_of_one_act_acquire_to_one_document_identity(
     assert upstream_locator(raw_earlier.metadata) == upstream_locator(raw_later.metadata)
     assert "20220213" not in upstream_locator(raw_earlier.metadata)
     assert "20240303" not in upstream_locator(raw_later.metadata)
+
+
+# ── SR collection enumeration ─────────────────────────────────────────────────
+#
+# Before this existed the provider could only acquire works pasted into
+# `seed_urls`: the five enabled federal templates named 16 URIs between them and
+# the deployed corpus held ONE federal document.
+
+
+class _EnumerationClient(FakeAsyncClient):
+    """Serves paged SR enumeration results, and records the offsets requested."""
+
+    def __init__(self, pages: list[list[str]]) -> None:
+        super().__init__()
+        self._pages = pages
+        self.offsets: list[int] = []
+
+    async def get(self, url: str, *, params=None, headers=None):
+        del headers
+        query = (params or {}).get("query", "")
+        request = httpx.Request("GET", url, params=params)
+        offset = int(query.rsplit("OFFSET", 1)[1].strip())
+        self.offsets.append(offset)
+        index = offset // FedlexSparqlProvider._SR_ENUMERATION_PAGE_SIZE
+        rows = self._pages[index] if index < len(self._pages) else []
+        return httpx.Response(
+            200,
+            json={"results": {"bindings": [{"work": {"value": uri}} for uri in rows]}},
+            request=request,
+        )
+
+
+def _cc(n: int) -> str:
+    return f"https://fedlex.data.admin.ch/eli/cc/{n}/1"
+
+
+@pytest.mark.asyncio
+async def test_enumeration_walks_pages_and_dedupes() -> None:
+    provider = FedlexSparqlProvider()
+    page = FedlexSparqlProvider._SR_ENUMERATION_PAGE_SIZE
+    # A full page forces a second request; the duplicate across pages must collapse.
+    first = [_cc(i) for i in range(page)]
+    second = [first[0], _cc(page + 1)]
+    client = _EnumerationClient([first, second])
+
+    uris, exhausted = await provider._enumerate_sr_work_uris(
+        client=client, sparql_endpoint="https://fedlex.data.admin.ch/sparqlendpoint", limit=None
+    )
+
+    assert len(uris) == page + 1
+    assert len(set(uris)) == len(uris), "duplicate work URIs across pages were not collapsed"
+    assert exhausted is True
+    assert client.offsets == [0, page], "paging did not advance by page size"
+
+
+@pytest.mark.asyncio
+async def test_enumeration_reports_truncation_rather_than_implying_a_whole_corpus() -> None:
+    """`exhausted=False` is what stops a capped walk being read as the full SR."""
+    provider = FedlexSparqlProvider()
+    client = _EnumerationClient([[_cc(1), _cc(2), _cc(3)]])
+
+    uris, exhausted = await provider._enumerate_sr_work_uris(
+        client=client, sparql_endpoint="https://fedlex.data.admin.ch/sparqlendpoint", limit=2
+    )
+
+    assert uris == [_cc(1), _cc(2)]
+    assert exhausted is False
+
+
+@pytest.mark.asyncio
+async def test_enumeration_ignores_uris_outside_the_sr_collection() -> None:
+    """An AS/BBl URI is federal but is not the Systematic Collection."""
+    provider = FedlexSparqlProvider()
+    client = _EnumerationClient(
+        [[_cc(1), "https://fedlex.data.admin.ch/eli/oc/2020/5", "https://example.com/eli/cc/9/9"]]
+    )
+
+    uris, _ = await provider._enumerate_sr_work_uris(
+        client=client, sparql_endpoint="https://fedlex.data.admin.ch/sparqlendpoint", limit=None
+    )
+
+    assert uris == [_cc(1)]
+
+
+def test_unknown_enumeration_strategy_is_refused_not_ignored() -> None:
+    provider = FedlexSparqlProvider()
+    with pytest.raises(ProviderConfigurationError, match="does not support enumeration"):
+        provider._enumeration_strategy({"enumeration": "systematic_digit_union"})
+
+
+def test_absent_enumeration_is_none_so_seeded_templates_are_unaffected() -> None:
+    provider = FedlexSparqlProvider()
+    assert provider._enumeration_strategy({}) is None
+    assert provider._enumeration_strategy({"enumeration": ""}) is None
+
+
+def test_plan_with_enumeration_needs_no_seed_urls() -> None:
+    """A seeded plan raises without seeds; an enumerating one must not."""
+    provider = FedlexSparqlProvider()
+    version = SimpleNamespace(
+        acquisition_spec={"enumeration": "sr_collection", "max_works": 50},
+    )
+
+    plan = provider.plan(SimpleNamespace(), version)
+
+    assert plan.seed_urls == []
+    assert plan.estimated_request_count == 50
+    assert any("enumeration=sr_collection" in note for note in plan.notes)
+
+
+def test_plan_without_enumeration_still_requires_seeds() -> None:
+    provider = FedlexSparqlProvider()
+    with pytest.raises(ProviderConfigurationError, match="requires acquisition_spec"):
+        provider.plan(SimpleNamespace(), SimpleNamespace(acquisition_spec={}))
