@@ -53,8 +53,19 @@ from evidara_cli.coverage import (
     server_refusals,
     summarise_templates,
 )
-from evidara_cli.envelope import build_envelope, evidence_assertion, evidence_count, evidence_http
+from evidara_cli.envelope import (
+    build_envelope,
+    evidence_assertion,
+    evidence_count,
+    evidence_http,
+)
 from evidara_cli.gate_coverage import gate_coverage_verdict, load_evidence_bundle
+from evidara_cli.scaffold import (
+    ScaffoldError,
+    build_template,
+    default_template_id,
+    render_yaml,
+)
 
 coverage_app = typer.Typer(
     no_args_is_help=True,
@@ -1220,3 +1231,104 @@ def coverage_queue(
     elif actor == "human":
         summary = {**summary, "agent_actionable": []}
     _emit(summary, human=human)
+
+
+@coverage_app.command("scaffold")
+def coverage_scaffold(
+    provider: Annotated[
+        str,
+        typer.Option("--provider", help="lexfind_api, fedlex_sparql, gemeinde_http."),
+    ],
+    jurisdiction_id: Annotated[str, typer.Option("--jurisdiction-id", help="e.g. jur_ch_be.")],
+    corpus_id: Annotated[str, typer.Option("--corpus-id", help="corpus_<snake_case>.")],
+    entity_id: Annotated[
+        list[int] | None,
+        typer.Option("--entity-id", help="lexfind_api entity (ZH=26, BE=4). Repeatable."),
+    ] = None,
+    seed_url: Annotated[
+        list[str] | None, typer.Option("--seed-url", help="Seed URL. Repeatable.")
+    ] = None,
+    bfs_number: Annotated[
+        int | None,
+        typer.Option("--bfs-number", help="gemeinde_http BFS number (Stadt Zurich=261)."),
+    ] = None,
+    language: Annotated[str, typer.Option("--language")] = "de",
+    suffix: Annotated[
+        str | None, typer.Option("--suffix", help="Template id suffix, e.g. 'full' or 'hunde'.")
+    ] = None,
+    human: Annotated[bool, typer.Option("--human", help="Indent the envelope.")] = False,
+) -> None:
+    """Draft a blueprint template for a jurisdiction that has none.
+
+    Prints YAML; writes nothing and calls nothing. A template is a claim its author makes
+    — which portal, which provider, which trust tier — and ADR-0030 puts that behind a
+    person, so the operator commits the result and reviews it as a diff.
+
+    `enabled: false` is not a parameter. The config key fails closed and a template is
+    inert until an acceptance run earns it.
+    """
+    step = "coverage.scaffold"
+    inputs = {
+        "provider": provider,
+        "jurisdiction_id": jurisdiction_id,
+        "corpus_id": corpus_id,
+        "entity_ids": entity_id,
+        "seed_urls": seed_url,
+        "bfs_number": bfs_number,
+        "language": language,
+        "suffix": suffix,
+    }
+    try:
+        body = build_template(
+            provider=provider,
+            jurisdiction_id=jurisdiction_id,
+            corpus_id=corpus_id,
+            entity_ids=entity_id,
+            seed_urls=seed_url,
+            bfs_number=bfs_number,
+            language=language,
+        )
+    except ScaffoldError as exc:
+        _emit(
+            build_envelope(
+                ok=False,
+                workflow=_WORKFLOW,
+                step=step,
+                status="failed_terminal",
+                side_effect_level="none",
+                inputs=inputs,
+                error=str(exc),
+                decision={
+                    "recommended_action": "needs-human",
+                    "reason": "The request cannot produce a template that would validate.",
+                },
+            ),
+            human=human,
+        )
+        raise typer.Exit(code=1) from exc
+
+    template_id = default_template_id(provider, jurisdiction_id, suffix)
+    yaml_text = render_yaml(template_id, body)
+    _emit(
+        build_envelope(
+            ok=True,
+            workflow=_WORKFLOW,
+            step=step,
+            status="passed",
+            side_effect_level="none",
+            inputs=inputs,
+            artifacts={"template_id": template_id, "template": body, "yaml": yaml_text},
+            decision={
+                "recommended_action": "needs-human",
+                "reason": (
+                    "Paste under overlays.<country>.provider_templates in "
+                    "platform-control/src/platform_control/hierarchies/source_blueprints.yaml, "
+                    "then capture acceptance evidence before turning `enabled` on (ADR-0030)."
+                ),
+            },
+            next_actions=[
+                f"evidara workflow coverage preflight --overlay <country> --template {template_id}",
+            ],
+        ),
+        human=human,
+    )
