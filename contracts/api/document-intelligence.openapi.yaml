@@ -283,3 +283,7 @@ components:
 tags:
   - name: documents
     description: Published document body reads
+  - name: embeddings
+    description: |
+      Query-side encoding into the learned-sparse feature space the projection
+      writes (ADR-0054). Read-only and stateless — it encodes, it does not search.

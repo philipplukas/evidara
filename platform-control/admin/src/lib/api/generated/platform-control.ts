@@ -2827,6 +2827,10 @@ export interface components {
              * @default 1
              */
             max_expressions: number;
+            /** Enumeration */
+            enumeration?: "sr_collection" | null;
+            /** Max Works */
+            max_works?: number | null;
         };
         /** FirecrawlAcquisitionSpec */
         FirecrawlAcquisitionSpec: {
