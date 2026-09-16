@@ -165,6 +165,15 @@ repos:
         pass_filenames: false
         files: ^infra/hetzner/apps/(kustomization|migrate-job)\.yaml$
 
+      # Explicit DI surface URIs must be paired with the ADR-0057 retraction ledger,
+      # because the explicit branch of RuntimeSettings does not derive it (#806).
+      - id: check-di-surface-config
+        name: DI surface config pairs explicit URIs with the retraction ledger
+        entry: python3 scripts/check_di_surface_config.py
+        language: system
+        pass_filenames: false
+        files: ^(infra/hetzner/apps/configmap\.yaml|scripts/check_di_surface_config\.py)$
+
       - id: check-component-doc-headings
         name: Check component doc headings
         entry: python scripts/check_component_docs.py
