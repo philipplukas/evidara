@@ -582,11 +582,27 @@ processed_count="$(jq -r '[.data[]? | select(.event_type=="document.processed")]
 
 # --- Content quality gates ---
 
-# Article density: at least 3 occurrences of "Art." across all raw artifacts
+# Legal-text density: at least 3 article markers across the corpus.
+#
+# BOTH "Art." AND "§", because the marker depends on the drafting tradition, not
+# on whether the text is law. Counting only "Art." reported a genuine Basel-Stadt
+# statute corpus as having no legal text at all — measured 2026-09-17 over four
+# indexed BS documents:
+#
+#     "Art." = 1        "§" = 126
+#     (the 24,225-character Hundeverordnung alone: 0 and 87)
+#
+# BS, BL, AG, SO, LU, SH, TG and ZG all draft in §, and German Land law uses it
+# almost exclusively — so `bundesland_http_bayern` would have failed the same way.
+# The gate was calibrated on Fedlex, which uses "Art.", and silently withheld
+# every § corpus.
+#
+# This widens what counts as law; it does not weaken the gate. "§" is an article
+# marker in exactly the same sense, and the floor of 3 is unchanged.
 art_density_count="$(jq -r '[.data[]? |
   ((.artifact_metadata.inline_body // "") + (.artifact_metadata.body // "") +
    (.artifact_metadata.provider_metadata.inline_body // "") + (.artifact_metadata.provider_metadata.body // ""))
-] | map([ match("Art\\."; "g") ] | length) | add // 0' < "${RUN_DIR}/raw-artifacts.json")"
+] | map([ match("Art\\.|§"; "g") ] | length) | add // 0' < "${RUN_DIR}/raw-artifacts.json")"
 art_density_ok=$(( art_density_count >= 3 ? 1 : 0 ))
 
 # Minimum content length: at least 10 KB (10240 bytes) in the largest artifact body
@@ -741,11 +757,13 @@ if [[ -e "${canonical_bodies[0]}" ]]; then
     content_gate_source="canonical"
     raw_art_density_count="${art_density_count}"
     raw_body_max_length="${body_max_length}"
-    art_density_count="$(jq -rs '[.[] | (.content // "") | [ match("Art\\."; "g") ] | length] | add // 0' "${canonical_bodies[@]}")"
+    # Same marker set as the raw path above: "Art." OR "§".
+    art_density_count="$(jq -rs '[.[] | (.content // "") | [ match("Art\\.|§"; "g") ] | length] | add // 0' "${canonical_bodies[@]}")"
     art_density_ok=$(( art_density_count >= 3 ? 1 : 0 ))
     body_max_length="${canonical_max_length}"
     min_content_length_ok=$(( body_max_length >= 10240 ? 1 : 0 ))
-    art1_ok="$(jq -rs '[.[] | select((.content // "") | test("Art\\. 1"))] | length' "${canonical_bodies[@]}")"
+    # "Art. 1" or "§ 1" — the first article, under either convention.
+    art1_ok="$(jq -rs '[.[] | select((.content // "") | test("Art\\. 1|§ ?1\\b"))] | length' "${canonical_bodies[@]}")"
     log "==> Content gates re-measured against the canonical text (${content_gate_source})"
     log "    raw artifact: art_density=${raw_art_density_count} body_max_length=${raw_body_max_length}"
     log "    canonical:    art_density=${art_density_count} body_max_length=${body_max_length}"
