@@ -57,6 +57,7 @@ from platform_control.services.acquisition_provider import (
     ProviderResource,
     ProviderStartResult,
 )
+from platform_control.services.run_scope import effective_resource_cap
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 
@@ -82,6 +83,13 @@ class PortalHttpProviderBase:
         portal_host = self._portal_host(code)
         seed_urls = self._seed_urls(acquisition_spec, portal_host=portal_host)
         timeout_seconds = float(acquisition_spec.get("request_timeout_seconds") or 30.0)
+        # Neither portal provider declares a resource ceiling of its own, so the
+        # run's `scope.max_resources` is the only cap there is. Applied before the
+        # fetch loop and before any `requested` count, so a capped run reports the
+        # number it actually attempted rather than the number it was seeded with.
+        seed_cap = effective_resource_cap(run)
+        if seed_cap is not None and len(seed_urls) > seed_cap:
+            seed_urls = seed_urls[:seed_cap]
         max_content_bytes = int(acquisition_spec.get("max_content_bytes") or 5_000_000)
 
         resources: list[ProviderResource] = []

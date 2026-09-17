@@ -159,6 +159,7 @@ from platform_control.services.acquisition_provider import (
     ProviderResource,
     ProviderStartResult,
 )
+from platform_control.services.run_scope import effective_resource_cap
 
 logger = logging.getLogger(__name__)
 
@@ -895,7 +896,11 @@ class LexFindApiProvider:
         search_text = str(spec.get("search_text") or "").strip()
         page_size = int(spec.get("results_per_page") or _DEFAULT_PAGE_SIZE)
         max_pages = int(spec.get("max_pages") or _MAX_PAGES)
-        max_documents = int(spec.get("max_documents") or 0)
+        # The template's own ceiling. `effective_resource_cap` narrows it with the
+        # run's `scope.max_resources` when one was given, so an acceptance run can
+        # sample the corpus without a source-version change; it can never raise
+        # this number.
+        max_documents = effective_resource_cap(run, int(spec.get("max_documents") or 0)) or 0
         min_pdf_bytes = int(spec.get("min_pdf_bytes") or _DEFAULT_MIN_PDF_BYTES)
         timeout_seconds = float(spec.get("request_timeout_seconds") or 20.0)
         # `0` disables the mirror spot-check; the default samples one document per
@@ -1029,7 +1034,9 @@ class LexFindApiProvider:
             if max_documents and len(records) > max_documents:
                 # A cap makes the run a sample, so the coverage claim has to stop
                 # being a completeness claim — otherwise `complete: true` from the
-                # enumeration would sit next to a fraction of the documents.
+                # enumeration would sit next to a fraction of the documents. This
+                # holds however the cap arrived: a run-scoped one narrows the
+                # corpus exactly as a template-declared one does.
                 if coverage is not None:
                     coverage["truncated_by_max_documents"] = True
                     coverage["complete"] = False

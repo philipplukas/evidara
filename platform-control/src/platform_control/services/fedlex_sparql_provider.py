@@ -20,6 +20,7 @@ from platform_control.services.acquisition_provider import (
     ProviderStartResult,
 )
 from platform_control.services.politeness import limited_get
+from platform_control.services.run_scope import effective_resource_cap
 
 _FEDLEX_HOST = "fedlex.data.admin.ch"
 _FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
@@ -265,12 +266,17 @@ OFFSET {offset}
         async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
             enumeration = self._enumeration_strategy(acquisition_spec)
             enumeration_exhausted: bool | None = None
+            # The run's `scope.max_resources` narrows the template's `max_works`;
+            # it can never raise it. Passed into the enumeration rather than
+            # applied after, so a capped run stops paging instead of fetching the
+            # whole Systematic Collection and discarding most of it.
+            max_works_raw = acquisition_spec.get("max_works")
+            work_limit = effective_resource_cap(run, int(max_works_raw) if max_works_raw else None)
             if enumeration is not None:
-                max_works = acquisition_spec.get("max_works")
                 work_uris, enumeration_exhausted = await self._enumerate_sr_work_uris(
                     client=client,
                     sparql_endpoint=sparql_endpoint,
-                    limit=int(max_works) if max_works else None,
+                    limit=work_limit,
                 )
                 if not work_uris:
                     raise ProviderConfigurationError(
@@ -279,6 +285,13 @@ OFFSET {offset}
                     )
             else:
                 work_uris = self._seed_work_uris(acquisition_spec)
+                # The seed path has no limit of its own, so the cap is applied
+                # here. Truncating seeds means the run is a sample of the declared
+                # source, which `enumeration_exhausted` must not report as a
+                # complete walk.
+                if work_limit is not None and len(work_uris) > work_limit:
+                    work_uris = work_uris[:work_limit]
+                    enumeration_exhausted = False
 
             for work_uri in work_uris:
                 try:
