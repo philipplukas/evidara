@@ -23,6 +23,23 @@ POLL_INTERVAL=5
 # than accepting a hole in the gates (#744: not_evaluated is a hole, not an
 # exclusion).
 READBACK_POLLS=12
+# Floor for the largest canonical body, in characters. 10 KB suits a federal or
+# cantonal act; it is wrong for a municipal one. Measured 2026-09-17: Stadt
+# Zürich's "Vollzugsvorschriften zum Hundegesetz" — the exact ordinance ADR-0033's
+# dog question needs, captured correctly, indexed correctly, `art_density=8`,
+# title and language both asserted — is 3,080 characters and failed this gate
+# alone.
+#
+# A floor calibrated on one corpus withholds real data on the next one, which
+# AGENTS.md already records happening with a marker floor of 3. So it is a
+# corpus-shape parameter like --expect-content-type, not a constant. The DEFAULT
+# is unchanged, so every existing driver and the nightly canaries keep the floor
+# they had.
+#
+# Lowering it does not make the run green by itself: `art_density_ok` is the
+# primary legal-text signal and still has to pass, and it is the one that catches
+# a navigation shell captured instead of the law (#631).
+MIN_CONTENT_LENGTH=10240
 WORKDIR_ROOT="${TMPDIR:-/tmp}/ch-fedlex-fast-loop"
 RUN_DIR=""
 # Corpus-shaped expectations (#744). The defaults below ARE the Fedlex canary that
@@ -107,6 +124,10 @@ Options:
                                  `preview` is refused by the two-key lock there (#743).
   --max-resources <n>            Preview scope max_resources (default: 25)
   --max-polls <n>                Maximum run polls (default: 60)
+  --min-content-length <n>       Floor for the largest canonical body, in characters
+                                 (default: 10240). A municipal ordinance is legitimately
+                                 far shorter than a federal act; art_density_ok stays the
+                                 primary legal-text signal either way.
   --readback-polls <n>           Polls (x5s) waiting for legal-search to serve each
                                  processed document back (default: 12). A corpus with an
                                  extraction step needs more, or the indexed-language and
@@ -215,6 +236,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --readback-polls)
       READBACK_POLLS="${2:?missing value for --readback-polls}"
+      shift 2
+      ;;
+    --min-content-length)
+      MIN_CONTENT_LENGTH="${2:?missing value for --min-content-length}"
       shift 2
       ;;
     --poll-interval)
@@ -612,7 +637,7 @@ body_max_length="$(jq -r '[.data[]? |
    (.artifact_metadata.provider_metadata.inline_body // "" | length),
    (.artifact_metadata.provider_metadata.body // "" | length)] | max
 ] | max // 0' < "${RUN_DIR}/raw-artifacts.json")"
-min_content_length_ok=$(( body_max_length >= 10240 ? 1 : 0 ))
+min_content_length_ok=$(( body_max_length >= MIN_CONTENT_LENGTH ? 1 : 0 ))
 
 # Body-language hint: for German templates, the acquired body must read as German.
 # NOTE: this only inspects the RAW artifact. It says nothing about the language the
@@ -761,7 +786,7 @@ if [[ -e "${canonical_bodies[0]}" ]]; then
     art_density_count="$(jq -rs '[.[] | (.content // "") | [ match("Art\\.|§"; "g") ] | length] | add // 0' "${canonical_bodies[@]}")"
     art_density_ok=$(( art_density_count >= 3 ? 1 : 0 ))
     body_max_length="${canonical_max_length}"
-    min_content_length_ok=$(( body_max_length >= 10240 ? 1 : 0 ))
+    min_content_length_ok=$(( body_max_length >= MIN_CONTENT_LENGTH ? 1 : 0 ))
     # "Art. 1" or "§ 1" — the first article, under either convention.
     art1_ok="$(jq -rs '[.[] | select((.content // "") | test("Art\\. 1|§ ?1\\b"))] | length' "${canonical_bodies[@]}")"
     log "==> Content gates re-measured against the canonical text (${content_gate_source})"
@@ -906,6 +931,7 @@ SUMMARY_JSON="$(jq -n \
   --arg content_gate_source "${content_gate_source}" \
   --argjson body_max_length "${body_max_length}" \
   --argjson min_content_length_ok "${min_content_length_ok}" \
+  --argjson min_content_length_floor "${MIN_CONTENT_LENGTH}" \
   --argjson lang_agreement_ok "${lang_agreement_ok}" \
   --argjson body_lang_hint_ok "${body_lang_hint_ok}" \
   --argjson body_lang_hint_checked "${body_lang_hint_checked}" \
@@ -964,6 +990,10 @@ SUMMARY_JSON="$(jq -n \
       content_gate_source: $content_gate_source,
       body_max_length: $body_max_length,
       min_content_length_ok: $min_content_length_ok,
+      # The floor this run was measured against. A bundle that passed with a
+      # lowered floor must say so, or a reader cannot tell a short municipal
+      # ordinance from a weakened gate.
+      min_content_length_floor: $min_content_length_floor,
       lang_agreement_ok: $lang_agreement_ok,
       body_lang_hint_ok: $body_lang_hint_ok,
       body_lang_hint_checked: $body_lang_hint_checked,
