@@ -278,6 +278,7 @@ overlays:
       # distinguishes a capped walk from an exhausted one, so a truncated corpus is
       # never reported as the whole SR (ADR-0042).
       fedlex_sparql_sr_full_de:
+        jurisdiction_id: jur_ch_federal
         provider: fedlex_sparql
         enumeration: sr_collection
         max_works: 500
