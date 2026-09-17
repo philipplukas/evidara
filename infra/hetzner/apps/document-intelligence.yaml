@@ -133,7 +133,25 @@ spec:
               cpu: 100m
               memory: 512Mi
             limits:
-              memory: 1Gi
+              # 4Gi, raised from 1Gi (#1012). On 2026-09-17 a 944-document
+              # lexfind_api_zh_full run OOMKilled this container SEVEN times in
+              # eighteen minutes — exit 137, one of them twelve seconds after
+              # startup. It idles at 76Mi and only dies under a batch.
+              #
+              # This is a CEILING, not a measurement. Nobody has profiled the
+              # peak: the crashed containers took their own evidence with them
+              # (#892, no log aggregation), so the number is chosen for headroom
+              # against a node with 62Gi allocatable at ~37% used, not derived
+              # from a high-water mark. If it OOMs again, profile before raising
+              # it a second time.
+              #
+              # It does NOT fix what made the crash expensive. Each kill left the
+              # documents it was holding at `processing` with no terminal status,
+              # no error and nothing queued to retry them — 59 of 917 from that
+              # one run. `processing` still means both "in flight" and "the worker
+              # died holding this". That is #1012's second half and #958's
+              # absent-vs-broken property; more memory only makes it rarer.
+              memory: 4Gi
 ---
 # NATS->legal-search + platform-control event bridge (M0.2 / #550). Subscribes to
 # evidara.document-processed, evidara.document-withdrawn and
