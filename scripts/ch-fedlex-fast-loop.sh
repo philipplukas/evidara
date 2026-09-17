@@ -594,11 +594,43 @@ content_type_count="$(jq -r --arg expect_content_type "${EXPECT_CONTENT_TYPE}" '
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
 title_ok="$(jq -r --arg title_regex "${TITLE_REGEX}" '[.data[]? | select((.title // "") | test($title_regex))] | length' < "${RUN_DIR}/captured-resources.json")"
 url_pattern_ok="$(jq -r --arg url_pattern "${URL_PATTERN}" '[.data[]? | select((.final_url // "") | test($url_pattern))] | length' < "${RUN_DIR}/captured-resources.json")"
-art1_ok="$(jq -r '[.data[]? | select(
-  ((.artifact_metadata.inline_body // "") | test("Art\\. 1"))
-  or ((.artifact_metadata.body // "") | test("Art\\. 1"))
-  or ((.artifact_metadata.provider_metadata.inline_body // "") | test("Art\\. 1"))
-  or ((.artifact_metadata.provider_metadata.body // "") | test("Art\\. 1"))
+# The FIRST article, under any of the drafting conventions this corpus set uses.
+# It is the only gate that distinguishes a complete document from a fragment
+# starting mid-text: art_density_ok passes on a fragment just as well.
+#
+#   Art. 1                Fedlex, and most modern Swiss and Austrian acts
+#   § 1                   BS/BL/AG/SO/LU/SH/TG/ZG, and German Land law
+#   Art. I                19th-century Swiss treaties and older acts
+#
+# The Roman branch needs the negative lookahead to stay a FIRST-article check:
+# it matches "Art. I3" (article I, footnote marker 3) and rejects "Art. II4".
+# Without it, any Roman-numbered article would satisfy the gate.
+#
+# Measured 2026-09-17 on SR 0.142.115.141, the 1875 Niederlassungsvertrag with
+# Liechtenstein, reached by fedlex_sparql_sr_full_de's enumeration: a complete
+# document — preamble, Art. I through Art. VI, signatures "So geschehen zu Wien,
+# am 6. Juli 1874" — whose only ARABIC "Art. 3" occurrences are cross-references
+# to other agreements. It failed this gate and took the run's verdict with it.
+#
+# This is a whitelist of conventions, and it should be read as one. French
+# ("Article premier") and Italian ("Art. 1-bis") are not covered yet and will
+# surface the same way: a correct corpus reported as suspect.
+# Each branch needs its own negative lookahead, or the gate passes on a fragment
+# that begins at a LATER article: bare `Art\. 1` matches "Art. 12", which is how
+# the original pattern read. `(?![0-9])` keeps "Art. 1a" — a real article — while
+# rejecting "Art. 12" and "Art. 19".
+# SINGLE backslashes. The old pattern lived inside a jq string literal, where
+# `\\.` unescapes to `\.`; passed through `--arg` jq takes the value verbatim, so
+# `\\.` would mean a literal backslash followed by any character and the gate would
+# match nothing. Verified against production, not just in a unit test — the first
+# draft of that test re-applied the unescaping itself and passed while the run
+# failed.
+ART1_PATTERN='Art\. 1(?![0-9])|§ ?1(?![0-9])|Art\. I(?![IVXLC])'
+art1_ok="$(jq -r --arg art1 "${ART1_PATTERN}" '[.data[]? | select(
+  ((.artifact_metadata.inline_body // "") | test($art1))
+  or ((.artifact_metadata.body // "") | test($art1))
+  or ((.artifact_metadata.provider_metadata.inline_body // "") | test($art1))
+  or ((.artifact_metadata.provider_metadata.body // "") | test($art1))
 )] | length' < "${RUN_DIR}/raw-artifacts.json")"
 accepted_count="$(jq -r '[.data[]? | select(.status=="accepted")] | length' < "${RUN_DIR}/processing-status.json")"
 processing_count="$(jq -r '[.data[]? | select(.status=="processing")] | length' < "${RUN_DIR}/processing-status.json")"
@@ -787,8 +819,8 @@ if [[ -e "${canonical_bodies[0]}" ]]; then
     art_density_ok=$(( art_density_count >= 3 ? 1 : 0 ))
     body_max_length="${canonical_max_length}"
     min_content_length_ok=$(( body_max_length >= MIN_CONTENT_LENGTH ? 1 : 0 ))
-    # "Art. 1" or "§ 1" — the first article, under either convention.
-    art1_ok="$(jq -rs '[.[] | select((.content // "") | test("Art\\. 1|§ ?1\\b"))] | length' "${canonical_bodies[@]}")"
+    # Same convention set as the raw path above (ART1_PATTERN).
+    art1_ok="$(jq -rs --arg art1 "${ART1_PATTERN}" '[.[] | select((.content // "") | test($art1))] | length' "${canonical_bodies[@]}")"
     log "==> Content gates re-measured against the canonical text (${content_gate_source})"
     log "    raw artifact: art_density=${raw_art_density_count} body_max_length=${raw_body_max_length}"
     log "    canonical:    art_density=${art_density_count} body_max_length=${body_max_length}"
