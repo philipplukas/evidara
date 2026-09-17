@@ -92,6 +92,49 @@ resources:
 # package (Package settings → Manage Actions access → `philipplukas/evidara`,
 # Write). See #884.
 #
+# f5bff6dd (#1010) is `main`'s tip at the time of this pin. runtime-images.yml is green
+# and all SEVEN tags below were confirmed present in GHCR before this pin was written —
+# the run's conclusion is necessary but it is not what this file depends on:
+#
+#   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
+#            document-intelligence-document-service document-intelligence-consumer marketing; do
+#     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"f5bff6dd63fda08dfbd41f72caf7e9800ced4f44\")]|length"
+#   done   # all returned 1
+#
+# WHAT THIS PIN ADDS over 444115ad. Four merged PRs:
+#   - #1004: the local loop's MinIO moved registries. `minio/minio` on Docker Hub stopped
+#     serving pulls, so the E2E CH Fedlex Loop canary died in the compose step on every
+#     scheduled main run from 2026-09-13, never reaching the loop it measures. Repointed at
+#     quay.io and pinned to the RELEASE tag this cluster already runs, so the local loop and
+#     the deployed environment now meet the same MinIO. No cluster effect; recorded because
+#     the canary's greenness is evidence about THIS deployment.
+#   - #1006: `fedlex_sparql_sr_full_de` had no `jurisdiction_id`. #997 added the template in
+#     the same batch #1000 filled that field in, so it was missed and
+#     `resolve_blueprint_jurisdiction_id()` returned None — the coverage queue could not
+#     attribute the template to a jurisdiction.
+#   - #1009: the admin Playwright suite aborts and NAMES any platform-control request a spec
+#     does not mock, instead of failing later on a missing element. Test-only; no runtime
+#     code. It has already earned its keep by DISCONFIRMING #942's leading hypothesis —
+#     two specs failed with the guard installed and nothing escaped.
+#   - #1010: providers finally read `scope.max_resources` off the run. It was validated by
+#     `POST /v1/runs`, stored in `run_metadata`, and read by nothing, so a `max_resources: 25`
+#     acceptance run on `lexfind_api_zh_full` published 944 documents (measured in production
+#     2026-09-17). THIS is the pin's operational point: without it every acceptance run for
+#     the nine config-blocked templates is a full ingest, and the fast-loop driver waits for
+#     every captured document to reach canonical_ready (#731) — about two hours each.
+#     A run's scope may only NARROW the template's own limit, never widen it.
+#
+# ZERO alembic delta, verified rather than assumed:
+#
+#   $ git diff --name-only --diff-filter=AMD 444115ad origin/main -- platform-control/alembic/
+#   (empty)
+#
+# migrate-job.yaml is bumped to this same SHA in this change; keep the two in lockstep,
+# since the `images:` transformer below deliberately does not reach it.
+#
+# ── prior pins, newest first ──
+#
 # 444115ad (#1000) is `main`'s tip at the time of this pin. runtime-images.yml is green
 # and all SEVEN tags below were confirmed present in GHCR before this pin was written —
 # the run's conclusion is necessary but it is not what this file depends on:
@@ -99,7 +142,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"444115ad918840700f6c72445a08ac9d0db7a2a0\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"f5bff6dd63fda08dfbd41f72caf7e9800ced4f44\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 63bd639e. Four merged PRs:
@@ -272,16 +315,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
+    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
+    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
+    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
+    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
+    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
+    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: 444115ad918840700f6c72445a08ac9d0db7a2a0
+    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
