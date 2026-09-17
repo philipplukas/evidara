@@ -524,6 +524,86 @@ class IndexedTitleIsAsserted(unittest.TestCase):
             )
 
 
+class PassingTheApiKeyOnArgvIsWarnedAbout(unittest.TestCase):
+    """`--api-key <value>` is readable by any local user while the run lasts.
+
+    argv is world-readable: `ps -eo cmd` and /proc/<pid>/cmdline both show it, and
+    anything that snapshots the process table captures it too. The key then
+    survives in shell history and in the caller's scrollback. Every harness has
+    always read EVIDARA_PLATFORM_CONTROL_API_KEY as well, which has neither
+    problem, so the flag is a convenience with a cost the caller cannot see.
+
+    Observed 2026-09-17: a `ps` taken to check whether a run was still alive
+    printed a live operator key in full.
+
+    The flag is kept — removing it would break callers mid-run — but it now says
+    what it costs. These run the scripts rather than grepping them, so deleting
+    the echo fails the test even if the comment above it stays.
+    """
+
+    def _harnesses_taking_an_api_key(self) -> list[Path]:
+        found = [
+            s for s in harness_scripts()
+            if re.search(r"^\s*--api-key\)", s.read_text(encoding="utf-8"), re.M)
+        ]
+        # Guard the filter: an empty list makes every assertion below vacuous.
+        self.assertGreaterEqual(
+            len(found), 6, f"expected >=6 harnesses parsing --api-key, found {len(found)}"
+        )
+        return found
+
+    #: Only flags every harness parses. `--ls-url` is NOT one of them
+    #: (at-ris-fast-loop.sh has no such flag and exits `Unknown argument`), and an
+    #: argument the parser rejects stops it before it reaches `--api-key`.
+    #: `--api-key` therefore goes FIRST: the warning is emitted while parsing, so
+    #: whatever the script does afterwards — refuse a flag, fail to reach a URL —
+    #: cannot suppress it.
+    def _run(self, script: Path, *args: str, env_key: str | None = None) -> str:
+        env = {"PATH": "/usr/bin:/bin", "HOME": str(REPO_ROOT)}
+        if env_key is not None:
+            env["EVIDARA_PLATFORM_CONTROL_API_KEY"] = env_key
+        proc = subprocess.run(
+            ["bash", str(script), *args, "--pc-url", "http://127.0.0.1:1", "--dry-run"],
+            capture_output=True, text=True, timeout=60, cwd=REPO_ROOT, env=env,
+        )
+        return proc.stderr
+
+    def _stderr(self, script: Path, *args: str) -> str:
+        return self._run(script, *args)
+
+    def test_argv_use_warns(self) -> None:
+        for script in self._harnesses_taking_an_api_key():
+            with self.subTest(script=script.name):
+                stderr = self._stderr(script, "--api-key", "TESTKEY")
+                self.assertIn("argv", stderr, f"{script.name} accepted --api-key silently")
+                self.assertIn(
+                    "EVIDARA_PLATFORM_CONTROL_API_KEY",
+                    stderr,
+                    f"{script.name} warned without naming the alternative",
+                )
+
+    def test_the_warning_never_echoes_the_key(self) -> None:
+        for script in self._harnesses_taking_an_api_key():
+            with self.subTest(script=script.name):
+                stderr = self._stderr(script, "--api-key", "TESTKEY")
+                self.assertNotIn(
+                    "TESTKEY", stderr, f"{script.name} printed the key while warning about it"
+                )
+
+    def test_the_env_var_path_is_silent(self) -> None:
+        """The warning must be about argv, not about authenticating at all.
+
+        A warning that also fired for the safe path would train the caller to
+        ignore it, which is worse than not warning.
+        """
+        for script in self._harnesses_taking_an_api_key():
+            with self.subTest(script=script.name):
+                stderr = self._run(script, env_key="TESTKEY")
+                self.assertNotIn(
+                    "argv", stderr, f"{script.name} warns even when the env var is used"
+                )
+
+
 class EveryHarnessRunsOnTheSelfHostedRuntime(unittest.TestCase):
     """A harness that hard-requires `gcloud` cannot produce evidence at all (#799).
 
