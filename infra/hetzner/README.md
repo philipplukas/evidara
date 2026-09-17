@@ -305,6 +305,24 @@ BASIC_AUTH_USER=admin BASIC_AUTH_PASS='choose-a-strong-pass' bash infra/hetzner/
     `PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1` / `AUTH_DEV_ALLOW_UNAUTHENTICATED=1`.
     Never set either in this cluster.
   Run `deploy-stage5.sh` before `kubectl apply -k apps/`.
+
+  **Rotating the operator key** — `deploy-stage5.sh` creates the Secret once and never
+  replaces an existing value, so it cannot rotate a key that leaked. Use:
+
+  ```sh
+  bash infra/hetzner/rotate-operator-key.sh --dry-run   # show what would change
+  bash infra/hetzner/rotate-operator-key.sh             # rotate, restart, verify
+  ```
+
+  It generates the replacement, patches the Secret through a `0600` file rather than
+  `kubectl patch -p` (argv is readable by any local user via `ps`, which is how a key
+  leaked on 2026-09-17), restarts all five workloads that read the Secret, and then
+  proves the rotation: the new key must answer `200` and the old one `401`, or it exits
+  non-zero. Env vars are fixed at pod start, so skipping the restart (`--no-restart`)
+  leaves every pod on the old key and the rotation not in effect.
+
+  The same argv exposure applies to the fast-loop harnesses' `--api-key` flag; they warn
+  about it and read `EVIDARA_PLATFORM_CONTROL_API_KEY` instead.
 - **Front door** — Traefik BasicAuth Middleware + Ingress on the real hostnames
   `admin.evidara.veyo.dev` / `search.evidara.veyo.dev` (admin + search; the old
   `*.88-99-26-120.nip.io` ingress has been retired). Rotate the BasicAuth password
