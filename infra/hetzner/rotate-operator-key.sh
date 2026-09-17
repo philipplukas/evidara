@@ -167,19 +167,50 @@ done
 
 echo "==> Verifying"
 PC_URL="${PC_URL:-https://platform-control-api.ts.veyo.dev}"
-probe() {  # $1 = key file -> prints the HTTP status
+probe() {  # $1 = key file -> prints the HTTP status, or 000 when unreachable
   curl -sS --max-time 20 -o /dev/null -w '%{http_code}' \
     "$PC_URL/v1/sources/blueprint-templates?limit=1" \
     -H "X-API-Key: $(cat "$1")" 2>/dev/null || echo "000"
 }
-new_code="$(probe "$WORKDIR/new")"
-old_code="$(probe "$WORKDIR/old")"
-echo "    new key -> HTTP $new_code (expect 200)"
-echo "    old key -> HTTP $old_code (expect 401)"
+
+# `kubectl rollout status` returns when the new ReplicaSet is complete, which is
+# NOT the same as the Service having stopped routing to a terminating pod. A
+# single probe fired the instant the rollout reports ready can still land on a
+# pod holding the previous key and read 401 for a key that is in fact live.
+# Observed on 2026-09-17: the script reported "rotation did not verify" for a
+# rotation that had entirely succeeded — the Secret, the pod env and the API all
+# agreed a minute later. So retry until it settles, and only then decide.
+new_code=""; old_code=""
+for attempt in $(seq 1 12); do
+  new_code="$(probe "$WORKDIR/new")"
+  old_code="$(probe "$WORKDIR/old")"
+  echo "    attempt ${attempt}: new key -> HTTP ${new_code} (want 200), old key -> HTTP ${old_code} (want 401)"
+  [[ "$new_code" == "200" && "$old_code" == "401" ]] && break
+  sleep 5
+done
 
 if [[ "$new_code" != "200" || "$old_code" != "401" ]]; then
-  echo "error: rotation did not verify. The Secret holds the new key, but the" >&2
-  echo "       API does not behave as expected — check pod rollout and retry." >&2
+  echo "error: rotation did not verify after 12 attempts." >&2
+  if [[ "$new_code" == "000" || "$old_code" == "000" ]]; then
+    # Distinguish "the rotation is wrong" from "this shell cannot reach the
+    # API". They need completely different responses, and conflating them sends
+    # the operator to re-rotate a key that is already correct.
+    echo "       HTTP 000 means curl could not reach $PC_URL at all." >&2
+    echo "       That is a connectivity problem, NOT a bad rotation: the Secret" >&2
+    echo "       was read back and matched before any pod restarted. Check the" >&2
+    echo "       tailnet, or set PC_URL, and re-run the checks below by hand." >&2
+  else
+    echo "       The Secret holds the new key and the round-trip check passed," >&2
+    echo "       so the stored value is correct. Check the pods:" >&2
+  fi
+  echo >&2
+  echo "       kubectl -n $NS get pods -l app=platform-control-api" >&2
+  echo "       kubectl -n $NS exec deploy/platform-control-api -- \\" >&2
+  echo "         sh -c 'printf \"%s\" \"\$PLATFORM_CONTROL_OPERATOR_API_KEY\"' | sha256sum" >&2
+  echo "       kubectl -n $NS get secret $SECRET \\" >&2
+  echo "         -o jsonpath='{.data.$KEY}' | base64 -d | sha256sum" >&2
+  echo "       The two digests must match. If they do, the rotation is DONE and" >&2
+  echo "       only this check failed — do not rotate again." >&2
   exit 1
 fi
 
