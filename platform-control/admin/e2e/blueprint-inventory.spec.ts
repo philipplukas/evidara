@@ -9,7 +9,9 @@
  * the two keys distinguishable; and the enable action actually reaches the
  * endpoint with the operator's evidence note attached.
  */
-import { expect, type Page, test } from "@playwright/test";
+
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 // Three templates, one per lock class, so every branch of `classifyTemplate`
 // renders: live (both keys), operator-actionable (config key shut, provider

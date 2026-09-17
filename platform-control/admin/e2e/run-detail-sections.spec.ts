@@ -17,8 +17,10 @@
  * Every request is mocked with `page.route`, as every spec in this directory does. No
  * backend, no database.
  */
-import { expect, type Page, test } from "@playwright/test";
+
+import type { Page } from "@playwright/test";
 import { pipelineHealth } from "./fixtures/pipelineHealth";
+import { expect, test } from "./support/test";
 
 const RUN_ID = "run_detail";
 

@@ -1,5 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { pipelineHealth } from "./fixtures/pipelineHealth";
+import { expect, test } from "./support/test";
 
 // ---------------------------------------------------------------------------
 // Smoke coverage for the ADR-0026 Tailwind port of the preview-approval queue

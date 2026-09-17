@@ -8,7 +8,9 @@
  *
  * Every request is mocked with `page.route`; no backend.
  */
-import { expect, type Page, test } from "@playwright/test";
+
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 const LEDGER = {
   basis: "platform_control_runs",

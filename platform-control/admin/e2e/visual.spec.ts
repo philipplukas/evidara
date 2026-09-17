@@ -37,8 +37,10 @@
  * `.github/workflows/platform-control.yml`, which is what
  * `scripts/check-e2e-spec-coverage.sh` asserts.
  */
-import { expect, type Page, type Route, test } from "@playwright/test";
+
+import type { Page, Route } from "@playwright/test";
 import { DECISION_SUPPORT } from "./fixtures/pipelineHealth";
+import { expect, test } from "./support/test";
 
 const RUN_ID = "run_01";
 
