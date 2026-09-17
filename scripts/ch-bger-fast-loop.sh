@@ -115,6 +115,14 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --api-key)
+      # An argv value is readable by any local user for the life of the process:
+      # `ps -eo cmd` and /proc/<pid>/cmdline both show it, and so does any tool
+      # that snapshots the process table. The key then survives in shell history
+      # and in the scrollback of whatever ran this. EVIDARA_PLATFORM_CONTROL_API_KEY
+      # has neither problem, so warn rather than accept silently.
+      echo "warning: --api-key puts the key in this process's argv, where any local" >&2
+      echo "         user can read it via \`ps\` or /proc. Prefer:" >&2
+      echo "           export EVIDARA_PLATFORM_CONTROL_API_KEY=...  # then omit --api-key" >&2
       PC_API_KEY="${2:?missing value for --api-key}"
       shift 2
       ;;
