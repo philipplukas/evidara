@@ -79,7 +79,15 @@ fi
 # proves the bytes came from the mirror the compliance policy names. Whether the
 # bytes match the canton's own copy is a separate, stronger check the provider
 # already makes per run (md5 mirror spot-check).
+# A LexFind capture is a PDF, so the canonical text only exists after an
+# extraction step and the projection lands later than it does for an HTML corpus.
+# The delegate's 12-poll default left a 7-document run still unqueryable at 60s
+# and fully queryable shortly after, which reported the indexed-language and
+# indexed-title gates NOT EVALUATED — a hole, and enough to disqualify an
+# otherwise clean run as acceptance evidence (#744). Passed BEFORE "$@" so a
+# caller can still override it.
 exec "${SCRIPT_DIR}/ch-fedlex-fast-loop.sh" \
+  --readback-polls 60 \
   --template "${TEMPLATE_ID}" \
   --expect-content-type "application/pdf" \
   --url-pattern 'lexfind\.ch/' \

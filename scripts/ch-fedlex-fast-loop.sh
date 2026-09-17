@@ -14,6 +14,15 @@ DRY_RUN=0
 COPY_EVIDENCE=0
 MAX_POLLS=60
 POLL_INTERVAL=5
+# How long to wait for legal-search to serve back each processed document. The
+# default of 12 x 5s was set for a small HTML corpus and is too short for one that
+# takes an extraction step: a 7-document PDF run on 2026-09-17 was still
+# unqueryable at 60s and fully queryable shortly after, which reported the
+# indexed-language and indexed-title gates as NOT EVALUATED and made an otherwise
+# clean run unusable as acceptance evidence. Raise it for a slow corpus rather
+# than accepting a hole in the gates (#744: not_evaluated is a hole, not an
+# exclusion).
+READBACK_POLLS=12
 WORKDIR_ROOT="${TMPDIR:-/tmp}/ch-fedlex-fast-loop"
 RUN_DIR=""
 # Corpus-shaped expectations (#744). The defaults below ARE the Fedlex canary that
@@ -98,6 +107,10 @@ Options:
                                  `preview` is refused by the two-key lock there (#743).
   --max-resources <n>            Preview scope max_resources (default: 25)
   --max-polls <n>                Maximum run polls (default: 60)
+  --readback-polls <n>           Polls (x5s) waiting for legal-search to serve each
+                                 processed document back (default: 12). A corpus with an
+                                 extraction step needs more, or the indexed-language and
+                                 indexed-title gates report NOT EVALUATED.
   --poll-interval <seconds>      Run poll interval (default: 5)
   --out-dir <path>               Exact directory for persisted evidence bundle
   --json                         Emit final machine-readable summary JSON
@@ -198,6 +211,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --max-polls)
       MAX_POLLS="${2:?missing value for --max-polls}"
+      shift 2
+      ;;
+    --readback-polls)
+      READBACK_POLLS="${2:?missing value for --readback-polls}"
       shift 2
       ;;
     --poll-interval)
@@ -308,11 +325,27 @@ else
   PC_AUTH_HEADER=(-H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}")
 fi
 
-# legal-search is public-by-default in self-hosted mode; on Cloud Run it needs the
-# minted identity token. Used only by the indexed-language gate below.
+# Auth for the read-back gates (indexed language, indexed title). Two shapes,
+# because there are two runtimes:
+#
+#   Cloud Run     a minted identity token   (EVIDARA_LEGAL_SEARCH_TOKEN)
+#   self-hosted   an X-API-Key              (EVIDARA_LEGAL_SEARCH_API_KEY)
+#
+# The comment here used to read "legal-search is public-by-default in self-hosted
+# mode", and the X-API-Key branch did not exist. That stopped being true when
+# legal-search started failing closed: every request without a key answers 401,
+# `curl -fsS` exits non-zero, the read-back loop treats it as "projection not
+# queryable yet" and burns its whole poll budget. The gates then report
+# NOT EVALUATED — a hole, not an exclusion (#744) — so every self-hosted bundle
+# produced since then disqualifies itself as acceptance evidence, for a reason
+# that has nothing to do with the corpus. Measured 2026-09-17: a run whose eight
+# documents all returned 200 to a hand-rolled curl polled 60 times and wrote a
+# zero-byte read-back file each time.
 LS_AUTH_HEADER=()
 if [[ -n "${EVIDARA_LEGAL_SEARCH_TOKEN:-}" ]]; then
   LS_AUTH_HEADER=(-H "Authorization: Bearer ${EVIDARA_LEGAL_SEARCH_TOKEN}")
+elif [[ -n "${EVIDARA_LEGAL_SEARCH_API_KEY:-}" ]]; then
+  LS_AUTH_HEADER=(-H "X-API-Key: ${EVIDARA_LEGAL_SEARCH_API_KEY}")
 fi
 
 curl_json() {
@@ -629,7 +662,7 @@ elif [[ -z "${processed_document_ids}" ]]; then
 else
   log "==> Asserting indexed language=${expected_lang} for: ${processed_document_ids}"
   read -ra doc_ids <<< "${processed_document_ids}"
-  for attempt in $(seq 1 12); do
+  for attempt in $(seq 1 "${READBACK_POLLS}"); do
     indexed_language_observed=""
     indexed_title_observed=""
     mismatches=0
@@ -666,13 +699,56 @@ else
       fi
       break
     fi
-    log "  indexed-language poll ${attempt}/12: projection not queryable yet"
+    log "  indexed-language poll ${attempt}/${READBACK_POLLS}: projection not queryable yet"
     sleep 5
   done
 
   if [[ "${indexed_language_checked}" -ne 1 ]]; then
     log "  indexed-language gate could not read the projection from legal-search"
     readback_skip_reason="projection_not_queryable"
+  fi
+fi
+
+# --- Content gates, re-measured against the CANONICAL text (#1014) ---
+#
+# The three gates above read the RAW artifact. For an HTML corpus that is the
+# document; for a binary one it is nothing at all. Measured 2026-09-17 on
+# `lexfind_api_zh_full`: all 8 raw PDFs carried `inline_body` and `body` of
+# length 0, so art_density=0, body_max_length=0 and min_content_length_ok=0 for a
+# run that processed 8/8/8 and indexed 152,853 characters per document. The
+# verdict was `pipeline_pass_content_suspect` for a corpus that was entirely fine.
+#
+# Weakening the thresholds would have made every corpus pass by construction.
+# Marking the gates `excluded` would have made them abstain on the format half our
+# providers return. So they are re-measured where the text actually is: the
+# canonical document the pipeline produced and legal-search serves, which is also
+# what a user reads. That asserts MORE than the raw body did, not less — it covers
+# extraction as well as capture.
+#
+# The readback loop above has already written ls-document-*.json for every
+# processed document, so this costs no extra requests.
+#
+# The raw-artifact numbers are kept and reported alongside, because a corpus whose
+# raw body IS the document (fedlex HTML) should not silently lose that signal.
+content_gate_source="raw_artifact"
+canonical_bodies=("${RUN_DIR}"/ls-document-*.json)
+if [[ -e "${canonical_bodies[0]}" ]]; then
+  canonical_max_length="$(jq -rs '[.[] | (.content // "") | length] | max // 0' "${canonical_bodies[@]}")"
+  # Only switch when the canonical text is actually there. A projection that
+  # returned 200 with an empty body must not silently replace a raw measurement
+  # with a zero — that would turn this fix into the defect it is fixing.
+  if [[ "${canonical_max_length}" -gt 0 ]]; then
+    content_gate_source="canonical"
+    raw_art_density_count="${art_density_count}"
+    raw_body_max_length="${body_max_length}"
+    art_density_count="$(jq -rs '[.[] | (.content // "") | [ match("Art\\."; "g") ] | length] | add // 0' "${canonical_bodies[@]}")"
+    art_density_ok=$(( art_density_count >= 3 ? 1 : 0 ))
+    body_max_length="${canonical_max_length}"
+    min_content_length_ok=$(( body_max_length >= 10240 ? 1 : 0 ))
+    art1_ok="$(jq -rs '[.[] | select((.content // "") | test("Art\\. 1"))] | length' "${canonical_bodies[@]}")"
+    log "==> Content gates re-measured against the canonical text (${content_gate_source})"
+    log "    raw artifact: art_density=${raw_art_density_count} body_max_length=${raw_body_max_length}"
+    log "    canonical:    art_density=${art_density_count} body_max_length=${body_max_length}"
   fi
 fi
 
@@ -809,6 +885,7 @@ SUMMARY_JSON="$(jq -n \
   --argjson art1_ok "${art1_ok}" \
   --argjson art_density_count "${art_density_count}" \
   --argjson art_density_ok "${art_density_ok}" \
+  --arg content_gate_source "${content_gate_source}" \
   --argjson body_max_length "${body_max_length}" \
   --argjson min_content_length_ok "${min_content_length_ok}" \
   --argjson lang_agreement_ok "${lang_agreement_ok}" \
@@ -861,6 +938,12 @@ SUMMARY_JSON="$(jq -n \
       art1_ok: $art1_ok,
       art_density_count: $art_density_count,
       art_density_ok: $art_density_ok,
+      # Which text the three content gates above were measured against (#1014):
+      # `canonical` is the document the pipeline produced and legal-search serves;
+      # `raw_artifact` is the bytes as captured. A binary corpus has no raw text at
+      # all, so a bundle reporting `raw_artifact` with a PDF content type is
+      # reporting gates that could not have found anything.
+      content_gate_source: $content_gate_source,
       body_max_length: $body_max_length,
       min_content_length_ok: $min_content_length_ok,
       lang_agreement_ok: $lang_agreement_ok,
