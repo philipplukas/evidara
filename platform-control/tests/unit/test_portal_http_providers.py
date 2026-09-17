@@ -290,3 +290,68 @@ def test_extract_title_collapses_whitespace() -> None:
 def test_extract_title_handles_attributes_on_title_tag() -> None:
     body = '<html><head><title lang="de">Statute</title></head></html>'
     assert BundeslandHttpProvider._extract_title(body) == "Statute"
+
+
+def _page(title: str) -> tuple[int, str, dict[str, str]]:
+    return (
+        200,
+        f"<html><head><title>{title}</title></head><body>"
+        "<h1>Art. 1 Geltungsbereich</h1>"
+        "<p>Art. 2 Abs. 1: Dieses Gesetz gilt ...</p>"
+        "<p>Art. 3 Abs. 2 Ziff. 1 ...</p></body></html>",
+        {"content-type": "text/html; charset=utf-8"},
+    )
+
+
+async def test_run_scope_max_resources_caps_the_seed_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`scope.max_resources` narrows a run without a source-version change (#1010).
+
+    It was accepted by the API, stored on the run and read by nothing: a
+    `max_resources: 25` acceptance run on `lexfind_api_zh_full` published 944
+    documents on 2026-09-17. Portal providers declare no ceiling of their own, so
+    the run scope is the only cap there is.
+    """
+    seeds = [
+        "https://www.gesetze-bayern.de/a",
+        "https://www.gesetze-bayern.de/b",
+        "https://www.gesetze-bayern.de/c",
+    ]
+    _install_fake_client(monkeypatch, {url: _page(f"Gesetz {url[-1].upper()}") for url in seeds})
+
+    result = await BundeslandHttpProvider().start_run(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"bundesland": "DE-BY", "seed_urls": seeds}),
+        SimpleNamespace(run_id="run_capped", run_metadata={"scope": {"max_resources": 2}}),
+    )
+
+    assert result.response_payload["captured"] == 2
+    assert len(result.inline_resources) == 2
+    # The first two, in order — a cap samples the head of the declared list rather
+    # than an arbitrary subset, so a capped run is reproducible.
+    assert [r.source_url for r in result.inline_resources] == seeds[:2]
+
+
+async def test_without_a_run_scope_every_seed_is_fetched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The cap must be opt-in: an uncapped run behaves exactly as before.
+
+    Without this, the test above would pass just as well if the provider had
+    started dropping seeds for some unrelated reason.
+    """
+    seeds = [
+        "https://www.gesetze-bayern.de/a",
+        "https://www.gesetze-bayern.de/b",
+        "https://www.gesetze-bayern.de/c",
+    ]
+    _install_fake_client(monkeypatch, {url: _page(f"Gesetz {url[-1].upper()}") for url in seeds})
+
+    result = await BundeslandHttpProvider().start_run(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"bundesland": "DE-BY", "seed_urls": seeds}),
+        SimpleNamespace(run_id="run_uncapped"),
+    )
+
+    assert result.response_payload["captured"] == 3

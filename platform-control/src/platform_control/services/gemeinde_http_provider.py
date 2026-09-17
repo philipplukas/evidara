@@ -139,6 +139,7 @@ from platform_control.services.acquisition_provider import (
     ProviderStartResult,
 )
 from platform_control.services.politeness import limited_get
+from platform_control.services.run_scope import effective_resource_cap
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 # The AS landing page renders its metadata into a web component whose
@@ -376,6 +377,13 @@ class GemeindeHttpProvider:
         portal = self._portal(bfs_number)
         seed_urls = self._seed_urls(acquisition_spec, portal_host=portal.host)
         timeout_seconds = float(acquisition_spec.get("request_timeout_seconds") or 30.0)
+        # Neither portal provider declares a resource ceiling of its own, so the
+        # run's `scope.max_resources` is the only cap there is. Applied before the
+        # fetch loop and before any `requested` count, so a capped run reports the
+        # number it actually attempted rather than the number it was seeded with.
+        seed_cap = effective_resource_cap(run)
+        if seed_cap is not None and len(seed_urls) > seed_cap:
+            seed_urls = seed_urls[:seed_cap]
         max_content_bytes = int(acquisition_spec.get("max_content_bytes") or 5_000_000)
         min_binary_bytes = int(
             acquisition_spec.get("min_manifestation_bytes") or _DEFAULT_MIN_BINARY_BYTES
