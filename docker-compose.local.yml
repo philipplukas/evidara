@@ -362,7 +362,19 @@ services:
   # so `--wait` now gates on bucket readiness — a stronger guarantee than the one-shot
   # ever gave, since nothing previously waited on it at all.
   minio:
-    image: minio/minio:latest
+    # quay.io, not Docker Hub, and a pinned RELEASE tag rather than `latest`.
+    # `minio/minio` on Docker Hub stopped serving pulls — it answers
+    # `pull access denied ... repository does not exist`, which `docker compose up`
+    # reports as a bring-up failure with no hint that the cause is a registry move.
+    # That is what made the E2E CH Fedlex Loop canary red on every scheduled main
+    # run from 2026-09-13 onward; the job never reached the loop it exists to test.
+    #
+    # The tag is the one the production cluster already runs
+    # (`kubectl -n evidara get pod minio-...`), so the local loop and the deployed
+    # environment now meet the same MinIO. `latest` could not give that even while
+    # it still resolved: two runs a week apart were not the same server, which is
+    # the #848 dependency-set defect in a second place.
+    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
     profiles: ["minio"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
