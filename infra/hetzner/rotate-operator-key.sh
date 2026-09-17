@@ -40,6 +40,7 @@ Usage: infra/hetzner/rotate-operator-key.sh [--dry-run] [--no-restart]
   --dry-run     Show what would happen; write nothing.
   --no-restart  Patch the Secret but leave pods alone. They keep the OLD key
                 until restarted, so the rotation is not in effect.
+  --self-test   Check the patch payload round-trips exactly. Needs no cluster.
 
 Env: NS (evidara), SECRET (evidara-auth), KEY (PLATFORM_CONTROL_OPERATOR_API_KEY)
 USAGE
@@ -47,14 +48,36 @@ USAGE
 
 DRY_RUN=0
 RESTART=1
+SELF_TEST=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --self-test) SELF_TEST=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --no-restart) RESTART=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if [[ "$SELF_TEST" == 1 ]]; then
+  # The bug this catches: building the payload from a file written by
+  # `openssl rand -hex 24 > file` stores the key with a trailing newline.
+  # Assert the exact construction used below decodes back to the input.
+  _probe="deadbeef00112233445566778899aabbccddeeff00112233"
+  _payload="$(printf '%s' "$_probe" | base64 -w0)"
+  _decoded="$(printf '%s' "$_payload" | base64 -d | od -An -c | tr -d ' \n')"
+  _expect="$(printf '%s' "$_probe" | od -An -c | tr -d ' \n')"
+  if [[ "$_decoded" != "$_expect" ]]; then
+    echo "self-test FAILED: payload does not round-trip" >&2
+    exit 1
+  fi
+  if printf '%s' "$_payload" | base64 -d | od -An -c | grep -q '\\n'; then
+    echo "self-test FAILED: payload carries a newline" >&2
+    exit 1
+  fi
+  echo "self-test OK: payload round-trips with no trailing newline"
+  exit 0
+fi
 
 for cmd in kubectl openssl base64; do
   command -v "$cmd" >/dev/null || { echo "error: $cmd not found" >&2; exit 1; }
@@ -89,16 +112,43 @@ echo "==> Reading the current key (kept only to prove the rotation took effect)"
 kubectl -n "$NS" get secret "$SECRET" -o "jsonpath={.data.$KEY}" | base64 -d > "$WORKDIR/old"
 
 echo "==> Generating a replacement"
-openssl rand -hex 24 > "$WORKDIR/new"
+# Command substitution strips trailing newlines; `openssl rand -hex 24 > file`
+# does NOT, and `base64 < file` then encodes the newline into the Secret. A key
+# stored with a trailing \n cannot be sent at all — an HTTP header may not
+# contain one, so httpx raises `Invalid header value` and the server's own
+# comparison fails too, since the caller's shell stripped what the pod kept.
+# That happened on 2026-09-17 and took the control plane down until it was
+# re-rotated. Hence the variable, and the shape assertion below.
+NEW_KEY="$(openssl rand -hex 24)"
+if ! printf '%s' "$NEW_KEY" | grep -Eq '^[0-9a-f]{48}$'; then
+  echo "error: generated key is not 48 lowercase hex characters; refusing." >&2
+  exit 1
+fi
+printf '%s' "$NEW_KEY" > "$WORKDIR/new"
 if cmp -s "$WORKDIR/old" "$WORKDIR/new"; then
   echo "error: generated key equals the current one; refusing." >&2
   exit 1
 fi
 
 echo "==> Patching $NS/$SECRET"
-printf '{"data":{"%s":"%s"}}' "$KEY" "$(base64 -w0 < "$WORKDIR/new")" > "$WORKDIR/patch.json"
+printf '{"data":{"%s":"%s"}}' "$KEY" "$(printf '%s' "$NEW_KEY" | base64 -w0)" > "$WORKDIR/patch.json"
 kubectl -n "$NS" patch secret "$SECRET" --type merge --patch-file "$WORKDIR/patch.json" >/dev/null
 echo "    patched"
+
+# Read the Secret back and compare BYTES before any pod restarts. A malformed
+# write is then caught while the old key is still the one every running pod
+# holds, so the cluster keeps working and the operator can retry. Verifying only
+# after the restart — as this script first did — turns a bad write into an
+# outage.
+echo "==> Verifying the stored bytes round-trip"
+kubectl -n "$NS" get secret "$SECRET" -o "jsonpath={.data.$KEY}" | base64 -d > "$WORKDIR/readback"
+if ! cmp -s "$WORKDIR/new" "$WORKDIR/readback"; then
+  echo "error: the Secret does not hold the generated value byte for byte." >&2
+  echo "       generated $(wc -c < "$WORKDIR/new") bytes, stored $(wc -c < "$WORKDIR/readback") bytes." >&2
+  echo "       No pod has been restarted, so the cluster is still on the old key." >&2
+  exit 1
+fi
+echo "    stored value matches ($(wc -c < "$WORKDIR/readback") bytes, no trailing newline)"
 
 if [[ "$RESTART" == 0 ]]; then
   echo "==> --no-restart: pods keep the OLD key. Rotation is NOT yet in effect."
