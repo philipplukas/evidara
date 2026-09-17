@@ -14,7 +14,7 @@ name: lakehouse-spike
 
 services:
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -31,7 +31,7 @@ services:
 
   # One-shot: create the Iceberg warehouse bucket.
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
     depends_on:
       minio:
         condition: service_healthy
