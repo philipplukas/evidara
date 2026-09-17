@@ -11,7 +11,9 @@
  * It lives in its own file rather than being folded into the existing specs so
  * the M16 evidence is reviewable as one thing.
  */
-import { expect, type Page, test } from "@playwright/test";
+
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 const COMPLETED_RUN = {
   run_id: "run_done_1",

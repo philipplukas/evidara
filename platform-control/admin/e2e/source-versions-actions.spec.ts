@@ -20,7 +20,9 @@
  * No Vitest layer can see this: jsdom has no layout engine, so the column's
  * geometry does not exist there. This spec is the layer that can.
  */
-import { expect, type Page, test } from "@playwright/test";
+
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 const SOURCE_ID = "src_e2e_versions";
 

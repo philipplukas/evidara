@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 // ---------------------------------------------------------------------------
 // Fixture data — mirrors the shapes the platform-control reference-data API
