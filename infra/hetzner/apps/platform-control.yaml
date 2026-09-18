@@ -49,8 +49,12 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              # 512Mi, raised from 256Mi. Measured p95 is 423Mi and the 30-day
+              # peak 451Mi — the request was below what it uses at rest.
+              memory: 512Mi
             limits:
+              # Peak is 59% of this. Left alone: it has headroom and this pod
+              # drives every acquisition run, so it is the wrong place to trim.
               memory: 768Mi
 ---
 apiVersion: v1
