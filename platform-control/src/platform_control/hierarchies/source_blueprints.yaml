@@ -759,6 +759,7 @@ overlays:
       # Sub-federal: regione template. Provider scaffold; live adapter
       # lands per-regione alongside its first acceptance run.
       regione_http_lombardia:
+        jurisdiction_id: jur_it_25
         provider: regione_http
         regione: IT-25
         seed_url: https://normelombardia.consiglio.regione.lombardia.it/

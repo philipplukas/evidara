@@ -13013,6 +13013,12 @@
       "level": "federal",
       "parent": null
     },
+    "jur_it_25": {
+      "name": "Regione Lombardia",
+      "slug": "it-25",
+      "level": "cantonal",
+      "parent": "jur_it"
+    },
     "jur_eu": {
       "name": "European Union",
       "slug": "eu",
