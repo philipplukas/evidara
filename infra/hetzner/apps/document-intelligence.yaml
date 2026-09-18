@@ -52,9 +52,27 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 512Mi
-            limits:
+              # 1Gi, raised from 512Mi. Measured p95 is 925Mi.
               memory: 1Gi
+            limits:
+              # 4Gi, raised from 1Gi. Same defect as di-consumer's (#1013), one
+              # service along, and measured the same way: OOMKilled, exit 137,
+              # three restarts in forty minutes, dying seventeen seconds after
+              # start while idling at 57Mi. It only dies under a burst of reads.
+              #
+              # This is very likely the ROOT of #1028. Every projection fetches
+              # the canonical document back from here, so under a batch this is
+              # the service that falls over — and `fetch failed`, the error
+              # legal-search recorded for all 30 placeholder-titled records, is
+              # exactly what a caller sees when the upstream is killed mid-request.
+              # #1030 makes that refuse rather than write a placeholder; this is
+              # what stops it happening.
+              #
+              # A CEILING, not a measurement: the peak is unprofiled because the
+              # crashed containers took their evidence with them (#892). Chosen
+              # for headroom against a node with 62Gi allocatable at ~37% used.
+              # Profile before raising it again.
+              memory: 4Gi
 ---
 apiVersion: v1
 kind: Service
@@ -131,7 +149,13 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 512Mi
+              # 1.5Gi, raised from 512Mi. Measured p95 over 7 days is 1222Mi and
+              # the 30-day peak 1411Mi, so the scheduler was placing this pod as
+              # if it needed a third of what it routinely uses. A request that
+              # low is not free: it is what lets the node accept work it cannot
+              # actually hold, and the OOM below is what that looks like from
+              # inside the container.
+              memory: 1536Mi
             limits:
               # 4Gi, raised from 1Gi (#1012). On 2026-09-17 a 944-document
               # lexfind_api_zh_full run OOMKilled this container SEVEN times in
