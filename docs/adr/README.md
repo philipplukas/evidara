@@ -60,6 +60,7 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0056 | [Agentic flows are visible in the panel](0056-agentic-flows-are-visible-in-the-panel.md) (amends ADR-0022) |
 | ADR-0057 | [Retraction is a record, not a deletion — and never a legal claim](0057-retraction-is-a-record-not-a-deletion.md) (Proposed) |
 | ADR-0058 | [A terminal outcome is recorded where someone will see it](0058-a-document-reaches-a-terminal-state-or-is-unaccounted-for.md) (Proposed) |
+| ADR-0059 | [An event is a fact another component acts on; a log is an explanation for a human](0059-an-event-is-a-fact-a-log-is-an-explanation.md) (Proposed) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.
