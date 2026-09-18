@@ -92,6 +92,33 @@ resources:
 # package (Package settings → Manage Actions access → `philipplukas/evidara`,
 # Write). See #884.
 #
+# fc981adb (#1024) is `main`'s tip at the time of this pin. All SEVEN tags were
+# confirmed present in GHCR before this pin was written, and the alembic delta over
+# f5bff6dd is empty (checked, not assumed).
+#
+# WHAT THIS PIN ADDS. The operational one is #1024; everything else is the harness.
+#   - #1024: Bayern and Lombardia get the reference data their templates need.
+#     jur_de_by existed with NO authority and jur_it_lombardia did not exist, so
+#     POST /v1/sources refused both with "Authority does not belong to the requested
+#     jurisdiction" and two live templates were unusable. THIS PIN IS WHAT APPLIES
+#     THEM: seeds ship in the image and the PreSync migrate job upserts them
+#     (`alembic upgrade head && platform-control-seed-reference-data`). Until it
+#     syncs, both templates keep refusing.
+#   - #1013: di-consumer's memory ceiling 1Gi -> 4Gi. It was OOMKilled seven times
+#     in eighteen minutes on a 944-document batch; it has since run a full batch
+#     with zero restarts.
+#   - #1015/#1016/#1017/#1019: the acceptance gates could not pass on a corpus that
+#     was fine. Read-back had no self-hosted auth so the language and title gates
+#     were NOT EVALUATED on every self-hosted run; content gates measured the raw
+#     artifact, empty for a PDF; a 10 KB floor withheld a 3,080-character municipal
+#     ordinance; the density gate counted only `Art.` and read Basel-Stadt's 126 `§`
+#     as no legal text; the first-article gate knew only `Art. 1` and failed an 1874
+#     treaty numbered Art. I to Art. VI. Scripts only — no runtime code.
+#   - #1023: the NATS DLQ has a reader. Scripts only.
+#   - #1020/#1021/#1022: evidence bundles and ADR-0058. Docs only.
+#
+# ── prior pins, newest first ──
+#
 # f5bff6dd (#1010) is `main`'s tip at the time of this pin. runtime-images.yml is green
 # and all SEVEN tags below were confirmed present in GHCR before this pin was written —
 # the run's conclusion is necessary but it is not what this file depends on:
@@ -99,7 +126,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"f5bff6dd63fda08dfbd41f72caf7e9800ced4f44\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"abddb64ffa55f6847f13297bd065296a69b265de\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 444115ad. Four merged PRs:
@@ -142,7 +169,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"f5bff6dd63fda08dfbd41f72caf7e9800ced4f44\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"abddb64ffa55f6847f13297bd065296a69b265de\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 63bd639e. Four merged PRs:
@@ -315,16 +342,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
+    newTag: abddb64ffa55f6847f13297bd065296a69b265de
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
+    newTag: abddb64ffa55f6847f13297bd065296a69b265de
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
+    newTag: abddb64ffa55f6847f13297bd065296a69b265de
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
+    newTag: abddb64ffa55f6847f13297bd065296a69b265de
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
+    newTag: abddb64ffa55f6847f13297bd065296a69b265de
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
+    newTag: abddb64ffa55f6847f13297bd065296a69b265de
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: f5bff6dd63fda08dfbd41f72caf7e9800ced4f44
+    newTag: abddb64ffa55f6847f13297bd065296a69b265de
