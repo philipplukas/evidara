@@ -677,6 +677,480 @@ overlays:
         document_type_hint: legislation
         enabled: false
       # ───────────────────────────────────────────────────────────────
+      # The other 25 cantons — whole-entity enumeration
+      #
+      # ZH above had the only `_full` template. These complete the set: one per
+      # canton, same provider, same enumeration, differing in `entity_ids` and
+      # `language`. All 25 are `enabled: false` and inert until an acceptance run
+      # earns the key (ADR-0030); adding them is config, and none of it dispatches.
+      #
+      # `entity_ids` was not typed. Each value came from
+      # `evidara workflow coverage scaffold`, which reads LexFind's published
+      # entity table. The three values this repo used to hold (ZH 26, BE 4, BS 6)
+      # are why the other cantons had no template.
+      #
+      # ON `language`. It does not filter the corpus: entity 23 (VD) returns the
+      # same 7 pages under /de/, /fr/ and /it/, measured 2026-09-18. It does pick
+      # which language manifestation is fetched, so it is set to the canton's
+      # majority official language. BE, FR, VS and GR are multilingual and carry
+      # ONE language here rather than a `language_codes` list nothing in the run
+      # produces; the second language of each is a second template, not a wider
+      # field on this one.
+      #
+      # Counts are LexFind's own active/total for that entity, read the same day.
+      # They are the denominator a run reconciles against, not a target, and
+      # `active_only` stays False so repealed law is still captured.
+      lexfind_api_ag_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ag
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ag_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [1]               # AG — 463 active / 983 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_ai_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ai
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ai_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [2]               # AI — 421 active / 568 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_ar_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ar
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ar_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [3]               # AR — 332 active / 459 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_be_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_be
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_be_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [4]               # BE — 711 active / 1129 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_bl_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_bl
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bl_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [5]               # BL — 860 active / 1178 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_bs_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_bs
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bs_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [6]               # BS — 944 active / 1404 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_fr_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_fr
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_fr_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [fr]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [7]               # FR — 816 active / 1625 total
+        language: fr
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_ge_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ge
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ge_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [fr]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [8]               # GE — 865 active / 1316 total
+        language: fr
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_gl_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_gl
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_gl_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [9]               # GL — 489 active / 779 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_gr_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_gr
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_gr_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [10]              # GR — 419 active / 680 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_ju_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ju
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ju_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [fr]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [11]              # JU — 855 active / 1169 total
+        language: fr
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_lu_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_lu
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_lu_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [12]              # LU — 630 active / 1059 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_ne_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ne
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ne_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [fr]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [13]              # NE — 823 active / 1706 total
+        language: fr
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_nw_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_nw
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_nw_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [14]              # NW — 401 active / 815 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_ow_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ow
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ow_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [15]              # OW — 517 active / 898 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_sg_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_sg
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_sg_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [16]              # SG — 732 active / 1414 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_sh_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_sh
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_sh_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [17]              # SH — 431 active / 633 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_so_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_so
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_so_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [18]              # SO — 539 active / 1201 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_sz_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_sz
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_sz_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [19]              # SZ — 430 active / 591 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_tg_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_tg
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_tg_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [20]              # TG — 461 active / 624 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_ti_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ti
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ti_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [it]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [21]              # TI — 622 active / 1022 total
+        language: it
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_ur_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_ur
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_ur_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [22]              # UR — 378 active / 492 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_vd_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_vd
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_vd_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [fr]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [23]              # VD — 902 active / 1311 total
+        language: fr
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_vs_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_vs
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_vs_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [fr]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [24]              # VS — 691 active / 942 total
+        language: fr
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      lexfind_api_zg_full:
+        provider: lexfind_api
+        jurisdiction_id: jur_ch_zg
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_zg_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enumeration: systematic_digit_union
+        entity_ids: [25]              # ZG — 686 active / 920 total
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        extractor_profile_id: exp_legislation_v1
+        enabled: false
+      # ───────────────────────────────────────────────────────────────
       # Swiss COMMUNAL legislation — Stadt Zürich (BFS 261) — #584 / ADR-0033
       # The municipal layer the dog question is decided in. 2,110
       # `jur_ch_gemeinde_*` jurisdictions are seeded; this is the first template
