@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+#
+# DOES NOT WORK ON THE CURRENT RUNTIME. This is a GCP Pub/Sub script — `gcloud`,
+# `--project`, subscription names — and ADR-0029 retired the GCP runtime. On
+# Hetzner/NATS it has no subscriptions to read, which is why the DLQ went
+# unread until 2026-09-17, when 88 dead-lettered events were found sitting in
+# the stream with nothing able to replay them.
+#
+# Use scripts/replay-nats-dlq.sh instead. This file is kept because the Pub/Sub
+# shape is the record of how the retired runtime did this.
+#
 # Replay messages from a Pub/Sub dead-letter queue (DLQ) to the original topic.
 #
 # Usage:
