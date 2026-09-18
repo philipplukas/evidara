@@ -129,6 +129,14 @@ items:
     jurisdiction_id: jur_de
     slug: de-bundesrecht
     name: Bundesrecht (gesetze-im-internet.de)
+  - authority_id: auth_de_by_staatskanzlei
+    jurisdiction_id: jur_de_by
+    slug: de-by-staatskanzlei
+    # Operates gesetze-bayern.de, the host bundesland_http_provider.py names for
+    # DE-BY. Bayern had a jurisdiction and no authority, so POST /v1/sources
+    # refused every pairing with "Authority does not belong to the requested
+    # jurisdiction" and bundesland_http_bayern could not be used at all.
+    name: Bayerische Staatskanzlei (gesetze-bayern.de)
   - authority_id: auth_de_bverfg
     jurisdiction_id: jur_de
     slug: de-bverfg
@@ -181,6 +189,13 @@ items:
     jurisdiction_id: jur_it
     slug: it-normattiva
     name: Normattiva
+  - authority_id: auth_it_lombardia
+    jurisdiction_id: jur_it_25
+    slug: it-lombardia-consiglio
+    # Publishes normelombardia.consiglio.regione.lombardia.it, the host
+    # regione_http_provider.py names for IT-25. Named for the body rather than
+    # the ISO code, matching auth_it_gazzetta and auth_it_normattiva beside it.
+    name: Consiglio regionale della Lombardia
   - authority_id: auth_it_cassazione
     jurisdiction_id: jur_it
     slug: it-cassazione

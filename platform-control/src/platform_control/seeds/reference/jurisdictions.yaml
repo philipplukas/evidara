@@ -10904,6 +10904,16 @@ items:
     slug: it
     name: Italy
     level: federal
+  - jurisdiction_id: jur_it_25
+    slug: it-25
+    # ISO 3166-2:IT-25, which is what regione_http_provider.py keys on and what
+    # the blueprint's `regione: IT-25` carries. Italian regions have NUMERIC ISO
+    # codes, so this id reads worse than jur_de_by or jur_ch_zh. The derivation is
+    # kept anyway: a second naming scheme costs more than one opaque number, and
+    # `name` is what a human reads.
+    name: Regione Lombardia
+    parent_id: jur_it
+    level: cantonal
   - jurisdiction_id: jur_eu
     slug: eu
     name: European Union
