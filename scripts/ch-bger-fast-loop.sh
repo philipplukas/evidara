@@ -339,6 +339,21 @@ resolve_fast_loop_source \
   "${PC_URL}" "${SOURCE_NAME}" "${RUN_DIR}" \
   "${VERSION_LABEL}" "${TEMPLATE_ID}" "ch" "${CREATE_PAYLOAD}"
 
+# Approve BEFORE checking readiness, not after (#998).
+#
+# Production readiness requires an approved source version, and this script creates
+# that version moments earlier — so asking first and approving second made
+# `--mode production` exit 1 every time on a fresh source, with the lock reporting
+# `acquisition_lock_open: true` beside it. The driver was asking a question whose
+# answer it was about to change.
+#
+# Approval is a PRECONDITION of the readiness check, not a consequence of it. The
+# check still runs and still refuses; it now runs against the state the run will
+# actually have.
+log "==> Approving source version"
+curl -fsS -X POST "${PC_URL}/v1/versions/${SOURCE_VERSION_ID}/approve" \
+  "${PC_AUTH_HEADER[@]}" | tee "${RUN_DIR}/approve.json" >/dev/null
+
 log "==> Checking readiness"
 curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=${RUN_MODE}" | tee "${RUN_DIR}/readiness.json" >/dev/null
 READY="$(jq -r '.ready' < "${RUN_DIR}/readiness.json")"
@@ -350,10 +365,6 @@ if [[ "${READY}" != "true" ]]; then
   cat "${RUN_DIR}/readiness.json" >&2
   exit 1
 fi
-
-log "==> Approving source version"
-curl -fsS -X POST "${PC_URL}/v1/versions/${SOURCE_VERSION_ID}/approve" \
-  "${PC_AUTH_HEADER[@]}" | tee "${RUN_DIR}/approve.json" >/dev/null
 
 RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --arg run_mode "${RUN_MODE}" --argjson max_resources "${MAX_RESOURCES}" '{
   source_id: $source_id,

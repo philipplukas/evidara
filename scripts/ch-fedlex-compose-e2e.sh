@@ -367,7 +367,16 @@ if [[ -z "${SOURCE_ID}" || -z "${SOURCE_VERSION_ID}" ]]; then
 fi
 log "    source_id=${SOURCE_ID} source_version_id=${SOURCE_VERSION_ID}"
 
-# ── 3. Readiness ───────────────────────────────────────────────────────────
+# ── 3. Approve ─────────────────────────────────────────────────────────────
+# Before readiness, not after (#998). Production readiness requires an approved
+# source version and this script creates that version moments earlier, so asking
+# first made `--mode production` exit 1 every time on a fresh source — with the
+# lock reporting `acquisition_lock_open: true` beside it. Approval is a
+# PRECONDITION of the check, not a consequence of it.
+log "==> Approving source version"
+curl_json -X POST "${PC_URL}/v1/versions/${SOURCE_VERSION_ID}/approve" | tee "${RUN_DIR}/approve.json" >/dev/null
+
+# ── 4. Readiness ───────────────────────────────────────────────────────────
 log "==> Checking readiness"
 curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=${RUN_MODE}" \
   | tee "${RUN_DIR}/readiness.json" >/dev/null
@@ -377,10 +386,6 @@ if [[ "${READY}" != "true" ]]; then
   cat "${RUN_DIR}/readiness.json" >&2
   exit 1
 fi
-
-# ── 4. Approve ─────────────────────────────────────────────────────────────
-log "==> Approving source version"
-curl_json -X POST "${PC_URL}/v1/versions/${SOURCE_VERSION_ID}/approve" | tee "${RUN_DIR}/approve.json" >/dev/null
 
 # ── 5. Launch preview run ──────────────────────────────────────────────────
 RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --arg run_mode "${RUN_MODE}" --argjson max_resources "${MAX_RESOURCES}" '{
