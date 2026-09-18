@@ -288,6 +288,33 @@ Before finalizing, verify:
 
 ## Working guidance for AI
 
+### And verify against the running system, not only the code
+
+Reading the code tells you what it *would* do. It does not tell you what it *did*.
+When the two can disagree — a stuck run, a missing document, a failed gate, a
+deploy that may not have rolled — query production before forming a conclusion,
+and before writing an ADR around one.
+
+The `measure-before-you-theorise` skill holds the read-only queries: corpus
+coverage, a run's terminal statuses, DLQ depth, consumer backlog, pod restarts and
+OOM kills, template lock state, canonical metadata, and whether the deployed image
+is the one you think.
+
+On 2026-09-17/18 one defect was diagnosed wrongly three times in a row — an OOM,
+then a silent 404, then a file that was not in the code path — and every
+correction came from a measurement that had been available the whole time. A
+three-part architecture was designed around a condition that `nats stream
+subjects` refuted in one command.
+
+Two failure modes that produced those wrong answers, both worth naming:
+
+- **Absence of a log line is not evidence.** Grep the *wired* class for the exact
+  log event name, then grep the logs for that name. Searching for a plausible
+  string found nothing and "proved" a failure was silent that had in fact logged
+  twice. Check which implementation is injected before reading one.
+- **A conclusion that fits the evidence is not the same as one the evidence
+  forces.** Say which alternatives were eliminated and how.
+
 ### Verify against code, not against issue text
 
 **Establish the baseline from the repository before you change anything.** Issue bodies, ADRs,
