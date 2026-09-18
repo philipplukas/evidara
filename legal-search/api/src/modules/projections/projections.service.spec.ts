@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
 import type {
@@ -938,26 +939,68 @@ describe('ProjectionsService', () => {
     );
   });
 
-  it('applies projection with fallback fields when DI enrichment is unavailable', async () => {
-    const repository = createRepositoryMock();
-    const diClient = createDocumentIntelligenceMock();
-    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    const service = new ProjectionsService(repository, diClient);
+  describe('DI enrichment unavailable (#1028)', () => {
+    // This spec used to assert the opposite: that a projection was applied with a
+    // title fabricated from the document id. That behaviour put 30 records into
+    // production that are indistinguishable from complete ones, so the assertion
+    // is inverted rather than deleted — the old expectation is the defect.
+    it('refuses to project rather than persisting a record it could not enrich', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      const service = new ProjectionsService(repository, diClient);
 
-    const result = await service.applyDocumentProcessed(baseProcessedEvent);
+      await expect(service.applyDocumentProcessed(baseProcessedEvent)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+    });
 
-    expect(result.status).toBe('applied');
-    expect(repository.upsertProjection).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: `Document ${baseProcessedEvent.payload.document_id}`,
-        authority_name: 'Fedlex',
-        is_official: true,
-        sections_count: 0,
-        citations_count: 0,
-        lifecycle_status: 'active',
-      }),
-    );
-    expect(repository.appendHistory).toHaveBeenCalledTimes(1);
+    it('writes nothing at all — not the projection, not the history row', async () => {
+      // A partial write would be worse than the fallback it replaces: the record
+      // would exist, be wrong, and the event would also be retried.
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      const service = new ProjectionsService(repository, diClient);
+
+      await expect(service.applyDocumentProcessed(baseProcessedEvent)).rejects.toThrow();
+
+      expect(repository.upsertProjection).not.toHaveBeenCalled();
+      expect(repository.appendHistory).not.toHaveBeenCalled();
+    });
+
+    it('throws a 5xx, because projection-bridge only retries those', async () => {
+      // `projection_bridge_consumer` classifies 4xx as permanent and terms the
+      // message. A 400 here would drop the event instead of redelivering it, and
+      // the document would never be projected at all.
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(baseProcessedEvent).then(
+        () => {
+          throw new Error('expected a refusal');
+        },
+        (err: unknown) => {
+          expect(err).toBeInstanceOf(ServiceUnavailableException);
+          expect((err as ServiceUnavailableException).getStatus()).toBe(503);
+        },
+      );
+    });
+
+    it('still projects normally when enrichment IS available', async () => {
+      // Guards the refusal from becoming a blanket one: the mock's default
+      // resolves to {}, a document with no fields but a successful fetch.
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      const service = new ProjectionsService(repository, diClient);
+
+      const result = await service.applyDocumentProcessed(baseProcessedEvent);
+
+      expect(result.status).toBe('applied');
+      expect(repository.upsertProjection).toHaveBeenCalled();
+    });
   });
 
   describe('record_kind discriminator (#425)', () => {

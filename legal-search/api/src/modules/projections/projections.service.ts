@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { deriveDocumentLevel, deriveSubordinateTo } from '../../core/norm-hierarchy';
 import { normalizeDocumentType } from '../../core/vocabularies';
 import {
@@ -74,11 +74,35 @@ export class ProjectionsService {
       },
     );
     if (leanDocument === null) {
-      // Keep projection flow non-blocking when DI read API is unavailable.
-      this.logger.warn('projection_enrichment_unavailable_fallback', {
+      // REFUSE. Do not project a record we cannot enrich (#1028, ADR-0033).
+      //
+      // This used to log and carry on — "keep projection flow non-blocking when
+      // DI read API is unavailable" — and `buildProjection` then filled the gaps:
+      // a title fabricated from the document id, an empty `jurisdiction_ids`, no
+      // language. The result is indistinguishable from a complete record, and 30
+      // of them accumulated in production before an acceptance gate asserting an
+      // expected title happened to catch one.
+      //
+      // A 5xx is the correct answer because the event is retryable and the
+      // machinery already exists: `projection_bridge_consumer` classifies 5xx as
+      // transient, naks, and JetStream redelivers; after `max_deliver` it
+      // dead-letters, and the DLQ has a reader since #1023. The failure that
+      // prompted this was a bare `fetch failed` reaching document-service —
+      // exactly what a retry is for.
+      //
+      // The cost, accepted deliberately: if enrichment is permanently
+      // unavailable the document does not appear at all, rather than appearing
+      // thin. For a legal corpus that is the right way round — ADR-0033's whole
+      // premise is that a convincing wrong answer is worse than a refusal.
+      this.logger.warn('projection_enrichment_unavailable_refused', {
         document_id: event.payload.document_id,
+        document_revision: event.payload.document_revision,
         correlation_id: event.correlation_id,
       });
+      throw new ServiceUnavailableException(
+        `Cannot project ${event.payload.document_id}: document-intelligence did not ` +
+          'return its canonical document. Retryable — the event is redelivered.',
+      );
     }
     const projection = this.buildProjection(event, leanDocument);
     await this.repository.upsertProjection(projection);
@@ -184,6 +208,17 @@ export class ProjectionsService {
   ): SearchProjectionDocument {
     const provenance = event.payload.provenance;
     const extracted = this.extractLeanDocumentFields(leanDocument);
+    // Reachable only when the lean document WAS fetched and `deriveTitle`'s whole
+    // chain — structured title, LLM title, body heading, official citation,
+    // first substantive line, structural path — found nothing in it. The
+    // enrichment-unavailable case no longer reaches here: it refuses above
+    // (#1028).
+    //
+    // Still a fabricated value persisted where a real title goes, and still
+    // indistinguishable from one. Making `title` optional touches this type, the
+    // OpenSearch mapping and the frontend's rendering, so it is deliberately left
+    // as follow-up rather than smuggled in here. Search
+    // `title:"Document doc_"` to find any.
     const title = extracted.title ?? `Document ${event.payload.document_id}`;
     const preview =
       extracted.previewText ??
