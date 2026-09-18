@@ -98,9 +98,11 @@ Encoded in every script, and stated in
 A workflow that reaches one of these stops and produces a **decision memo** naming what a human must
 decide. `cantonal-onboarding-dry-run.js` is built entirely around that pattern: it drafts and
 validates blueprint templates for the cantons that have none, and its expected output for most of
-them is a precise blocker — the LexFind `entity_ids` value is derivable from this repo for exactly
-three cantons, and inventing a plausible one would produce a template that runs against the wrong
-canton and looks like it worked.
+them is a precise blocker. The `entity_ids` value used to be one: it was derivable from this repo
+for exactly three cantons, and inventing a plausible one produces a template that runs against the
+wrong canton and looks like it worked. `coverage scaffold` now reads it from LexFind's published
+entity table and refuses on no match or an ambiguous one, so the remaining blocker per canton is
+the acceptance run, not the number.
 
 ## Status
 

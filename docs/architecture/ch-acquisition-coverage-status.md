@@ -304,10 +304,15 @@ systematic collection.
 
 ## NOT BUILT
 
-- **Cantonal coverage beyond ZH/BE/BS templates** — `lexfind_api` reaches
-  all 28 LexFind entities, but only ZH, BE and BS have templates, and only
-  ZH has a whole-entity enumeration template. The other 23 cantons have no
-  template at all.
+- **Cantonal coverage beyond the templates that exist** — `lexfind_api`
+  reaches all 28 LexFind entities. Two things that blocked adding a canton
+  are now closed: `evidara workflow coverage scaffold` resolves the
+  `entity_ids` value from LexFind's published table rather than an
+  operator's memory, and all 26 cantons have an authority in
+  `seeds/reference/authorities.yaml` (they did not, so `POST /v1/sources`
+  refused a cantonal source for 20 of them). What is left per canton is the
+  acceptance run and its evidence bundle. The 26 cantons hold 16,362 active
+  texts against the corpus's current size.
 - **National communal coverage** — communal law lives on ~2,000
   independent municipal sites with no common schema. Only Zürich (BFS 261)
   is allow-listed, and the per-portal parser (not the host allow-list) is
@@ -337,7 +342,7 @@ gate that code alone cannot satisfy (ADR-0030 §5).
 | 5 | Federal court decisions (#530) | `awaiting_evidence` | Real discovery URLs + a `pass` acceptance run → flip both keys |
 | 6 | Cantonal court decisions (#531) | `awaiting_evidence` (same provider) | Templates exist for ZH/BE/BS against `entscheidsuche.ch`; needs the same acceptance run |
 | 7 | CI-gated CH e2e (#533) | n/a | Wire the fast-loops as a required CI status check |
-| 8 | Remaining 23 cantons | `live` (same provider) | Per-canton templates; the provider is unchanged, the cost is config + evidence |
+| 8 | Remaining cantons | `live` (same provider) | Per-canton templates; the provider is unchanged, and scaffolding plus reference data are no longer in the way. The cost is the acceptance run and its evidence |
 | 9 | Full communal coverage (#736) | `live` for ZH's portal shape only | A parser per portal shape — ~2,000 municipal sites, a programme, not a step |
 | — | Cantonal portal scraping (`canton_http`) | `scaffold` | Superseded by LexFind. Do not plan against it |
 

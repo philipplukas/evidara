@@ -877,3 +877,104 @@ def test_enable_stops_on_an_unreadable_bundle_rather_than_ignoring_it(
 
     assert exc.value.exit_code == 2
     assert req_mock.call_count == 0
+
+
+# ── coverage scaffold: resolving the lexfind_api entity id ──────────────────
+#
+# The entity id used to come from an operator's memory — the help text named ZH
+# and BE, and `source_blueprints.yaml` held three of the 28. That is why 23
+# cantons had no template.
+
+_LEXFIND_ENTITIES = [
+    {
+        "id": 1,
+        "abbreviation": "AG",
+        "name": "Aargau",
+        "status": {"total_texts_of_law": 983, "active_texts_of_law": 463},
+    },
+    {
+        "id": 26,
+        "abbreviation": "ZH",
+        "name": "Zürich",
+        "status": {"total_texts_of_law": 1378, "active_texts_of_law": 944},
+    },
+]
+
+_SCAFFOLD_AG = [
+    "workflow",
+    "coverage",
+    "scaffold",
+    "--provider",
+    "lexfind_api",
+    "--jurisdiction-id",
+    "jur_ch_ag",
+    "--corpus-id",
+    "corpus_public_ch_canton_ag_legislation",
+    "--suffix",
+    "full",
+]
+
+
+@patch("evidara_cli.lexfind_entities.request_json", return_value=_LEXFIND_ENTITIES)
+def test_scaffold_resolves_the_entity_id_without_an_operator(req: Any) -> None:
+    result = CliRunner().invoke(app, _SCAFFOLD_AG)
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["artifacts"]["template"]["entity_ids"] == [1]
+    assert payload["artifacts"]["template_id"] == "lexfind_api_ag_full"
+    # The value's origin is recorded, so a reviewer can tell a looked-up number
+    # from a typed one.
+    provenance = payload["artifacts"]["entity_id_provenance"]
+    assert provenance["source"] == "lexfind_entities_extended"
+    assert provenance["denominator"]["active_texts_of_law"] == 463
+    assert req.call_count == 1
+
+
+@patch("evidara_cli.lexfind_entities.request_json")
+def test_an_explicit_entity_id_wins_and_makes_no_call(req: Any) -> None:
+    result = CliRunner().invoke(app, [*_SCAFFOLD_AG, "--entity-id", "7"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["artifacts"]["template"]["entity_ids"] == [7]
+    assert payload["artifacts"]["entity_id_provenance"]["source"] == "operator"
+    assert req.call_count == 0
+
+
+@patch("evidara_cli.lexfind_entities.request_json")
+def test_no_discover_entity_keeps_the_old_offline_refusal(req: Any) -> None:
+    result = CliRunner().invoke(app, [*_SCAFFOLD_AG, "--no-discover-entity"])
+    assert result.exit_code == 1, result.output
+    payload = json.loads(result.output)
+    assert payload["ok"] is False
+    assert payload["status"] == "failed_terminal"
+    assert req.call_count == 0
+
+
+@patch("evidara_cli.lexfind_entities.request_json")
+def test_unreachable_lexfind_scaffolds_nothing_and_says_retriable(req: Any) -> None:
+    req.side_effect = HttpJsonError("connect timeout", status_code=None, body="")
+    result = CliRunner().invoke(app, _SCAFFOLD_AG)
+    assert result.exit_code == 1, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "failed_retriable"
+    assert payload["side_effect_level"] == "none"
+
+
+@patch("evidara_cli.lexfind_entities.request_json", return_value=_LEXFIND_ENTITIES)
+def test_a_canton_lexfind_does_not_publish_is_terminal(_req: Any) -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "workflow",
+            "coverage",
+            "scaffold",
+            "--provider",
+            "lexfind_api",
+            "--jurisdiction-id",
+            "jur_ch_vd",
+            "--corpus-id",
+            "corpus_public_ch_canton_vd_legislation",
+        ],
+    )
+    assert result.exit_code == 1, result.output
+    assert json.loads(result.output)["status"] == "failed_terminal"
