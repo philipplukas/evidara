@@ -34,7 +34,7 @@ result:
 |---|---|---|---|
 | document-intelligence (`di-consumer`, `projection-bridge`) | yes — `correlation_id` is the run id, set at publish time (`run_service.py:1963`) and carried through the event envelope | **yes** | `<date> <time> <LEVEL> {json}` — a `logging.basicConfig` line whose *message* is JSON, **not** a JSON line |
 | platform-control | yes — `correlation_and_logging_middleware` (`main.py:93`) builds an `http_request` payload with it | **no** — #1047 | nothing. The API runs under `uvicorn` with no `--log-config` and calls no `basicConfig`, so the root logger stays at WARNING and every `INFO` record is dropped before formatting. Probed live: a request with `X-Correlation-Id: probe-892-logcheck` returned the header and left zero matching lines in the pod log |
-| legal-search/api | yes, per request (`CorrelationIdMiddleware`) | n/a | the Nest default logger, ANSI-coloured, with the correlation id in **no** line |
+| legal-search/api | yes, per request (`CorrelationIdMiddleware`) | lines yes, **the id no** | the Nest default logger, ANSI-coloured, one line per adapter call, and the correlation id appears in none of them |
 
 So today a run-scoped query answers *"what did document-intelligence say about
 this run"* and nothing else. That is the half the 2026-09-17 investigation
