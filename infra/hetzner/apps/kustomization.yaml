@@ -126,7 +126,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"abddb64ffa55f6847f13297bd065296a69b265de\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"2d964ef4d435e072707af37d7048df22df3769fa\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 444115ad. Four merged PRs:
@@ -169,7 +169,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"abddb64ffa55f6847f13297bd065296a69b265de\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"2d964ef4d435e072707af37d7048df22df3769fa\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 63bd639e. Four merged PRs:
@@ -342,16 +342,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: abddb64ffa55f6847f13297bd065296a69b265de
+    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: abddb64ffa55f6847f13297bd065296a69b265de
+    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: abddb64ffa55f6847f13297bd065296a69b265de
+    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: abddb64ffa55f6847f13297bd065296a69b265de
+    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: abddb64ffa55f6847f13297bd065296a69b265de
+    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: abddb64ffa55f6847f13297bd065296a69b265de
+    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: abddb64ffa55f6847f13297bd065296a69b265de
+    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
