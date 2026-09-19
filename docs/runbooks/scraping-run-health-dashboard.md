@@ -118,6 +118,17 @@ When a panel degrades, use this sequence:
      first of those was reported as `projection_stalled`, which sent operators to debug a
      bridge that was not involved, and a failed run with a recorded reason was reported as
      `unknown`.
+   - **Is the pipeline still moving, or did it stop?** `overall_status` answers this, and
+     `stalled` is the value to read carefully (#951). It means the run itself ended but
+     downstream stages never reported, and — unlike `in_progress` — that nothing further
+     is scheduled, so no amount of waiting changes it. Pair it with the stall cause above:
+     `stalled` says *that* the pipeline stopped, `projection_stalled` /
+     `publish_path_disabled` say *where*.
+
+     A completed run does **not** immediately become `stalled`. Acquisition finishing is
+     not the pipeline finishing — DI, projection and search land afterwards, and measured
+     against production on 2026-09-19 that lag reached 5h58m on the largest run. Only
+     after 24h does the run report `stalled`; before that it is honestly `in_progress`.
    - **What did it capture, publish and refuse?** A capture ledger with `captured` and
      `published` as separate numbers, the per-resource refusal slugs grouped by reason, and
      the mirror-fidelity spot check. Anything the provider did not record renders as `—`,

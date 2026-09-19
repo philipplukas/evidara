@@ -94,6 +94,7 @@ type RecentHealthSummary = {
   blocked: number;
   failed: number;
   in_progress: number;
+  stalled: number;
   unavailable: number;
 };
 
@@ -105,8 +106,13 @@ type RecentHealthSummary = {
  * union, which was narrower than what the server may send (#695). An
  * unrecognised status counts as `unavailable` rather than silently landing in
  * whichever bucket it happens to spell.
+ *
+ * `stalled` joined the set with #951 — a run that ended while downstream stages
+ * never reported. It needs a bucket of its own precisely because of the rule
+ * above: without one it would count as `unavailable`, turning a state the server
+ * *did* report into "we don't know", which is the inversion ADR-0052 forbids.
  */
-const HEALTH_BUCKETS = ["ok", "blocked", "failed", "in_progress"] as const;
+const HEALTH_BUCKETS = ["ok", "blocked", "failed", "in_progress", "stalled"] as const;
 
 type HealthBucket = (typeof HEALTH_BUCKETS)[number];
 
@@ -158,7 +164,7 @@ export const summarizeRecentHealth = (recentHealth: RecentRunHealth[]): RecentHe
       }
       return summary;
     },
-    { ok: 0, blocked: 0, failed: 0, in_progress: 0, unavailable: 0 },
+    { ok: 0, blocked: 0, failed: 0, in_progress: 0, stalled: 0, unavailable: 0 },
   );
 
 /**
@@ -614,6 +620,9 @@ export function Dashboard() {
                   </Pill>
                   <Pill level={pipelineHealthToLevel("in_progress")}>
                     in progress: {recentHealthSummary.in_progress}
+                  </Pill>
+                  <Pill level={pipelineHealthToLevel("stalled")}>
+                    stalled: {recentHealthSummary.stalled}
                   </Pill>
                   <Pill level="neutral">unavailable: {recentHealthSummary.unavailable}</Pill>
                 </div>

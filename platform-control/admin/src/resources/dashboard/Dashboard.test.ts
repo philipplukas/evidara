@@ -84,8 +84,25 @@ describe("Dashboard helpers", () => {
       blocked: 1,
       failed: 0,
       in_progress: 0,
+      stalled: 0,
       unavailable: 1,
     });
+  });
+
+  it("counts a stalled run as stalled, not as unavailable", () => {
+    // #951: the server reports `stalled` for a run that ended while downstream
+    // stages never reported. Without a bucket of its own it falls through to
+    // `unavailable` — turning a state the server did report into "we don't know",
+    // which is worse than the `in_progress` it replaced.
+    const summary = summarizeRecentHealth([
+      {
+        run_id: "run-stalled",
+        health: { overall_status: "stalled" } as never,
+        error: null,
+      },
+    ]);
+    expect(summary.stalled).toBe(1);
+    expect(summary.unavailable).toBe(0);
   });
 
   it("prioritizes blocked health over other attention signals", () => {
