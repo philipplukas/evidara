@@ -54,6 +54,18 @@ export interface SearchOptions {
    * `authority_ids.keyword`.
    */
   authorityIds?: string[];
+  /**
+   * Canonical jurisdiction IDs to PREFER in ranking — never to filter by
+   * (#975 gap A).
+   *
+   * `jurisdictionIds` above is a filter: it removes everything else.
+   * This one only re-scores, so a document outside these jurisdictions is
+   * still returned and still reachable. The distinction is load-bearing: a
+   * question naming Zürich must not hide the federal act it operates under,
+   * and `search.integration.spec.ts` asserts the total hit count is identical
+   * with and without it.
+   */
+  boostJurisdictionIds?: string[];
   languages?: string[];
   documentTypes?: string[];
   officialOnly?: boolean;

@@ -5,6 +5,7 @@ import {
   detectSubdivisionMentions,
   type SubdivisionMention,
 } from '../../core/jurisdiction-mentions';
+import { getGoverningScopes } from '../../core/norm-hierarchy';
 import type { WarnFn } from '../../core/types/warn';
 import { CorpusJurisdictionsService } from './corpus-jurisdictions.service';
 import type { SearchRefusalEntity } from './entities/search.entities';
@@ -16,6 +17,40 @@ import {
   type SearchRefinement,
   type SearchRepository,
 } from './search.repository';
+
+/**
+ * Which jurisdictions should a query that NAMES a place prefer? (#975 gap A)
+ *
+ * The named jurisdiction, plus every scope that governs it — which for a Swiss
+ * canton is the federal tier, because `getGoverningScopes` treats a same-level
+ * child (`jur_ch_federal` under `jur_ch`) as a refinement of its parent's scope
+ * rather than a tier below it. So this is read out of the jurisdiction seed,
+ * not hardcoded to Switzerland, and an AT or DE overlay gets the same shape for
+ * free.
+ *
+ * **Including the federal tier is the point, not a detail.** Measured against
+ * production 2026-09-19 for "Darf ich in Zürich einen Hund halten": boosting
+ * the canton ALONE pushed the federal Tierschutzgesetz from rank 15 out of the
+ * top 20 entirely, because every Zurich document gained on it. A cantonal
+ * question in Swiss law always has a federal rung above it — ADR-0033's dog
+ * question needs both — so burying it to surface the canton answers the
+ * question worse, not better. With the chain, it stays at 15.
+ *
+ * Returns `undefined` when the query names nowhere, which is the overwhelming
+ * majority of queries: they are then scored exactly as they are today.
+ */
+function preferredJurisdictionIds(mentions: SubdivisionMention[]): string[] | undefined {
+  if (mentions.length === 0) return undefined;
+
+  const ids = new Set<string>();
+  for (const mention of mentions) {
+    ids.add(mention.jurisdictionId);
+    for (const scope of getGoverningScopes(mention.jurisdictionId)) {
+      ids.add(scope.jurisdiction_id);
+    }
+  }
+  return [...ids];
+}
 
 @Injectable()
 export class SearchService {
@@ -48,7 +83,9 @@ export class SearchService {
   ) {
     const locale = options?.locale ?? DEFAULT_LOCALE;
 
-    const refusal = await this.refuseIfJurisdictionNotHeld(query);
+    const mentions = detectSubdivisionMentions(query);
+
+    const refusal = await this.refuseIfJurisdictionNotHeld(query, mentions);
     if (refusal) {
       // Deliberately no search round trip. Returning the best-scoring documents
       // of a DIFFERENT canton beside the refusal is exactly the confident wrong
@@ -66,6 +103,7 @@ export class SearchService {
       refinements: options?.refinements,
       page: options?.page,
       pageSize: options?.pageSize,
+      boostJurisdictionIds: preferredJurisdictionIds(mentions),
     });
 
     return {
@@ -97,8 +135,8 @@ export class SearchService {
    */
   private async refuseIfJurisdictionNotHeld(
     query: string,
+    mentions: SubdivisionMention[],
   ): Promise<SearchRefusalEntity | undefined> {
-    const mentions = detectSubdivisionMentions(query);
     if (mentions.length === 0) return undefined;
 
     const held = await this.corpusJurisdictions.heldJurisdictionIds();
