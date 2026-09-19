@@ -44,6 +44,10 @@ platform-control-temporal-worker = "platform_control.temporal_worker:main"
 # NOT by a Temporal schedule — Temporal is deployed nowhere. `pc retention sweep`
 # is the manual alias over the same implementation.
 platform-control-retention-sweep = "platform_control.retention_sweep:main"
+# Terminal status for documents that entered processing and never came out (#1038).
+# Scheduled by the processing-reclaim CronJob; `pc processing reclaim` is the manual
+# alias over the same implementation, and is also the operator backfill command.
+platform-control-processing-reclaim = "platform_control.processing_reclaim:main"
 pc = "platform_control.cli:main"
 
 [dependency-groups]

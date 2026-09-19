@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import dispatchable_compliance_policy
 from sqlalchemy import select
 
-from platform_control.domain import ProcessingStatus, ProviderJobStatus, RunMode, RunStatus
+from platform_control.domain import (
+    ProcessingReconciliationVerdict,
+    ProcessingStatus,
+    ProviderJobStatus,
+    RunMode,
+    RunStatus,
+)
 from platform_control.errors import DispatchPublishError, InvalidStateTransitionError
 from platform_control.events.publisher import LocalOutboxRawArtifactPublisher
 from platform_control.models.authority import Authority, Jurisdiction
@@ -1370,6 +1377,204 @@ async def test_get_pipeline_health_reports_a_quarantine_as_blocked_not_ok(sessio
     assert "no text layer" in by_stage["document_intelligence"].detail
     assert by_stage["projection"].status == "blocked"
     assert pipeline.overall_status != "ok"
+    # A quarantine is a finished document, so the run still reconciles.
+    assert pipeline.processing_reconciliation.verdict is ProcessingReconciliationVerdict.RECONCILED
+
+
+async def _run_with_processing_rows(
+    session,
+    rows: list[tuple[str, ProcessingStatus, datetime]],
+):
+    """A COMPLETED run carrying the given `(manifest_id, status, occurred_at)` rows."""
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.ACCEPTANCE,
+        )
+    )
+    run.status = RunStatus.COMPLETED
+    run.completed_at = run.created_at
+    for index, (manifest_id, status, occurred_at) in enumerate(rows):
+        session.add(
+            ProcessingStatusUpdate(
+                event_id=f"evt_ps_recon_{index}",
+                run_id=run.run_id,
+                processing_manifest_id=manifest_id,
+                processing_version="2026.09",
+                status=status,
+                occurred_at=occurred_at,
+                source_snapshot_id="snap_recon",
+                bundle_manifest_id="abm_recon",
+                document_id=f"doc_{manifest_id}",
+                document_revision=1,
+                error_code=None,
+                error_summary=None,
+            )
+        )
+    await session.commit()
+    return run_service, run
+
+
+@pytest.mark.asyncio
+async def test_pipeline_health_refuses_ok_while_documents_never_terminated(session) -> None:
+    """A `completed` run holding stranded documents must not report a healthy DI stage.
+
+    This is #1038's whole defect as a read-model bug. `_resolve_di_stage` reads the
+    run's NEWEST status row, which on a mostly-successful run is a
+    `canonical_ready` — so both `run_01m26a84j0gdmeh9g5f8b1k36k` (2026-09-10) and
+    `run_01m2q5fsqmarc3mxvfpsw1jjdt` (2026-09-17) reported `completed`/`ok` while
+    each held 58 documents that never reached a terminal status and never reached
+    the index.
+
+    MUTATION: delete `_apply_unterminated_guard` (or make `get_pipeline_health` pass
+    a reconciliation of `[]`) and this goes red on `status == "blocked"`.
+    """
+    old = datetime(2026, 9, 10, 18, 49, 37, tzinfo=UTC)
+    recent = datetime.now(UTC) - timedelta(minutes=1)
+    run_service, run = await _run_with_processing_rows(
+        session,
+        [
+            ("pm_stranded", ProcessingStatus.ACCEPTED, old),
+            ("pm_stranded", ProcessingStatus.PROCESSING, old + timedelta(seconds=1)),
+            ("pm_done", ProcessingStatus.ACCEPTED, recent),
+            ("pm_done", ProcessingStatus.CANONICAL_READY, recent + timedelta(seconds=1)),
+        ],
+    )
+
+    pipeline = await run_service.get_pipeline_health(run.run_id)
+    by_stage = {stage.stage: stage for stage in pipeline.stages}
+
+    assert by_stage["document_intelligence"].status == "blocked"
+    assert "never reached a terminal status" in by_stage["document_intelligence"].detail
+    assert pipeline.overall_status != "ok"
+
+    reconciliation = pipeline.processing_reconciliation
+    assert reconciliation.verdict is ProcessingReconciliationVerdict.UNTERMINATED
+    assert reconciliation.observed_units == 2
+    assert reconciliation.terminal_units == 1
+    assert reconciliation.unterminated_units == 1
+    assert reconciliation.unterminated_units_past_deadline == 1
+    assert [unit.processing_manifest_id for unit in reconciliation.unterminated] == ["pm_stranded"]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_health_does_not_cry_wolf_inside_the_deadline(session) -> None:
+    """Work legitimately in flight reports `in_progress`, never `blocked`.
+
+    A guard that failed every healthy mid-flight run would be switched off within
+    a week, so the distinction is load-bearing. It still must not report `ok`: the
+    run is holding a document nothing downstream has seen.
+
+    MUTATION: drop the `unterminated_units_past_deadline > 0` condition in
+    `_apply_unterminated_guard` and this goes red on `status == "in_progress"`.
+    """
+    recent = datetime.now(UTC) - timedelta(minutes=1)
+    run_service, run = await _run_with_processing_rows(
+        session,
+        [
+            ("pm_inflight", ProcessingStatus.ACCEPTED, recent),
+            ("pm_inflight", ProcessingStatus.PROCESSING, recent + timedelta(seconds=1)),
+            ("pm_done", ProcessingStatus.ACCEPTED, recent),
+            ("pm_done", ProcessingStatus.CANONICAL_READY, recent + timedelta(seconds=2)),
+        ],
+    )
+
+    pipeline = await run_service.get_pipeline_health(run.run_id)
+    by_stage = {stage.stage: stage for stage in pipeline.stages}
+
+    assert by_stage["document_intelligence"].status == "in_progress"
+    assert "Still within the reclaim deadline." in by_stage["document_intelligence"].detail
+    assert pipeline.processing_reconciliation.unterminated_units == 1
+    assert pipeline.processing_reconciliation.unterminated_units_past_deadline == 0
+
+
+@pytest.mark.asyncio
+async def test_pipeline_health_keeps_a_reported_failure_and_adds_the_stranded_count(
+    session,
+) -> None:
+    """A reported DI failure is more actionable than "58 units are stranded".
+
+    So the guard appends rather than replaces: the status stays `failed` and the
+    sentence is still there for anyone counting.
+    """
+    old = datetime(2026, 9, 10, 18, 49, 37, tzinfo=UTC)
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.ACCEPTANCE,
+        )
+    )
+    run.status = RunStatus.COMPLETED
+    run.completed_at = run.created_at
+    session.add(
+        ProcessingStatusUpdate(
+            event_id="evt_ps_strand",
+            run_id=run.run_id,
+            processing_manifest_id="pm_stranded",
+            processing_version="2026.09",
+            status=ProcessingStatus.PROCESSING,
+            occurred_at=old,
+            source_snapshot_id="snap_recon",
+            bundle_manifest_id="abm_recon",
+            document_id="doc_stranded",
+            document_revision=1,
+            error_code=None,
+            error_summary=None,
+        )
+    )
+    session.add(
+        ProcessingStatusUpdate(
+            event_id="evt_ps_failed",
+            run_id=run.run_id,
+            processing_manifest_id="pm_failed",
+            processing_version="2026.09",
+            status=ProcessingStatus.FAILED,
+            occurred_at=old + timedelta(seconds=5),
+            source_snapshot_id="snap_recon",
+            bundle_manifest_id="abm_recon",
+            document_id="doc_failed",
+            document_revision=1,
+            error_code="normalize_error",
+            error_summary="Docling raised on page 3.",
+        )
+    )
+    await session.commit()
+
+    pipeline = await run_service.get_pipeline_health(run.run_id)
+    by_stage = {stage.stage: stage for stage in pipeline.stages}
+
+    assert by_stage["document_intelligence"].status == "failed"
+    assert "Docling raised on page 3." in by_stage["document_intelligence"].detail
+    assert "never reached a terminal status" in by_stage["document_intelligence"].detail
+    assert pipeline.processing_reconciliation.unterminated_units == 1
+
+
+@pytest.mark.asyncio
+async def test_pipeline_health_reports_nothing_observed_rather_than_a_clean_zero(
+    session,
+) -> None:
+    """A run with no processing rows has an answer, and it is not `reconciled`.
+
+    MUTATION: make `reconcile_processing` return `RECONCILED` for an empty ledger
+    and this goes red — which is the abstention this whole change exists to
+    refuse.
+    """
+    run_service, run = await _run_with_processing_rows(session, [])
+
+    pipeline = await run_service.get_pipeline_health(run.run_id)
+
+    reconciliation = pipeline.processing_reconciliation
+    assert reconciliation.verdict is ProcessingReconciliationVerdict.NOTHING_OBSERVED
+    assert reconciliation.observed_units == 0
+    assert reconciliation.unterminated_units == 0
 
 
 @pytest.mark.asyncio

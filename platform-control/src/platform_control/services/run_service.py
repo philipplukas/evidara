@@ -80,9 +80,11 @@ from platform_control.schemas.run import (
     RunPreviewSummaryDriftCheck,
     RunPreviewSummaryResponse,
     RunPreviewSummarySample,
+    RunProcessingReconciliation,
     RunReadinessCheck,
     RunReadinessResponse,
     RunStageAction,
+    RunUnterminatedUnit,
 )
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
@@ -93,6 +95,10 @@ from platform_control.services.compliance_policy_service import (
 )
 from platform_control.services.coverage_reconciliation import parse_coverage_payload
 from platform_control.services.politeness import current_rate_limiter
+from platform_control.services.processing_reconciliation import (
+    ProcessingReconciliation,
+    reconcile_processing,
+)
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.replay_checkpoint import checkpoint_dict_from_parent
@@ -1082,8 +1088,16 @@ class RunService:
         latest_processing = processing_updates[0] if processing_updates else None
         latest_lifecycle = lifecycle_events[0] if lifecycle_events else None
 
+        # Reconciled from the rows already in memory — `processing_updates` holds
+        # every status row for the run, and until #1038 this method used exactly one
+        # of them (`[0]`) and threw the rest away. That is how a run whose newest row
+        # is `canonical_ready` reported `ok` while holding 58 documents that never
+        # terminated: the read model asked the latest row a question only the whole
+        # set can answer.
+        reconciliation = reconcile_processing(processing_updates)
+
         acquisition_stage = self._resolve_acquisition_stage(run)
-        di_stage = self._resolve_di_stage(run, latest_processing)
+        di_stage = self._resolve_di_stage(run, latest_processing, reconciliation)
         projection_stage = self._resolve_projection_stage(latest_processing, latest_lifecycle)
         search_stage = self._resolve_search_stage(latest_lifecycle)
 
@@ -1106,6 +1120,7 @@ class RunService:
             stages=stages,
             processing_status_event_count=len(processing_updates),
             document_lifecycle_event_count=len(lifecycle_events),
+            processing_reconciliation=self._to_reconciliation_schema(reconciliation),
             decision_support=self._build_decision_support(
                 run=run,
                 stages=stages,
@@ -1358,7 +1373,103 @@ class RunService:
         )
 
     @staticmethod
+    def _to_reconciliation_schema(
+        reconciliation: ProcessingReconciliation,
+    ) -> RunProcessingReconciliation:
+        return RunProcessingReconciliation(
+            observed_units=reconciliation.observed_units,
+            terminal_units=reconciliation.terminal_units,
+            unterminated_units=reconciliation.unterminated_units,
+            unterminated_units_past_deadline=reconciliation.unterminated_units_past_deadline,
+            oldest_unterminated_at=reconciliation.oldest_unterminated_at,
+            verdict=reconciliation.verdict,
+            unterminated=[
+                RunUnterminatedUnit(
+                    processing_manifest_id=unit.processing_manifest_id,
+                    document_id=unit.document_id,
+                    last_status=unit.last_status,
+                    last_seen_at=unit.last_seen_at,
+                    past_deadline=unit.past_deadline,
+                )
+                for unit in reconciliation.unterminated
+            ],
+        )
+
+    @classmethod
     def _resolve_di_stage(
+        cls,
+        run: Run,
+        latest_processing: ProcessingStatusUpdate | None,
+        reconciliation: ProcessingReconciliation,
+    ) -> RunPipelineHealthStage:
+        stage = cls._resolve_di_stage_from_latest_row(run, latest_processing)
+        return cls._apply_unterminated_guard(stage, reconciliation)
+
+    @staticmethod
+    def _apply_unterminated_guard(
+        stage: RunPipelineHealthStage,
+        reconciliation: ProcessingReconciliation,
+    ) -> RunPipelineHealthStage:
+        """Refuse to call the DI stage `ok` while the run holds unterminated units.
+
+        The resolver below reads the run's **newest** status row. For a run of 1,000
+        documents where 58 stopped at `processing` and the rest finished, that row is
+        a `canonical_ready` and the stage reads `ok` — which is exactly what both of
+        the 2026-09-10 and 2026-09-17 runs reported while 58 documents each were
+        missing from search.
+
+        Two rules, and the split is the point:
+
+        * **past the deadline** demotes to `blocked`. Nothing more is coming; the
+          reclaim sweep will terminate these on its next pass.
+        * **within the deadline** demotes `ok` to `in_progress`, never to `blocked`.
+          Work still in flight is not a fault, and a guard that cried failure on
+          every healthy mid-flight run would be switched off within a week.
+
+        An already-`failed` or already-`blocked` stage keeps its status and gains the
+        sentence: replacing a reported DI failure with "58 units are stranded" would
+        hide the more actionable of the two.
+        """
+        if reconciliation.unterminated_units == 0:
+            return stage
+
+        oldest = reconciliation.oldest_unterminated_at
+        outstanding = (
+            f" {reconciliation.unterminated_units} of {reconciliation.observed_units} "
+            f"processing unit(s) started and never reached a terminal status"
+            f"{f' (oldest last seen {oldest.isoformat()})' if oldest else ''}."
+        )
+
+        if reconciliation.unterminated_units_past_deadline > 0:
+            detail = (
+                stage.detail
+                + outstanding
+                + f" {reconciliation.unterminated_units_past_deadline} of them are past"
+                " the reclaim deadline: no terminal status is coming, and nothing"
+                " downstream ever saw these documents."
+            )
+            # `failed` is the one status this does not overwrite. A reported DI
+            # failure names a cause an operator can act on; "some units are
+            # stranded" does not, and replacing the first with the second would
+            # trade a better answer for a worse one. The sentence is appended
+            # either way, so the count is never lost.
+            if stage.status is PipelineStageStatus.FAILED:
+                return stage.model_copy(update={"detail": detail})
+            return stage.model_copy(
+                update={"status": PipelineStageStatus.BLOCKED, "detail": detail}
+            )
+
+        if stage.status is PipelineStageStatus.OK:
+            return stage.model_copy(
+                update={
+                    "status": PipelineStageStatus.IN_PROGRESS,
+                    "detail": stage.detail + outstanding + " Still within the reclaim deadline.",
+                }
+            )
+        return stage.model_copy(update={"detail": stage.detail + outstanding})
+
+    @staticmethod
+    def _resolve_di_stage_from_latest_row(
         run: Run, latest_processing: ProcessingStatusUpdate | None
     ) -> RunPipelineHealthStage:
         if latest_processing is None:

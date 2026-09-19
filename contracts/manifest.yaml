@@ -111,7 +111,7 @@ apis:
     # taken by the fedlex-enumeration change in the same batch — two PRs picking
     # the same successor merge cleanly and then describe two different surfaces
     # under one version, which is the #913 failure seen from the API-version side.
-    version: "0.34.0"
+    version: "0.35.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
