@@ -12,6 +12,7 @@ import {
   formatSpecEntryValue,
   partitionAcquisitionSpec,
   partitionedKeys,
+  unreadableSpecLines,
 } from "./acquisitionSpecView";
 import { summarizeAcquisitionSpec } from "./sourceVersionForm";
 
@@ -99,5 +100,33 @@ describe("formatSpecEntryValue", () => {
     expect(formatSpecEntryValue(["de", "fr"])).toBe("de, fr");
     expect(formatSpecEntryValue(true)).toBe("yes");
     expect(formatSpecEntryValue(false)).toBe("no");
+  });
+});
+
+/**
+ * #953 — the API reports a stored spec it cannot parse as `acquisition_spec:
+ * null` plus a reason, rather than answering 500. Every surface that renders a
+ * spec has to say so, and none of them may render it as an empty configuration.
+ */
+describe("unreadableSpecLines", () => {
+  it("says the spec could not be read, not that there is none", () => {
+    const lines = unreadableSpecLines("<root>: Unable to extract tag using discriminator").join(
+      "\n",
+    );
+
+    expect(lines).toContain("could not be read");
+    // The failure mode this whole issue is about: a defect rendered as a finding.
+    expect(lines).not.toMatch(/\bno spec\b|\bempty configuration\b|\(empty\)/i);
+  });
+
+  it("carries the API's reason through when there is one", () => {
+    expect(unreadableSpecLines("HTTP 500").join("\n")).toContain("HTTP 500");
+  });
+
+  it("says the reason is missing rather than implying there was none", () => {
+    const lines = unreadableSpecLines(null).join("\n");
+
+    expect(lines).toContain("not stated by the API");
+    expect(lines).toContain("could not be read");
   });
 });

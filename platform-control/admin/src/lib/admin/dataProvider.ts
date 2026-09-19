@@ -80,8 +80,15 @@ export type FedlexSparqlAcquisitionSpec = Schemas["FedlexSparqlAcquisitionSpec"]
  * The editable subset is a separate, explicit concept and stays that way —
  * `EDITABLE_PROVIDERS` / `isEditableProvider` in `sourceVersionForm.ts`. A
  * provider this form cannot edit must be *unrenderable*, never *unrepresentable*.
+ *
+ * `NonNullable` because this type means *a spec we could read*. Since #953 the
+ * field itself is nullable — the API reports a stored spec it can no longer
+ * parse as `null` plus an `acquisition_spec_error` rather than answering 500 —
+ * and the null belongs to the *field*, not to this union. Folding it in here
+ * would push "unreadable" into every provider branch that only ever deals with
+ * specs that parsed.
  */
-export type AcquisitionSpec = Schemas["SourceVersionResponse"]["acquisition_spec"];
+export type AcquisitionSpec = NonNullable<Schemas["SourceVersionResponse"]["acquisition_spec"]>;
 
 type Source = Schemas["SourceResponse"];
 

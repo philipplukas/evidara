@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  source version responses report an unreadable acquisition_spec instead of 500ing (#953)

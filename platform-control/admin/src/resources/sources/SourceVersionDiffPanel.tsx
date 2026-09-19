@@ -14,6 +14,8 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { AcquisitionSpec, SourceVersionRecord } from "../../lib/admin/dataProvider";
+import { InlineAlert } from "../../ui/primitives";
+import { unreadableSpecLines } from "./acquisitionSpecView";
 
 type DiffKind = "added" | "removed" | "changed" | "unchanged";
 
@@ -32,7 +34,14 @@ function displayValue(value: unknown): string {
   return String(value);
 }
 
-/** Produce a flat key-by-key diff between two acquisition spec objects. */
+/**
+ * Produce a flat key-by-key diff between two acquisition spec objects.
+ *
+ * `null` means the API could not read that side's stored spec (#953), which is
+ * not the same as an empty spec — diffing against `{}` would report every field
+ * on the other side as "added" or "removed" and invent a change nobody made. The
+ * caller checks both sides first and renders the refusal instead.
+ */
 function diffSpecs(previous: AcquisitionSpec, current: AcquisitionSpec): DiffEntry[] {
   const allKeys = new Set<string>([...Object.keys(previous), ...Object.keys(current)]);
   const entries: DiffEntry[] = [];
@@ -101,7 +110,16 @@ export function SourceVersionDiffPanel({
   defaultOpen = false,
 }: SourceVersionDiffPanelProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const entries = diffSpecs(previous.acquisition_spec, current.acquisition_spec);
+  const unreadableSide =
+    previous.acquisition_spec === null
+      ? previous
+      : current.acquisition_spec === null
+        ? current
+        : null;
+  const entries =
+    previous.acquisition_spec === null || current.acquisition_spec === null
+      ? []
+      : diffSpecs(previous.acquisition_spec, current.acquisition_spec);
   const changedCount = entries.filter((e) => e.kind !== "unchanged").length;
 
   return (
@@ -120,7 +138,16 @@ export function SourceVersionDiffPanel({
             </span>
           </span>
         </span>
-        {changedCount > 0 ? (
+        {unreadableSide !== null ? (
+          // "No changes" over an unreadable side would be a finding we never
+          // made. Say we could not compare (#953).
+          <span
+            className="text-[11px] text-[var(--status-critical)]"
+            data-testid="version-diff-not-comparable"
+          >
+            Not comparable
+          </span>
+        ) : changedCount > 0 ? (
           <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-semibold bg-[var(--attention-subtle)] text-[var(--attention)] border border-[var(--attention-border)]">
             {changedCount} {changedCount === 1 ? "change" : "changes"}
           </span>
@@ -129,7 +156,25 @@ export function SourceVersionDiffPanel({
         )}
       </button>
 
-      {open ? (
+      {open && unreadableSide !== null ? (
+        <div className="border-t border-[var(--border)] p-3">
+          <InlineAlert tone="error" testId="version-diff-unreadable">
+            <div className="space-y-1">
+              <p className="font-semibold text-[var(--foreground)]">
+                These versions cannot be compared
+              </p>
+              {unreadableSpecLines(unreadableSide.acquisition_spec_error).map((line) => (
+                <p key={line} className="text-[var(--foreground-muted)]">
+                  {line}
+                </p>
+              ))}
+              <p className="text-[var(--foreground-muted)]">
+                Unreadable side: <strong>{unreadableSide.version_label}</strong>.
+              </p>
+            </div>
+          </InlineAlert>
+        </div>
+      ) : open ? (
         <div className="border-t border-[var(--border)]">
           {/* Column headers */}
           <div className="grid grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,2fr)_80px] gap-px bg-[var(--brand-wash-6)]">

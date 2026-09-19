@@ -42,6 +42,7 @@ import {
 } from "../../ui/primitives";
 import { sourceVersionStatusToLevel } from "../shared/statusLevels";
 import { AcquisitionSpecPanel } from "./AcquisitionSpecPanel";
+import { unreadableSpecLines } from "./acquisitionSpecView";
 import { SourceVersionDiffPanel } from "./SourceVersionDiffPanel";
 import {
   describeSourceVersionStatus,
@@ -221,6 +222,20 @@ function SourceVersionForm({
             <strong>{formState.provider_template_id || "not selected"}</strong>.
           </InlineAlert>
         </>
+      ) : formState.spec_unreadable ? (
+        <InlineAlert tone="error" testId="version-form-spec-unreadable">
+          <div className="space-y-1">
+            <p className="font-semibold text-[var(--foreground)]">
+              This version's acquisition spec could not be read.
+            </p>
+            <p className="text-[var(--foreground-muted)]">
+              {formState.spec_error ?? "The API did not state a reason."} The version label and
+              extractor profile above are still editable and will save; the stored spec is left
+              exactly as it is, because rebuilding it here would replace a record nobody has read
+              with a default.
+            </p>
+          </div>
+        </InlineAlert>
       ) : !formState.spec_editable ? (
         <>
           <InlineAlert tone="warning">
@@ -671,7 +686,14 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
             overlay_id: formState.overlay_id,
             provider_template_id: formState.provider_template_id,
           }
-        : { acquisition_spec: toAcquisitionSpec(formState) };
+        : formState.spec_unreadable
+          ? // The API could not read this version's stored spec back (#953), so
+            // there is nothing to round-trip. `UpdateSourceVersionRequest` uses
+            // `exclude_unset`, so omitting the field leaves the stored value
+            // alone and the label / extractor profile still save. Sending a
+            // rebuilt spec would overwrite a record nobody has read.
+            {}
+          : { acquisition_spec: toAcquisitionSpec(formState) };
 
       if (editingVersion) {
         await dataProvider.update("source-versions", {
@@ -929,7 +951,12 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                         <td className="px-4 py-3.5">{version.extractor_profile_id ?? "—"}</td>
                         <td className="px-4 py-3.5">
                           <pre className="m-0 max-w-[260px] overflow-hidden whitespace-pre-wrap rounded-md border border-[var(--border-faint)] bg-[var(--surface-input)] p-2 font-mono text-[11px] leading-[1.6] text-[var(--foreground-muted)]">
-                            {summarizeAcquisitionSpec(version.acquisition_spec).join("\n")}
+                            {(version.acquisition_spec === null
+                              ? // Not "(empty)" — the stored spec exists and we
+                                // could not read it back (#953).
+                                unreadableSpecLines(version.acquisition_spec_error)
+                              : summarizeAcquisitionSpec(version.acquisition_spec)
+                            ).join("\n")}
                           </pre>
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap text-[12px] text-[var(--foreground-muted)]">
@@ -1025,7 +1052,10 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                       {isSpecOpen ? (
                         <tr className="border-t border-[var(--border-faint)] bg-[var(--surface-input)]">
                           <td colSpan={6} className="px-4 py-3">
-                            <AcquisitionSpecPanel spec={version.acquisition_spec} />
+                            <AcquisitionSpecPanel
+                              spec={version.acquisition_spec}
+                              specError={version.acquisition_spec_error}
+                            />
                           </td>
                         </tr>
                       ) : null}

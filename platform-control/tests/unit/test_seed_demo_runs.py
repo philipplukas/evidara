@@ -15,10 +15,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from platform_control.config import get_settings
-from platform_control.domain import ExecutionMode, RunStatus
+from platform_control.domain import AcquisitionProvider, ExecutionMode, RunStatus
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.run import Run
 from platform_control.models.source_version import SourceVersion
+from platform_control.schemas.source import parse_acquisition_spec
 from platform_control.seed_demo_runs import (
     DEMO_MARKER_KEY,
     DEMO_SOURCE_VERSION_ID,
@@ -115,6 +116,57 @@ async def test_demo_source_version_is_never_live(
 
     assert version is not None
     assert version.execution_mode is ExecutionMode.SHADOW
+
+
+@pytest.mark.asyncio
+async def test_demo_source_version_spec_is_one_the_api_can_serve(
+    session_maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """The seeder writes the ORM row directly, so nothing else validates its spec.
+
+    It used to write `{"kind": "demo_fixture", "targets": []}`, which no member of
+    the provider-discriminated union matches — so every read of the demo source's
+    version list raised inside response construction and answered 500 (#953).
+    """
+    await _seed_reference_data(session_maker)
+    await seed_demo_runs(session_maker)
+
+    async with session_maker() as session:
+        version = await session.get(SourceVersion, DEMO_SOURCE_VERSION_ID)
+
+    assert version is not None
+    spec = parse_acquisition_spec(version.acquisition_spec)
+    assert spec.provider is AcquisitionProvider.DETERMINISTIC_HTTP
+    # RFC 2606 reserves `.invalid`: the row cannot describe a reachable target even
+    # if something decided to dispatch it.
+    assert all(str(url).endswith(".invalid/fixtures") for url in spec.seed_urls)
+
+
+@pytest.mark.asyncio
+async def test_reseeding_repairs_a_spec_written_before_the_fix(
+    session_maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """A stack seeded before #953 still holds the unreadable row; re-running fixes it.
+
+    Without the repair the fix would ship and every already-seeded workstation would
+    keep answering 500, which reads as "the fix did nothing".
+    """
+    await _seed_reference_data(session_maker)
+    await seed_demo_runs(session_maker)
+
+    async with session_maker() as session:
+        version = await session.get(SourceVersion, DEMO_SOURCE_VERSION_ID)
+        assert version is not None
+        version.acquisition_spec = {"kind": "demo_fixture", "targets": []}
+        await session.commit()
+
+    await seed_demo_runs(session_maker)
+
+    async with session_maker() as session:
+        repaired = await session.get(SourceVersion, DEMO_SOURCE_VERSION_ID)
+
+    assert repaired is not None
+    assert parse_acquisition_spec(repaired.acquisition_spec) is not None
 
 
 @pytest.mark.asyncio
