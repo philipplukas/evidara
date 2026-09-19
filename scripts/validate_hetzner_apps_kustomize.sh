@@ -51,6 +51,15 @@ expected_names=(
   # namespace no declarative config governed, and this list not naming it is part
   # of why that went unnoticed for as long as it did.
   marketing
+  # The two CronJobs, added in #1038. Both were in `resources:` and neither was in
+  # this list, so dropping either from the kustomization rendered valid YAML, kept
+  # this check green, and silently stopped the job running — the precise failure
+  # the comment above this list describes, sitting inside the guard that describes
+  # it. A scheduled job is the worst case for that: nothing errors, nothing is
+  # deleted under `prune: false`, and the only symptom is work that quietly stops
+  # happening. Which is how 116 documents went unreclaimed for nine days.
+  platform-control-retention-sweep
+  platform-control-processing-reclaim
 )
 
 # The marketing Ingress is the other half of #884 and the half nothing checked: the

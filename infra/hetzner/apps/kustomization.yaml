@@ -14,6 +14,10 @@ resources:
   # Legal-retention hard delete (ADR-0031). In `resources:` so the `images:` pin
   # below applies and the tag never has to be maintained by hand.
   - retention-sweep-cronjob.yaml
+  # Terminal status for documents stranded mid-processing (#1038). In `resources:`
+  # for the same two reasons as the sweep above: the `images:` pin reaches it, and
+  # a CronJob that no kustomization renders is a fix that never runs.
+  - processing-reclaim-cronjob.yaml
   # The Alembic migrate Job, as an Argo CD `PreSync` hook (ADR-0055). It is in
   # `resources:` so Argo CD sees it at all — a hook Argo never renders cannot run,
   # and the rollout would then apply a platform-control expecting a migration the

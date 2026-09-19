@@ -58,6 +58,13 @@ _FIRECRAWL_WEBHOOKS_UNMATCHED = Counter(
 )
 
 
+_PROCESSING_UNITS_RECLAIMED = Counter(
+    "platform_control_processing_units_reclaimed_total",
+    "Processing units given a terminal status by the reclaim sweep because no "
+    "terminal status arrived before the deadline (#1038).",
+)
+
+
 def record_run_launched(provider: str) -> None:
     _RUNS_LAUNCHED.labels(provider=provider).inc()
 
@@ -73,6 +80,18 @@ def record_bundle_event_published(count: int = 1) -> None:
 
 def record_di_event_received(event_type: str) -> None:
     _DI_EVENTS_RECEIVED.labels(event_type=event_type).inc()
+
+
+def record_processing_units_reclaimed(count: int = 1) -> None:
+    """Count units the control plane stopped waiting for.
+
+    A non-zero rate is not a pipeline error rate — it is the rate at which
+    document-intelligence stops reporting on work it accepted. Before #1038 that
+    number was unobservable, so 116 documents sat unterminated for nine days while
+    both of their runs reported `completed`.
+    """
+    if count > 0:
+        _PROCESSING_UNITS_RECLAIMED.inc(count)
 
 
 def record_firecrawl_webhook_unmatched(*, event_type: str, reason: str) -> None:
