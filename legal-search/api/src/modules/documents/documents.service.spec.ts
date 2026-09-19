@@ -349,5 +349,4 @@ describe('DocumentsService read-time citation join (order independence)', () => 
       await expect(service.getDetail('doc_001')).rejects.toBeInstanceOf(TypeError);
     });
   });
-
 });
