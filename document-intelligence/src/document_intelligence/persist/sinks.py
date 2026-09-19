@@ -595,6 +595,7 @@ class DeltaCanonicalSink(CanonicalSink):
                     schema = None
             if schema is not None:
                 schema = _widen_for_new_nested_fields(schema, ready)
+                refuse_if_nested_keys_dropped(uri, schema, ready)
                 table = pa.Table.from_pylist(ready, schema=schema)
             else:
                 table = pa.Table.from_pylist(ready)
@@ -604,6 +605,12 @@ class DeltaCanonicalSink(CanonicalSink):
             if self._storage_options:
                 writer_kwargs["storage_options"] = self._storage_options
             self._writer(uri, table, **writer_kwargs)
+        except ProcessingError:
+            # A named refusal — `canonical_metadata_dropped` — must keep its own code.
+            # Flattening it to `delta_write_failed` would put a metadata loss and a
+            # transport fault under one indistinguishable name, which is the failure this
+            # issue is about, one layer up.
+            raise
         except Exception as error:  # pragma: no cover - library-specific
             raise ProcessingError(
                 "delta_write_failed",
@@ -818,6 +825,8 @@ class IcebergCanonicalSink(CanonicalSink):
                 schema = schema_override
                 table = None
 
+            if schema is not None:
+                refuse_if_nested_keys_dropped(identifier, schema, ready)
             arrow_table = (
                 pa.Table.from_pylist(ready, schema=schema) if schema is not None else pa.Table.from_pylist(ready)
             )
@@ -1082,6 +1091,99 @@ def _widen_for_new_nested_fields(schema: pa.Schema, rows: list[dict[str, object]
     # afterwards and drops to inference, which is how a new column reaches its
     # catalog loudly.
     return pa.schema(merged_fields)
+
+
+def _nested_keys_the_schema_cannot_hold(
+    field_type: pa.DataType,
+    value: object,
+    prefix: str,
+    lost: set[str],
+) -> None:
+    """Collect the paths in ``value`` that casting to ``field_type`` would silently drop."""
+
+    if pa.types.is_map(field_type):
+        # A map is keyed at the data level, not the schema level: it holds whatever the
+        # row carries. Nothing below it can be lost to the cast, so do not descend.
+        return
+    if pa.types.is_struct(field_type):
+        if not isinstance(value, Mapping):
+            return
+        declared = {field_type.field(i).name: field_type.field(i).type for i in range(field_type.num_fields)}
+        for key, inner in value.items():
+            if key not in declared:
+                # A null (or an emptied container, which `_normalize_delta_value` has
+                # already turned into one) carries nothing, so dropping it loses nothing.
+                # Only a value the producer actually resolved counts as loss.
+                if inner is not None and inner != {} and inner != []:
+                    lost.add(f"{prefix}.{key}")
+                continue
+            _nested_keys_the_schema_cannot_hold(declared[key], inner, f"{prefix}.{key}", lost)
+        return
+    if pa.types.is_list(field_type) or pa.types.is_large_list(field_type) or pa.types.is_fixed_size_list(field_type):
+        if not isinstance(value, (list, tuple)):
+            return
+        for item in value:
+            _nested_keys_the_schema_cannot_hold(field_type.value_type, item, f"{prefix}[]", lost)
+
+
+def dropped_nested_keys(schema: pa.Schema, rows: Sequence[Mapping[str, object]]) -> tuple[str, ...]:
+    """Every nested key in ``rows`` that ``schema`` cannot hold, as dotted paths (#871).
+
+    This is the measurement the write path never took. ``_widen_for_new_nested_fields``
+    stops the loss in the cases it can unify, but its fallback is deliberately conservative
+    and its only trace is a ``DEBUG`` record — invisible at the ``INFO`` the consumers run
+    at. So a genuine type conflict, or any future regression that weakens the widening,
+    goes back to discarding keys exactly as silently as before the fix.
+
+    Comparing the batch against the schema it is about to be cast to closes that: it reports
+    the outcome rather than the mechanism, so it holds whatever the reason for the loss.
+    """
+
+    declared = {schema.field(i).name: schema.field(i).type for i in range(len(schema))}
+    lost: set[str] = set()
+    for row in rows:
+        for column, value in row.items():
+            field_type = declared.get(column)
+            if field_type is None:
+                # A top-level column the schema lacks is handled by the callers, which drop
+                # to inference rather than cast. Not this function's case.
+                continue
+            _nested_keys_the_schema_cannot_hold(field_type, value, column, lost)
+    return tuple(sorted(lost))
+
+
+def refuse_if_nested_keys_dropped(
+    surface: str,
+    schema: pa.Schema,
+    rows: Sequence[Mapping[str, object]],
+) -> None:
+    """Refuse a write that would silently narrow the batch (#871 step 3, #958).
+
+    A canonical row that reaches Delta with a key missing is indistinguishable, ever after,
+    from a document for which nothing produced that key — which is the exact confusion
+    ADR-0052 and the #958 milestone exist to end, and it cannot be undone by widening the
+    schema later. Publishing the narrowed row is therefore the worse outcome: it converts a
+    recoverable write failure into an unrecoverable corpus claim.
+
+    So the write fails, loudly and by name, and the document stays unpublished until someone
+    looks. The operator's next step is the audit
+    (``python -m document_intelligence.persist.metadata_audit``), which says whether the
+    surface has lost anything already.
+    """
+
+    lost = dropped_nested_keys(schema, rows)
+    if not lost:
+        return
+    logger.error(
+        "canonical_metadata_dropped surface=%s keys=%s",
+        surface,
+        ",".join(lost),
+    )
+    raise ProcessingError(
+        "canonical_metadata_dropped",
+        f"refusing to write {surface}: the target schema cannot hold {len(lost)} key(s) the "
+        f"batch carries, and casting would discard them silently: {', '.join(lost)}",
+    )
 
 
 def _delta_ready_rows(
