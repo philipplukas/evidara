@@ -11,8 +11,9 @@ info:
   contact:
     name: Evidara Team
   license:
-    # The licence decision this block used to defer was made on 2026-09-16: the
-    # repository is Apache-2.0 (see /LICENSE). `identifier` is a valid SPDX
+    # The repository's licence is AGPL-3.0-only as of 2026-09-19 (see /LICENSE,
+    # and /LICENSE-HISTORY.md for the Apache-2.0 period this succeeds and does
+    # not withdraw). `identifier` is a valid SPDX
     # expression, which is what OpenAPI 3.1 requires when the field is present —
     # so declaring it also clears the two style warnings the old comment
     # catalogued (redocly `info-license-strict`, orval's bundled 3.0-shaped
@@ -25,8 +26,8 @@ info:
     # This licenses the SPEC and the code implementing it. It says nothing about
     # the legal corpus served through it, which carries each issuing body's own
     # terms — see the Licence section of /README.md.
-    name: Apache-2.0
-    identifier: Apache-2.0
+    name: AGPL-3.0-only
+    identifier: AGPL-3.0-only
 
 servers:
   - url: http://localhost:8091

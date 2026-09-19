@@ -12,7 +12,7 @@
  */
 "use client";
 
-import { BrandMark } from "@evidara/shell";
+import { BrandMark, RepositoryLink } from "@evidara/shell";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -232,8 +232,20 @@ export function AppBar() {
           ) : null}
         </div>
 
-        {/* Theme toggle + back-to-legal-search CTA */}
+        {/* Source link + theme toggle + back-to-legal-search CTA */}
         <div className="flex items-stretch lg:items-center gap-2 self-stretch lg:self-auto">
+          {/*
+            AGPL-3.0 section 13: an operator interacting with this control plane
+            over a network must be offered its source. The admin is a
+            network-facing surface, so this link is a licence obligation rather
+            than a convenience — see /LICENSE-HISTORY.md. It sits in the header
+            rather than the sidebar footer because the sidebar is `hidden
+            md:block`, which would leave mobile widths without it.
+          */}
+          <RepositoryLink
+            label="Source code on GitHub"
+            className="inline-flex items-center justify-center rounded-full px-2.5 self-stretch lg:self-auto min-h-11 sm:h-10 text-[var(--admin-on-brand-muted)] transition-colors hover:bg-[var(--admin-on-brand-wash-hover)] hover:text-[var(--admin-on-brand)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
+          />
           <ThemeToggle />
           <a
             href={handoff.returnToUrl}

@@ -254,6 +254,9 @@ jobs:
             CONTRIBUTING.md \
             SECURITY.md \
             THIRD-PARTY-NOTICES.md \
+            LICENSE-HISTORY.md \
+            CLA.md \
+            CLA-CORPORATE.md \
             docs/**/*.md \
             .github/pull_request_template.md \
             --config .markdownlint.json

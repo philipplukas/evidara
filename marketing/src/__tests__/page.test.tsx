@@ -1,3 +1,4 @@
+import { REPOSITORY_URL } from "@evidara/shell";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
@@ -44,6 +45,39 @@ describe("waitlist page", () => {
       expect(href).not.toMatch(/search\.evidara|admin\.evidara/);
     }
     expect(screen.queryByRole("link", { name: /try|demo|log ?in|sign ?in/i })).toBeNull();
+  });
+
+  /**
+   * AGPL-3.0 section 13: anyone interacting with this software over a network
+   * must be offered its source. This page is served over a network, so the
+   * footer link is a licence obligation rather than decoration — delete
+   * `<RepositoryLink>` from `page.tsx` and this test goes red, which is the
+   * whole point of it existing.
+   *
+   * Note the tension with the test above, and that it is real rather than
+   * accidental: this page links to *source*, never to a running deployment.
+   * The assertions below pin the distinction so a future edit cannot quietly
+   * turn one into the other.
+   *
+   * The drawn-path check mirrors `legal-search/frontend`'s (#995): an icon that
+   * resolves to `undefined` renders an empty anchor, which satisfies "a link
+   * exists" while showing the user nothing.
+   */
+  it("offers its source, as AGPL section 13 requires", () => {
+    render(<Home />);
+
+    const link = screen.getByRole("link", { name: /source code on github/i });
+
+    expect(link).toHaveAttribute("href", REPOSITORY_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+
+    const rel = link.getAttribute("rel") ?? "";
+    expect(rel).toContain("noopener");
+    expect(rel).toContain("noreferrer");
+
+    const path = link.querySelector("svg path");
+    expect(path).not.toBeNull();
+    expect(path?.getAttribute("d") ?? "").not.toHaveLength(0);
   });
 
   it("renders every capability and every stated limitation", () => {

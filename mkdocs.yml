@@ -87,6 +87,7 @@ nav:
   - Licensing:
       - Decision brief: licensing/README.md
       - Dependency licence inventory: licensing/dependency-licence-inventory.md
+      - AGPL compatibility audit: licensing/agpl-compatibility-audit.md
       - Drafts (unselected): licensing/drafts/README.md
       - "Draft: third-party notices": licensing/drafts/THIRD-PARTY-NOTICES.md
       - "Draft: manifest licence fields": licensing/drafts/manifest-license-fields.md

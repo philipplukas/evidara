@@ -1,5 +1,25 @@
 # Contributing to Evidara
 
+## Contributor License Agreement
+
+**Evidara requires a signed CLA before your first contribution can be merged.** Not a DCO — a CLA.
+
+- Individuals: [CLA.md](CLA.md)
+- If your employer owns the IP in your work: [CLA-CORPORATE.md](CLA-CORPORATE.md)
+
+Signing is a comment on your first pull request; the text to paste is at the bottom of
+[CLA.md](CLA.md#how-to-sign). You keep the copyright in your contribution.
+
+**Why a CLA and not a DCO.** Evidara is [AGPL-3.0-only](LICENSE), and the owner intends to keep the
+option of also selling a commercial licence to organisations that cannot use AGPL software. That
+requires a copyright licence from every contributor broad enough to relicense their code. A DCO
+certifies that you had the right to submit the code; it grants nothing. The CLA's section 4 states
+the commercial-licensing intent in plain words rather than burying it — read it, and if you do not
+want to grant it, say so on the pull request instead of signing.
+
+The CLA is adapted from the Apache Software Foundation's ICLA and CCLA, with every change from the
+original listed at the bottom of each document.
+
 ## Clean-Room Implementation
 
 This is a **clean-room implementation**. All contributions must adhere to the [clean-room principles](docs/architecture/clean-room-principles.md). Do not copy source code, tests, prompts, or proprietary documentation from prior repositories.
