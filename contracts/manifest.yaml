@@ -146,7 +146,15 @@ apis:
     # a court decision (#760). Additive and optional on the locked
     # `/v1/documents/{id}` path: no producer outside the seed scripts emits the
     # underlying index field, so every reader must keep handling its absence.
-    version: "0.11.0"
+    # 0.12.0: makes the document reader's structure real (#1040), on the locked
+    # `/v1/documents/{id}` path. `LocalStructureItem.text` carries the section
+    # text the mapper was dropping; `ReferenceItem` gains `targetDocumentId`,
+    # `unresolvedReason` and a REQUIRED `resolved`. Required rather than
+    # optional because an absent boolean reads as "not unresolved", which is
+    # the exact defect the field exists to close (ADR-0052) — and, as with
+    # 0.10.0's `visibility`, a response field becoming required only
+    # strengthens what a reader may rely on.
+    version: "0.12.0"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"

@@ -17,7 +17,7 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
 particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.11.0
+ * OpenAPI spec version: 0.12.0
  */
 
 export interface LocalStructureItem {
@@ -25,4 +25,11 @@ export interface LocalStructureItem {
   label: string;
   depth?: number;
   active?: boolean;
+  /** The section's own text, as the `sections` index holds it
+(`content_preview`). Omitted when the section carries none — an
+empty string would have the reader draw a paragraph around nothing.
+This is what makes the outline an outline rather than a list of
+labels.
+ */
+  text?: string;
 }

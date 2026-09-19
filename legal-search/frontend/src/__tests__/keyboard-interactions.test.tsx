@@ -45,11 +45,16 @@ describe("Keyboard interactions", () => {
     expect(onFocus).toHaveBeenCalledWith("decision-1");
   });
 
+  // A structure row activates `onSelectSection`, which moves the reader inside
+  // the open document. It used to activate `onFocus` — the workspace's
+  // *document* selection — with a `section_id`, which is what made every
+  // outline row a 404 (#1040).
   it("activates structure rows with Space", () => {
-    const onFocus = vi.fn();
+    const onSelectSection = vi.fn();
     renderWithProviders(
       <StructureTab
-        onFocus={onFocus}
+        onSelectSection={onSelectSection}
+        anchoredIds={new Set(["art-754", "art-755"])}
         items={[
           { id: "art-754", label: "Art. 754 - Liability", active: true },
           { id: "art-755", label: "Art. 755 - Audit", active: false },
@@ -61,7 +66,7 @@ describe("Keyboard interactions", () => {
     row.focus();
     fireEvent.keyDown(row, { key: " " });
 
-    expect(onFocus).toHaveBeenCalledWith("art-755");
+    expect(onSelectSection).toHaveBeenCalledWith("art-755");
   });
 
   it("toggles filter switch with Enter keyboard activation", () => {

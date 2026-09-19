@@ -389,6 +389,12 @@ Wer die Erfüllung einer Aufgabe befugterweise einem anderen Organ überträgt, 
       ],
     },
   ],
+  // `citation` and `resolved` are the fields the API sends. This mock used
+  // `subtitle`, a key no response has ever carried, and typed itself against a
+  // `ReferenceItem` that declared the same phantom key — so mock and view
+  // model agreed with each other and both disagreed with the API (#1040).
+  // `r3` is unresolved on purpose: the dev surface has to show the dead
+  // reference, not only the happy path.
   references: [
     {
       direction: "Cited by",
@@ -396,17 +402,47 @@ Wer die Erfüllung einer Aufgabe befugterweise einem anderen Organ überträgt, 
         {
           id: "r1",
           title: "Art. 756 OR",
-          subtitle: "Klagerecht der Gesellschaft und der Aktionäre",
+          citation: "Klagerecht der Gesellschaft und der Aktionäre",
+          resolved: true,
+          targetDocumentId: "doc_or_756",
+          href: "/documents/doc_or_756",
         },
-        { id: "r2", title: "Art. 757 OR", subtitle: "Klagerecht der Gläubiger" },
-        { id: "r3", title: "Art. 725a OR", subtitle: "Drohende Zahlungsunfähigkeit" },
+        {
+          id: "r2",
+          title: "Art. 757 OR",
+          citation: "Klagerecht der Gläubiger",
+          resolved: true,
+          targetDocumentId: "doc_or_757",
+          href: "/documents/doc_or_757",
+        },
+        {
+          id: "r3",
+          title: "Art. 725a OR",
+          citation: "Drohende Zahlungsunfähigkeit",
+          resolved: false,
+          unresolvedReason: "no_target_in_corpus",
+        },
       ],
     },
     {
       direction: "Cites",
       items: [
-        { id: "r4", title: "Art. 717 OR", subtitle: "Sorgfalts- und Treuepflicht" },
-        { id: "r5", title: "Art. 41 OR", subtitle: "Allgemeine Haftungsvoraussetzungen" },
+        {
+          id: "r4",
+          title: "Art. 717 OR",
+          citation: "Sorgfalts- und Treuepflicht",
+          resolved: true,
+          targetDocumentId: "doc_or_717",
+          href: "/documents/doc_or_717",
+        },
+        {
+          id: "r5",
+          title: "Art. 41 OR",
+          citation: "Allgemeine Haftungsvoraussetzungen",
+          resolved: true,
+          targetDocumentId: "doc_or_41",
+          href: "/documents/doc_or_41",
+        },
       ],
     },
   ],
@@ -511,16 +547,50 @@ Das Bundesgericht bestätigt, dass die Verantwortlichkeit nach Art. 754 OR eine 
     {
       direction: "Cited by",
       items: [
-        { id: "cb1", title: "BGer 4A_567/2023", subtitle: "Federal Supreme Court · 12.01.2024" },
-        { id: "cb2", title: "BGer 4A_890/2022", subtitle: "Federal Supreme Court · 05.09.2023" },
+        {
+          id: "cb1",
+          title: "BGer 4A_567/2023",
+          citation: "Federal Supreme Court · 12.01.2024",
+          resolved: true,
+          targetDocumentId: "doc_bger_4a_567_2023",
+          href: "/documents/doc_bger_4a_567_2023",
+        },
+        {
+          id: "cb2",
+          title: "BGer 4A_890/2022",
+          citation: "Federal Supreme Court · 05.09.2023",
+          resolved: true,
+          targetDocumentId: "doc_bger_4a_890_2022",
+          href: "/documents/doc_bger_4a_890_2022",
+        },
       ],
     },
     {
       direction: "Cites",
       items: [
-        { id: "ct1", title: "BGE 132 III 564", subtitle: "Federal Supreme Court · 2006" },
-        { id: "ct2", title: "BGE 139 III 24", subtitle: "Federal Supreme Court · 2013" },
-        { id: "ct3", title: "BGE 144 III 93", subtitle: "Federal Supreme Court · 2018" },
+        {
+          id: "ct1",
+          title: "BGE 132 III 564",
+          citation: "Federal Supreme Court · 2006",
+          resolved: true,
+          targetDocumentId: "doc_bge_132_iii_564",
+          href: "/documents/doc_bge_132_iii_564",
+        },
+        {
+          id: "ct2",
+          title: "BGE 139 III 24",
+          citation: "Federal Supreme Court · 2013",
+          resolved: true,
+          targetDocumentId: "doc_bge_139_iii_24",
+          href: "/documents/doc_bge_139_iii_24",
+        },
+        {
+          id: "ct3",
+          title: "BGE 144 III 93",
+          citation: "Federal Supreme Court · 2018",
+          resolved: false,
+          unresolvedReason: "no_target_in_corpus",
+        },
       ],
     },
   ],
