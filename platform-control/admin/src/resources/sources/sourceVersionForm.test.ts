@@ -20,6 +20,7 @@ const baseVersion = (overrides: Partial<SourceVersionRecord>): SourceVersionReco
   version_label: overrides.version_label ?? "v1",
   status: overrides.status ?? "draft",
   execution_mode: overrides.execution_mode ?? "off",
+  acquisition_spec_error: overrides.acquisition_spec_error ?? null,
   acquisition_spec:
     overrides.acquisition_spec ??
     buildAcquisitionSpec({
@@ -411,5 +412,73 @@ describe("acquisition-spec round-trip (#614)", () => {
     expect(spec).not.toHaveProperty("mode");
     expect(spec).not.toHaveProperty("include_paths");
     expect(spec).not.toHaveProperty("limit");
+  });
+});
+
+/**
+ * #953 — a version whose stored `acquisition_spec` the API could not parse back
+ * arrives as `null` with an `acquisition_spec_error`. The form must hand it back
+ * untouched: rebuilding a spec from `emptyFormState()` means firecrawl, and would
+ * overwrite a record nobody has read with a plausible default. That is #614
+ * again, with the evidence already gone.
+ */
+describe("a version whose stored spec could not be read", () => {
+  // `baseVersion` coalesces an absent spec to a default one, so the null is
+  // applied after it — the point of this fixture is the null.
+  const unreadable: SourceVersionRecord = {
+    ...baseVersion({ source_version_id: "sv_unreadable", version_label: "demo-run-states" }),
+    acquisition_spec: null,
+    acquisition_spec_error: "<root>: Unable to extract tag using discriminator 'provider'",
+  };
+
+  it("loads read-only, and says why", () => {
+    const form = toFormState(unreadable);
+
+    expect(form.spec_unreadable).toBe(true);
+    expect(form.spec_editable).toBe(false);
+    expect(form.spec_error).toContain("discriminator");
+    // The rest of the version is still editable — the spec is the broken part.
+    expect(form.version_label).toBe("demo-run-states");
+  });
+
+  it("is distinguishable from a provider that merely has no widgets", () => {
+    // Both are read-only, and they are not the same fact: one spec we
+    // understand and cannot edit, one we could not read at all.
+    const noWidgets = toFormState(
+      baseVersion({
+        acquisition_spec: buildAcquisitionSpec({
+          provider: "canton_http",
+          canton_code: "CH-ZH",
+          seed_url: "https://www.zh.ch/de.html",
+        }),
+      }),
+    );
+
+    expect(noWidgets.spec_editable).toBe(false);
+    expect(noWidgets.spec_unreadable).toBe(false);
+    expect(toFormState(unreadable).spec_unreadable).toBe(true);
+  });
+
+  it("refuses to build a replacement spec for it", () => {
+    // The mutation test for that refusal: delete the `spec_unreadable` guard in
+    // `toAcquisitionSpec` and this goes green while the function silently
+    // returns a firecrawl spec.
+    expect(() => toAcquisitionSpec(toFormState(unreadable))).toThrow(/could not be read/);
+  });
+
+  it("does not refuse for an ordinary read-only spec", () => {
+    // The guard must fire for the unreadable case only; a canton_http version
+    // still round-trips its spec unchanged.
+    const form = toFormState(
+      baseVersion({
+        acquisition_spec: buildAcquisitionSpec({
+          provider: "canton_http",
+          canton_code: "CH-ZH",
+          seed_url: "https://www.zh.ch/de.html",
+        }),
+      }),
+    );
+
+    expect(toAcquisitionSpec(form)).toMatchObject({ provider: "canton_http" });
   });
 });

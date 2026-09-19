@@ -110,6 +110,16 @@ export type SourceVersionFormState = {
    * The dialog then shows the spec read-only and round-trips it untouched.
    */
   spec_editable: boolean;
+  /**
+   * True when the API could not read the stored spec back at all — it answered
+   * `acquisition_spec: null` with an `acquisition_spec_error` (#953). Distinct
+   * from `spec_editable: false`, which means "a spec we understand, but have no
+   * widgets for". Here we understand nothing, so there is nothing to round-trip
+   * and a save must leave the stored spec alone rather than rebuild it.
+   */
+  spec_unreadable: boolean;
+  /** Why the stored spec could not be read, straight from the API. */
+  spec_error: string | null;
 };
 
 export const SOURCE_VERSION_LIST_PARAMS = {
@@ -144,6 +154,8 @@ export const emptyFormState = (): SourceVersionFormState => ({
   max_expressions: "1",
   original_spec: null,
   spec_editable: true,
+  spec_unreadable: false,
+  spec_error: null,
 });
 
 export const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: string }>> = {
@@ -391,7 +403,6 @@ export const toFormState = (version?: SourceVersionRecord | null): SourceVersion
     return emptyFormState();
   }
   const spec = version.acquisition_spec;
-  const provider = specProvider(spec);
   const common = {
     version_label: version.version_label,
     extractor_profile_id: version.extractor_profile_id ?? "",
@@ -400,6 +411,23 @@ export const toFormState = (version?: SourceVersionRecord | null): SourceVersion
     provider_template_id: "ris_ogd_bundesrecht",
     original_spec: spec,
   } as const;
+
+  // The API could not parse the stored spec back (#953). There is nothing to
+  // merge an edit over, so the dialog must not offer to rebuild one: a rebuild
+  // starts from `emptyFormState()`, which is firecrawl, and would overwrite a
+  // record nobody has read with a plausible-looking default. That is #614 again,
+  // with the evidence already gone.
+  if (spec === null) {
+    return {
+      ...emptyFormState(),
+      ...common,
+      spec_editable: false,
+      spec_unreadable: true,
+      spec_error: version.acquisition_spec_error,
+    };
+  }
+
+  const provider = specProvider(spec);
 
   // A provider this form has no widgets for (canton_http, gemeinde_http,
   // legifrance, …). Rebuilding it from form fields would rewrite it as
@@ -573,6 +601,19 @@ const toProviderSpec = (state: SourceVersionFormState): Partial<AcquisitionSpec>
  */
 export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<AcquisitionSpec> => {
   const original = state.original_spec;
+
+  // There is no spec to send for a version whose stored one could not be read
+  // (#953), and the fall-through below would invent a firecrawl-shaped one. The
+  // caller is expected to omit `acquisition_spec` from the payload entirely —
+  // `UpdateSourceVersionRequest` uses `exclude_unset`, so an omitted field leaves
+  // the stored value alone. Reaching here means that was not done, which is a bug
+  // worth failing loudly for rather than silently overwriting a record.
+  if (state.spec_unreadable) {
+    throw new Error(
+      "refusing to build an acquisition_spec for a version whose stored spec could " +
+        "not be read: omit the field so the server leaves it unchanged (#953)",
+    );
+  }
 
   // A provider the form never modelled: there is nothing to merge, and
   // rebuilding it would be the corruption. Send back exactly what we loaded.

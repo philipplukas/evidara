@@ -4285,8 +4285,16 @@ export interface components {
             version_label: string;
             status: components["schemas"]["SourceVersionStatus"];
             execution_mode: components["schemas"]["ExecutionMode"];
-            /** Acquisition Spec */
-            acquisition_spec: components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["LexFindAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"];
+            /**
+             * Acquisition Spec
+             * @description The stored acquisition spec. `null` **only** when the stored JSON no longer validates against any known provider, in which case `acquisition_spec_error` says why. A null spec is therefore never 'this version has no spec' — see #953 and ADR-0052.
+             */
+            acquisition_spec: (components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["LexFindAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"]) | null;
+            /**
+             * Acquisition Spec Error
+             * @description Why the stored acquisition spec could not be read back, or `null` when it read back fine. Set together with a null `acquisition_spec`; exactly one of the two is always populated.
+             */
+            acquisition_spec_error: string | null;
             /**
              * Created At
              * Format: date-time

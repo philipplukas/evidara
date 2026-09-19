@@ -104,4 +104,65 @@ describe('SearchService', () => {
     expect(result.results).toEqual([]);
     expect(result.facets).toEqual([]);
   });
+
+  // ─── #975 gap A: the query names a place, and that must reach the ranker ───
+
+  describe('jurisdiction mentions as a ranking signal (#975 gap A)', () => {
+    it('prefers the named canton AND the federal tier above it, never one alone', async () => {
+      // Both halves are load-bearing and were measured against production:
+      // without the canton, "Kanton Bern" returned a ZURICH document whose
+      // title merely contains the word Bern; without the federal tier, the
+      // Tierschutzgesetz fell out of the top 20 of the dog question entirely.
+      const repo = createMockRepo({
+        getHeldJurisdictionIds: vi.fn().mockResolvedValue(['jur_ch_be', 'jur_ch_zh']),
+      });
+      const service = new SearchService(repo, new CorpusJurisdictionsService(repo));
+
+      await service.search('Hundehaltung Kanton Bern Vorschriften');
+
+      const [, options] = (repo.search as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(options.boostJurisdictionIds).toEqual(
+        expect.arrayContaining(['jur_ch_be', 'jur_ch_federal']),
+      );
+    });
+
+    it('passes it as a ranking signal, never as a filter', async () => {
+      // `jurisdictionIds` REMOVES everything else; this must not. A query naming
+      // Zürich that silently filtered to Zürich would hide the federal act.
+      const repo = createMockRepo();
+      const service = new SearchService(repo, new CorpusJurisdictionsService(repo));
+
+      await service.search('Hundegesetz Kanton Zuerich');
+
+      const [, options] = (repo.search as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(options.boostJurisdictionIds).toEqual(expect.arrayContaining(['jur_ch_zh']));
+      expect(options.jurisdictionIds).toBeUndefined();
+    });
+
+    it('sends no signal at all when the query names nowhere', async () => {
+      // The overwhelming majority of queries. They must be scored exactly as
+      // they are today — an empty array here would be a clause that matches
+      // nothing and still changes the query.
+      const repo = createMockRepo();
+      const service = new SearchService(repo, new CorpusJurisdictionsService(repo));
+
+      await service.search('Anrechnung auslaendischer Quellensteuern');
+
+      const [, options] = (repo.search as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(options.boostJurisdictionIds).toBeUndefined();
+    });
+
+    it('does not reach the repository at all when the corpus refuses', async () => {
+      // Refusal wins over ranking: there is nothing to rank.
+      const repo = createMockRepo({
+        getHeldJurisdictionIds: vi.fn().mockResolvedValue(['jur_ch_zh']),
+      });
+      const service = new SearchService(repo, new CorpusJurisdictionsService(repo));
+
+      const result = await service.search('Hundegesetz Kanton Aargau');
+
+      expect(result.refusal?.code).toBe('jurisdiction_not_held');
+      expect(repo.search).not.toHaveBeenCalled();
+    });
+  });
 });

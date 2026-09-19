@@ -23,11 +23,12 @@
 
 import { useMemo, useState } from "react";
 import type { AcquisitionSpec } from "../../lib/admin/dataProvider";
-import { CodeBlock } from "../../ui/primitives";
+import { CodeBlock, InlineAlert } from "../../ui/primitives";
 import {
   formatSpecEntryValue,
   partitionAcquisitionSpec,
   type SpecEntry,
+  unreadableSpecLines,
 } from "./acquisitionSpecView";
 
 function EntryRows({ entries }: { entries: SpecEntry[] }) {
@@ -59,9 +60,40 @@ function Group({ title, hint, entries }: { title: string; hint: string; entries:
   );
 }
 
-export function AcquisitionSpecPanel({ spec }: { spec: AcquisitionSpec }) {
+export function AcquisitionSpecPanel({
+  spec,
+  specError = null,
+}: {
+  spec: AcquisitionSpec | null;
+  /** Set when `spec` is null: why the API could not read the stored one (#953). */
+  specError?: string | null;
+}) {
   const [showRaw, setShowRaw] = useState(false);
-  const partitioned = useMemo(() => partitionAcquisitionSpec(spec), [spec]);
+  const partitioned = useMemo(
+    () => (spec === null ? null : partitionAcquisitionSpec(spec)),
+    [spec],
+  );
+
+  // A spec we could not read is not an empty spec. Rendering the usual groups
+  // with nothing in them would say "this version is configured with nothing",
+  // which is the false statement #953 is about.
+  if (partitioned === null) {
+    const [headline, ...rest] = unreadableSpecLines(specError);
+    return (
+      <div className="space-y-3" data-testid="acquisition-spec-panel">
+        <InlineAlert tone="error" testId="acquisition-spec-unreadable">
+          <div className="space-y-1">
+            <p className="font-semibold text-[var(--foreground)]">{headline}</p>
+            {rest.map((line) => (
+              <p key={line} className="text-[var(--foreground-muted)]">
+                {line}
+              </p>
+            ))}
+          </div>
+        </InlineAlert>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3" data-testid="acquisition-spec-panel">

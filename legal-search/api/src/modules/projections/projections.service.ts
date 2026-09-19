@@ -4,6 +4,7 @@ import { normalizeDocumentType } from '../../core/vocabularies';
 import {
   DOCUMENT_INTELLIGENCE_CLIENT,
   type DocumentIntelligenceClient,
+  LeanDocumentUnavailableError,
 } from '../../lib/document-intelligence/document-intelligence.client';
 // The abbreviation SHAPE test is shared with the resolver on purpose: minting
 // a node the resolver's key format cannot address is the drift that silently
@@ -66,15 +67,38 @@ export class ProjectionsService {
       return { eventId: event.event_id, status: 'stale' };
     }
 
-    const leanDocument = await this.documentIntelligence.fetchLeanDocument(
-      event.payload.document_id,
-      {
+    let leanDocument: unknown | null;
+    try {
+      leanDocument = await this.documentIntelligence.fetchLeanDocument(event.payload.document_id, {
         correlationId: event.correlation_id,
         documentRevision: event.payload.document_revision,
-      },
-    );
+      });
+    } catch (err) {
+      if (!(err instanceof LeanDocumentUnavailableError)) throw err;
+      // Same disposition as the refusal below — retry — but recorded as a
+      // different fact. Until #984 this arrived as `null` and was logged as
+      // "enrichment unavailable", so a broken upstream and a document that has
+      // no canonical row produced byte-identical evidence. Both are retryable
+      // here (the row may exist by the next delivery), so the status stays 503
+      // on purpose; what changes is that the DLQ reader can now tell which
+      // happened without guessing.
+      this.logger.warn('projection_enrichment_read_failed', {
+        document_id: event.payload.document_id,
+        document_revision: event.payload.document_revision,
+        correlation_id: event.correlation_id,
+        upstream_status: err.status,
+      });
+      throw new ServiceUnavailableException(
+        `Cannot project ${event.payload.document_id}: the read from document-intelligence ` +
+          `failed (upstream ${err.status ?? 'no response'}). Retryable — the event is redelivered.`,
+      );
+    }
     if (leanDocument === null) {
       // REFUSE. Do not project a record we cannot enrich (#1028, ADR-0033).
+      //
+      // Since #984 `null` means one thing only: document-intelligence answered
+      // 404, or the integration is switched off. A read that FAILED no longer
+      // arrives here — it throws above.
       //
       // This used to log and carry on — "keep projection flow non-blocking when
       // DI read API is unavailable" — and `buildProjection` then filled the gaps:

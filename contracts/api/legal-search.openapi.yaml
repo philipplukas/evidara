@@ -244,6 +244,15 @@ paths:
                 $ref: "#/components/schemas/DetailView"
         "404":
           description: Document not found
+        "503":
+          description: |
+            The document exists but its body could not be read.
+
+            Returned only when the index holds no body for the document AND the
+            canonical-text read from document-intelligence failed (5xx, timeout,
+            transport error). Distinct from a 200 whose `content` is absent —
+            that is a document we hold no text for, which is a fact about the
+            corpus rather than a failed read (#984).
 
   /v1/documents/{document_id}/sections:
     get:

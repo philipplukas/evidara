@@ -39,6 +39,7 @@ const cantonVersion: SourceVersionRecord = {
   version_label: "v1",
   status: "draft",
   execution_mode: "off",
+  acquisition_spec_error: null,
   acquisition_spec: buildAcquisitionSpec({
     provider: "canton_http",
     canton_code: "CH-ZH",
