@@ -22,6 +22,7 @@ import {
 } from '../../../core/presentation/metadata-icons';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
+import type { CitationUnresolvedReason } from '../../citations/citation-resolution';
 import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/document.entities';
 
 /**
@@ -78,11 +79,25 @@ export interface DetailView {
       title: string;
       citation: string;
       href?: string;
+      /**
+       * The document the citation resolves to, present exactly when `href` is.
+       * The reader navigates by document id (`?item=`), not by URL path, so it
+       * gets the id rather than re-parsing a display href.
+       */
+      targetDocumentId?: string;
+      /**
+       * Whether the corpus holds the cited norm. Required, and `false` is a
+       * real answer the client must render differently — see
+       * `composeReferences`.
+       */
+      resolved: boolean;
+      /** Why not, when the index recorded a reason. */
+      unresolvedReason?: CitationUnresolvedReason;
     }[];
   }[];
   annotations: { id: string; label: string; text: string; type?: string }[];
   localStructure?: {
-    items: { id: string; label: string; depth?: number; active?: boolean }[];
+    items: { id: string; label: string; depth?: number; active?: boolean; text?: string }[];
   };
 }
 
@@ -261,13 +276,34 @@ function composeReferences(
     if (!groups.has(groupLabel)) {
       groups.set(groupLabel, { label: groupLabel, items: [] });
     }
+    // Resolution is decided by `target_document_id` and nothing else.
+    //
+    // That field is what `href` is built from, and `DocumentsService.
+    // joinUnresolvedCitations` fills it in at read time for edges the index
+    // wrote before their target was projected. The index's own `resolved`
+    // flag is a write-time denormalization that goes stale in BOTH
+    // directions, so keying the link off it would either hide a link the
+    // corpus can now serve or advertise one it cannot.
+    //
+    // `resolved: false` is the answer, not the absence of one: the four
+    // citations on the ZH Hundegesetz all carry `no_target_in_corpus`, and
+    // rendering them as rows identical to resolvable ones is the reader
+    // claiming a norm is reachable when the corpus says it is not (ADR-0052,
+    // #1040).
+    const resolved = Boolean(cit.target_document_id);
     groups.get(groupLabel)!.items.push({
       id: cit.citation_id,
       title: cit.target_title ?? cit.citation_text,
       citation: cit.citation_text,
+      resolved,
       ...(cit.target_document_id && {
+        targetDocumentId: cit.target_document_id,
         href: `/documents/${cit.target_document_id}`,
       }),
+      // Only when it is both unresolved AND the index said why. An
+      // unresolved row with no recorded reason still reports unresolved; it
+      // does not acquire an invented cause.
+      ...(!resolved && cit.unresolved_reason && { unresolvedReason: cit.unresolved_reason }),
     });
   }
 
@@ -287,6 +323,13 @@ function composeLocalStructure(
         id: s.section_id,
         label: s.title ?? `${t('labels.section', locale)} ${s.ordinal ?? 0}`,
         depth: s.depth,
+        // The section's own text. The `sections` index carries it on all
+        // 50,389 rows and this mapper used to drop it, so the outline
+        // reached the reader as labels with nothing under them — a list, not
+        // a structure (#1040). Same honesty rule as `content` and `regeste`
+        // above: a whitespace-only preview is omitted rather than shipped, so
+        // the client can tell "no text" from "blank text".
+        ...(hasBodyText(s.content_preview) && { text: s.content_preview.trim() }),
       })),
   };
 }

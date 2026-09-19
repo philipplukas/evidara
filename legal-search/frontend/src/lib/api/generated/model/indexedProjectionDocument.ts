@@ -17,7 +17,7 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
 particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.11.0
+ * OpenAPI spec version: 0.12.0
  */
 
 export interface IndexedProjectionDocument {

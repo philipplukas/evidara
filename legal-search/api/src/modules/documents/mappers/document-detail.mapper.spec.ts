@@ -47,6 +47,39 @@ const sections: SectionEntity[] = [
   },
 ];
 
+/**
+ * Sections as the `sections` index really holds them: nested by `depth`, each
+ * carrying the `content_preview` the mapper used to drop. The third row has a
+ * whitespace-only preview, which the index does store and which must not reach
+ * the client as `text: ''`.
+ */
+const nestedSections: SectionEntity[] = [
+  {
+    section_id: 'sec_100',
+    document_id: 'doc_001',
+    title: 'I. Allgemeine Bestimmungen',
+    ordinal: 0,
+    depth: 0,
+    content_preview: 'Dieses Gesetz regelt die Haltung von Hunden.',
+  },
+  {
+    section_id: 'sec_101',
+    document_id: 'doc_001',
+    title: '§ 1 Meldepflicht',
+    ordinal: 1,
+    depth: 1,
+    content_preview: 'Wer einen Hund hält, meldet ihn der Gemeinde.',
+  },
+  {
+    section_id: 'sec_102',
+    document_id: 'doc_001',
+    title: '§ 2 Aufgehoben',
+    ordinal: 2,
+    depth: 1,
+    content_preview: '   ',
+  },
+];
+
 const citations: CitationEntity[] = [
   {
     citation_id: 'cit_001',
@@ -58,6 +91,31 @@ const citations: CitationEntity[] = [
     resolved: true,
   },
 ];
+
+/**
+ * A citation exactly as the ZH Hundegesetz's four are indexed: a well-formed
+ * key, no target, and a recorded reason. Measured live 2026-09-19 (#1040).
+ */
+const unresolvedCitations: CitationEntity[] = [
+  {
+    citation_id: 'cit_doc_001_1',
+    source_document_id: 'doc_001',
+    citation_text: 'SR 455.1',
+    citation_type: 'SR',
+    normalized_reference: 'sr:455.1',
+    resolved: false,
+    unresolved_reason: 'no_target_in_corpus',
+  },
+];
+
+/** Indexed before `unresolved_reason` existed: unresolved, cause unrecorded. */
+const reasonlessCitation: CitationEntity = {
+  citation_id: 'cit_doc_001_2',
+  source_document_id: 'doc_001',
+  citation_text: 'SR 210',
+  citation_type: 'SR',
+  resolved: false,
+};
 
 const minimalDoc: DocumentEntity = {
   document_id: 'doc_099',
@@ -306,11 +364,95 @@ describe('mapDocumentToDetailView', () => {
     expect(view.references[0].items[0].href).toBe('/documents/doc_010');
   });
 
+  it('should carry the target document id beside the href on a resolved citation', () => {
+    // The reader navigates by `?item=<document_id>`, not by URL path, so the
+    // id is what it needs. Before #1040 it had only `href`, read it as a
+    // document id, and called GET /v1/documents/cit_… — a 404 on every click.
+    const view = mapDocumentToDetailView(lawDoc, sections, citations);
+    const item = view.references[0].items[0];
+    expect(item.resolved).toBe(true);
+    expect(item.targetDocumentId).toBe('doc_010');
+    expect(item.unresolvedReason).toBeUndefined();
+  });
+
   it('should compose localStructure from sections', () => {
     const view = mapDocumentToDetailView(lawDoc, sections, citations);
     expect(view.localStructure).toBeDefined();
     expect(view.localStructure!.items).toHaveLength(2);
     expect(view.localStructure!.items[0].label).toBe('Allgemeine Bestimmungen');
+  });
+
+  it('should carry section depth and text into localStructure', () => {
+    // The `sections` index carries `depth` and `content_preview` on every one
+    // of its 50,389 rows. `composeLocalStructure` emitted neither the text nor
+    // — one hop later — the depth, so the outline arrived as a flat list of
+    // labels with nothing under them (#1040).
+    const view = mapDocumentToDetailView(lawDoc, nestedSections, []);
+    const items = view.localStructure!.items;
+
+    expect(items.map((i) => i.depth)).toEqual([0, 1, 1]);
+    expect(items[0].text).toBe('Dieses Gesetz regelt die Haltung von Hunden.');
+    expect(items[1].text).toBe('Wer einen Hund hält, meldet ihn der Gemeinde.');
+  });
+
+  it('should omit section text when the preview is blank rather than shipping an empty string', () => {
+    // Same rule as `content` and `regeste`: the client cannot tell "no text"
+    // from "text that is blank" once the key is present.
+    const view = mapDocumentToDetailView(lawDoc, nestedSections, []);
+    const blank = view.localStructure!.items[2];
+
+    expect(blank.text).toBeUndefined();
+    expect('text' in blank).toBe(false);
+  });
+
+  // ─── Unresolved citations (ADR-0052: unknown is not zero) ───
+  //
+  // GUARD. The rule under test is `composeReferences`'s `const resolved =
+  // Boolean(cit.target_document_id)` and the two spreads it gates. Delete the
+  // `resolved` key from the emitted item, or key it off `cit.resolved`
+  // instead, and the two assertions below go red.
+
+  it('should mark a citation whose target the corpus does not hold as unresolved', () => {
+    const view = mapDocumentToDetailView(lawDoc, [], unresolvedCitations);
+    const item = view.references[0].items[0];
+
+    expect(item.resolved).toBe(false);
+    expect(item.unresolvedReason).toBe('no_target_in_corpus');
+  });
+
+  it('should give an unresolved citation no href and no target id to follow', () => {
+    // The whole defect: an unresolved row rendered identically to a
+    // resolvable one, so clicking it navigated to a document that is not in
+    // the corpus. A dead reference must carry nothing to follow.
+    const view = mapDocumentToDetailView(lawDoc, [], unresolvedCitations);
+    const item = view.references[0].items[0];
+
+    expect(item.href).toBeUndefined();
+    expect(item.targetDocumentId).toBeUndefined();
+  });
+
+  it('should still report unresolved when the index recorded no reason', () => {
+    // Absent reason is a third state. The row stays unresolved; it does not
+    // acquire an invented cause, and it does not silently become resolvable.
+    const view = mapDocumentToDetailView(lawDoc, [], [reasonlessCitation]);
+    const item = view.references[0].items[0];
+
+    expect(item.resolved).toBe(false);
+    expect(item.unresolvedReason).toBeUndefined();
+    expect(item.href).toBeUndefined();
+  });
+
+  it('should trust the read-time join over the index flag', () => {
+    // `DocumentsService.joinUnresolvedCitations` fills `target_document_id`
+    // for edges the index wrote before their target was projected, and leaves
+    // the stale `resolved: false` in place. Keying off the index flag would
+    // withhold a link the corpus can serve.
+    const joined = { ...unresolvedCitations[0], target_document_id: 'doc_777', resolved: false };
+    const item = mapDocumentToDetailView(lawDoc, [], [joined]).references[0].items[0];
+
+    expect(item.resolved).toBe(true);
+    expect(item.href).toBe('/documents/doc_777');
+    expect(item.unresolvedReason).toBeUndefined();
   });
 
   it('should omit optional fields when absent', () => {

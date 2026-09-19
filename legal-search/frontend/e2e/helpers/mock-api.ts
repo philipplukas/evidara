@@ -168,6 +168,10 @@ function buildRichDetail(documentId: string) {
         ],
       },
     ],
+    // `citation` and `resolved` are what `ReferenceItem` requires; `subtitle`
+    // was a key no API response has ever sent, so these rows used to render
+    // their titles alone (#1040). `ct2` is unresolved on purpose — the
+    // dead-reference state needs a browser-level fixture too.
     references: [
       {
         label: "Cited by",
@@ -175,12 +179,18 @@ function buildRichDetail(documentId: string) {
           {
             id: "cb1",
             title: "BGer 4A_567/2023",
-            subtitle: "Federal Supreme Court · 12.01.2024",
+            citation: "Federal Supreme Court · 12.01.2024",
+            resolved: true,
+            targetDocumentId: "decision-cb1",
+            href: "/documents/decision-cb1",
           },
           {
             id: "cb2",
             title: "BGer 4A_890/2022",
-            subtitle: "Federal Supreme Court · 05.09.2023",
+            citation: "Federal Supreme Court · 05.09.2023",
+            resolved: true,
+            targetDocumentId: "decision-cb2",
+            href: "/documents/decision-cb2",
           },
         ],
       },
@@ -190,12 +200,17 @@ function buildRichDetail(documentId: string) {
           {
             id: "ct1",
             title: "BGE 132 III 564",
-            subtitle: "Federal Supreme Court · 2006",
+            citation: "Federal Supreme Court · 2006",
+            resolved: true,
+            targetDocumentId: "decision-ct1",
+            href: "/documents/decision-ct1",
           },
           {
             id: "ct2",
             title: "BGE 139 III 24",
-            subtitle: "Federal Supreme Court · 2013",
+            citation: "Federal Supreme Court · 2013",
+            resolved: false,
+            unresolvedReason: "no_target_in_corpus",
           },
         ],
       },
@@ -206,12 +221,16 @@ function buildRichDetail(documentId: string) {
         text: "Art. 754 OR regelt die zentrale Haftungsnorm für Gesellschaftsorgane im schweizerischen Aktienrecht.",
       },
     ],
+    // `depth` and `text` are what make this an outline rather than a list of
+    // labels. None of these titles occurs in this fixture's two-paragraph
+    // `content`, so none of them anchors — which is the correct outcome and
+    // the reason the details-tab visual baselines are unchanged by #1040.
     localStructure: {
       items: [
-        { id: "art-752", label: "Art. 752 – Gründungshaftung", active: false },
-        { id: "art-753", label: "Art. 753 – Emissionshaftung", active: false },
-        { id: "art-754", label: "Art. 754 – Haftung der Verwaltung", active: true },
-        { id: "art-755", label: "Art. 755 – Revisionshaftung", active: false },
+        { id: "art-752", label: "Art. 752 – Gründungshaftung", active: false, depth: 0 },
+        { id: "art-753", label: "Art. 753 – Emissionshaftung", active: false, depth: 0 },
+        { id: "art-754", label: "Art. 754 – Haftung der Verwaltung", active: true, depth: 0 },
+        { id: "art-755", label: "Art. 755 – Revisionshaftung", active: false, depth: 1 },
       ],
     },
   };

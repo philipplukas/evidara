@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { MetadataList } from "@/components/detail/MetadataList";
+import type { DocumentOutline } from "@/lib/document-structure";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 import { DocumentBody } from "../DocumentBody";
@@ -9,9 +10,14 @@ import { TabEmptyState } from "./TabEmptyState";
 
 interface DetailsTabProps {
   detail: DetailViewModel;
+  /**
+   * The body with its section headings placed in it. Passed down rather than
+   * recomputed so this tab and the reader tab agree on where a section starts.
+   */
+  outline?: DocumentOutline;
 }
 
-export function DetailsTab({ detail }: DetailsTabProps) {
+export function DetailsTab({ detail, outline }: DetailsTabProps) {
   const t = useTranslations("detail");
   const hasMetadata = detail.metadata.length > 0;
   const hasContent = Boolean(detail.contentText?.trim());
@@ -31,7 +37,7 @@ export function DetailsTab({ detail }: DetailsTabProps) {
       {hasContent && detail.contentText && (
         <section className="space-y-3">
           <SectionLabel>{t("tabs.content")}</SectionLabel>
-          <DocumentBody text={detail.contentText} />
+          <DocumentBody text={detail.contentText} outline={outline} />
         </section>
       )}
 

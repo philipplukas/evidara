@@ -87,10 +87,19 @@
     },
     "descriptions": {
       "details": "Metadaten stehen zuerst, danach folgt der Dokumenttext f\u00fcr schnelleres Erfassen.",
-      "references": "Eingehende und ausgehende Verweise sind getrennt, damit Sie Zitierpfade gezielt verfolgen k\u00f6nnen.",
+      "references": "Verweise sind nach Fundstellentyp gruppiert. Nicht aufl\u00f6sbare Verweise sind gekennzeichnet und f\u00fchren nirgendwohin.",
       "related": "Verkn\u00fcpfte Treffer sind thematisch gruppiert, damit die st\u00e4rksten Zusammenh\u00e4nge zuerst sichtbar werden.",
       "annotations": "Anmerkungen sind thematisch geb\u00fcndelt, damit Sie Hinweise schnell erfassen, ohne den Kontext zu verlieren.",
       "structure": "Spr\u00fcnge durch die Gliederung halten den Lesekontext im aktuellen Dokument verankert."
+    },
+    "references": {
+      "unresolved": "Nicht im Bestand",
+      "reasonUnrecorded": "Kein Grund erfasst.",
+      "reasons": {
+        "no_target_in_corpus": "Die zitierte Norm ist nicht im Bestand.",
+        "not_normalizable": "Die Fundstelle nennt keine auswertbare Kennung.",
+        "ambiguous": "Mehrere Dokumente beantworten diese Fundstelle."
+      }
     },
     "empty": {
       "noSelection": "Kein Ergebnis ausgew\u00e4hlt",
