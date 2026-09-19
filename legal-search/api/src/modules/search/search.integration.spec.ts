@@ -162,6 +162,11 @@ afterAll(async () => {
 
 /** (Re)create the index from the canonical mapping and seed the corpus into it. */
 async function seedIndex(): Promise<void> {
+  await seedCorpus(CORPUS as unknown as readonly Record<string, unknown>[]);
+}
+
+/** As `seedIndex`, for a corpus that proves something the base corpus cannot. */
+async function seedCorpus(corpus: readonly Record<string, unknown>[]): Promise<void> {
   const exists = await client.indices.exists({ index: INDEX });
   if (exists.body) {
     await client.indices.delete({ index: INDEX });
@@ -183,7 +188,7 @@ async function seedIndex(): Promise<void> {
 
   await client.bulk({
     refresh: true,
-    body: CORPUS.flatMap((doc) => [{ index: { _index: INDEX, _id: doc.document_id } }, doc]),
+    body: corpus.flatMap((doc) => [{ index: { _index: INDEX, _id: doc.document_id } }, doc]),
   });
 }
 
@@ -388,5 +393,125 @@ describe('search against a real seeded index (canonical mapping)', () => {
     expect(body.jurisdictions.length).toBeGreaterThan(0);
     expect(body.languages.length).toBeGreaterThan(0);
     expect(body.sourceTypes.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * #975 gap A — the query NAMES a canton, and that must move the ranking.
+ *
+ * The defect this fixture reproduces was measured on production, not imagined:
+ * "Hundehaltung Kanton Bern Vorschriften" returned a ZURICH document first —
+ * "Vetsuisse-Fakultät der Universitäten Bern und Zürich", which merely has the
+ * word *Bern* in its title — above Bern's actual Hundegesetz (9.76 vs 8.99).
+ * `jurisdiction_ids` was indexed, faceted and filterable, and contributed
+ * nothing to ranking, so naming the canton in the question did nothing at all.
+ *
+ * **The corpus is symmetric on purpose.** Every canton gets the same pair of
+ * documents and the same query, and the assertions run over all three. A weight
+ * tuned until Zürich wins one query — the fixture trap #891 rejected and #975
+ * warns about by name — cannot pass this: it would have to win for BE and BS
+ * too, from a fixture where nothing distinguishes them.
+ */
+const RANKING_CANTONS = [
+  { id: 'jur_ch_zh', name: 'Zürich' },
+  { id: 'jur_ch_be', name: 'Bern' },
+  { id: 'jur_ch_bs', name: 'Basel-Stadt' },
+] as const;
+
+/**
+ * Every document here carries the SAME text. That is the whole design: if the
+ * words cannot tell two documents apart, then any difference in their order is
+ * attributable to one thing only — the jurisdiction the query named. A fixture
+ * where the target also wins on wording would pass with the signal deleted.
+ *
+ * The foreign twin is seeded BEFORE the canton's own law, so with the signal
+ * removed the two tie on score and OpenSearch breaks the tie by insertion order
+ * (single shard, `number_of_shards: 1` in the canonical mapping) — putting the
+ * WRONG one first. Deleting the boost therefore turns these three tests red
+ * rather than leaving them green on a coin flip.
+ */
+const SAME_TEXT = {
+  record_kind: 'legal_document',
+  title: 'Vorschriften über die Hundehaltung',
+  content: 'Wer einen Hund hält, untersteht diesen Vorschriften über die Hundehaltung.',
+  jurisdiction: 'CH',
+  authority_ids: ['auth_lexfind'],
+  language: 'de',
+  document_type: 'law',
+  is_official: true,
+} as const;
+
+const RANKING_CORPUS = [
+  ...RANKING_CANTONS.flatMap((canton, index) => {
+    // The twin belongs to the NEXT canton in the ring, so no canton is special
+    // and every canton is somebody's twin.
+    const foreign = RANKING_CANTONS[(index + 1) % RANKING_CANTONS.length];
+    return [
+      { ...SAME_TEXT, document_id: `doc-foreign-${canton.id}`, jurisdiction_ids: [foreign.id] },
+      { ...SAME_TEXT, document_id: `doc-own-${canton.id}`, jurisdiction_ids: [canton.id] },
+    ];
+  }),
+  // The federal rung. A cantonal question in Swiss law always has one, and
+  // ADR-0033's dog question needs it in the answer.
+  {
+    ...SAME_TEXT,
+    document_id: 'doc-federal-tierschutz',
+    jurisdiction_ids: ['jur_ch_federal'],
+    authority_ids: ['auth_fedlex'],
+  },
+] as const;
+
+describe('jurisdiction mentions change the ranking (#975 gap A)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    await seedCorpus(RANKING_CORPUS as unknown as readonly Record<string, unknown>[]);
+    app = await createApp();
+  }, 120_000);
+
+  afterAll(async () => {
+    await app?.close();
+    // Leave the index as the rest of the file expects to find it.
+    await seedIndex();
+  });
+
+  async function ids(query: string): Promise<string[]> {
+    const response = await request(app.getHttpServer()).get(`/v1/search?${query}`).expect(200);
+    return (response.body as { results: { id: string }[] }).results.map((result) => result.id);
+  }
+
+  it.each(
+    RANKING_CANTONS,
+  )("ranks $name's own law above a word-for-word identical law of another canton", async (canton) => {
+    const ranked = await ids(
+      `q=${encodeURIComponent(`Hundehaltung Kanton ${canton.name} Vorschriften`)}`,
+    );
+
+    const own = ranked.indexOf(`doc-own-${canton.id}`);
+    const foreign = ranked.indexOf(`doc-foreign-${canton.id}`);
+
+    expect(own, `${canton.name}'s own law is missing from the results`).toBeGreaterThanOrEqual(0);
+    expect(foreign, 'the twin is missing, so this asserts nothing').toBeGreaterThanOrEqual(0);
+    expect(own).toBeLessThan(foreign);
+  });
+
+  it('keeps the federal rung in the results when a canton is named', async () => {
+    // Boosting the canton ALONE pushed the federal Tierschutzgesetz from rank
+    // 15 out of production's top 20 for the dog question. The signal therefore
+    // carries the whole governing-scope chain, and this is what says so.
+    const ranked = await ids('q=Hundehaltung%20Kanton%20Z%C3%BCrich%20Vorschriften');
+
+    expect(ranked).toContain('doc-federal-tierschutz');
+  });
+
+  it('re-ranks without removing anything — naming a canton is not a filter', async () => {
+    // If this ever becomes a `filter`, the other cantons' documents disappear
+    // and a user searching "Kanton Zürich" silently stops being able to see
+    // that Bern has a rule at all.
+    const ranked = await ids('q=Hundehaltung%20Kanton%20Z%C3%BCrich%20Vorschriften');
+
+    for (const canton of RANKING_CANTONS) {
+      expect(ranked, `${canton.name} was filtered out`).toContain(`doc-own-${canton.id}`);
+    }
   });
 });
