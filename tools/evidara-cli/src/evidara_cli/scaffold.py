@@ -102,8 +102,9 @@ def build_template(
     if provider == "lexfind_api":
         if not entity_ids:
             raise ScaffoldError(
-                "lexfind_api needs --entity-id (ZH = 26, BE = 4). Unscoped, enumeration "
-                "would sweep all 28 entities."
+                "lexfind_api needs an entity id. Unscoped, enumeration would sweep all 28 "
+                "entities. `coverage scaffold` resolves it from LexFind's published table "
+                "for the jurisdiction; pass --entity-id to set it by hand."
             )
         common.update(
             {

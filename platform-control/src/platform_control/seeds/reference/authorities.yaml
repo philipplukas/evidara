@@ -69,6 +69,105 @@ items:
     jurisdiction_id: jur_ch_ti
     slug: ti-cancelleria
     name: Cancelleria dello Stato del Cantone Ticino
+  # ─── Remaining cantonal chancelleries ──────────────────────
+  # The other 20 cantons. Six already had one above (ZH/BE/BS/GE/VD/TI); these
+  # complete the set, so every `jur_ch_<iso>` has the authority that publishes
+  # its systematic collection. Without a row here `POST /v1/sources` refuses a
+  # cantonal source with "Authority does not belong to the requested
+  # jurisdiction" — a template that scaffolds cleanly and cannot register.
+  #
+  # The chancellery is not one office name repeated 26 times: AI runs a
+  # Ratskanzlei, AR a Kantonskanzlei, BL a Landeskanzlei, GR and UR a
+  # Standeskanzlei. Each name below was read off the canton's own site on
+  # 2026-09-18, except BL, UR and VS, whose portals did not serve the name to a
+  # plain GET (BL is behind Cloudflare). Those three carry the office name from
+  # public record and are the ones to re-check if a name looks wrong.
+  #
+  # Fribourg is `auth_ch_fr_sk`, not `auth_fr_sk`: the flat scheme (#264) has
+  # already spent `auth_fr_*` on France — `auth_fr_ce` is the Conseil d'État.
+  # So an authority id is NOT derivable from a jurisdiction id; look it up.
+  # Compliance binds through the jurisdiction (`cp_ch_lexfind`), as it does for
+  # the six above, so none of these overrides it.
+  - authority_id: auth_ag_sk
+    jurisdiction_id: jur_ch_ag
+    slug: ag-staatskanzlei
+    name: Staatskanzlei Kanton Aargau
+  - authority_id: auth_ai_sk
+    jurisdiction_id: jur_ch_ai
+    slug: ai-ratskanzlei
+    name: Ratskanzlei Kanton Appenzell Innerrhoden
+  - authority_id: auth_ar_sk
+    jurisdiction_id: jur_ch_ar
+    slug: ar-kantonskanzlei
+    name: Kantonskanzlei Appenzell Ausserrhoden
+  - authority_id: auth_bl_sk
+    jurisdiction_id: jur_ch_bl
+    slug: bl-landeskanzlei
+    name: Landeskanzlei Kanton Basel-Landschaft
+  - authority_id: auth_ch_fr_sk
+    jurisdiction_id: jur_ch_fr
+    slug: ch-fr-staatskanzlei
+    name: Staatskanzlei Kanton Freiburg / Chancellerie d'État du canton de Fribourg
+  - authority_id: auth_gl_sk
+    jurisdiction_id: jur_ch_gl
+    slug: gl-staatskanzlei
+    name: Staatskanzlei Kanton Glarus
+  - authority_id: auth_gr_sk
+    jurisdiction_id: jur_ch_gr
+    slug: gr-standeskanzlei
+    name: Standeskanzlei Kanton Graubünden
+  - authority_id: auth_ju_ce
+    jurisdiction_id: jur_ch_ju
+    slug: ju-chancellerie
+    name: Chancellerie d'État de la République et Canton du Jura
+  - authority_id: auth_lu_sk
+    jurisdiction_id: jur_ch_lu
+    slug: lu-staatskanzlei
+    name: Staatskanzlei Kanton Luzern
+  - authority_id: auth_ne_ce
+    jurisdiction_id: jur_ch_ne
+    slug: ne-chancellerie
+    name: Chancellerie d'État de la République et Canton de Neuchâtel
+  - authority_id: auth_nw_sk
+    jurisdiction_id: jur_ch_nw
+    slug: nw-staatskanzlei
+    name: Staatskanzlei Kanton Nidwalden
+  - authority_id: auth_ow_sk
+    jurisdiction_id: jur_ch_ow
+    slug: ow-staatskanzlei
+    name: Staatskanzlei Kanton Obwalden
+  - authority_id: auth_sg_sk
+    jurisdiction_id: jur_ch_sg
+    slug: sg-staatskanzlei
+    name: Staatskanzlei Kanton St. Gallen
+  - authority_id: auth_sh_sk
+    jurisdiction_id: jur_ch_sh
+    slug: sh-staatskanzlei
+    name: Staatskanzlei Kanton Schaffhausen
+  - authority_id: auth_so_sk
+    jurisdiction_id: jur_ch_so
+    slug: so-staatskanzlei
+    name: Staatskanzlei Kanton Solothurn
+  - authority_id: auth_sz_sk
+    jurisdiction_id: jur_ch_sz
+    slug: sz-staatskanzlei
+    name: Staatskanzlei Kanton Schwyz
+  - authority_id: auth_tg_sk
+    jurisdiction_id: jur_ch_tg
+    slug: tg-staatskanzlei
+    name: Staatskanzlei Kanton Thurgau
+  - authority_id: auth_ur_sk
+    jurisdiction_id: jur_ch_ur
+    slug: ur-standeskanzlei
+    name: Standeskanzlei Kanton Uri
+  - authority_id: auth_vs_sk
+    jurisdiction_id: jur_ch_vs
+    slug: vs-staatskanzlei
+    name: Staatskanzlei Kanton Wallis / Chancellerie d'État du canton du Valais
+  - authority_id: auth_zg_sk
+    jurisdiction_id: jur_ch_zg
+    slug: zg-staatskanzlei
+    name: Staatskanzlei Kanton Zug
   # ─── Swiss communal authorities ────────────────────────────
   # The municipal layer: 2,110 `jur_ch_gemeinde_*` jurisdictions are seeded but
   # had no authority at all until #584 — modelled and unreachable. This is the

@@ -60,6 +60,10 @@ from evidara_cli.envelope import (
     evidence_http,
 )
 from evidara_cli.gate_coverage import gate_coverage_verdict, load_evidence_bundle
+from evidara_cli.lexfind_entities import (
+    EntityResolutionError,
+    resolve_from_lexfind,
+)
 from evidara_cli.scaffold import (
     ScaffoldError,
     build_template,
@@ -1243,8 +1247,21 @@ def coverage_scaffold(
     corpus_id: Annotated[str, typer.Option("--corpus-id", help="corpus_<snake_case>.")],
     entity_id: Annotated[
         list[int] | None,
-        typer.Option("--entity-id", help="lexfind_api entity (ZH=26, BE=4). Repeatable."),
+        typer.Option(
+            "--entity-id",
+            help=(
+                "lexfind_api entity. Repeatable. Omit it and the entity is read from "
+                "LexFind's published table for --jurisdiction-id."
+            ),
+        ),
     ] = None,
+    discover_entity: Annotated[
+        bool,
+        typer.Option(
+            "--discover-entity/--no-discover-entity",
+            help="Read a missing lexfind_api entity id from LexFind. Read-only.",
+        ),
+    ] = True,
     seed_url: Annotated[
         list[str] | None, typer.Option("--seed-url", help="Seed URL. Repeatable.")
     ] = None,
@@ -1260,19 +1277,59 @@ def coverage_scaffold(
 ) -> None:
     """Draft a blueprint template for a jurisdiction that has none.
 
-    Prints YAML; writes nothing and calls nothing. A template is a claim its author makes
-    — which portal, which provider, which trust tier — and ADR-0030 puts that behind a
-    person, so the operator commits the result and reviews it as a diff.
+    Prints YAML and writes nothing. A template is a claim its author makes — which
+    portal, which provider, which trust tier — and ADR-0030 puts that behind a person,
+    so the operator commits the result and reviews it as a diff.
+
+    The one call it makes is read-only: for `lexfind_api` with no `--entity-id`, it
+    reads LexFind's published entity table to resolve `--jurisdiction-id` to its entity.
+    That number used to have to come from an operator's memory, which is why 23 cantons
+    had no template. `--entity-id` still wins when passed, `--no-discover-entity` turns
+    the lookup off, and `artifacts.entity_id_provenance` records which of the two
+    supplied the value.
 
     `enabled: false` is not a parameter. The config key fails closed and a template is
     inert until an acceptance run earns it.
     """
     step = "coverage.scaffold"
+    entity_ids: list[int] = list(entity_id or [])
+    entity_provenance: dict[str, Any] = {"source": "operator" if entity_ids else "none"}
+    if provider == "lexfind_api" and not entity_ids and discover_entity:
+        try:
+            resolved, entity_provenance = resolve_from_lexfind(jurisdiction_id, language=language)
+        except EntityResolutionError as exc:
+            _emit(
+                build_envelope(
+                    ok=False,
+                    workflow=_WORKFLOW,
+                    step=step,
+                    status="failed_retriable" if exc.retriable else "failed_terminal",
+                    side_effect_level="none",
+                    inputs={
+                        "provider": provider,
+                        "jurisdiction_id": jurisdiction_id,
+                        "corpus_id": corpus_id,
+                        "language": language,
+                    },
+                    error=str(exc),
+                    decision={
+                        "recommended_action": "needs-human",
+                        "reason": (
+                            "Could not resolve the LexFind entity for this jurisdiction. "
+                            "Pass --entity-id, or --no-discover-entity to scaffold offline."
+                        ),
+                    },
+                ),
+                human=human,
+            )
+            raise typer.Exit(code=1) from exc
+        entity_ids = [resolved]
     inputs = {
         "provider": provider,
         "jurisdiction_id": jurisdiction_id,
         "corpus_id": corpus_id,
-        "entity_ids": entity_id,
+        "entity_ids": entity_ids or None,
+        "entity_id_provenance": entity_provenance,
         "seed_urls": seed_url,
         "bfs_number": bfs_number,
         "language": language,
@@ -1283,7 +1340,7 @@ def coverage_scaffold(
             provider=provider,
             jurisdiction_id=jurisdiction_id,
             corpus_id=corpus_id,
-            entity_ids=entity_id,
+            entity_ids=entity_ids or None,
             seed_urls=seed_url,
             bfs_number=bfs_number,
             language=language,
@@ -1317,7 +1374,12 @@ def coverage_scaffold(
             status="passed",
             side_effect_level="none",
             inputs=inputs,
-            artifacts={"template_id": template_id, "template": body, "yaml": yaml_text},
+            artifacts={
+                "template_id": template_id,
+                "template": body,
+                "yaml": yaml_text,
+                "entity_id_provenance": entity_provenance,
+            },
             decision={
                 "recommended_action": "needs-human",
                 "reason": (
