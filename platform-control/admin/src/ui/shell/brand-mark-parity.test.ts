@@ -38,7 +38,13 @@ describe("brand-mark cross-surface contract", () => {
 describe("admin consumes the shared BrandMark", () => {
   it("imports it from @evidara/shell in both shell surfaces", () => {
     for (const source of [appBarSource, adminShellSource]) {
-      expect(source).toContain('import { BrandMark } from "@evidara/shell"');
+      // Matched as a named import rather than as the exact one-symbol line: the
+      // barrel legitimately exports more than the mark (`RepositoryLink` landed
+      // with the AGPL relicence), and a literal match asserted the *width* of
+      // the import statement, which is not what this guard is about. The
+      // question it answers is "does the mark come from the shared module, or
+      // has someone re-inlined one?" — and that is still answered.
+      expect(source).toMatch(/import \{[^}]*\bBrandMark\b[^}]*\} from "@evidara\/shell"/);
       expect(source).toContain("<BrandMark");
     }
   });
