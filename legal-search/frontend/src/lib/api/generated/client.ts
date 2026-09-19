@@ -162,11 +162,16 @@ export type getDocumentResponse404 = {
   data: void
   status: 404
 }
+
+export type getDocumentResponse503 = {
+  data: void
+  status: 503
+}
     
 export type getDocumentResponseSuccess = (getDocumentResponse200) & {
   headers: Headers;
 };
-export type getDocumentResponseError = (getDocumentResponse404) & {
+export type getDocumentResponseError = (getDocumentResponse404 | getDocumentResponse503) & {
   headers: Headers;
 };
 

@@ -74,9 +74,13 @@ kubectl -n evidara logs deploy/<svc> --since=40m | grep -oE "<those exact names>
 Two ways this goes wrong, both observed:
 
 - Searching for `"lean fetch"` found nothing and "proved" a failure was silent.
-  That string belongs to `modules/documents/document-intelligence.fetch-client.ts`,
-  which is **not wired**. The wired class is `HttpDocumentIntelligenceClient` and
-  it logs `document_intelligence_lean_failed`. It had logged both failures twice.
+  That string belonged to `modules/documents/document-intelligence.fetch-client.ts`,
+  which was **not wired** — and which #984 deleted, because reading it cost two
+  agents a diagnosis each. The wired class is `HttpDocumentIntelligenceClient`
+  (`lib/document-intelligence/document-intelligence.client.ts`) and it logs
+  `document_intelligence_lean_http_error`, `document_intelligence_lean_failed`
+  and `document_intelligence_lean_unexpected_status`. It had logged both
+  failures twice.
 - **Check which implementation is injected before reading one.** Two classes can
   share a concept and only one is in the path:
   `grep -rn "useClass\|provide:" <module>.module.ts`

@@ -1,6 +1,9 @@
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
+import {
+  type DocumentIntelligenceClient,
+  LeanDocumentUnavailableError,
+} from '../../lib/document-intelligence/document-intelligence.client';
 import type { CitationsRepository } from '../citations/citations.repository';
 import type { DocumentsRepository } from './documents.repository';
 import { DocumentsService } from './documents.service';
@@ -256,4 +259,95 @@ describe('DocumentsService read-time citation join (order independence)', () => 
 
     expect(detail.references.flatMap((g) => g.items)[0].href).toBeUndefined();
   });
+
+  describe('a failed body read is not an empty document (#984)', () => {
+    // `getDetail` asks document-intelligence for a body only when the index has
+    // none. Before #984 every reason for not getting one produced the same page:
+    // a document rendered without content and without a content tab. That page
+    // is a claim — "we hold no text for this norm" — and a 503 from the upstream
+    // is not evidence for it.
+
+    it('renders without a body when the upstream says there is none', async () => {
+      const fetchLeanDocument = vi.fn().mockResolvedValue(null);
+      const service = new DocumentsService(
+        createMockRepo(),
+        { fetchLeanDocument },
+        createMockCitationsRepo(),
+      );
+
+      const detail = await service.getDetail('doc_001');
+
+      expect(detail.content).toBeUndefined();
+      expect(detail.tabs.map((t) => t.key)).not.toContain('content');
+    });
+
+    it('refuses with a 503 when the body read failed', async () => {
+      const fetchLeanDocument = vi
+        .fn()
+        .mockRejectedValue(new LeanDocumentUnavailableError('doc_001', 503, 'upstream refused'));
+      const service = new DocumentsService(
+        createMockRepo(),
+        { fetchLeanDocument },
+        createMockCitationsRepo(),
+      );
+
+      const err = await service.getDetail('doc_001').then(
+        () => {
+          throw new Error('expected a refusal');
+        },
+        (e: unknown) => e,
+      );
+
+      expect(err).toBeInstanceOf(ServiceUnavailableException);
+      expect((err as ServiceUnavailableException).getStatus()).toBe(503);
+    });
+
+    it('produces a different outcome for an absent body than for a failed read', async () => {
+      // The assertion the issue asks for, stated as a comparison. It goes red
+      // the moment the two collapse back into one value, whichever way round.
+      const absent = new DocumentsService(
+        createMockRepo(),
+        { fetchLeanDocument: vi.fn().mockResolvedValue(null) },
+        createMockCitationsRepo(),
+      )
+        .getDetail('doc_001')
+        .then(
+          () => 'rendered' as const,
+          () => 'refused' as const,
+        );
+
+      const failed = new DocumentsService(
+        createMockRepo(),
+        {
+          fetchLeanDocument: vi
+            .fn()
+            .mockRejectedValue(new LeanDocumentUnavailableError('doc_001', 500, 'boom')),
+        },
+        createMockCitationsRepo(),
+      )
+        .getDetail('doc_001')
+        .then(
+          () => 'rendered' as const,
+          () => 'refused' as const,
+        );
+
+      expect(await absent).toBe('rendered');
+      expect(await failed).toBe('refused');
+      expect(await absent).not.toBe(await failed);
+    });
+
+    it('does not swallow an unrelated error as a body refusal', async () => {
+      // A blanket catch here would re-flatten the distinction one level up:
+      // everything would become "body unavailable", including bugs.
+      const fetchLeanDocument = vi.fn().mockRejectedValue(new TypeError('programmer error'));
+      const service = new DocumentsService(
+        createMockRepo(),
+        { fetchLeanDocument },
+        createMockCitationsRepo(),
+      );
+
+      await expect(service.getDetail('doc_001')).rejects.toBeInstanceOf(TypeError);
+    });
+  });
+
 });
