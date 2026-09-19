@@ -442,5 +442,227 @@ class DeltaTableAuditTest(unittest.TestCase):
         self.assertEqual(Status.PRESENT, _finding(report, "provenance", "run_id").status)
 
 
+SECTIONIZE_SOURCE = os.path.join(
+    os.path.dirname(__file__), "..", "src", "document_intelligence", "sectionize", "html.py"
+)
+NORMALIZE_DIR = os.path.join(os.path.dirname(__file__), "..", "src", "document_intelligence", "normalize")
+
+
+def _section_metadata_keys_from_source() -> set[str]:
+    """Re-derive every key a section row's `metadata` can carry, from the producers' AST.
+
+    Two producers, because a section's metadata is `{"heading_level", "block_id",
+    **block.attrs}` (`sectionize/html.py:34-36`): the sectionizer's own keys, and every
+    `Block(attrs=...)` literal in the normalizers — which is where the loss actually varies,
+    since each normalizer emits a different set.
+    """
+
+    keys: set[str] = set()
+
+    with open(SECTIONIZE_SOURCE, encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    for node in ast.walk(tree):
+        # `metadata: dict[str, Any] = {"heading_level": ..., "block_id": ...}`
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = list(node.targets) if isinstance(node, ast.Assign) else [node.target]
+            names = {t.id for t in targets if isinstance(t, ast.Name)}
+            if "metadata" in names and isinstance(node.value, ast.Dict):
+                for key in node.value.keys:
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                        keys.add(key.value)
+            # `metadata["parent_title"] = ...`
+            for target in targets:
+                if (
+                    isinstance(target, ast.Subscript)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "metadata"
+                    and isinstance(target.slice, ast.Constant)
+                    and isinstance(target.slice.value, str)
+                ):
+                    keys.add(target.slice.value)
+
+    for entry in sorted(os.listdir(NORMALIZE_DIR)):
+        if not entry.endswith(".py"):
+            continue
+        with open(os.path.join(NORMALIZE_DIR, entry), encoding="utf-8") as handle:
+            tree = ast.parse(handle.read())
+        for node in ast.walk(tree):
+            # `Block(..., attrs={"tag": ..., "page_no": ...})`
+            if isinstance(node, ast.Call):
+                for keyword in node.keywords:
+                    if keyword.arg == "attrs" and isinstance(keyword.value, ast.Dict):
+                        for key in keyword.value.keys:
+                            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                                keys.add(key.value)
+            if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = list(node.targets) if isinstance(node, ast.Assign) else [node.target]
+                # `attrs: dict[str, Any] = {"tag": "pdf", "page_no": ..., "bbox_top": ...}`
+                if any(isinstance(t, ast.Name) and t.id == "attrs" for t in targets) and isinstance(
+                    node.value, ast.Dict
+                ):
+                    for key in node.value.keys:
+                        if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                            keys.add(key.value)
+                # `attrs["anchor"] = ...`
+                for target in targets:
+                    if (
+                        isinstance(target, ast.Subscript)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "attrs"
+                        and isinstance(target.slice, ast.Constant)
+                        and isinstance(target.slice.value, str)
+                    ):
+                        keys.add(target.slice.value)
+
+    # The third producer: the pipeline adds its own keys to a section's metadata
+    # (`section_metadata["citations"] = ...`, pipeline.py:981).
+    with open(PIPELINE_SOURCE, encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if (
+                isinstance(target, ast.Subscript)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "section_metadata"
+                and isinstance(target.slice, ast.Constant)
+                and isinstance(target.slice.value, str)
+            ):
+                keys.add(target.slice.value)
+    return keys
+
+
+class SurfaceRegistryTest(unittest.TestCase):
+    """#871 step 2: a registry is a claim about one surface's producer, not about tables.
+
+    Measured against production on 2026-09-19, auditing `published_sections` with the
+    document registry reported `metadata.source_origin_kind` and `metadata.trust_tier` as
+    lost on all 57,128 rows — citing `pipeline.py:721`, which is in `_build_document` and
+    never touches a section row — while registering none of the eleven keys those rows
+    actually carry. Wrong in both directions at once, from one default argument.
+    """
+
+    def test_the_section_registry_covers_every_key_a_section_row_can_carry(self) -> None:
+        from document_intelligence.persist.metadata_audit import SECTION_EMITTED_KEYS
+
+        scanned = _section_metadata_keys_from_source()
+
+        # Non-vacuity first: a scanner that matched nothing passes the subset check below
+        # unconditionally, which is how a drift guard becomes decoration.
+        self.assertGreaterEqual(len(scanned), 10, f"the AST scan found too little to be trusted: {scanned}")
+        sentinels = ("heading_level", "block_id", "page_no", "bbox_top", "official_label", "parent_title", "citations")
+        for sentinel in sentinels:
+            self.assertIn(sentinel, scanned, "the AST scan stopped seeing section metadata producers")
+
+        registered = {spec.key for spec in SECTION_EMITTED_KEYS if spec.column == "metadata"}
+        self.assertEqual(
+            set(),
+            scanned - registered,
+            "a section producer writes metadata keys the audit registry does not know about",
+        )
+
+    def test_no_section_key_is_unconditional(self) -> None:
+        """`sectionize/html.py:63-73` emits `metadata={}` for a whole-body fallback section.
+
+        So there is no key a section row must carry, and marking one unconditional would
+        reproduce the false loss this registry exists to stop — that is exactly how the
+        document registry produced two on 57,128 section rows.
+        """
+        from document_intelligence.persist.metadata_audit import SECTION_EMITTED_KEYS
+
+        unconditional = [spec.key for spec in SECTION_EMITTED_KEYS if spec.column == "metadata" and spec.unconditional]
+        self.assertEqual([], unconditional)
+
+    def test_a_section_table_is_not_audited_against_the_document_registry(self) -> None:
+        import deltalake
+        import pyarrow as pa
+
+        from document_intelligence.persist.metadata_audit import audit_delta_table
+
+        rows = [
+            {
+                "section_id": "sec_1",
+                "document_id": "doc_1",
+                "provenance": _provenance(),
+                "metadata": {"heading_level": 1, "block_id": "blk_0001", "tag": "pdf"},
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            uri = os.path.join(temp_dir, "published_sections")
+            deltalake.write_deltalake(uri, pa.Table.from_pylist(rows), mode="overwrite")
+            report = audit_delta_table(uri)
+
+        self.assertEqual("published_sections", report.surface)
+        audited = {(f.column, f.key) for f in report.findings}
+        # The document-only keys are not claims this surface can support at all.
+        self.assertNotIn(("metadata", "source_origin_kind"), audited)
+        self.assertNotIn(("metadata", "trust_tier"), audited)
+        self.assertEqual((), report.dropped)
+        # ...and the keys sections do carry are now audited, which the document registry
+        # never did: it called all eleven of them "declared but unknown to this pipeline".
+        self.assertIn(("metadata", "page_no"), audited)
+        self.assertEqual(Status.PRESENT, _finding(report, "metadata", "heading_level").status)
+
+    def test_a_section_key_the_table_dropped_is_still_seen(self) -> None:
+        """The other half: scoping the registry must not cost the ability to find a real loss.
+
+        A PDF block always sets `page_no` and `bbox_top` in one literal
+        (`normalize/pdf.py:282`), so a row carrying one without the other is a drop.
+        """
+        import deltalake
+        import pyarrow as pa
+
+        from document_intelligence.persist.metadata_audit import audit_delta_table
+
+        rows = [
+            {
+                "section_id": "sec_1",
+                "document_id": "doc_1",
+                "provenance": _provenance(),
+                "metadata": {"block_id": "blk_0001", "tag": "pdf", "bbox_top": 12.5},
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            uri = os.path.join(temp_dir, "published_sections")
+            deltalake.write_deltalake(uri, pa.Table.from_pylist(rows), mode="overwrite")
+            report = audit_delta_table(uri)
+
+        finding = _finding(report, "metadata", "page_no")
+        self.assertEqual(Status.DROPPED, finding.status)
+        self.assertIn("bbox_top", finding.reason)
+
+    def test_an_unknown_surface_is_refused_rather_than_guessed(self) -> None:
+        import deltalake
+        import pyarrow as pa
+
+        from document_intelligence.persist.metadata_audit import UnknownSurfaceError, audit_delta_table
+
+        rows = [{"document_id": "doc_1", "provenance": _provenance(), "metadata": {"normalizer": "pdf_v1"}}]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            uri = os.path.join(temp_dir, "published_something_new")
+            deltalake.write_deltalake(uri, pa.Table.from_pylist(rows), mode="overwrite")
+            with self.assertRaises(UnknownSurfaceError) as raised:
+                audit_delta_table(uri)
+
+        self.assertIn("published_something_new", str(raised.exception))
+        self.assertIn("published_documents", str(raised.exception))
+
+    def test_an_explicit_surface_overrides_the_uri(self) -> None:
+        from document_intelligence.persist.metadata_audit import SECTION_EMITTED_KEYS, registry_for_surface
+
+        self.assertIs(SECTION_EMITTED_KEYS, registry_for_surface("published_sections"))
+
+    def test_a_surface_with_no_audited_struct_columns_makes_no_claim(self) -> None:
+        """`canonical_retractions` (ADR-0057) carries neither struct column.
+
+        Auditing it against the document registry produced 32 "nothing can be established"
+        findings — noise that reads like a report.
+        """
+        from document_intelligence.persist.metadata_audit import registry_for_surface
+
+        self.assertEqual((), registry_for_surface("canonical_retractions"))
+
+
 if __name__ == "__main__":
     unittest.main()

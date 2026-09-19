@@ -727,6 +727,185 @@ def build_commentary_insight() -> CommentaryInsight:
     )
 
 
+class DroppedNestedKeyGuardTests(unittest.TestCase):
+    """#871 step 3: a write that cannot keep what the producer emitted must fail, not publish.
+
+    `_widen_for_new_nested_fields` stops the loss wherever it can unify, but its fallback is
+    deliberately conservative and its only trace is a `DEBUG` record — invisible at the `INFO`
+    the consumers run at. So a genuine type conflict, or any regression that weakens the
+    widening, returns the write path to discarding keys exactly as silently as before the fix.
+
+    These tests assert the *outcome* rather than the mechanism: what the batch carries versus
+    what the schema it is about to be cast to can hold. That is what makes the guard hold for
+    a cause nobody has thought of yet.
+    """
+
+    def _schema(self, **fields):
+        import pyarrow as pa
+
+        return pa.schema([pa.field(name, dtype) for name, dtype in fields.items()])
+
+    def test_a_key_the_struct_cannot_hold_is_reported(self) -> None:
+        import pyarrow as pa
+
+        from document_intelligence.persist.sinks import dropped_nested_keys
+
+        schema = self._schema(metadata=pa.struct([pa.field("normalizer", pa.string())]))
+        rows = [{"metadata": {"normalizer": "pdf_v1", "regeste": "Leitsatz"}}]
+
+        self.assertEqual(("metadata.regeste",), dropped_nested_keys(schema, rows))
+
+    def test_a_struct_inside_a_struct_is_walked(self) -> None:
+        """`metadata.field_provenance` is the trap one level deeper (#871).
+
+        Its sub-keys vary per document — `publication_organ` and `ecli` appear only when the
+        extractor resolved them (`pipeline.py:827-830`) — so the struct a table was created
+        with freezes which *provenance claims* it can record, not just which metadata keys.
+        A guard that only compared the top level of `metadata` would pass here.
+        """
+        import pyarrow as pa
+
+        from document_intelligence.persist.sinks import dropped_nested_keys
+
+        schema = self._schema(
+            metadata=pa.struct([pa.field("field_provenance", pa.struct([pa.field("title", pa.string())]))])
+        )
+        rows = [{"metadata": {"field_provenance": {"title": "t", "publication_organ": "AS"}}}]
+
+        self.assertEqual(("metadata.field_provenance.publication_organ",), dropped_nested_keys(schema, rows))
+
+    def test_a_list_of_structs_is_walked(self) -> None:
+        import pyarrow as pa
+
+        from document_intelligence.persist.sinks import dropped_nested_keys
+
+        schema = self._schema(
+            metadata=pa.struct([pa.field("citations", pa.list_(pa.struct([pa.field("text", pa.string())])))])
+        )
+        rows = [{"metadata": {"citations": [{"text": "Art. 1", "normalized_reference": "SR 1/1"}]}}]
+
+        self.assertEqual(
+            ("metadata.citations[].normalized_reference",),
+            dropped_nested_keys(schema, rows),
+        )
+
+    def test_a_map_column_holds_any_key_and_is_never_a_loss(self) -> None:
+        """A map is keyed at the data level, so nothing under it can be cast away.
+
+        `published_commentary_insights` declares `metadata` as `map<string,string>`
+        (`_COMMENTARY_INSIGHTS_ARROW_SCHEMA`). Reporting its keys as dropped would make the
+        guard fire on every write of that surface and take its publish path down — the same
+        shape of fault as #940.
+        """
+        import pyarrow as pa
+
+        from document_intelligence.persist.sinks import dropped_nested_keys
+
+        schema = self._schema(metadata=pa.map_(pa.string(), pa.string()))
+        rows = [{"metadata": {"anything": "at all", "and_more": "still fine"}}]
+
+        self.assertEqual((), dropped_nested_keys(schema, rows))
+
+    def test_a_null_value_is_not_reported_as_loss(self) -> None:
+        """Dropping a null discards nothing, and a guard that cried about it would be turned off."""
+        import pyarrow as pa
+
+        from document_intelligence.persist.sinks import dropped_nested_keys
+
+        schema = self._schema(metadata=pa.struct([pa.field("normalizer", pa.string())]))
+        rows = [{"metadata": {"normalizer": "pdf_v1", "regeste": None, "docling": {}}}]
+
+        self.assertEqual((), dropped_nested_keys(schema, rows))
+
+    def test_the_ordinary_append_does_not_trip_the_guard(self) -> None:
+        """Non-vacuity, the other way round: with widening in place, a new key still publishes.
+
+        Without this, a guard that refused *every* append would pass the refusal test above
+        and quietly stop the pipeline.
+        """
+        import deltalake
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            documents_uri = os.path.join(temp_dir, "published_documents")
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=documents_uri,
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                )
+            )
+            first = build_processing_result()
+            sink.persist(first.document, first.sections, first.manifest)
+
+            widened = dataclasses.replace(
+                first.document,
+                document_id="doc_01hx000000000000000000009z",
+                metadata={**first.document.metadata, "regeste": "Leitsatz"},
+            )
+            sink.persist(widened, [], first.manifest)
+
+            rows = {
+                row["document_id"]: row for row in deltalake.DeltaTable(documents_uri).to_pyarrow_table().to_pylist()
+            }
+            self.assertEqual("Leitsatz", rows[widened.document_id]["metadata"]["regeste"])
+
+    def test_a_write_that_would_drop_a_key_is_refused_by_name(self) -> None:
+        """The guard, end to end, through the real sink.
+
+        Widening is neutralised here to stand in for the conditions it cannot rescue — a
+        genuine type conflict between batch and table, or a future change that weakens it.
+        Before this guard, exactly this input published a row with `regeste` missing and
+        returned success; the key was then indistinguishable, forever, from a document whose
+        source carried no headnote.
+
+        The refusal keeps its own code: flattening it to `delta_write_failed` would put a
+        metadata loss and a transport fault under one name.
+        """
+        import deltalake
+
+        from document_intelligence.errors import ProcessingError
+        from document_intelligence.persist import sinks as sinks_module
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            documents_uri = os.path.join(temp_dir, "published_documents")
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=documents_uri,
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                )
+            )
+            first = build_processing_result()
+            sink.persist(first.document, first.sections, first.manifest)
+            self.assertNotIn(
+                "regeste",
+                deltalake.DeltaTable(documents_uri).to_pyarrow_table().to_pylist()[0]["metadata"],
+            )
+
+            narrowing = dataclasses.replace(
+                first.document,
+                document_id="doc_01hx00000000000000000000aa",
+                metadata={**first.document.metadata, "regeste": "Leitsatz"},
+            )
+
+            original = sinks_module._widen_for_new_nested_fields
+            sinks_module._widen_for_new_nested_fields = lambda schema, rows: schema
+            try:
+                with self.assertRaises(ProcessingError) as raised:
+                    sink.persist(narrowing, [], first.manifest)
+            finally:
+                sinks_module._widen_for_new_nested_fields = original
+
+            self.assertEqual("canonical_metadata_dropped", raised.exception.code)
+            self.assertIn("metadata.regeste", str(raised.exception))
+
+            # And it refused rather than publishing a row that lies by omission.
+            published = {
+                row["document_id"] for row in deltalake.DeltaTable(documents_uri).to_pyarrow_table().to_pylist()
+            }
+            self.assertNotIn(narrowing.document_id, published)
+
+
 class FakeStorageClient:
     def __init__(self, payloads):
         self._payloads = payloads

@@ -41,6 +41,14 @@ What this module deliberately refuses to conclude:
   dropped by the same mechanism. It is reported as unavailable, and the finding stays
   ``INDETERMINATE``.
 * **An empty table is not evidence.** Every finding over zero rows is ``INDETERMINATE``.
+* **A surface it has no registry for.** The registry is a claim about *that surface's
+  producer*; applied to another surface it is wrong in both directions at once — it reports
+  keys that producer never writes as lost, and stays silent about every key it does write.
+  Measured against production on 2026-09-19, auditing ``published_sections`` with the
+  document registry called ``source_origin_kind`` and ``trust_tier`` lost on all 57,128 rows,
+  citing ``pipeline.py:721`` — a line in ``_build_document``, which never touches a section
+  row — while registering none of the eleven keys sections actually carry. An unknown surface
+  is now refused (``UnknownSurfaceError``).
 
 ``NEVER_EMITTED`` is claimed in exactly one situation: the key **is** declared — so the cast
 preserved whatever the batch carried — and is null on every row. That, and only that, is
@@ -104,7 +112,14 @@ _PROVENANCE_CANONICAL = (
     "processing_manifest_id",
 )
 
-#: Every key the pipeline can write into an audited struct column.
+#: Every key the pipeline can write into an audited struct column **of a document row**.
+#:
+#: Scoped to ``published_documents`` on purpose: these are ``_build_document``'s keys
+#: (``pipeline.py:720-838``). A *section* row's ``metadata`` is a different dictionary built
+#: by ``_build_sections`` (``pipeline.py:962-999``) and it never carries any of them — so
+#: auditing ``published_sections`` against this registry reports two unconditional keys as
+#: lost on every row of that surface, which is a manufactured repair plan rather than a
+#: finding. See ``SURFACE_REGISTRIES``.
 #:
 #: Hand-written on purpose — ``unconditional`` and ``witnesses`` are claims about the code
 #: that no AST scan can derive — and drift-guarded: ``test_metadata_audit.py`` re-derives the
@@ -266,6 +281,148 @@ EMITTED_KEYS: tuple[EmittedKey, ...] = (
 )
 
 
+_PROVENANCE_KEYS: tuple[EmittedKey, ...] = tuple(spec for spec in EMITTED_KEYS if spec.column == "provenance")
+
+#: Every key a **section** row can carry in ``metadata``.
+#:
+#: A section's metadata is ``{"heading_level", "block_id", **block.attrs}`` plus the ancestry
+#: and citation keys (``sectionize/html.py:34-44``, ``pipeline.py:975-981``), and
+#: ``block.attrs`` is open-ended and *normalizer-specific*: the PDF normalizer emits
+#: ``page_no`` / ``bbox_top`` / ``marginal`` (``normalize/pdf.py:282-287``), the XML one
+#: ``official_label`` / ``heading_text`` / ``typ`` (``normalize/xml.py:218-246``), the HTML one
+#: ``anchor`` and the recovery flags (``normalize/html.py:174-186``, ``:217``, ``:252``).
+#:
+#: **Nothing here is unconditional.** ``sectionize/html.py:63-73`` has a whole-body fallback
+#: that emits ``metadata={}``, so a section can legitimately carry no key at all. Declaring
+#: any of these unconditional would reproduce the false loss this registry exists to stop.
+SECTION_EMITTED_KEYS: tuple[EmittedKey, ...] = (
+    EmittedKey(
+        column="metadata",
+        key="block_id",
+        emitter="sectionize/html.py:35",
+        witnesses=(
+            Witness(
+                path=("heading_level",),
+                why=(
+                    "both are set in one dict literal (sectionize/html.py:34-36) and `block.id` "
+                    "is never None, so a heading_level on the row proves block_id was emitted"
+                ),
+            ),
+        ),
+    ),
+    # `block.level` is None for an XML structural heading (normalize/xml.py:272), so a
+    # present `block_id` does NOT imply a non-null heading_level. No witness.
+    EmittedKey(column="metadata", key="heading_level", emitter="sectionize/html.py:34"),
+    EmittedKey(column="metadata", key="citations", emitter="pipeline.py:981"),
+    EmittedKey(
+        column="metadata",
+        key="ancestor_titles",
+        emitter="sectionize/html.py:40",
+        witnesses=(
+            Witness(
+                path=("parent_title",),
+                why="set in the same `if ancestry:` branch (sectionize/html.py:40-41)",
+            ),
+        ),
+    ),
+    EmittedKey(
+        column="metadata",
+        key="parent_title",
+        emitter="sectionize/html.py:41",
+        witnesses=(
+            Witness(
+                path=("ancestor_titles",),
+                why="the converse of the same branch (sectionize/html.py:40-41)",
+            ),
+        ),
+    ),
+    # Only set when the ancestor had an anchor, so `parent_title` is not sufficient.
+    EmittedKey(column="metadata", key="parent_anchor", emitter="sectionize/html.py:44"),
+    EmittedKey(column="metadata", key="tag", emitter="normalize/{html,pdf,xml}.py (block.attrs)"),
+    EmittedKey(column="metadata", key="anchor", emitter="normalize/html.py:186, normalize/pdf.py:285"),
+    EmittedKey(
+        column="metadata",
+        key="page_no",
+        emitter="normalize/pdf.py:282",
+        witnesses=(
+            Witness(
+                path=("bbox_top",),
+                why="both are set in one dict literal on every PDF block (normalize/pdf.py:282)",
+            ),
+        ),
+    ),
+    EmittedKey(
+        column="metadata",
+        key="bbox_top",
+        emitter="normalize/pdf.py:282",
+        witnesses=(
+            Witness(
+                path=("page_no",),
+                why="the converse of the same literal (normalize/pdf.py:282)",
+            ),
+        ),
+    ),
+    EmittedKey(column="metadata", key="marginal", emitter="normalize/pdf.py:287"),
+    EmittedKey(column="metadata", key="official_label", emitter="normalize/xml.py:218-220, :273-275"),
+    EmittedKey(column="metadata", key="heading_text", emitter="normalize/xml.py:218-220"),
+    EmittedKey(column="metadata", key="typ", emitter="normalize/xml.py:246"),
+    EmittedKey(column="metadata", key="fallback", emitter="normalize/xml.py:128, normalize/html.py:217,252"),
+    EmittedKey(column="metadata", key="parse_error_recovery", emitter="normalize/html.py:217"),
+    EmittedKey(column="metadata", key="format", emitter="normalize/html.py:297,316,330"),
+    EmittedKey(column="metadata", key="normalizer", emitter="normalize/html.py:361"),
+    *_PROVENANCE_KEYS,
+)
+
+#: A manifest row carries `provenance` and no `metadata` column at all
+#: (`_PROCESSING_MANIFESTS_DELTA_KEYS`, `persist/sinks.py:56-74`).
+MANIFEST_EMITTED_KEYS: tuple[EmittedKey, ...] = _PROVENANCE_KEYS
+
+#: A retraction row (ADR-0057) carries neither audited struct column. An empty registry is
+#: the honest answer — it yields no findings rather than 32 "cannot be established" ones.
+RETRACTION_EMITTED_KEYS: tuple[EmittedKey, ...] = ()
+
+#: Which registry each canonical surface is audited against.
+#:
+#: The registry is a claim about the **producer of that surface's rows**. Applying one
+#: surface's registry to another is not a conservative default, it is a false verdict in
+#: both directions at once: it manufactures losses for keys that surface never carried, and
+#: it is silent about every key that surface actually does carry. A surface that is not here
+#: is refused (``UnknownSurfaceError``) rather than audited against a guess.
+SURFACE_REGISTRIES: dict[str, tuple[EmittedKey, ...]] = {
+    "published_documents": EMITTED_KEYS,
+    "published_sections": SECTION_EMITTED_KEYS,
+    "processing_manifests": MANIFEST_EMITTED_KEYS,
+    "canonical_retractions": RETRACTION_EMITTED_KEYS,
+}
+
+
+class UnknownSurfaceError(ValueError):
+    """Raised rather than auditing a surface against a registry that may not describe it."""
+
+
+def surface_name_from_uri(uri: str) -> str:
+    """The surface name in a table URI — its last non-empty path segment."""
+
+    trimmed = uri.rstrip("/")
+    _, _, tail = trimmed.rpartition("/")
+    return tail or trimmed
+
+
+def registry_for_surface(surface: str) -> tuple[EmittedKey, ...]:
+    """The registry for ``surface``, or a refusal naming the ones that exist."""
+
+    try:
+        return SURFACE_REGISTRIES[surface]
+    except KeyError:
+        known = ", ".join(sorted(SURFACE_REGISTRIES))
+        raise UnknownSurfaceError(
+            f"no emitted-key registry for surface {surface!r}: auditing it against another "
+            f"surface's registry would report keys its producer never writes as lost, and "
+            f"say nothing about the keys it does write. Known surfaces: {known}. "
+            f"Pass --surface to name one explicitly."
+        ) from None
+
+
 @dataclass(frozen=True)
 class KeyFinding:
     column: str
@@ -303,6 +460,9 @@ class AuditReport:
     findings: tuple[KeyFinding, ...]
     undeclared_columns: tuple[str, ...] = ()
     unregistered_declared_fields: tuple[str, ...] = ()
+    #: Which surface's registry produced these findings. Reported because a verdict is only
+    #: meaningful against the producer it was derived from.
+    surface: str = "<unspecified>"
 
     def with_status(self, status: Status) -> tuple[KeyFinding, ...]:
         return tuple(finding for finding in self.findings if finding.status is status)
@@ -318,6 +478,7 @@ class AuditReport:
     def to_dict(self) -> dict[str, object]:
         return {
             "table_uri": self.table_uri,
+            "surface": self.surface,
             "rows_total": self.rows_total,
             "undeclared_columns": list(self.undeclared_columns),
             "unregistered_declared_fields": list(self.unregistered_declared_fields),
@@ -357,12 +518,18 @@ def audit_rows(
     rows: Sequence[Mapping[str, object]],
     table_uri: str = "<rows>",
     keys: Sequence[EmittedKey] = EMITTED_KEYS,
+    surface: str = "<unspecified>",
 ) -> AuditReport:
     """Classify every registered key against one table's declared schema and its rows.
 
     ``declared_fields`` maps a struct column to the field names its Arrow struct declares —
     or to ``None`` when the column is absent from the table, or is not a struct (a
     ``map<string,string>`` column cannot drop keys and is not audited here).
+
+    ``keys`` must be the registry for the surface these rows came from. The default is the
+    ``published_documents`` one because that is what this module was written for; every
+    caller that knows its surface should resolve with ``registry_for_surface`` instead, and
+    ``audit_delta_table`` does.
     """
 
     rows_total = len(rows)
@@ -529,6 +696,7 @@ def audit_rows(
         findings=tuple(findings),
         undeclared_columns=undeclared_columns,
         unregistered_declared_fields=unregistered,
+        surface=surface,
     )
 
 
@@ -562,17 +730,33 @@ def audit_delta_table(
     *,
     storage_options: Mapping[str, str] | None = None,
     columns: Sequence[str] = CANONICAL_STRUCT_COLUMNS,
+    surface: str | None = None,
 ) -> AuditReport:
-    """Read-only audit of a Delta canonical table. Opens the log and reads; writes nothing."""
+    """Read-only audit of a Delta canonical table. Opens the log and reads; writes nothing.
+
+    The registry is resolved from ``surface`` — or, when it is not given, from the URI's last
+    path segment. An unrecognised surface raises ``UnknownSurfaceError`` rather than falling
+    back to the document registry, because that fallback is what produced a 57,128-row repair
+    plan for two keys no section row has ever carried.
+    """
 
     import deltalake
+
+    resolved_surface = surface or surface_name_from_uri(uri)
+    keys = registry_for_surface(resolved_surface)
 
     table = deltalake.DeltaTable(uri, storage_options=dict(storage_options or {}))
     schema = table.to_pyarrow_dataset().schema
     declared = declared_struct_fields(schema, columns)
     read_columns = [name for name in ("document_id", *columns) if name in schema.names]
     rows = table.to_pyarrow_table(columns=read_columns).to_pylist()
-    return audit_rows(declared_fields=declared, rows=rows, table_uri=uri)
+    return audit_rows(
+        declared_fields=declared,
+        rows=rows,
+        table_uri=uri,
+        keys=keys,
+        surface=resolved_surface,
+    )
 
 
 # --------------------------------------------------------------------------------------
@@ -674,7 +858,15 @@ def plan_repair(report: AuditReport, rows: Sequence[Mapping[str, object]]) -> Re
 
 
 def render_text(report: AuditReport) -> str:
-    lines = [f"table: {report.table_uri}", f"rows:  {report.rows_total}", ""]
+    lines = [
+        f"table:   {report.table_uri}",
+        f"surface: {report.surface} ({len(report.findings)} registered key(s))",
+        f"rows:    {report.rows_total}",
+        "",
+    ]
+    if not report.findings:
+        lines.append("this surface has no audited struct columns; nothing here can be claimed")
+        lines.append("")
     for status in (Status.DROPPED, Status.INDETERMINATE, Status.NEVER_EMITTED, Status.PRESENT):
         findings = report.with_status(status)
         if not findings:
@@ -701,11 +893,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--uri", required=True, help="Delta table URI (file path, s3://, gs://)")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of text")
     parser.add_argument("--plan", action="store_true", help="also print the repair plan (executes nothing)")
+    parser.add_argument(
+        "--surface",
+        default=None,
+        choices=sorted(SURFACE_REGISTRIES),
+        help="which surface's emitted-key registry to audit against (default: read from the URI)",
+    )
     args = parser.parse_args(argv)
 
     from document_intelligence.persist.sinks import delta_storage_options
 
-    report = audit_delta_table(args.uri, storage_options=delta_storage_options() or {})
+    try:
+        report = audit_delta_table(
+            args.uri,
+            storage_options=delta_storage_options() or {},
+            surface=args.surface,
+        )
+    except UnknownSurfaceError as error:
+        print(f"refusing to audit: {error}", file=sys.stderr)
+        return 2
     payload: dict[str, object] = {"audit": report.to_dict()}
     text = [render_text(report)]
     if args.plan:
