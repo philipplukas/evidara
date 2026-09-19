@@ -98,3 +98,21 @@ export function formatSpecEntryValue(value: unknown): string {
   if (typeof value === "boolean") return value ? "yes" : "no";
   return String(value);
 }
+
+/**
+ * What a table cell or panel says about a version whose stored spec the API
+ * could not read back (#953).
+ *
+ * One producer, used by every surface that would otherwise have to decide for
+ * itself — the table summary, the spec panel and the diff. The wording is the
+ * load-bearing part: "could not be read" is a statement about us, and an empty
+ * configuration is a statement about the record. Rendering the second when the
+ * first is true is the defect ADR-0052 names.
+ */
+export function unreadableSpecLines(reason: string | null): string[] {
+  return [
+    "Stored spec could not be read",
+    reason ? `Reason: ${reason}` : "Reason: not stated by the API",
+    "This version has a spec. It is not empty — it is unreadable.",
+  ];
+}

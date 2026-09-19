@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.33.0
+  version: 0.34.0
 paths:
   /health:
     get:
@@ -8385,35 +8385,47 @@ components:
         execution_mode:
           $ref: '#/components/schemas/ExecutionMode'
         acquisition_spec:
-          oneOf:
-          - $ref: '#/components/schemas/FirecrawlAcquisitionSpec'
-          - $ref: '#/components/schemas/DeterministicHttpAcquisitionSpec'
-          - $ref: '#/components/schemas/FedlexSparqlAcquisitionSpec'
-          - $ref: '#/components/schemas/RisOgdAcquisitionSpec'
-          - $ref: '#/components/schemas/LegifranceAcquisitionSpec'
-          - $ref: '#/components/schemas/EurLexSparqlAcquisitionSpec'
-          - $ref: '#/components/schemas/ChCourtDecisionsAcquisitionSpec'
-          - $ref: '#/components/schemas/CantonHttpAcquisitionSpec'
-          - $ref: '#/components/schemas/LexFindAcquisitionSpec'
-          - $ref: '#/components/schemas/GemeindeHttpAcquisitionSpec'
-          - $ref: '#/components/schemas/BundeslandHttpAcquisitionSpec'
-          - $ref: '#/components/schemas/RegioneHttpAcquisitionSpec'
+          anyOf:
+          - oneOf:
+            - $ref: '#/components/schemas/FirecrawlAcquisitionSpec'
+            - $ref: '#/components/schemas/DeterministicHttpAcquisitionSpec'
+            - $ref: '#/components/schemas/FedlexSparqlAcquisitionSpec'
+            - $ref: '#/components/schemas/RisOgdAcquisitionSpec'
+            - $ref: '#/components/schemas/LegifranceAcquisitionSpec'
+            - $ref: '#/components/schemas/EurLexSparqlAcquisitionSpec'
+            - $ref: '#/components/schemas/ChCourtDecisionsAcquisitionSpec'
+            - $ref: '#/components/schemas/CantonHttpAcquisitionSpec'
+            - $ref: '#/components/schemas/LexFindAcquisitionSpec'
+            - $ref: '#/components/schemas/GemeindeHttpAcquisitionSpec'
+            - $ref: '#/components/schemas/BundeslandHttpAcquisitionSpec'
+            - $ref: '#/components/schemas/RegioneHttpAcquisitionSpec'
+            discriminator:
+              propertyName: provider
+              mapping:
+                bundesland_http: '#/components/schemas/BundeslandHttpAcquisitionSpec'
+                canton_http: '#/components/schemas/CantonHttpAcquisitionSpec'
+                ch_court_decisions: '#/components/schemas/ChCourtDecisionsAcquisitionSpec'
+                deterministic_http: '#/components/schemas/DeterministicHttpAcquisitionSpec'
+                eur_lex_sparql: '#/components/schemas/EurLexSparqlAcquisitionSpec'
+                fedlex_sparql: '#/components/schemas/FedlexSparqlAcquisitionSpec'
+                firecrawl: '#/components/schemas/FirecrawlAcquisitionSpec'
+                gemeinde_http: '#/components/schemas/GemeindeHttpAcquisitionSpec'
+                legifrance: '#/components/schemas/LegifranceAcquisitionSpec'
+                lexfind_api: '#/components/schemas/LexFindAcquisitionSpec'
+                regione_http: '#/components/schemas/RegioneHttpAcquisitionSpec'
+                ris_ogd: '#/components/schemas/RisOgdAcquisitionSpec'
+          - type: 'null'
           title: Acquisition Spec
-          discriminator:
-            propertyName: provider
-            mapping:
-              bundesland_http: '#/components/schemas/BundeslandHttpAcquisitionSpec'
-              canton_http: '#/components/schemas/CantonHttpAcquisitionSpec'
-              ch_court_decisions: '#/components/schemas/ChCourtDecisionsAcquisitionSpec'
-              deterministic_http: '#/components/schemas/DeterministicHttpAcquisitionSpec'
-              eur_lex_sparql: '#/components/schemas/EurLexSparqlAcquisitionSpec'
-              fedlex_sparql: '#/components/schemas/FedlexSparqlAcquisitionSpec'
-              firecrawl: '#/components/schemas/FirecrawlAcquisitionSpec'
-              gemeinde_http: '#/components/schemas/GemeindeHttpAcquisitionSpec'
-              legifrance: '#/components/schemas/LegifranceAcquisitionSpec'
-              lexfind_api: '#/components/schemas/LexFindAcquisitionSpec'
-              regione_http: '#/components/schemas/RegioneHttpAcquisitionSpec'
-              ris_ogd: '#/components/schemas/RisOgdAcquisitionSpec'
+          description: 'The stored acquisition spec. `null` **only** when the stored JSON no longer validates
+            against any known provider, in which case `acquisition_spec_error` says why. A null spec is
+            therefore never ''this version has no spec'' — see #953 and ADR-0052.'
+        acquisition_spec_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Acquisition Spec Error
+          description: Why the stored acquisition spec could not be read back, or `null` when it read
+            back fine. Set together with a null `acquisition_spec`; exactly one of the two is always populated.
         created_at:
           type: string
           format: date-time
@@ -8431,6 +8443,7 @@ components:
       - status
       - execution_mode
       - acquisition_spec
+      - acquisition_spec_error
       - created_at
       - updated_at
       title: SourceVersionResponse

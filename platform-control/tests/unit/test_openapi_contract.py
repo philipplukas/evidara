@@ -78,6 +78,31 @@ def test_info_version_matches_contract_manifest(schema: dict) -> None:
     )
 
 
+def _provider_discriminator_mapping(property_schema: dict) -> dict:
+    """The provider mapping of an `acquisition_spec` property, wherever it sits.
+
+    Since #953 the field on `SourceVersionResponse` is nullable, so the generated
+    schema wraps the discriminated union in `anyOf: [<union>, {type: null}]` and the
+    `discriminator` moved one level down. Walking to it keeps the #614 assertion
+    below pointed at the union the admin's version editor actually consumes.
+
+    This raises rather than returning `{}` when it cannot find one: an empty mapping
+    would make the caller's set comparison fail with a confusing message, and a
+    `None` would let a future shape change turn this guard into a silent abstention.
+    """
+    if "discriminator" in property_schema:
+        return property_schema["discriminator"]["mapping"]
+    for variant in property_schema.get("anyOf", []):
+        if "discriminator" in variant:
+            return variant["discriminator"]["mapping"]
+    raise AssertionError(
+        "no provider discriminator found on the acquisition_spec property. The "
+        "generated shape changed; find the union again rather than deleting this "
+        "check — it is what keeps the contract's providers equal to the domain's "
+        "(#614)."
+    )
+
+
 def test_every_acquisition_provider_is_a_contract_variant(schema: dict) -> None:
     """The drift that caused #614: the contract knew 4 of 11 providers.
 
@@ -89,10 +114,21 @@ def test_every_acquisition_provider_is_a_contract_variant(schema: dict) -> None:
     """
     from platform_control.domain import AcquisitionProvider
 
-    mapping = schema["components"]["schemas"]["SourceVersionResponse"]["properties"][
-        "acquisition_spec"
-    ]["discriminator"]["mapping"]
+    mapping = _provider_discriminator_mapping(
+        schema["components"]["schemas"]["SourceVersionResponse"]["properties"]["acquisition_spec"]
+    )
     assert set(mapping) == {provider.value for provider in AcquisitionProvider}
+
+
+def test_the_provider_discriminator_lookup_cannot_silently_abstain() -> None:
+    """The helper above must fail, not return empty, when the shape moves again.
+
+    A lookup that answered `{}` would turn the #614 guard into an assertion about
+    nothing on the next generator change — the failure mode AGENTS.md calls a guard
+    that abstains by construction.
+    """
+    with pytest.raises(AssertionError, match="no provider discriminator"):
+        _provider_discriminator_mapping({"anyOf": [{"type": "object"}, {"type": "null"}]})
 
 
 #: List responses whose endpoints paginate. Not all of them do — `GET
