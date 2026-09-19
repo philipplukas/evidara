@@ -36,9 +36,11 @@ Two PRs that both change the platform-control API surface therefore collide twic
 each of those three lines, and semantically, because two PRs that pick the *same* successor merge
 cleanly and then describe two different surfaces under one number.
 
-**Measured, 2026-09-19.** #1041 and #1042 both moved `API_VERSION` from `0.33.0` to `0.34.0`, and
-both also edited `contracts/api/platform-control.openapi.yaml` and `contracts/manifest.yaml`.
-Whichever lands second conflicts.
+**Measured, 2026-09-19.** While both were open, #1041 and #1042 each moved `API_VERSION` from
+`0.33.0` to `0.34.0`, and each also edited `contracts/api/platform-control.openapi.yaml` and
+`contracts/manifest.yaml`. They landed hours apart, and the second had to rebase and re-pick its
+successor. That is the lane being run by hand under time pressure; writing it down is cheaper than
+rediscovering it.
 
 **The rule.** At most one in-flight PR changes the platform-control API surface. Before you open the
 second one:

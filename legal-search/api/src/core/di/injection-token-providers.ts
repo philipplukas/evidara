@@ -32,9 +32,16 @@
  *
  * ## The allowlist is a debt register, not a mute button
  *
- * Entries are printed by the spec and go **stale-red**: once a listed token is
- * provided (or deleted), the entry itself fails the gate. Same design as
+ * Entries go **stale-red**: once a listed token is provided or deleted, the
+ * entry itself fails the gate. Same design as
  * `scripts/check_test_reachability.py`'s `KNOWN_UNREACHABLE`.
+ *
+ * It is empty, and that is not decoration — it held exactly one entry,
+ * `DOCUMENT_CONTENT_PORT`, for the hours between this guard being written and
+ * #1044 landing. #1044 deleted the port and its orphaned fetch client, the
+ * entry went stale, `has no stale entries in the known-unprovided register`
+ * went red, and the entry came out. The register did its whole job once before
+ * anyone read it.
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -59,15 +66,13 @@ export interface TokenAudit {
 
 /**
  * Tokens that are knowingly unprovided right now, each with the reason and the
- * change that clears it. Every entry must go red once it stops being true.
+ * change that clears it. Every entry must go red once it stops being true, so
+ * an entry is a dated debt, never a mute.
+ *
+ * Format: `TOKEN_NAME: 'why it is unprovided, which change clears it, and the
+ * `src/...` path it lives at'`.
  */
-export const KNOWN_UNPROVIDED: Record<string, string> = {
-  DOCUMENT_CONTENT_PORT:
-    'Declared by src/modules/documents/ports/document-content.port.ts and provided by ' +
-    'nothing; its only implementation (document-intelligence.fetch-client.ts) is imported ' +
-    'by nothing. PR #1044 deletes both — delete this entry when that PR merges. The pair ' +
-    'misled two diagnoses of #984.',
-};
+export const KNOWN_UNPROVIDED: Record<string, string> = {};
 
 const TOKEN_DECLARATION = /export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*Symbol\s*\(/g;
 const TOKEN_PROVISION = /\bprovide\s*:\s*([A-Z][A-Z0-9_]*)\b/g;

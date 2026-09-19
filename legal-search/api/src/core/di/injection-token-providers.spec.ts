@@ -117,6 +117,9 @@ describe('injection token provider audit — the real api surface', () => {
   });
 
   it('keeps every known-unprovided entry pointed at a real file', () => {
+    // Vacuous while the register is empty, and deliberately so: the register's
+    // teeth are the staleness rule, which the fixture cases above exercise
+    // directly. This only stops an entry from naming a file that is not there.
     for (const token of Object.keys(KNOWN_UNPROVIDED)) {
       const reason = KNOWN_UNPROVIDED[token];
       const referenced = reason.match(/src\/[\w./-]+\.ts/g) ?? [];
