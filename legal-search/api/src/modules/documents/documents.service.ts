@@ -1,10 +1,17 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { SupportedLocale } from '../../core/i18n';
 import { DEFAULT_LOCALE } from '../../core/i18n';
 import type { WarnFn } from '../../core/types/warn';
 import {
   DOCUMENT_INTELLIGENCE_CLIENT,
   type DocumentIntelligenceClient,
+  LeanDocumentUnavailableError,
 } from '../../lib/document-intelligence/document-intelligence.client';
 import { resolveAgainstTargets } from '../citations/citation-resolution';
 import {
@@ -78,7 +85,7 @@ export class DocumentsService {
     // produces — so every document that HAD a body skipped the fetch and then
     // had its body dropped by the mapper. The body never reached the client.
     if (!hasBodyText(doc.content)) {
-      const lean = await this.documentIntelligence.fetchLeanDocument(id, { correlationId });
+      const lean = await this.readLeanBodySource(id, correlationId);
       const body = extractLeanBodyText(lean);
       if (body !== undefined) {
         doc = { ...doc, content: body };
@@ -86,6 +93,46 @@ export class DocumentsService {
     }
 
     return mapDocumentToDetailView(doc, sections, citations, locale, this.warn);
+  }
+
+  /**
+   * Read the body fallback, and refuse rather than answer "no body" on a guess.
+   *
+   * `null` is the upstream saying the document has no canonical row, or the
+   * integration being switched off. Either way the detail view renders without
+   * a body and omits the content tab — an honest "we hold no text for this".
+   *
+   * A *failed* read is not that. Returning the document anyway would publish
+   * the same page and make the failure indistinguishable from the absence,
+   * which is what #984 is: the 503 #983 introduced to say "do not believe this
+   * absence" arrived here and became `undefined`. So it becomes a 503 of our
+   * own — `use-detail.ts` already branches 404 (not found) from any other
+   * non-200 (failed to load), so the distinction has a consumer at the surface.
+   *
+   * The narrower answer — serve the page with the body marked unavailable —
+   * needs a field on the detail view and therefore `document-detail.mapper.ts`,
+   * which is #1039's lane. Until then a refusal is the only channel that does
+   * not lie, and it fires only for a document the index has no body for AND
+   * whose upstream read actually broke.
+   */
+  private async readLeanBodySource(id: string, correlationId?: string): Promise<unknown | null> {
+    try {
+      return await this.documentIntelligence.fetchLeanDocument(id, { correlationId });
+    } catch (err) {
+      if (err instanceof LeanDocumentUnavailableError) {
+        this.logger.warn('document_body_read_unavailable', {
+          document_id: id,
+          upstream_status: err.status,
+          correlation_id: correlationId,
+        });
+        throw new ServiceUnavailableException(
+          `Document ${id} has no indexed body and its canonical text could not be read ` +
+            '(document-intelligence did not answer). This is a failed read, not an empty ' +
+            'document — retry rather than concluding the document has no text.',
+        );
+      }
+      throw err;
+    }
   }
 
   async getSections(documentId: string) {
