@@ -138,3 +138,7 @@ scripts/deploy-hetzner-runner.sh
 # Survey HTTP cache — a scratch artifact of scripts/survey_communal_portals.py,
 # not evidence. The JSONL checkpoint beside it IS the work product.
 docs/runbooks/evidence/.portal-cache/
+
+# scripts/run-gate.sh writes full gate output here when EVIDARA_GATE_LOG_DIR is
+# unset. The PASS / FAIL / DID-NOT-RUN line is the evidence; the log is scratch.
+.gate-logs/
