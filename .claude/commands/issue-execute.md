@@ -5,7 +5,40 @@ argument-hint: <issue-number>
 
 Execute issue **#$1** from the `philipplukas/evidara` roadmap (tracked in #279).
 
-Follow the six-step recipe below. Use the MCP GitHub tools for all GitHub interactions. Do not improvise — if a step's preconditions aren't met, stop and surface the gap to the user.
+Follow the recipe below. Use the MCP GitHub tools for all GitHub interactions. Do not improvise — if a step's preconditions aren't met, stop and surface the gap to the user.
+
+## 0. Re-measure the premise — before any code
+
+**Report `PREMISE: PASS` or `PREMISE: STALE` before writing a single line.** An issue body records
+what was true when it was written. On 2026-09-19 three tickets worked in one day had premises that
+were already false:
+
+- **#953** — the 500 it describes reproduces only under a dev-only seeder.
+- **#984** — the file it cites is not wired into the running app at all.
+- **#871** — all three of its predictions were refuted; the corpus had been rebuilt after the fix.
+
+And three more carried stale numbers: **#1012** said 58 where there were 116, **#1028**'s 30 records
+were already gone, **#975**'s headline measurement had been overtaken.
+
+Do this:
+
+1. Read the issue's **Measured** section (the template requires one). If it has none, or it says
+   "not measured", the premise is unestablished — treat it as STALE until you establish it.
+2. **Re-run the command it names, today.** Compare the output to what the issue claims. Read-only
+   queries for the usual questions: `.claude/skills/measure-before-you-theorise/SKILL.md`.
+3. **Verify the premise against the code on current `origin/main`**, citing `file:line`. Check
+   whether a merged PR already resolved it (`git log --grep`, the issue's cross-references). An
+   **open** PR resolves nothing.
+4. Report one of:
+   - `PREMISE: PASS` — the command, the date, the output, and the `file:line` that agree with it.
+   - `PREMISE: STALE` — what the issue asserts, what you measured instead, and how they differ.
+
+On STALE, **stop and surface it to the user** with the evidence. Do not implement a fix aimed at a
+cause that does not exist. Per AGENTS.md, an issue that turns out to be resolved or wrong is a valid
+and useful outcome — report it rather than manufacturing work to match the ticket.
+
+A conclusion that merely fits the evidence is not one the evidence forces: say which alternatives
+you eliminated and how.
 
 ## 1. Scope
 
