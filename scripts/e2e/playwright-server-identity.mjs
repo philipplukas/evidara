@@ -217,6 +217,43 @@ export async function assertServerIdentity(target, options) {
 }
 
 /**
+ * Fetch the app shell once so the first test does not pay for it.
+ *
+ * The identity check above proves the server is ours, but it only touches
+ * `/api/e2e-identity` — a route that compiles and caches separately from the
+ * page. The first test to open the app was still paying first-byte costs
+ * inside its own 5s assertion budget. One bounded GET here moves that cost out
+ * of the tests, where it reads as "element(s) not found" rather than as
+ * latency.
+ *
+ * Never fatal: a warm-up that fails tells us nothing the identity check has
+ * not already established, and failing here would turn a slow server into an
+ * unexplained global-setup error.
+ */
+async function warmAppShell(target, timeoutMs = 60_000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const startedAt = Date.now();
+  try {
+    const response = await fetch(target.url, {
+      signal: controller.signal,
+      headers: { accept: "text/html" },
+    });
+    // Drain it: the body is what the server had to render.
+    await response.text();
+    console.log(
+      `[e2e-identity] warmed ${target.surface} @ ${target.url} in ${Date.now() - startedAt}ms (HTTP ${response.status})`,
+    );
+  } catch (error) {
+    console.log(
+      `[e2e-identity] warm-up skipped for ${target.surface}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Playwright `globalSetup`. Runs once, before any browser starts, after
  * `webServer` entries are up.
  */
@@ -240,6 +277,7 @@ export default async function globalSetup() {
 
   for (const target of targets) {
     const payload = await assertServerIdentity(target, { expectedRunId, enforceRunId });
+    await warmAppShell(target);
     if (enforceRunId) {
       console.log(
         `[e2e-identity] OK ${target.surface} @ ${target.url} (run ${payload.runId}, pid ${payload.pid})`,
