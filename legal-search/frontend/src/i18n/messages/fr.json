@@ -87,10 +87,19 @@
     },
     "descriptions": {
       "details": "Les m\u00e9tadonn\u00e9es apparaissent d'abord, puis le corps du document pour une lecture plus rapide.",
-      "references": "Les r\u00e9f\u00e9rences entrantes et sortantes sont s\u00e9par\u00e9es pour vous permettre de suivre le fil des citations dans une seule direction \u00e0 la fois.",
+      "references": "Les r\u00e9f\u00e9rences sont regroup\u00e9es par type. Celles qui ne sont pas r\u00e9solues sont signal\u00e9es comme telles et ne m\u00e8nent nulle part.",
       "related": "Les r\u00e9sultats li\u00e9s sont regroup\u00e9s par th\u00e8me pour faire ressortir d'abord les connexions les plus fortes.",
       "annotations": "Les annotations sont regroup\u00e9es par th\u00e8me pour faciliter le balayage sans perdre le contexte de la source.",
       "structure": "Naviguer dans le plan permet de garder la lecture ancr\u00e9e dans le document courant."
+    },
+    "references": {
+      "unresolved": "Absent du corpus",
+      "reasonUnrecorded": "Aucun motif enregistr\u00e9.",
+      "reasons": {
+        "no_target_in_corpus": "La norme cit\u00e9e est absente du corpus.",
+        "not_normalizable": "La r\u00e9f\u00e9rence ne porte aucun identifiant exploitable.",
+        "ambiguous": "Plusieurs documents r\u00e9pondent \u00e0 cette r\u00e9f\u00e9rence."
+      }
     },
     "empty": {
       "noSelection": "Aucun r\u00e9sultat s\u00e9lectionn\u00e9",

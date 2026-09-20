@@ -86,11 +86,32 @@ export interface RelatedItem {
   href?: string;
 }
 
+/**
+ * One row of the references tab.
+ *
+ * `citation` is the key the API actually sends (`ReferenceItem.citation` in
+ * `contracts/api/legal-search.openapi.yaml`). This interface declared
+ * `subtitle?` instead — a key no response has ever carried — so
+ * `ReferencesTab` rendered `{item.subtitle && …}`, which is always false, and
+ * every reference row showed its title alone. On the ZH Hundegesetz that made
+ * four distinct citations read as `SR 210`, `SR 455.1`, `SR 210`, `SR 455.1`
+ * (#1040).
+ */
 export interface ReferenceItem {
   id: string;
   title: string;
-  subtitle?: string;
+  citation: string;
   href?: string;
+  /** The cited document, when the corpus holds it. What a click navigates to. */
+  targetDocumentId?: string;
+  /**
+   * Whether the corpus holds the cited norm. Required, because a missing
+   * boolean would read as "not unresolved" and restore exactly the defect
+   * this field exists to close (ADR-0052).
+   */
+  resolved: boolean;
+  /** `not_normalizable` | `no_target_in_corpus` | `ambiguous`, when recorded. */
+  unresolvedReason?: string;
 }
 
 export interface AnnotationViewModel {
@@ -117,10 +138,25 @@ export interface ReferenceGroup {
   items: ReferenceItem[];
 }
 
+/**
+ * One entry of the document outline.
+ *
+ * `depth` and `text` both reach this app from the `sections` index and were
+ * both dropped on the way to the screen: the BFF dropped the text, and
+ * `mapDetail` then dropped the depth, so `StructureTab` had no way to render
+ * nesting even for the ZGB's 1,377 sections and rendered every one of them at
+ * a single indent (#1040).
+ *
+ * Both stay optional — a section legitimately has no preview text, and a
+ * source that publishes no hierarchy has no depth. The renderer treats absent
+ * depth as top level rather than inventing one.
+ */
 export interface LocalStructureItem {
   id: string;
   label: string;
   active: boolean;
+  depth?: number;
+  text?: string;
 }
 
 export interface DetailViewModel {

@@ -2,9 +2,11 @@
 
 import { FileText } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildDocumentOutline } from "@/lib/document-structure";
 import type { DetailViewModel } from "@/lib/types";
 import { DetailPanelHeader } from "./DetailPanelHeader";
-import { DetailTabs, useActiveTab } from "./DetailTabs";
+import { DetailTabs, useDetailTab } from "./DetailTabs";
 import { DocumentBody } from "./DocumentBody";
 import { AnnotationTab } from "./tabs/AnnotationTab";
 import { DetailsTab } from "./tabs/DetailsTab";
@@ -31,11 +33,13 @@ import { StructureTab } from "./tabs/StructureTab";
 // branch it drives — the two drifting apart is what produced #609 and #622.
 const REFERENCE_TAB_KEYS: string[] = ["references", "citations"];
 const STRUCTURE_TAB_KEYS: string[] = ["structure", "sections"];
+/** The tab that renders the body. Where a section jump sends the reader. */
+const CONTENT_TAB_KEY = "content";
 const DETAIL_TAB_KEYS: string[] = [
   "details",
   "related",
   "annotation",
-  "content",
+  CONTENT_TAB_KEY,
   ...REFERENCE_TAB_KEYS,
   ...STRUCTURE_TAB_KEYS,
 ];
@@ -50,7 +54,46 @@ interface DetailPanelProps {
 
 export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: DetailPanelProps) {
   const t = useTranslations("detail");
-  const activeTab = useActiveTab();
+  const [activeTab, setActiveTab] = useDetailTab();
+  const [focusedSectionId, setFocusedSectionId] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // One alignment of outline to body per document, shared by every surface
+  // that renders either. Computing it twice would let the outline and the
+  // text disagree about which sections exist in the body.
+  const structureItems = detail?.localStructure?.items;
+  const contentText = detail?.contentText;
+  const outline = useMemo(
+    () => buildDocumentOutline(contentText, structureItems ?? []),
+    [contentText, structureItems],
+  );
+
+  // Selecting a section moves the reader. It does NOT select a document: the
+  // outline hands out `section_id`s, and feeding one to the workspace's
+  // document selection is what made every outline click a 404 (#1040).
+  const handleSectionSelect = useCallback(
+    (id: string) => {
+      setFocusedSectionId(id);
+      void setActiveTab(CONTENT_TAB_KEY);
+    },
+    [setActiveTab],
+  );
+
+  // The heading only exists once the content tab has rendered, so the scroll
+  // waits for the tab rather than happening in the click handler.
+  useEffect(() => {
+    if (!focusedSectionId || activeTab !== CONTENT_TAB_KEY) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    const target = Array.from(container.querySelectorAll<HTMLElement>("[data-section-id]")).find(
+      (element) => element.dataset.sectionId === focusedSectionId,
+    );
+    // jsdom implements no layout, so this is absent under Vitest. The tab
+    // switch and the anchor's presence are what the tests assert.
+    if (target && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ block: "start" });
+    }
+  }, [focusedSectionId, activeTab]);
 
   if (!detail) {
     return (
@@ -72,8 +115,8 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
     <section aria-label="Dokumentdetail" className="flex h-full min-h-0 flex-col">
       <DetailPanelHeader detail={detail} onPin={onPin} isPinned={isPinned} />
       <DetailTabs tabs={detail.tabs} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {activeTab === "details" && <DetailsTab detail={detail} />}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        {activeTab === "details" && <DetailsTab detail={detail} outline={outline} />}
         {activeTab === "related" && (
           <RelatedTab
             groups={detail.relatedGroups}
@@ -95,10 +138,10 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
         {/* Inhalt renders the document body. It used to render the structure
             outline, so a tab labelled "Inhalt" showed a heading reading
             "LOKALE STRUKTUR" — the outline, never the text (#609). */}
-        {activeTab === "content" &&
+        {activeTab === CONTENT_TAB_KEY &&
           (detail.contentText?.trim() ? (
             <div className="px-5 py-5">
-              <DocumentBody text={detail.contentText} />
+              <DocumentBody text={detail.contentText} outline={outline} />
             </div>
           ) : (
             <DetailEmptyState
@@ -108,7 +151,12 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
           ))}
         {STRUCTURE_TAB_KEYS.includes(activeTab) &&
           (detail.localStructure?.items?.length ? (
-            <StructureTab items={detail.localStructure.items} onFocus={onFocus} />
+            <StructureTab
+              items={detail.localStructure.items}
+              onSelectSection={handleSectionSelect}
+              anchoredIds={outline.anchored}
+              activeSectionId={focusedSectionId}
+            />
           ) : (
             <DetailEmptyState
               title={t("empty.noStructureTitle")}

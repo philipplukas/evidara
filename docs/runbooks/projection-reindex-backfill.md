@@ -250,6 +250,16 @@ uv run --extra service python -m document_intelligence.persist.metadata_audit \
 # --json for a machine-readable report, --plan to add the repair plan (still writes nothing)
 ```
 
+**Each surface is audited against its own producer's registry**, resolved from the URI's
+last path segment (`--surface` overrides it). That is not bookkeeping: a section row's
+`metadata` is built by `_build_sections`, not `_build_document`, and the two share no key.
+Auditing `published_sections` against the document registry — which the tool did until
+2026-09-19 — reported `source_origin_kind` and `trust_tier` as lost on all 57,128 rows,
+citing a line in `_build_document` that never touches a section, while registering none of
+the eleven keys sections do carry. Wrong in both directions at once. A surface with no
+registry is now **refused** rather than audited against a guess; add it to
+`SURFACE_REGISTRIES` with its producer's keys.
+
 `document_intelligence/persist/metadata_audit.py` replaces the two hand-run snippets this
 runbook used to carry. They answered "which fields does the struct declare" and "how many
 rows are null" — both necessary, neither sufficient, because an operator still had to
@@ -315,6 +325,20 @@ Widening the schema does not backfill existing rows either: rows written before 
 read back with the new field as `null`. That is correct — the value was never captured —
 and it is exactly why "the schema now has the field" must not be mistaken for "the corpus
 now has the value".
+
+### If a publish fails with `canonical_metadata_dropped`
+
+This is the write path refusing to create the condition this procedure repairs. The batch
+carried nested keys the target schema cannot hold and widening could not absorb them, so
+the sink raised rather than writing a row that would be indistinguishable — forever — from
+a document whose source never had those keys. The error names every lost path
+(`metadata.regeste`, `metadata.field_provenance.ecli`, …) and the surface.
+
+The document stays unpublished, which is the recoverable state. Run the audit against that
+surface, then fix the schema conflict — almost always a column whose declared type cannot
+unify with what the batch infers — and reprocess. Do **not** reach for a way to suppress
+the refusal: a published row that silently lost a key cannot be told apart from an honest
+absence afterwards, which is the whole of #871.
 
 ## Procedure: Reconcile — remove indexed documents canonical does not back
 

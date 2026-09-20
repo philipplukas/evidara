@@ -17,12 +17,37 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
 particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.11.0
+ * OpenAPI spec version: 0.12.0
  */
 
 export interface ReferenceItem {
   id: string;
   title: string;
   citation: string;
+  /** Link to the cited document. Present only when the corpus holds it. */
   href?: string;
+  /** The document this citation resolves to. Present exactly when `href`
+is, and carried separately because the reader navigates by document
+id (`?item=`) rather than by URL path — re-deriving the id by
+parsing a display href is the coupling this field removes.
+ */
+  targetDocumentId?: string;
+  /** Whether the corpus holds the cited norm. REQUIRED, and `false` is a
+real answer: an unresolved citation must render as a dead reference
+rather than as a link that 404s (ADR-0052 — unknown is not zero).
+Derived from `target_document_id` AFTER the read-time join in
+`DocumentsService`, never from the index's write-time `resolved`
+flag alone, which goes stale in both directions.
+ */
+  resolved: boolean;
+  /** Why the target is absent, when `resolved` is false and the index
+recorded a reason. One of `not_normalizable` (the citation names no
+identifier we can key on), `no_target_in_corpus` (well-formed key,
+norm not ingested) or `ambiguous` (several different documents
+answer to the key) — the three states
+`modules/citations/citation-resolution.ts` keeps distinct. Omitted
+when no reason was recorded: the row is still marked unresolved,
+only the explanation is withheld.
+ */
+  unresolvedReason?: string;
 }

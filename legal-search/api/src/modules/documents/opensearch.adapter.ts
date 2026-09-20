@@ -11,6 +11,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
+import type { CitationUnresolvedReason } from '../citations/citation-resolution';
 import type { DocumentsRepository } from './documents.repository';
 import type { CitationEntity, DocumentEntity, SectionEntity } from './entities/document.entities';
 
@@ -144,6 +145,7 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
             citation_type: src.citation_type as string | undefined,
             normalized_reference: src.normalized_reference as string | undefined,
             resolved: (src.resolved as boolean) ?? false,
+            unresolved_reason: src.unresolved_reason as CitationUnresolvedReason | undefined,
           };
         });
     } catch (err) {
@@ -180,6 +182,7 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
             citation_type: src.citation_type as string | undefined,
             normalized_reference: src.normalized_reference as string | undefined,
             resolved: (src.resolved as boolean) ?? false,
+            unresolved_reason: src.unresolved_reason as CitationUnresolvedReason | undefined,
           };
         });
     } catch (err) {

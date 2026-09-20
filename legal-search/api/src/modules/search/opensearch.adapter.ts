@@ -28,6 +28,11 @@ import type {
   SearchRefinement,
   SearchRepository,
 } from './search.repository';
+import {
+  JURISDICTION_MENTION_BOOST,
+  PHRASE_BOOST_FIELDS,
+  SEARCH_FIELD_WEIGHTS,
+} from './search-relevance.config';
 
 type OpenSearchHit = {
   _source?: Record<string, unknown>;
@@ -37,25 +42,6 @@ type OpenSearchHit = {
     regeste?: string[];
   };
 };
-
-const SEARCH_FIELD_WEIGHTS = [
-  'title^4',
-  'authority_name^3',
-  'official_citation^3',
-  'structural_path^2',
-  'regeste^2',
-  'content',
-  'content_preview',
-  'docket_number^2',
-] as const;
-
-const PHRASE_BOOST_FIELDS = [
-  ['title', 8],
-  ['official_citation', 6],
-  ['authority_name', 5],
-  ['structural_path', 4],
-  ['docket_number', 4],
-] as const;
 
 /**
  * Bucket ceiling for the jurisdiction-holdings aggregation. The jurisdiction
@@ -138,17 +124,11 @@ export class SearchOpenSearchAdapter implements SearchRepository {
             queryShape === 'wildcard'
               ? [{ match_all: {} }]
               : [this.buildPrimaryQuery(normalizedQuery, queryShape)],
-          should:
-            queryShape === 'wildcard'
-              ? []
-              : PHRASE_BOOST_FIELDS.map(([field, boost]) => ({
-                  match_phrase: {
-                    [field]: {
-                      query: normalizedQuery,
-                      boost,
-                    },
-                  },
-                })),
+          should: this.buildShouldClauses(
+            normalizedQuery,
+            queryShape,
+            options?.boostJurisdictionIds,
+          ),
           filter: filters,
         },
       },
@@ -348,6 +328,43 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     }
 
     return 'free_text';
+  }
+
+  /**
+   * Scoring-only clauses: phrase boosts, plus the jurisdictions the query
+   * NAMED (#975 gap A).
+   *
+   * `should` is the whole point. In a `bool` query with a `must`, a `should`
+   * clause adds to the score of the documents it matches and removes nothing —
+   * so a Zurich question still returns the federal act, Bern's law and
+   * everything else, in a different order. Putting these ids in `filter`
+   * instead would answer a question nobody asked ("show me ONLY Zurich"), and
+   * would hide the federal rung that a cantonal question always has above it.
+   */
+  private buildShouldClauses(
+    query: string,
+    shape: QueryShape,
+    boostJurisdictionIds?: string[],
+  ): Record<string, unknown>[] {
+    const clauses: Record<string, unknown>[] =
+      shape === 'wildcard'
+        ? []
+        : PHRASE_BOOST_FIELDS.map(([field, boost]) => ({
+            match_phrase: { [field]: { query, boost } },
+          }));
+
+    if (boostJurisdictionIds && boostJurisdictionIds.length > 0) {
+      clauses.push({
+        terms: {
+          // `.keyword` for the same reason the filter above uses it: this is an
+          // exact-id match, and it is the form that resolves on the live index.
+          'jurisdiction_ids.keyword': boostJurisdictionIds,
+          boost: JURISDICTION_MENTION_BOOST,
+        },
+      });
+    }
+
+    return clauses;
   }
 
   private buildPrimaryQuery(

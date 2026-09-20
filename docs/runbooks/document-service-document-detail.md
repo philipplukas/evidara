@@ -37,6 +37,35 @@ surface that has never been written is a genuine zero, not a refusal.
 4. **Do not "fix" it by widening the catch.** Serving the document as section-less is the failure
    mode this refusal replaced.
 
+## Symptom: `503` from the **BFF** on `GET /v1/documents/{document_id}`
+
+The refusal above only helps if it survives the next hop, and until #984 it did not: the BFF caught
+every upstream failure and returned the same value it returns for a 404, so a broken read rendered
+as a document we hold no text for. `HttpDocumentIntelligenceClient.fetchLeanDocument` now returns
+`null` **only** for a genuine 404 or a switched-off integration, and throws
+`LeanDocumentUnavailableError` when the read failed.
+
+The BFF answers `503` when **both** are true: the search index holds no body for the document, and
+the canonical-text read from the Document Service failed. A document the corpus genuinely has no
+text for still answers `200`, without `content` and without a content tab — that is a fact about the
+corpus, not an outage.
+
+1. **Read the log line** — `document_body_read_unavailable` on `DocumentsService` carries
+   `document_id`, `upstream_status` and `correlation_id`. The client logs the cause one level down
+   as `document_intelligence_lean_http_error` (upstream answered non-2xx),
+   `document_intelligence_lean_failed` (no answer at all — transport, DNS, timeout) or
+   `document_intelligence_lean_unexpected_status`.
+2. **Follow `upstream_status`** — `503` means the Document Service refused; work the section above.
+   `null` means the request never got an answer; check the base URL, network policy and pod health.
+3. **Do not widen the catch.** Returning the page without a body is the failure mode this replaced.
+   If you want the page served with the body marked unavailable instead, that needs a field on the
+   detail view (`document-detail.mapper.ts`) — see #1039 — not a swallowed error here.
+
+Projection-side, the same distinction shows up as two different log events, both refusing with a
+retryable `503`: `projection_enrichment_read_failed` (the read broke) versus
+`projection_enrichment_unavailable_refused` (the document has no canonical row). A DLQ full of the
+first is an outage; a DLQ full of the second is a corpus gap.
+
 ## Symptom: Slow document detail (high latency)
 
 1. **Payload size** — Lean vs full Docling JSON; prefer `/lean` for UI paths.

@@ -60,41 +60,72 @@ ADR-0022 is partially built: the `workflow` verb tree exists in the CLI and
 **This pointer has gone stale twice** — it named #628 for three days after it closed, then #731 for
 six days after that. If you are briefed from an anchor, check its state before scoping against it.
 
+That paragraph was here for both of those, which is the evidence that writing it down does not
+maintain it. `scripts/check_planning_anchor.py` now reads the `**Current anchor: #N` line above,
+resolves the issue's state, and fails the `docs-lint` job when it is CLOSED. It runs in CI and in
+`scripts/check_docs.sh`; with no `gh` and no token it reports `DID-NOT-RUN` rather than passing.
+
 The predecessor M1–M6 roadmap (#279) closed 2026-04-20. When opening new work, prefer
 `/issue-execute <number>` if a ticket exists; otherwise scope inline against ADR-0033's build order.
 
 ### Per-surface quality gates
 
-Run the narrowest gate for the surface you touched before pushing:
+Run the narrowest gate for the surface you touched before pushing, **through
+`scripts/run-gate.sh`**:
+
+```bash
+bash scripts/run-gate.sh <name> [--dir <surface>] -- <command...>
+```
+
+It runs the command under `set -o pipefail`, tees the full output to a log, and
+prints a final line that is exactly one of `PASS`, `FAIL` or `DID-NOT-RUN` plus
+the command's own exit status and the log path. **Read that line, not the
+shell's `$?`.** On 2026-09-19 a gate was run as `... | tail -40`; the suite
+failed, `tail` exited 0, and the run was recorded green. That is not an unusual
+mistake — a pipeline's status is its *last* command's, so every `| tail`,
+`| head` and `| grep` launders a failure into a success, and it happened
+repeatedly in one session before anyone caught it. `DID-NOT-RUN` exits 2 and is
+never 0: a gate whose prerequisites were absent did not pass.
 
 | Surface | Gate |
 |---|---|
-| `platform-control/` | `bash scripts/check-platform-control.sh` — ruff check + ruff format --check + pytest **and** the OpenAPI contract-drift gate **and** the full admin gate. A bare `uv run pytest` is narrower than CI. |
-| `platform-control/admin/` | `cd platform-control/admin && npm run check && npm run build` |
-| `document-intelligence/` | `cd document-intelligence && CI=true uv run --extra dev --extra service --extra test --extra llm pytest && uv run ruff check . && uv run ruff format --check .` — `CI=true` is not optional, see below |
-| `legal-search/api/` | `cd legal-search/api && npm run check` |
-| `legal-search/frontend/` | `cd legal-search/frontend && npm run check && npm run build` — build is a separate CI step; it catches SSR issues `tsc` misses |
-| `legal-search/` (both surfaces) | `bash scripts/check-legal-search.sh` |
-| `legal-search/frontend/e2e/` or `platform-control/admin/e2e/` | `bash scripts/check-e2e-spec-coverage.sh` — asserts every spec is selected by some CI command (#686). It skips a surface whose `node_modules` is absent, so run `npm ci` in the surface you touched first or the check passes having checked nothing. |
-| `platform-control/admin/e2e/` | `cd platform-control/admin && npm run e2e:browsers && npm run e2e && npm run e2e:visual` — the admin's Playwright suite. Every spec mocks the API with `page.route`, so no backend is needed. It is the only layer that sees layout, stylesheets and routing: jsdom has none of the three, which is how a clipped ACTIONS column, a UA-beveled sort header and an absent dark mode all passed `npm run check`. `npm run e2e` runs `--grep-invert @visual`, so **`e2e:visual` is a separate command and a separate CI job** — running only the first is narrower than CI. Its pixel baseline lives in this surface as of #913 (a PNG has no merge strategy, and an admin change was failing a *legal-search* job — #895, #902, #905); regenerate it with the `visual-baseline-refresh` PR label, not locally. Both commands need a free port: `ADMIN_E2E_PORT=3010`. |
-| `marketing/` | `cd marketing && npm run check` (then `npm run build` — the static export is the deploy artifact) |
-| `tools/evidara-cli/` | `bash scripts/check-evidara-cli.sh` |
+| `platform-control/` | `bash scripts/run-gate.sh platform-control -- bash scripts/check-platform-control.sh` — ruff check + ruff format --check + pytest **and** the OpenAPI contract-drift gate **and** the full admin gate. A bare `uv run pytest` is narrower than CI. |
+| `platform-control/admin/` | `bash scripts/run-gate.sh admin --dir platform-control/admin -- npm run check`, then the same with `-- npm run build` |
+| `document-intelligence/` | `CI=true bash scripts/run-gate.sh document-intelligence --dir document-intelligence -- uv run --extra dev --extra service --extra test --extra llm pytest`, then `-- uv run ruff check .` and `-- uv run ruff format --check .` — `CI=true` is not optional, see below |
+| `legal-search/api/` | `bash scripts/run-gate.sh legal-search-api --dir legal-search/api -- npm run check` — includes the injection-token audit (`src/core/di/injection-token-providers.spec.ts`), which fails on a token nothing `provide:`s |
+| `legal-search/frontend/` | `bash scripts/run-gate.sh legal-search-frontend --dir legal-search/frontend -- npm run check`, then the same with `-- npm run build` — build is a separate CI step; it catches SSR issues `tsc` misses |
+| `legal-search/` (both surfaces) | `bash scripts/run-gate.sh legal-search -- bash scripts/check-legal-search.sh` |
+| `legal-search/frontend/e2e/` or `platform-control/admin/e2e/` | `bash scripts/run-gate.sh e2e-coverage -- bash scripts/check-e2e-spec-coverage.sh` — asserts every spec is selected by some CI command (#686). It skips a surface whose `node_modules` is absent, so run `npm ci` in the surface you touched first or the check passes having checked nothing. |
+| `CLAUDE.md`, `AGENTS.md`, `.github/ISSUE_TEMPLATE/`, `.claude/commands/issue-execute.md`, `docs/process/` run each of `scripts/check_planning_anchor.py`, `scripts/check_classifier_evidence_rule.py`, `scripts/check_measured_premise.py` and `scripts/check_api_version_lane.py` through `bash scripts/run-gate.sh <name> -- python3 <script>` — the four pointer checks in the `docs-lint` job. The anchor check reports `DID-NOT-RUN` without `gh` or a `GH_TOKEN`; `--require-network` turns that into a failure. |
+| `platform-control/admin/e2e/` | `bash scripts/run-gate.sh admin-e2e --dir platform-control/admin -- npm run e2e:browsers`, then `-- npm run e2e` and `-- npm run e2e:visual` — the admin's Playwright suite. Every spec mocks the API with `page.route`, so no backend is needed. It is the only layer that sees layout, stylesheets and routing: jsdom has none of the three, which is how a clipped ACTIONS column, a UA-beveled sort header and an absent dark mode all passed `npm run check`. `npm run e2e` runs `--grep-invert @visual`, so **`e2e:visual` is a separate command and a separate CI job** — running only the first is narrower than CI. Its pixel baseline lives in this surface as of #913 (a PNG has no merge strategy, and an admin change was failing a *legal-search* job — #895, #902, #905); regenerate it with the `visual-baseline-refresh` PR label, not locally. Both commands need a free port: `ADMIN_E2E_PORT=3010`. |
+| `marketing/` | `bash scripts/run-gate.sh marketing --dir marketing -- npm run check`, then the same with `-- npm run build` — the static export is the deploy artifact |
+| `tools/evidara-cli/` | `bash scripts/run-gate.sh evidara-cli -- bash scripts/check-evidara-cli.sh` |
 | `eval/` | see `.github/workflows/eval-ris.yml` — two `-k`-filtered pytest selections |
-| `scripts/` | `uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` — see note below; without pyyaml only 144 of 201 tests run |
-| `country-overlays/` or `platform-control/src/platform_control/seeds/` | `for c in AT CH DE FR IT EU; do python scripts/check_country_overlay_files.py --country $c; done` — `--country` is required; the bare command exits 2 on argparse |
-| `contracts/api/` or `contracts/events/` | `python3 scripts/check_contract_version_bump.py --base origin/main` — the contract **changeset** gate. **Not** covered by `check-platform-control.sh`, which only checks that the generated spec still matches the app. |
-| `infra/hetzner/` | `python3 scripts/check_platform_ownership.py` — the shared cluster layer moved to [`research-platform`](https://github.com/philipplukas/research-platform) and the copies here are **frozen by hash**. An edit to a frozen file does not reach the cluster; the guard refuses it and names where the change belongs. Also run `bash scripts/validate_hetzner_apps_kustomize.sh` and `python3 scripts/check_hetzner_image_pins.py` — the two that cover what this repo still owns. |
-| Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
+| `scripts/` | `bash scripts/run-gate.sh scripts -- uv run --with pyyaml python -m unittest discover -s scripts/tests -p "test_*.py"` — see note below; without pyyaml only 264 of 404 tests run (measured 2026-09-19) |
+| `country-overlays/` or `platform-control/src/platform_control/seeds/` | `for c in AT CH DE FR IT EU; do bash scripts/run-gate.sh "overlay-$c" -- python3 scripts/check_country_overlay_files.py --country "$c"; done` — `--country` is required; the bare command exits 2 on argparse |
+| `contracts/api/` or `contracts/events/` | `bash scripts/run-gate.sh contract-changeset -- python3 scripts/check_contract_version_bump.py --base origin/main` — the contract **changeset** gate. **Not** covered by `check-platform-control.sh`, which only checks that the generated spec still matches the app. |
+| `infra/hetzner/` | `bash scripts/run-gate.sh hetzner-ownership -- python3 scripts/check_platform_ownership.py` — the shared cluster layer moved to [`research-platform`](https://github.com/philipplukas/research-platform) and the copies here are **frozen by hash**. An edit to a frozen file does not reach the cluster; the guard refuses it and names where the change belongs. Also run `scripts/validate_hetzner_apps_kustomize.sh` and `scripts/check_hetzner_image_pins.py` through the wrapper — the two that cover what this repo still owns. |
+| Any scraping-touching PR | `bash scripts/run-gate.sh scraping-qa -- bash scripts/check-scraping-qa.sh` |
 
 Rows here must not be narrower than what CI runs: a clean local run against a
 narrower gate means nothing, and the gap surfaces as a surprise red (#664, #688).
 
+The wrapper does not make a gate correct — it makes its *outcome* readable. It
+detects the prerequisites this repo has actually been burned by (no Docker
+daemon for a Testcontainers layer, an `npm` gate in a tree with no
+`node_modules`, a command that is not on `PATH`) and reports `DID-NOT-RUN` for
+those; anything it cannot detect is left to the command, because a wrapper that
+guesses wrong in the other direction is no better than one that prints PASS.
+State `--requires docker`, `--requires path:…`, `--requires cmd:…` or
+`--requires env:…` when you know a prerequisite it cannot infer.
+
 For `scripts/`, `--with pyyaml` is not optional either. CI installs it via
 `requirements-docs.txt`; a workstation `python3` may or may not have it, and that is the
-point — the gate must not depend on ambient state. Without it eleven test modules fail to
-import and the runner reports `Ran 144 tests ... FAILED (errors=11)` — which reads as eleven
-broken tests and is really **fifty-seven that never ran**. `uv` is already required by this
-repo, so the command above needs no venv and no system package.
+point — the gate must not depend on ambient state. Measured again on 2026-09-19: without it
+the runner reports `Ran 264 tests ... FAILED (failures=5, errors=15)` against 404 with it —
+which reads as twenty broken tests and is really **a hundred and forty that never ran**.
+`uv` is already required by this repo, so the command above needs no venv and no system
+package.
 
 `infra/hetzner/` is a trap of its own kind, and the opposite one: the guard exists and
 is correct, but a **frozen file is not obviously frozen from the file itself**. Nothing

@@ -50,6 +50,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from platform_control.config import get_settings
 from platform_control.database import get_session_maker
 from platform_control.domain import (
+    AcquisitionProvider,
     ExecutionMode,
     RunMode,
     RunStatus,
@@ -64,6 +65,13 @@ from platform_control.models.source_version import SourceVersion
 DEMO_SOURCE_ID = "src_demo_run_states"
 DEMO_SOURCE_VERSION_ID = "sv_demo_run_states"
 DEMO_SOURCE_NAME = "Demo · run-state fixtures"
+
+#: The demo source version's acquisition spec. See the comment at its use site for
+#: why it is a real, validating spec rather than a made-up fixture shape (#953).
+DEMO_ACQUISITION_SPEC: dict = {
+    "provider": AcquisitionProvider.DETERMINISTIC_HTTP.value,
+    "seed_urls": ["https://demo-run-states.invalid/fixtures"],
+}
 
 #: Marker written to every row this module creates. Nothing else in the schema
 #: carries it, so `metadata->>'demo_seed'` is an exact predicate for "this row is
@@ -206,6 +214,12 @@ async def _ensure_demo_source(session: AsyncSession) -> tuple[SourceVersion, boo
     """
     existing = await session.get(SourceVersion, DEMO_SOURCE_VERSION_ID)
     if existing is not None:
+        # Re-running repairs the spec on a stack seeded before #953. Idempotence is
+        # the point of this function, but leaving the old unreadable spec in place
+        # would mean the fix ships and every already-seeded workstation keeps the
+        # 500 — the row is in the `*_demo_*` id space, so rewriting it is in scope.
+        if existing.acquisition_spec != DEMO_ACQUISITION_SPEC:
+            existing.acquisition_spec = DEMO_ACQUISITION_SPEC
         return existing, False
 
     jurisdiction = await session.scalar(select(Jurisdiction).limit(1))
@@ -243,7 +257,19 @@ async def _ensure_demo_source(session: AsyncSession) -> tuple[SourceVersion, boo
         # but fixture-backed, touching no upstream server", which is exactly what
         # these rows describe. `live` here would be the one field that lies.
         execution_mode=ExecutionMode.SHADOW,
-        acquisition_spec={"kind": "demo_fixture", "targets": []},
+        # A real `AcquisitionSpec`, because this seeder writes the ORM row directly
+        # and so skips the validation `create_source_version` applies. It used to
+        # write `{"kind": "demo_fixture", "targets": []}`, which is not a member of
+        # the provider-discriminated union — so every read of this row raised inside
+        # response construction and `GET /v1/sources/{id}/versions` answered 500 for
+        # the whole source (#953). A fixture that the API cannot serve is not a
+        # fixture, it is a landmine.
+        #
+        # `deterministic_http` is the plainest provider in the union, and the host is
+        # in the RFC 2606 `.invalid` TLD, which is guaranteed never to resolve — so
+        # the row stays as inert as `execution_mode=SHADOW` says it is while still
+        # being a spec the contract can represent.
+        acquisition_spec=DEMO_ACQUISITION_SPEC,
     )
     session.add(version)
     return version, True

@@ -17,7 +17,12 @@ from collections.abc import Callable, Sequence
 from platform_control.cli import fetch as fetch_cmd
 from platform_control.cli import ingest as ingest_cmd
 from platform_control.cli import plan as plan_cmd
+from platform_control.cli import processing as processing_cmd
 from platform_control.cli import retention as retention_cmd
+
+# Imports `platform_control.domain` and nothing else — no SQLAlchemy, no FastAPI —
+# so the parser stays as cheap to build as the rest of this module.
+from platform_control.services.processing_reconciliation import DEFAULT_PROCESSING_DEADLINE
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -109,6 +114,41 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Report what would be purged without touching the database.",
     )
     sweep_parser.set_defaults(runner=retention_cmd.run_from_args)
+
+    processing_parser = subparsers.add_parser(
+        "processing",
+        help="Document-processing operator commands.",
+    )
+    processing_subparsers = processing_parser.add_subparsers(
+        dest="processing_command", required=True
+    )
+    reclaim_parser = processing_subparsers.add_parser(
+        "reclaim",
+        help=(
+            "Give a terminal status to documents that entered processing and never "
+            "came out (#1038)."
+        ),
+    )
+    reclaim_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report what would be reclaimed without writing anything.",
+    )
+    reclaim_parser.add_argument(
+        "--deadline-hours",
+        type=float,
+        default=DEFAULT_PROCESSING_DEADLINE.total_seconds() / 3600,
+        help=(
+            "How long to wait for a terminal status before reclaiming a unit "
+            "(default: %(default)s)."
+        ),
+    )
+    reclaim_parser.add_argument(
+        "--run-id",
+        default=None,
+        help="Reclaim only this run's units. Omit to sweep every run.",
+    )
+    reclaim_parser.set_defaults(runner=processing_cmd.run_from_args)
 
     return parser
 

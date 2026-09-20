@@ -169,6 +169,42 @@ holdings, never about whether the law exists.
 **Not yet consumed by the frontend.** The API produces the refusal and the generated
 client types it; rendering it as something other than "no results" is follow-up work.
 
+## Jurisdiction mentions as a ranking signal
+
+When the corpus *does* hold the canton a query names, the question is no longer whether to
+answer but which canton's law to answer with. `jurisdiction_ids` was indexed, filterable and
+faceted, and contributed nothing to ranking — so the words "Kanton Bern" in a question moved
+nothing, and a Zurich document whose title merely contains *Bern* outranked Bern's actual
+Hundegesetz (measured against production, 9.76 vs 8.99; #975 gap A).
+
+Search now passes the named jurisdictions to the ranker as a `should` clause on
+`jurisdiction_ids.keyword`. Three properties define it:
+
+1. **It is the same detection the refusal uses.** `detectSubdivisionMentions` runs once per
+   query and feeds both, so a place is either understood for both purposes or for neither. A
+   bare city name is still not a mention — see the refusal section above.
+2. **It carries the whole governing-scope chain, not the canton alone.** `getGoverningScopes`
+   resolves `jur_ch_zh` to `{jur_ch, jur_ch_federal, jur_ch_zh}` out of the jurisdiction seed,
+   so an AT or DE overlay gets the same shape without a code change. Boosting the canton by
+   itself pushed the federal Tierschutzgesetz from rank 15 out of the top 20 of the dog
+   question entirely — a cantonal question in Swiss law always has a federal rung above it,
+   and ADR-0033's acceptance test needs both.
+3. **It re-ranks; it never filters.** The clause is `should`, so documents of every other
+   jurisdiction are still returned and the hit total is unchanged — verified identical with
+   and without the signal on all six labelled queries. A `filter` here would answer a
+   question nobody asked and would hide the federal act.
+
+**The weight is 1, and that is a measurement rather than a preference.** It is the smallest
+integer weight that makes the property hold across a labelled set spanning ZH, BE and BS in
+both query shapes, and it is deliberately worth less than one extra keyword match in
+`title^4`: naming the canton breaks a near-tie, it does not override topical relevance. The
+honest consequence is that "Tierschutz Hunde Kanton Zürich" still ranks two Bernese and
+Basler ordinances above the first Zurich hit, because they outscore it topically by ~5
+points. A weight large enough to flip that would be large enough to promote an off-topic
+Zurich document over an on-topic federal act — the fixture trap #891 rejected and #975 warns
+about by name. `search.integration.spec.ts` holds the labelled set; raising the weight means
+re-measuring it.
+
 ## Minimal next tasks
 
 - [x] Define search projection schema

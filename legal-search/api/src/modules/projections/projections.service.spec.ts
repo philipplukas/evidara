@@ -1,6 +1,9 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
+import {
+  type DocumentIntelligenceClient,
+  LeanDocumentUnavailableError,
+} from '../../lib/document-intelligence/document-intelligence.client';
 import type {
   DocumentProcessedEventDto,
   DocumentWithdrawnEventDto,
@@ -987,6 +990,38 @@ describe('ProjectionsService', () => {
           expect((err as ServiceUnavailableException).getStatus()).toBe(503);
         },
       );
+    });
+
+    it('records a FAILED read as a different fact than an absent one', async () => {
+      // Both refuse and both are 503 — retry is the right disposition for each.
+      // What #984 changes is that the evidence differs: before it, a broken
+      // upstream and a document with no canonical row arrived as the same
+      // `null` and logged the same event, so the DLQ reader could not tell a
+      // corpus gap from an outage.
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new LeanDocumentUnavailableError('doc_1', 503, 'upstream refused'),
+      );
+      const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+      const service = new ProjectionsService(repository, diClient);
+
+      const err = await service.applyDocumentProcessed(baseProcessedEvent).then(
+        () => {
+          throw new Error('expected a refusal');
+        },
+        (e: unknown) => e,
+      );
+
+      expect(err).toBeInstanceOf(ServiceUnavailableException);
+      expect((err as ServiceUnavailableException).getStatus()).toBe(503);
+      expect(repository.upsertProjection).not.toHaveBeenCalled();
+      expect(repository.appendHistory).not.toHaveBeenCalled();
+
+      const events = warn.mock.calls.map((call) => call[0]);
+      expect(events).toContain('projection_enrichment_read_failed');
+      expect(events).not.toContain('projection_enrichment_unavailable_refused');
+      warn.mockRestore();
     });
 
     it('still projects normally when enrichment IS available', async () => {

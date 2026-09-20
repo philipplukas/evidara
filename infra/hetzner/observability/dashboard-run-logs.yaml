@@ -1,0 +1,205 @@
+# From a run to that run's logs (#892, ADR-0059).
+#
+# The run timeline (#887) shows an operator which stage stalled and has nothing to
+# hand them for *why*. This dashboard is the target of that missing link: a stable
+# URL, parameterised by run id, that a `runDeepLinks.ts` entry can build once a base
+# URL is configured.
+#
+#   /d/evidara-run-logs/evidara-run-logs?var-run=run_01jq7a3s9b7j4dndd9sgv6pb9d
+#
+# THE STACK IS NOT OURS. Loki and the Alloy collector live in
+# research-platform (`observability/loki/`, `observability/alloy/`), installed by
+# its `scripts/deploy-observability.sh`. `infra/hetzner/OWNERSHIP.md` maps the
+# observability Helm values there, and an edit here does not reach the cluster.
+# What describes *Evidara* stays in this repository — the same split that puts
+# scrape-targets.yaml and dashboard-funnel.yaml here rather than in the chart.
+# Apply this AFTER Loki exists, or the panels render "datasource not found".
+#
+# EVERY QUERY BELOW WAS EXECUTED, on 2026-09-19, against a throwaway Loki 3.3.2
+# loaded with the real line shapes these services produce. That was not ceremony:
+# the query the upstream deploy script prints as its verification —
+# `{namespace="evidara"} |= "correlation_id" | json` — fails on every one of our
+# lines with `__error__: JSONParserErr`, because a `logging.basicConfig` line is
+# `<date> <time> <LEVEL> {json}` and not JSON. Adding a field filter to it returns
+# **zero lines**, which reads as "this run logged nothing" and means "the parser
+# gave up". That is ADR-0052's unknown-is-not-zero, in the one tool an operator
+# reaches for when something is already wrong. Hence `pattern` + `line_format`
+# before `| json` in every structured panel here.
+#
+# WHAT IT CANNOT SEE, measured the same day (#1047, and
+# docs/runbooks/event-tracing-queries.md has the table):
+#   * platform-control writes NO structured line to stdout. Its
+#     `correlation_and_logging_middleware` (main.py:93) builds an `http_request`
+#     JSON payload at INFO, but the API runs under `uvicorn` with no `--log-config`
+#     and calls no `basicConfig`, so the root logger stays at WARNING and the record
+#     is dropped before formatting. Probed live: a request carrying
+#     `X-Correlation-Id: probe-892-logcheck` came back with the header echoed and
+#     left zero matching lines in the pod log.
+#   * legal-search/api carries a correlation id on the request (CorrelationIdMiddleware)
+#     and puts it in no log line.
+# So a run-scoped query finds document-intelligence and nothing else. The panels say
+# so rather than rendering an empty graph that reads as "this stage did nothing".
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-evidara-run-logs
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: Evidara
+data:
+  evidara-run-logs.json: |
+    {
+      "uid": "evidara-run-logs",
+      "title": "Evidara — logs for one run",
+      "description": "Every log line that names a run id, and which containers produced them. Paste a run id, or arrive here from the admin panel's run detail.",
+      "tags": ["evidara", "logs"],
+      "schemaVersion": 39,
+      "editable": true,
+      "time": { "from": "now-24h", "to": "now" },
+      "refresh": "",
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "label": "Logs datasource",
+            "type": "datasource",
+            "query": "loki",
+            "current": {},
+            "hide": 0
+          },
+          {
+            "name": "run",
+            "label": "Run id",
+            "type": "textbox",
+            "description": "A run id, e.g. run_01jq7a3s9b7j4dndd9sgv6pb9d. The default deliberately matches nothing: an unset variable would make every panel show the whole namespace, which is the opposite of run-scoped.",
+            "query": "run_paste-a-run-id-here",
+            "current": { "text": "run_paste-a-run-id-here", "value": "run_paste-a-run-id-here" },
+            "options": [],
+            "hide": 0
+          }
+        ]
+      },
+      "panels": [
+        {
+          "type": "text",
+          "title": "What this dashboard can see",
+          "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+          "options": {
+            "mode": "markdown",
+            "content": "A line reaches these panels only if the process wrote the run id to stdout. Measured 2026-09-19: **document-intelligence does** (`correlation_id` is set to `run.run_id` when the bundle event is published — `run_service.py:1963`), **platform-control does not** (its structured lines never reach stdout — evidara#1047), **legal-search/api does not** (it has a correlation id per request and logs none of it).\n\nSo an empty panel here means *document-intelligence said nothing about this run* — it does **not** mean the run did nothing. Check the run timeline and the pipeline funnel dashboard before concluding anything from silence."
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Lines naming this run",
+          "description": "Substring match on the raw line, so it is independent of each service's log format.",
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 5 },
+          "targets": [
+            {
+              "refId": "A",
+              "queryType": "instant",
+              "expr": "sum(count_over_time({namespace=\"evidara\"} |= \"$run\" [$__range]))"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "noValue": "0 — nothing in the retention window mentioned this run",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "text", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "type": "table",
+          "title": "Containers that named this run",
+          "description": "How far the run got, by who talked about it. A run that platform-control accepted but di-consumer never mentions is a run that did not reach processing.",
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 18, "x": 6, "y": 5 },
+          "targets": [
+            {
+              "refId": "A",
+              "queryType": "instant",
+              "expr": "sum by (container) (count_over_time({namespace=\"evidara\"} |= \"$run\" [$__range]))"
+            }
+          ],
+          "options": { "showHeader": true },
+          "fieldConfig": {
+            "defaults": { "noValue": "No container in the evidara namespace named this run" },
+            "overrides": []
+          }
+        },
+        {
+          "type": "logs",
+          "title": "Everything that named this run",
+          "description": "Raw lines, no parsing. This is the panel that still works when a service changes its log format, and the only one that can show a Python traceback: a traceback's continuation lines carry no run id, so read them from the pod and time window this panel gives you.",
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "gridPos": { "h": 11, "w": 24, "x": 0, "y": 10 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{namespace=\"evidara\"} |= \"$run\""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "sortOrder": "Ascending",
+            "dedupStrategy": "none"
+          }
+        },
+        {
+          "type": "logs",
+          "title": "Structured events for this run (document-intelligence)",
+          "description": "The `pattern` stage strips `<date> <time> <LEVEL>` before `| json`, because the line is a logging.basicConfig line with JSON as its message, not a JSON line. Without it the parser errors and the field filter returns nothing.",
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "gridPos": { "h": 11, "w": 24, "x": 0, "y": 21 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{namespace=\"evidara\"} |= \"$run\" | pattern \"<_> <_> <_> <msg>\" | line_format \"{{.msg}}\" | json | correlation_id=\"$run\""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": false,
+            "wrapLogMessage": true,
+            "sortOrder": "Ascending",
+            "dedupStrategy": "none"
+          }
+        },
+        {
+          "type": "logs",
+          "title": "Failures for this run",
+          "description": "Only the lines that carry an error_class. `transient` was retried; `permanent` was acked and dropped — dlq-triage-and-replay.md is the next stop for the second.",
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 32 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{namespace=\"evidara\"} |= \"$run\" | pattern \"<_> <_> <_> <msg>\" | line_format \"{{.msg}}\" | json | correlation_id=\"$run\" | error_class != \"\""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": false,
+            "wrapLogMessage": true,
+            "sortOrder": "Ascending",
+            "dedupStrategy": "none"
+          }
+        }
+      ]
+    }

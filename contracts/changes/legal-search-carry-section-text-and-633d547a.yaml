@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  legal-search: carry section text and depth into the document reader, and mark an unresolved citation as unresolved (#1040)

@@ -28,6 +28,19 @@ const healthyPipeline: RunPipelineHealth = {
   stages: [],
   processing_status_event_count: 1,
   document_lifecycle_event_count: 1,
+  // Required since #1038, for the same reason `decision_support` is: an absent
+  // block and "nothing is stranded" must not be the same wire value, so the API
+  // always sends it and a fixture that omitted it would describe a response the
+  // API cannot return.
+  processing_reconciliation: {
+    observed_units: 1,
+    terminal_units: 1,
+    unterminated_units: 0,
+    unterminated_units_past_deadline: 0,
+    oldest_unterminated_at: null,
+    verdict: "reconciled",
+    unterminated: [],
+  },
   // Required since #908: the judgement travels with the health payload rather
   // than being recomputed here. A fixture that omitted it would describe a
   // response the API cannot return.

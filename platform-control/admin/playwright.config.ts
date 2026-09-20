@@ -61,15 +61,39 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    // Webpack dev mode resolves Tailwind from admin/node_modules while
-    // Turbopack's widened monorepo root resolves CSS from platform-control.
-    command: `npm run dev -- --webpack --port ${port}`,
+    /*
+     * A PRODUCTION BUILD, not `next dev`. Two reasons, one of them measured.
+     *
+     * `next dev` compiles a route on its first request. With two workers on a
+     * cold cache, the first test to reach a data grid had to finish compile ->
+     * serve -> hydrate -> fetch -> render inside Playwright's 5s `expect`
+     * budget, and `retries: 0` turned every miss into a red job. Measured
+     * 2026-09-19: `operator-usability.spec.ts:174` and
+     * `preview-review-v2.spec.ts:134` — the two deepest locator chains in the
+     * suite, both `row -> Cancel button` — failed on `main` itself at
+     * f2611301, on a types-only PR, and on an untouched base commit, and
+     * passed on every warm re-run. Three re-runs were spent on one PR
+     * establishing that it was not a regression.
+     *
+     * The second reason stands on its own: `next dev` is not what ships. A
+     * suite that only ever met the dev server was never testing the artifact.
+     *
+     * Local iteration cost is the build. `reuseExistingServer()` is the escape
+     * hatch — start your own server, export the same E2E_RUN_ID, and the
+     * identity nonce still proves it is yours.
+     *
+     * `next build` uses webpack, so the Tailwind resolution this file used to
+     * pin with `--webpack` still holds: admin/node_modules, not the widened
+     * monorepo root Turbopack would pick.
+     */
+    command: `npm run build && npm run start -- --port ${port}`,
     url: baseURL,
     // OPT-IN reuse. Defaulting this to true is how a lane's run silently
     // attached to another lane's dev server on :3000 and reported green
     // against a tree that did not contain its changes.
     reuseExistingServer: reuse,
-    timeout: 60_000,
+    // A build plus a boot, not just a boot.
+    timeout: 300_000,
     env: { E2E_RUN_ID: runId },
   },
   projects: [

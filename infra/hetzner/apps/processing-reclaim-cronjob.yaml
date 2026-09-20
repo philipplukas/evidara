@@ -1,0 +1,83 @@
+# Terminal status for documents that entered processing and never came out (#1038).
+#
+# `processing` means two things today — *in flight* and *the worker died holding
+# this* — and nothing in the stack distinguishes them. Measured 2026-09-19, 116
+# documents had been in that state for up to 8d22h across two runs that both report
+# `completed`, and `1901 known - 116 = 1785` is the search index's count exactly.
+#
+# WHY A CRONJOB AND NOT A `finally:` IN THE CONSUMER. The consumer is what dies. A
+# shutdown hook, a callback or a best-effort `except` all run inside the process
+# whose death is the failure; the only writer that survives it is one that never
+# took part. That is the whole design, and it is why this manifest is part of the
+# fix rather than packaging around it: the sweep exists in the image either way,
+# but until something schedules it, nothing reclaims anything.
+#
+# The image carries no tag on purpose: this manifest is in kustomization.yaml's
+# `resources:`, so the `images:` transformer pins it to the same SHA as
+# platform-control. Do not hardcode a tag here — see retention-sweep-cronjob.yaml
+# for why migrate-job.yaml is the exception and what drifted in #549.
+#
+# Runbook: docs/runbooks/processing-reclaim.md.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: platform-control-processing-reclaim
+  namespace: evidara
+  labels:
+    app.kubernetes.io/name: platform-control-processing-reclaim
+    app.kubernetes.io/part-of: evidara
+spec:
+  # Hourly. The deadline the sweep applies is 24h, so an hourly pass bounds a
+  # stranded document's invisibility at ~25h rather than the ~48h a daily cron
+  # would allow. The pass is a single indexed query over units holding no terminal
+  # status, so it costs nothing on a clean estate.
+  # SUSPENDED on first deploy (#1045). The sweep is correct; its first pass would be
+  # applied to a backlog it would describe wrongly. #1045 establishes that the 116 units
+  # holding no terminal status are almost certainly quarantines — the quarantine path
+  # records `accepted` and `processing` and nothing else, because nothing in the pipeline
+  # ever emits `quarantined`. Writing `processing_deadline_exceeded` over them would put a
+  # cause we know to be wrong into a terminal row. Flip to false once #1045 emits a real
+  # quarantine status; the reconciler and `scripts/reclaim-stuck-processing.sh` need no
+  # change and are useful now.
+  suspend: true
+  schedule: "20 * * * *"
+  timeZone: "Etc/UTC"
+  # Two concurrent passes would race on the same units. They could not corrupt
+  # anything — the terminal row's event_id is derived from the unit id, so the
+  # second insert collides on the primary key — but `Forbid` keeps the logs
+  # readable and the counts meaningful.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 3
+  # Keep failures: a sweep that has not run is indistinguishable from a sweep that
+  # found nothing, which is the exact confusion this job exists to end.
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      # Hard cap well inside the hour so a wedged pass cannot straddle the next one.
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: platform-control-processing-reclaim
+            app.kubernetes.io/part-of: evidara
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: processing-reclaim
+              image: ghcr.io/philipplukas/evidara-platform-control
+              command: ["platform-control-processing-reclaim"]
+              envFrom:
+                - configMapRef:
+                    name: evidara-config
+                - secretRef:
+                    name: evidara-app-secrets
+              # No S3 secret, unlike the retention sweep: this job writes one
+              # database row per stranded unit and touches no object storage.
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi

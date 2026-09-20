@@ -3301,6 +3301,20 @@ export interface components {
          */
         PipelineStageStatus: "ok" | "pending" | "in_progress" | "blocked" | "failed" | "not_applicable";
         /**
+         * ProcessingReconciliationVerdict
+         * @description What a run's processing ledger says when accepted units are counted against
+         *     terminal ones (#1038).
+         *
+         *     There are three outcomes and deliberately no fourth. In particular there is no
+         *     "not applicable": the acquisition reconciler (`coverage_reconciliations`)
+         *     reported both of the runs that stranded 58 documents each as fully reconciled,
+         *     because it reconciles what *discovery* found against what the source publishes
+         *     and never looks at processing at all. A verdict that can decline the case it
+         *     exists for is decoration.
+         * @enum {string}
+         */
+        ProcessingReconciliationVerdict: "reconciled" | "unterminated" | "nothing_observed";
+        /**
          * ProcessingStatus
          * @enum {string}
          */
@@ -3845,6 +3859,7 @@ export interface components {
             processing_status_event_count: number;
             /** Document Lifecycle Event Count */
             document_lifecycle_event_count: number;
+            processing_reconciliation: components["schemas"]["RunProcessingReconciliation"];
             decision_support: components["schemas"]["RunDecisionSupport"];
         };
         /** RunPipelineHealthStage */
@@ -3916,6 +3931,31 @@ export interface components {
             http_status: number | null;
             /** Reason */
             reason: string;
+        };
+        /**
+         * RunProcessingReconciliation
+         * @description Started processing units counted against finished ones, for this run (#1038).
+         *
+         *     Required, never optional. An absent block and "nothing is stranded" must not be
+         *     the same wire value, for exactly the reason `blocked_stages` above is required:
+         *     a consumer cannot distinguish a server that did not say from a server that said
+         *     zero — and reading the first as the second is how 116 documents stayed invisible
+         *     for nine days while both their runs reported `completed`.
+         */
+        RunProcessingReconciliation: {
+            /** Observed Units */
+            observed_units: number;
+            /** Terminal Units */
+            terminal_units: number;
+            /** Unterminated Units */
+            unterminated_units: number;
+            /** Unterminated Units Past Deadline */
+            unterminated_units_past_deadline: number;
+            /** Oldest Unterminated At */
+            oldest_unterminated_at: string | null;
+            verdict: components["schemas"]["ProcessingReconciliationVerdict"];
+            /** Unterminated */
+            unterminated: components["schemas"]["RunUnterminatedUnit"][];
         };
         /** RunReadinessCheck */
         RunReadinessCheck: {
@@ -4070,6 +4110,24 @@ export interface components {
          * @enum {string}
          */
         RunStatus: "pending" | "running" | "completed" | "failed" | "cancelled";
+        /**
+         * RunUnterminatedUnit
+         * @description One processing unit that started and never reached a terminal status.
+         */
+        RunUnterminatedUnit: {
+            /** Processing Manifest Id */
+            processing_manifest_id: string;
+            /** Document Id */
+            document_id: string | null;
+            last_status: components["schemas"]["ProcessingStatus"];
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /** Past Deadline */
+            past_deadline: boolean;
+        };
         /** ScheduleListResponse */
         ScheduleListResponse: {
             /** Data */
@@ -4285,8 +4343,16 @@ export interface components {
             version_label: string;
             status: components["schemas"]["SourceVersionStatus"];
             execution_mode: components["schemas"]["ExecutionMode"];
-            /** Acquisition Spec */
-            acquisition_spec: components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["LexFindAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"];
+            /**
+             * Acquisition Spec
+             * @description The stored acquisition spec. `null` **only** when the stored JSON no longer validates against any known provider, in which case `acquisition_spec_error` says why. A null spec is therefore never 'this version has no spec' — see #953 and ADR-0052.
+             */
+            acquisition_spec: (components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["LexFindAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"]) | null;
+            /**
+             * Acquisition Spec Error
+             * @description Why the stored acquisition spec could not be read back, or `null` when it read back fine. Set together with a null `acquisition_spec`; exactly one of the two is always populated.
+             */
+            acquisition_spec_error: string | null;
             /**
              * Created At
              * Format: date-time

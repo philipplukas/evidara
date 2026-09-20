@@ -36,6 +36,16 @@ Parallel streams by component: [docs/process/parallel-work-streams.md](docs/proc
 - [ ] N/A — no shared seam with another in-flight change
 - [ ] Coordinating PR or owner: <!-- link and/or @handle -->
 
+## Classifier / guard evidence
+
+<!-- A classifier, auditor or guard decides present / absent / indeterminate.
+     See AGENTS.md, "A classifier is tested against the surface it classifies". -->
+
+- [ ] N/A — this PR adds or changes no classifier, auditor or guard
+- [ ] Fixture is drawn from the real surface the tool classifies (not a lookalike)
+- [ ] At least one expected answer is established independently of the tool under test
+- [ ] The guard was deleted or inverted and a named test went red — which test: <!-- name it -->
+
 ## Sync Impact
 
 <!-- Updated where applicable: -->

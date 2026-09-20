@@ -14,5 +14,10 @@ https://example.com
 # GitHub-specific URLs that require auth
 https://github.com/philipplukas/evidara/settings
 
+# The shared cluster layer (infra/hetzner/OWNERSHIP.md). The repository is private,
+# so an anonymous request gets 404 — which is not the same as a broken link, and
+# every doc that names the ownership boundary has to link it.
+https://github.com/philipplukas/research-platform
+
 # Structurizr local
 http://localhost:8080

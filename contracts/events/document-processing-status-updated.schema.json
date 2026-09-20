@@ -77,12 +77,16 @@
               ]
             }
           },
+          "$comment": "Every refusal states its reason; nothing else may carry one. `quarantined` joined `failed` in this rule with #1045 — the enum had carried it since 0.22.0 while the rule still said `failed`, so the one event document-intelligence needed to emit with an ADR-0047 reason slug was the one shape the contract rejected. Mirrors platform-control's STATUSES_REQUIRING_A_REASON (domain.py), which already held both.",
           "allOf": [
             {
               "if": {
                 "properties": {
                   "status": {
-                    "const": "failed"
+                    "enum": [
+                      "failed",
+                      "quarantined"
+                    ]
                   }
                 },
                 "required": [

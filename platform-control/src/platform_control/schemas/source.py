@@ -9,6 +9,7 @@ from pydantic import (
     Field,
     HttpUrl,
     TypeAdapter,
+    ValidationError,
     field_validator,
     model_validator,
 )
@@ -479,6 +480,37 @@ class UpdateSourceVersionRequest(BaseModel):
         return self
 
 
+#: The attributes a `SourceVersion` ORM row contributes to `SourceVersionResponse`.
+#: Named explicitly because the `mode="before"` validator below has to normalise an
+#: ORM instance into a mapping before it can inspect `acquisition_spec`, and reading
+#: whatever happens to be on the object would drag relationships in with it.
+_SOURCE_VERSION_RESPONSE_ATTRS = (
+    "source_version_id",
+    "source_id",
+    "extractor_profile_id",
+    "version_label",
+    "status",
+    "execution_mode",
+    "acquisition_spec",
+    "created_at",
+    "updated_at",
+)
+
+
+def _summarise_spec_error(error: ValidationError) -> str:
+    """One operator-readable line per failed location, joined.
+
+    Pydantic's own `str(exc)` carries a docs URL and the full input on every line.
+    The input is the stored spec, which can be large and can carry credentials in a
+    provider config, so only the location and the message are reported.
+    """
+    parts = []
+    for detail in error.errors():
+        location = ".".join(str(item) for item in detail["loc"]) or "<root>"
+        parts.append(f"{location}: {detail['msg']}")
+    return "; ".join(parts) or "acquisition_spec did not validate"
+
+
 class SourceVersionResponse(BaseModel):
     source_version_id: str = Field(examples=["sv_01hzxk8a2bmne6g4r7j3k9l5"])
     source_id: str
@@ -486,11 +518,102 @@ class SourceVersionResponse(BaseModel):
     version_label: str
     status: SourceVersionStatus
     execution_mode: ExecutionMode
-    acquisition_spec: AcquisitionSpec
+    # Both fields are declared without a default, so both stay `required` in the
+    # generated contract: the key is always on the wire. A client that has to tell
+    # "absent key" from "null value" from "missing field" is back to guessing, which
+    # is the failure mode this whole change is about.
+    acquisition_spec: AcquisitionSpec | None = Field(
+        description=(
+            "The stored acquisition spec. `null` **only** when the stored JSON no "
+            "longer validates against any known provider, in which case "
+            "`acquisition_spec_error` says why. A null spec is therefore never "
+            "'this version has no spec' — see #953 and ADR-0052."
+        ),
+    )
+    acquisition_spec_error: str | None = Field(
+        description=(
+            "Why the stored acquisition spec could not be read back, or `null` when "
+            "it read back fine. Set together with a null `acquisition_spec`; exactly "
+            "one of the two is always populated."
+        ),
+    )
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def report_unreadable_acquisition_spec(cls, value: object) -> object:
+        """Report a spec that no longer validates instead of raising over it (#953).
+
+        `acquisition_spec` is a union discriminated on `provider`. A stored row whose
+        JSON predates a provider, or was written past the service layer, therefore
+        blows up **response construction** — which surfaces as an unhandled 500 on
+        `GET /v1/sources/{id}/versions`, not as a report about one row. The admin's
+        dashboard then rendered that 500 as an em dash, identical to "this source has
+        no versions": a failure read as an absence, which is the defect ADR-0052 names.
+
+        So the row still comes back, carrying the reason its spec is unreadable. The
+        `mode="after"` guard below is what keeps the null from ever standing alone.
+        """
+        if isinstance(value, BaseModel):
+            return value
+
+        from_row = not isinstance(value, dict)
+        if from_row:
+            data = {
+                name: getattr(value, name)
+                for name in _SOURCE_VERSION_RESPONSE_ATTRS
+                if hasattr(value, name)
+            }
+        else:
+            data = dict(value)
+
+        # An ORM row has no `acquisition_spec_error` attribute — this is the only
+        # producer of that field, so it fills in the "nothing wrong" case too.
+        data.setdefault("acquisition_spec_error", None)
+
+        raw_spec = data.get("acquisition_spec")
+        if isinstance(raw_spec, BaseModel):
+            return data
+        if raw_spec is None:
+            # The column is `NOT NULL`, so this should be unreachable — but "should
+            # be" is what the pre-#953 code assumed about the spec's shape, and the
+            # mutual-exclusion guard below would turn a surprise here straight back
+            # into the 500 this change exists to remove. A row is never dropped and
+            # never silently blank: it says what we found.
+            if from_row:
+                data["acquisition_spec_error"] = (
+                    data["acquisition_spec_error"] or "<root>: stored acquisition_spec is null"
+                )
+            return data
+
+        try:
+            AcquisitionSpecAdapter.validate_python(raw_spec)
+        except ValidationError as exc:
+            data["acquisition_spec"] = None
+            data["acquisition_spec_error"] = _summarise_spec_error(exc)
+        return data
+
+    @model_validator(mode="after")
+    def spec_is_readable_or_says_why(self) -> SourceVersionResponse:
+        """Exactly one of `acquisition_spec` / `acquisition_spec_error` is populated.
+
+        Without this, a null spec with no reason would be constructible, and the wire
+        payload would say "no spec" for a version that has one we could not read —
+        the same absent-vs-broken collapse one layer down. Deleting this guard makes
+        `test_null_spec_without_a_reason_is_refused` fail.
+        """
+        has_spec = self.acquisition_spec is not None
+        has_error = self.acquisition_spec_error is not None
+        if has_spec == has_error:
+            raise ValueError(
+                "acquisition_spec and acquisition_spec_error are mutually exclusive "
+                "and jointly exhaustive: a version either has a readable spec or a "
+                "stated reason it has none."
+            )
+        return self
 
 
 class SourceVersionListResponse(BaseModel):

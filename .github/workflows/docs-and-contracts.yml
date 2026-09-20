@@ -218,6 +218,13 @@ jobs:
   docs-lint:
     runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
 
+    # `issues: read` is what lets check_planning_anchor.py resolve the anchor's
+    # state. Without it the check reports DID-NOT-RUN rather than passing, which
+    # is honest but is not the gate anyone wanted. Scoped to this job.
+    permissions:
+      contents: read
+      issues: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -277,6 +284,34 @@ jobs:
       - name: Check Mermaid diagrams render
         run: |
           npm run --silent check:mermaid
+
+      # CLAUDE.md's "Current anchor" named #628 for three days after it closed,
+      # then #731 for six days after that — while documenting that exact failure
+      # in its own text. Documenting a pointer does not maintain it.
+      - name: Check the planning anchor is an open issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/check_planning_anchor.py
+
+      # A classifier tested against a surface it does not classify reported two
+      # keys DROPPED across 57,128 rows and missed all eleven real ones, green.
+      - name: Check the classifier-evidence rule is stated and surfaced
+        run: |
+          python scripts/check_classifier_evidence_rule.py
+
+      # Six tickets in one day (2026-09-19) were worked against premises that
+      # were already false. The forms ask for the command; issue-execute re-runs it.
+      - name: Check issues must carry the command that established their premise
+        run: |
+          python scripts/check_measured_premise.py
+
+      # API_VERSION is a contended scalar with no changeset treatment available
+      # (#913's fix does not transfer). What ships is a single-owner lane, and a
+      # documented lane is only useful while it still names the real constant.
+      - name: Check the API_VERSION single-owner lane still describes the code
+        run: |
+          python scripts/check_api_version_lane.py
 
       - name: Build docs site (strict)
         run: |

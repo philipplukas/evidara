@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  legal-search GET /v1/documents/{document_id} can answer 503 when the document's body read failed, distinct from a 200 with no content (#984)

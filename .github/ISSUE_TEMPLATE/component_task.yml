@@ -37,6 +37,33 @@ body:
     validations:
       required: true
   - type: textarea
+    id: measured
+    attributes:
+      label: Measured
+      description: |
+        The command that established the state this task assumes, the date you ran it,
+        and its output. Not "the corpus is missing X" — the query, the day, the rows.
+
+        Three tickets worked on 2026-09-19 had premises that were already false: #953
+        reproduced only under a dev-only seeder, #984 cited a file the app does not
+        wire, and #871's three predictions were refuted because the corpus had been
+        rebuilt after the fix. Others carried stale numbers — #1012 said 58 where there
+        were 116, and #1028's 30 records were already gone. Each cost a working session
+        before anyone re-ran the premise.
+
+        Read-only queries for the usual questions live in
+        `.claude/skills/measure-before-you-theorise/SKILL.md`.
+
+        If you have not measured it, write "not measured" — that is a usable answer,
+        and a silent guess is not.
+      placeholder: |
+        $ curl -sS "$EVIDARA_LEGAL_SEARCH_URL/v1/coverage" -H "X-API-Key: ***"
+        2026-09-19
+        {"total_documents": 57128, "documents_without_group_key": 412}
+      render: shell
+    validations:
+      required: true
+  - type: textarea
     id: acceptance
     attributes:
       label: Acceptance Criteria

@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  document.processing_status.updated: a quarantined status may carry error_code and error_summary, so ADR-0047's refusal reason survives the contract (#1045)

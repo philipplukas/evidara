@@ -1,0 +1,81 @@
+name: Admin e2e nightly
+
+# A flake-rate signal for the admin Playwright suite, on a quiet `main`.
+#
+# The suite already runs on `main` as a job inside `platform-control.yml`, but
+# only when a merge touches its paths — so its failures arrive mixed in with
+# merge traffic, and reading them means knowing that the JOB is called
+# "Admin e2e" while the WORKFLOW is called "Platform Control". That cost three
+# re-runs on one PR (#1048) before it was established that `main` was failing
+# the same test with nobody's diff involved (#942, 2026-09-19).
+#
+# This run exists to answer one question — "does the suite pass on untouched
+# `main`?" — and nothing else. It gates no merge and is not a required check,
+# so a red night is a signal to read, never a block to route around.
+
+on:
+  schedule:
+    # 05:17 UTC. Off the hour on purpose: the hour is when every scheduled
+    # workflow on GitHub queues at once, and a run that waits 20 minutes for a
+    # runner measures the queue as much as the suite.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: admin-e2e-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Admin e2e on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: platform-control/admin
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          # Read the pin from `.nvmrc` so CI and local cannot drift.
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: platform-control/admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('platform-control/admin/package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npm run e2e:browsers
+
+      - name: Run admin e2e suite
+        # The config builds and serves a production bundle, so there is no
+        # on-demand compilation for the first test to pay for.
+        run: npm run e2e
+
+      - name: Upload traces and screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-e2e-nightly-artifacts
+          path: platform-control/admin/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
