@@ -385,11 +385,13 @@ test.describe("Canonical screenshot evidence pack", () => {
     await expect(page.getByText("Applied norms")).toBeVisible();
     await saveScreenshot(page, "detail-tab-related.png", detailPanel);
 
-    const referencesTab = detailPanel.getByRole("tab", { name: /References/i });
-    await referencesTab.click();
-    await forceExpandDetailPanel(page);
-    await expect(page.getByText("Cited by")).toBeVisible();
-    await saveScreenshot(page, "detail-tab-references.png", detailPanel);
+    // References are no longer a tab on desktop. Reading mode puts them in the
+    // evidence rail beside the text rather than behind a tab that replaces it
+    // (#1053), so the capture frames the rail. The file name is unchanged
+    // because `docs/runbooks/ux-aesthetic-review.md` names it.
+    const evidenceRail = page.getByRole("complementary").first();
+    await expect(evidenceRail.getByText("Cited by")).toBeVisible();
+    await saveScreenshot(page, "detail-tab-references.png", evidenceRail);
   });
 
   test("@screenshots captures mobile responsive layout", async ({ page }) => {
