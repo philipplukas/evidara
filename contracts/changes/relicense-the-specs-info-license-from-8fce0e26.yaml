@@ -1,0 +1,4 @@
+bump: patch
+additive: true
+summary: >-
+  Relicense the specs' info.license from Apache-2.0 to AGPL-3.0-only, matching /LICENSE

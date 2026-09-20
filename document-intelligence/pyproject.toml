@@ -1,5 +1,5 @@
 [build-system]
-# >=77 because `license = "Apache-2.0"` below is a PEP 639 SPDX expression.
+# >=77 because `license = "AGPL-3.0-only"` below is a PEP 639 SPDX expression.
 # setuptools only learned that form in 77.0.0; an older one reads the bare
 # string as a legacy license *table* and fails the build. The floor and the
 # license field have to move together.
@@ -11,7 +11,7 @@ name = "document-intelligence"
 version = "0.1.0"
 description = "Initial Evidara document-intelligence scaffold"
 readme = "README.md"
-license = "Apache-2.0"
+license = "AGPL-3.0-only"
 requires-python = ">=3.12"
 dependencies = [
   "boto3>=1.34.0,<2",

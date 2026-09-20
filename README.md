@@ -273,13 +273,25 @@ single-author project — issues and discussion are more useful than large unsol
 
 ## Licence
 
-[Apache License 2.0](LICENSE) — permissive, with an express patent grant.
+[GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`). Run a modified version as
+a network service and you owe your users its source — section 13. Evidara is a network service by
+design, so that is the operative clause, not a footnote; every user-facing surface links to this
+repository to discharge it.
+
+**This is forward-only.** Everything up to and including commit `36a07ceb` was released under the
+Apache License 2.0 and **stays available under it** — that grant is irrevocable and is not being
+withdrawn. [LICENSE-HISTORY.md](LICENSE-HISTORY.md) records the cutover, who held the copyright
+that made the change possible, and where the section 13 links live.
+
+Contributions require a signed [CLA](CLA.md), so that dual licensing stays possible — see
+[CONTRIBUTING.md](CONTRIBUTING.md#contributor-license-agreement) for why a CLA and not a DCO. If
+AGPL does not work for your organisation, the commercial-licence option exists precisely for that.
 
 Two things the licence does not cover, because they are not this repository's to give:
 
 - **The legal corpus is not licensed here.** Evidara acquires primary law from the bodies that
   issue it, and each source carries its own terms. A Swiss federal act mirrored through LexFind is
-  redistributable on the Confederation's terms, not on Apache-2.0's. The licence covers the
+  redistributable on the Confederation's terms, not on the AGPL's. The licence covers the
   platform; provenance on every record is how you find out what covers the content.
 - **Third-party material keeps its own licence.**
   [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) covers what is *copied into this tree* and the

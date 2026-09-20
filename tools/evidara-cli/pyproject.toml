@@ -3,7 +3,7 @@ name = "evidara-cli"
 version = "0.1.0"
 description = "Agent-oriented CLI for Evidara platform-control and legal-search APIs"
 readme = "README.md"
-license = "Apache-2.0"
+license = "AGPL-3.0-only"
 requires-python = ">=3.12"
 dependencies = [
   "httpx>=0.28.0,<1",

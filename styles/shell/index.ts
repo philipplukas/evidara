@@ -12,6 +12,7 @@
  */
 
 export { BrandMark, BrandMarkCompact, type BrandMarkProps } from "./BrandMark";
+export { RepositoryLink, REPOSITORY_URL, type RepositoryLinkProps } from "./RepositoryLink";
 
 /**
  * Sentinel value the scaffolding gate-tests can import to confirm the

@@ -3,8 +3,10 @@
 This repository stores copies of material authored by third parties. Their licences require that
 the notices below travel with those copies. **These obligations come from the third parties'
 licences, not from this project's own** — they hold regardless of what this repository is licensed
-under, and are unaffected by it. (That licence is now [Apache-2.0](LICENSE), chosen 2026-09-16;
-this sentence used to say the repository carried no licence yet.)
+under, and are unaffected by it. (That licence is now [AGPL-3.0-only](LICENSE) as of 2026-09-19;
+it was Apache-2.0 from 2026-09-16, and before that the repository carried no licence at all. See
+[LICENSE-HISTORY.md](LICENSE-HISTORY.md). Nothing in this file changed as a result: relicensing our
+own work cannot and does not relicense anyone else's.)
 
 Scope: material **copied into this tree**, and **data redistributed in this tree**. Dependencies
 that are merely installed from a registry are not listed here; their obligations attach to a built

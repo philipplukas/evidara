@@ -42,7 +42,11 @@ describe("brand-mark cross-surface contract", () => {
 
 describe("workspace consumes the shared BrandMark", () => {
   it("imports it from @evidara/shell rather than re-inlining a mark", () => {
-    expect(appHeaderSource).toContain('import { BrandMark } from "@evidara/shell"');
+    // Kept identical to the admin mirror in
+    // `platform-control/admin/src/ui/shell/brand-mark-parity.test.ts`: matched
+    // as a named import, not as the exact one-symbol line, so a second export
+    // pulled from the same barrel does not read as a re-inlined mark.
+    expect(appHeaderSource).toMatch(/import \{[^}]*\bBrandMark\b[^}]*\} from "@evidara\/shell"/);
     expect(appHeaderSource).toContain("<BrandMark");
   });
 

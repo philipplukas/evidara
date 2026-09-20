@@ -1,6 +1,22 @@
 # Licensing decision brief
 
-**Status: nothing is chosen. This page prepares a decision; it does not take one.**
+> **Superseded as a decision, kept as evidence.** When this page was written nothing was chosen. Two
+> choices have been made since: **Apache-2.0** on 2026-09-16, then **AGPL-3.0-only** on 2026-09-19.
+> The current licence is [`/LICENSE`](../../LICENSE) and the cutover is recorded in
+> [`/LICENSE-HISTORY.md`](../../LICENSE-HISTORY.md).
+>
+> The recommendation in §4 is **not** what the owner decided, and §3.3 argues *against* AGPL. That
+> is left standing on purpose: the counter-arguments it raises are real, and a reader weighing the
+> licence later should see them rather than a page rewritten to agree with the outcome. §3.3's
+> point 1 — that ADR-0037 rejected PyMuPDF *for being AGPL* — is the sharpest of them, and the
+> answer is that the constraint it describes was a consequence of the then-permissive licence and
+> no longer binds; the dependency choice itself was not revisited.
+>
+> The dependency findings in §2 remain accurate as of the audit date. They were re-run against the
+> AGPL question on 2026-09-19; see
+> [`agpl-compatibility-audit.md`](agpl-compatibility-audit.md).
+
+**Status when written: nothing is chosen. This page prepares a decision; it does not take one.**
 
 Audited 2026-09-03 against `origin/main` at `59721399`. Every claim below is cited to a
 `file:line` in this repository or to a live fetch made during the audit, with the fetch date.

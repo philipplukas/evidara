@@ -1,4 +1,4 @@
-import { BrandMark } from "@evidara/shell";
+import { BrandMark, RepositoryLink } from "@evidara/shell";
 import { WaitlistForm } from "@/components/WaitlistForm";
 import { CAPABILITIES, HERO, NOT_YET, THESIS, WAITLIST } from "@/lib/content";
 
@@ -131,11 +131,23 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="mt-auto border-t border-[var(--marketing-rule)] py-8 text-sm text-[var(--foreground-subtle)]">
-        <p>
+      <footer className="mt-auto flex flex-wrap items-center justify-between gap-4 border-t border-[var(--marketing-rule)] py-8 text-sm text-[var(--foreground-subtle)]">
+        <p className="max-w-[var(--marketing-measure)]">
           Evidara — legal data infrastructure. This page describes a system under active development
           and is not an offer of legal services or legal advice.
         </p>
+        {/*
+          AGPL-3.0 section 13. This page is served over a network, so it offers
+          its source like every other Evidara surface — see /LICENSE-HISTORY.md.
+          It is a source link, not a product link: the page deliberately points
+          at no running deployment (see the note at the top of this file), and
+          `page.test.tsx` enforces that.
+        */}
+        <RepositoryLink
+          label="Source code on GitHub"
+          size={18}
+          className="inline-flex items-center justify-center rounded-md p-2 text-[var(--foreground-subtle)] transition-colors hover:text-[var(--foreground)]"
+        />
       </footer>
     </div>
   );
