@@ -88,18 +88,44 @@ candidates:
 
 - the worker died mid-document (#1012's OOM, since fixed);
 - the status event was published and lost;
-- DI made a terminal decision it never publishes. ADR-0047's quarantine path emits
-  `accepted` and `processing` and then deliberately stops
-  (`document-intelligence/src/document_intelligence/pipeline.py:487`), so a
-  quarantined document leaves exactly this fingerprint.
+- DI made a terminal decision it never published. Until #1045, ADR-0047's quarantine
+  path emitted `accepted` and `processing` and then stopped, so a quarantined
+  document left exactly this fingerprint.
 
-That third one is a defect on DI's surface and is tracked separately:
-`quarantined`, `failed`, `withdrawn` and `skipped_duplicate` are all declared in
-`ProcessingStatus` and modelled in
-`contracts/events/document-processing-status-updated.schema.json`, and
-`build_processing_status_event` is called from exactly three places, all of which
-pass `accepted`, `processing` or `canonical_ready`. No `error_code` has ever been
-written to the table.
+**The third one was the answer, and it is now fixed at the source.** Measured
+2026-09-20, before #1045 shipped: all 117 stranded units had a `quarantined` row in
+DI's own `processing_manifests` table — the two sets are equal, not overlapping —
+every one of them `below_content_floor`. They were refusals the control plane was
+never told about. #1045 makes the quarantine path emit a terminal `quarantined`
+status carrying the ADR-0047 reason slug as `error_code`, so from that deploy
+onwards a refusal reconciles as `reconciled` and the sweep sees only genuine
+silence.
+
+`withdrawn` and `skipped_duplicate` are still declared in `ProcessingStatus` and in
+`contracts/events/document-processing-status-updated.schema.json` with nothing
+emitting them; `document-intelligence/src/document_intelligence/events/status_updated.py`
+carries the register and `tests/test_status_producers.py` fails if a new status
+joins them silently.
+
+### The 117 already in the table
+
+They predate the fix, so they still hold `{accepted, processing}`, and the sweep —
+`scripts/reclaim-stuck-processing.sh`, above — would stamp them `failed` /
+`processing_deadline_exceeded`. That row is honest about *who wrote it* and wrong
+about the cause, which we now know: they were quarantined.
+
+There is **no quarantine backfill tool**, and this runbook does not pretend
+otherwise. The operator has two options and they are not equivalent:
+
+1. Reclaim them as `failed` / `processing_deadline_exceeded` anyway. Cheap, and it
+   ends the silence, but it files 117 refusals under a deadline slug and
+   `/v1/coverage` will still report `quarantined_documents: 0` for `jur_ch_zh`.
+2. Write the 117 `quarantined` rows from DI's `processing_manifests` table, where
+   the reason slug and evidence already sit, then let the sweep run. The join key is
+   `processing_manifest_id`; the two sets were verified equal on 2026-09-20.
+
+Option 2 is what makes the counter true. Until one of them is done the sweep stays
+suspended, because its first pass forecloses option 2.
 
 ## A reclaimed document is not a recovered one
 

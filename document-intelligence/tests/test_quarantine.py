@@ -26,6 +26,8 @@ from reportlab.pdfgen import canvas as reportlab_canvas
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
 
+from jsonschema.exceptions import ValidationError
+
 from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
 from document_intelligence.normalize.pdf import normalize_pdf_document
 from document_intelligence.normalize.quarantine import (
@@ -40,6 +42,7 @@ from document_intelligence.normalize.quarantine import (
 )
 from document_intelligence.persist.sinks import InMemoryCanonicalSink
 from document_intelligence.pipeline import ProcessingPipeline
+from document_intelligence.validate.schema_validation import validate_instance_against_contract
 from document_intelligence.validate.validator import validate_processing_manifest
 from support import build_bundle_event, build_manifest_payload
 
@@ -351,11 +354,63 @@ class QuarantinePipelineTests(unittest.TestCase):
         self.assertEqual(sink.published_documents, [])
         self.assertEqual(sink.published_sections, [])
         self.assertEqual(sink.document_processed_events, [])
-        # The status flow stops before `canonical_ready` — it never became canonical.
+        # The status flow never reaches `canonical_ready` — it never became canonical —
+        # but it does end. Before #1045 it stopped at `processing`, which is also what a
+        # worker that died mid-document leaves behind, so nothing downstream could tell a
+        # refusal from a corpse.
         self.assertEqual(
             [event["payload"]["status"] for event in result.status_events],
-            ["accepted", "processing"],
+            ["accepted", "processing", "quarantined"],
         )
+
+    def test_the_quarantine_status_event_carries_the_reason_and_is_contract_valid(self) -> None:
+        """The terminal event exists, states why, and survives the contract (#1045).
+
+        MUTATION: delete the `build_processing_status_event(..., status="quarantined")`
+        block in `ProcessingPipeline._quarantine_result` and this fails on the missing
+        event; revert the `if status in {failed, quarantined}` widening in
+        `contracts/events/document-processing-status-updated.schema.json` and it fails on
+        `validate_instance_against_contract`, because the pre-#1045 rule required
+        `error_code` to be null for every status but `failed`.
+        """
+        result, _ = self._process_pdf(_image_only_pdf())
+
+        terminal = result.status_events[-1]
+        self.assertEqual(terminal["payload"]["status"], "quarantined")
+        # The slug, not prose: it is what the operator queue groups by and what picks
+        # which of ADR-0047's two exits this cohort takes.
+        self.assertEqual(terminal["payload"]["error_code"], "no_text_layer")
+        self.assertIn(terminal["payload"]["error_code"], QUARANTINE_REASONS)
+        self.assertIn("OCR", terminal["payload"]["error_summary"])
+        # Same manifest and document as the quarantine record, so the two surfaces join.
+        self.assertEqual(
+            terminal["payload"]["processing_manifest_id"],
+            result.manifest.processing_manifest_id,
+        )
+        self.assertEqual(terminal["payload"]["document_id"], result.manifest.document_id)
+
+        validate_instance_against_contract(
+            terminal,
+            "events/document-processing-status-updated.schema.json",
+        )
+
+    def test_the_contract_refuses_a_quarantine_that_explains_nothing(self) -> None:
+        """The widened rule binds in both directions.
+
+        Without this, `error_code` could be widened to *optional* for `quarantined` and
+        every test above would still pass — the guard would accept the silence it exists
+        to end. Proven against the schema rather than against a Python validator, because
+        the schema is what the event has to cross.
+        """
+        result, _ = self._process_pdf(_image_only_pdf())
+        terminal = dict(result.status_events[-1])
+        terminal["payload"] = {**terminal["payload"], "error_code": None, "error_summary": None}
+
+        with self.assertRaises(ValidationError):
+            validate_instance_against_contract(
+                terminal,
+                "events/document-processing-status-updated.schema.json",
+            )
 
     def test_the_quarantine_reason_is_recorded_and_retrievable(self) -> None:
         result, sink = self._process_pdf(_image_only_pdf())

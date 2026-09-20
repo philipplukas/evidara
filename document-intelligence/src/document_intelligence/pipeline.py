@@ -440,16 +440,26 @@ class ProcessingPipeline:
           forwards to legal-search, so emitting one would put a document the corpus holds
           no legal text for into search results — the confident fabrication ADR-0033
           exists to prevent, arriving through the back door.
-        - No ``canonical_ready`` status event, and no canonical rows. The status flow ends
-          at ``processing``.
+        - No ``canonical_ready`` status event, and no canonical rows. Nothing here became
+          canonical, so nothing may say it did.
         - No exception. A quarantined document did not *fail*: processing completed and
           produced output we should not trust. Raising would route it to the DLQ, whose
           remedy is replay, and replay changes nothing until someone implements the
           missing class. Same queue shape, opposite remedy.
 
         What *is* done is the record: a ``quarantined`` manifest row on the DI-owned
-        ``processing_manifests`` surface carrying the reason slug and the evidence, plus a
-        counter. A quarantine nobody can see is silent failure with extra steps.
+        ``processing_manifests`` surface carrying the reason slug and the evidence, a
+        counter, and — since #1045 — a terminal ``quarantined`` **status event** carrying
+        the same reason. A quarantine nobody can see is silent failure with extra steps.
+
+        That status event is the part this path was missing for the whole of its life.
+        Until #1045 the flow stopped at ``processing``, which is also the fingerprint of a
+        worker that died mid-document, so the control plane could not tell a refusal from
+        a corpse: 117 units measured on 2026-09-20 held ``{accepted, processing}`` and
+        nothing else, and every one of them had a ``quarantined`` manifest row beside it.
+        It also left ``/v1/coverage``'s ``quarantined_documents`` structurally at zero —
+        a counter that cannot leave zero cannot distinguish *we hold nothing here* from
+        *we refused everything here* (#958, #986).
         """
         selected_profiles = resolve_selected_profiles(
             source_origin_kind=selected_bundle.manifest.source_origin_kind,
@@ -478,6 +488,29 @@ class ProcessingPipeline:
             failure=None,
             quarantine=quarantine.as_record(),
         )
+
+        # The terminal row. `error_code` is the ADR-0047 reason slug — the closed
+        # taxonomy an operator groups the queue by, and what decides which of the ADR's
+        # two exits this cohort takes — and `error_summary` is the sentence the verdict
+        # already carries. Both are required of a `quarantined` status by
+        # `STATUSES_REQUIRING_A_REASON` in platform-control and by the event contract, so
+        # a quarantine that explains nothing cannot be written: the refusal states its
+        # reason or it does not land at all.
+        status_events = [
+            *status_events,
+            build_processing_status_event(
+                processing_manifest_id=processing_manifest_id,
+                provenance=provenance,
+                processing_version=self._processing_version,
+                status="quarantined",
+                document_id=document_id,
+                document_revision=document_revision,
+                correlation_id=event.correlation_id or provenance.run_id,
+                causation_id=event.event_id,
+                error_code=quarantine.reason or "unknown",
+                error_summary=quarantine.detail or "document-intelligence withheld this manifestation",
+            ),
+        ]
 
         validate_processing_manifest(manifest)
         for status_event in status_events:
