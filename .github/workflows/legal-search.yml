@@ -396,6 +396,16 @@ jobs:
           python3 scripts/check_visual_baseline_provenance.py \
             --base-ref "origin/${{ github.event.pull_request.base.ref }}"
 
+      - name: Refuse a baseline captured from a superseded base
+        # A PNG has no merge strategy, so a branch that refreshed a baseline the
+        # base has since moved replaces it wholesale on merge — reverting the
+        # newer correction with nothing red, because the regression suite
+        # compares the run against the baseline in the SAME tree and the two
+        # agree with each other. Observed 2026-09-20 between #1054 and #1051.
+        run: |
+          python3 scripts/check_baseline_stale_base.py \
+            --base "origin/${{ github.event.pull_request.base.ref }}"
+
   # ─── Playwright pixel baselines ───
   #
   # Runs at ZERO pixel tolerance (#611). The project-level
