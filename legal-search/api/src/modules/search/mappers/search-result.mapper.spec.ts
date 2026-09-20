@@ -212,7 +212,7 @@ describe('composeRelatedCounts', () => {
     expect(counts).toHaveLength(3);
     expect(counts.find((c) => c.label === 'Kommentare')?.count).toBe(8);
     expect(counts.find((c) => c.label === 'Gerichtsentscheide')?.count).toBe(23);
-    expect(counts.find((c) => c.label === 'Zitationen')?.count).toBe(15);
+    expect(counts.find((c) => c.label === 'Verweise')?.count).toBe(15);
   });
 
   it('should return empty array when no counts', () => {

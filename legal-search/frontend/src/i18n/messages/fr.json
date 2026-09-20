@@ -45,7 +45,7 @@
     "resetAll": "R\u00e9initialiser",
     "resetToast": "Filtres r\u00e9initialis\u00e9s",
     "resetUndoAction": "Annuler",
-    "sheetDescription": "Affiner les r\u00e9sultats par juridiction, langue, instance et autres crit\u00e8res.",
+    "sheetDescription": "Affiner les r\u00e9sultats par ordre juridique, langue, instance et autres crit\u00e8res.",
     "empty": {
       "title": "Aucun filtre disponible",
       "description": "Le jeu de r\u00e9sultats actuel ne propose pas encore de filtres.",
@@ -128,7 +128,7 @@
     "translatedContent": "Contenu traduit",
     "pin": "\u00c9pingler",
     "unpin": "D\u00e9tacher",
-    "copyCitation": "Copier la citation",
+    "copyCitation": "Copier la citation officielle",
     "print": "Imprimer",
     "confidenceSuffix": "confiance",
     "sourcesSuffix": "sources"
@@ -157,8 +157,8 @@
     "sourceTypes": {
       "all": "Tout",
       "law": "Lois",
-      "decision": "Arr\u00eats",
-      "rechtssatz": "Rechtss\u00e4tze",
+      "decision": "D\u00e9cisions judiciaires",
+      "rechtssatz": "Principes juridiques",
       "commentary": "Commentaires"
     },
     "card": {
@@ -198,7 +198,7 @@
       "noResultsFilteredHint": "Assouplissez un filtre ou r\u00e9initialisez tous les filtres.",
       "resetFiltersAction": "R\u00e9initialiser les filtres",
       "startTitle": "D\u00e9marrer la recherche",
-      "startHint": "Saisissez une requ\u00eate pour explorer les lois, arr\u00eats et commentaires.",
+      "startHint": "Saisissez une requ\u00eate pour explorer les lois, d\u00e9cisions judiciaires et commentaires.",
       "searchFailed": "La recherche a \u00e9chou\u00e9",
       "searchFailedDescription": "Impossible de charger les r\u00e9sultats pour cette requ\u00eate. Veuillez r\u00e9essayer.",
       "searchFailedRetry": "R\u00e9essayer"

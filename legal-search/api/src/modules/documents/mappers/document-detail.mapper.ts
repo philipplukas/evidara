@@ -137,7 +137,7 @@ function composeSubtitle(doc: DocumentEntity, locale: SupportedLocale, warn?: Wa
 
 /**
  * A detail metadata row. `visibility` is REQUIRED — the BFF owns the density
- * decision because `label` is localized ("Zuständigkeit", "In Kraft") and the
+ * decision because `label` is localized ("Rechtsordnung", "In Kraft") and the
  * frontend cannot key a rule off it across locales (#787). Making it required
  * here is what stops a new `rows.push` from silently reaching the reader with
  * no visibility, which `filterByDensity` would then hide at default density.
@@ -263,6 +263,28 @@ function composeTabs(
   return tabs;
 }
 
+/**
+ * German (or French) name for a citation type code.
+ *
+ * `citation_type` is a machine code — production carries `sr`, `article`,
+ * `ch_paragraph`, `de_paragraph`, `eu_directive` and `eu_regulation` across
+ * the 8,234 rows of the `citations` index. This function used not to exist:
+ * the group heading was the raw code, so a German-language legal UI printed
+ * headings reading "sr" and "article" over the reference groups, and
+ * `labels.references` — the only translated string in the path — fired only
+ * for the rare row with no type at all.
+ *
+ * An unmapped code falls back to the code itself rather than to a generic
+ * word. A new upstream type must be *visible* as untranslated, not quietly
+ * absorbed into "Verweise": the guard in `terminology.spec.ts` asserts the
+ * mapped set, and a code that slips through should look wrong on screen.
+ */
+function citationTypeLabel(citationType: string, locale: SupportedLocale): string {
+  const key = `citationTypes.${citationType.trim().toLowerCase()}`;
+  const label = t(key, locale);
+  return label === key ? citationType : label;
+}
+
 function composeReferences(
   citations: CitationEntity[],
   locale: SupportedLocale,
@@ -272,7 +294,9 @@ function composeReferences(
   // Group by citation type
   const groups = new Map<string, DetailView['references'][0]>();
   for (const cit of citations) {
-    const groupLabel = cit.citation_type ?? t('labels.references', locale);
+    const groupLabel = cit.citation_type
+      ? citationTypeLabel(cit.citation_type, locale)
+      : t('labels.references', locale);
     if (!groups.has(groupLabel)) {
       groups.set(groupLabel, { label: groupLabel, items: [] });
     }

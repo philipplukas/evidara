@@ -364,6 +364,37 @@ describe('mapDocumentToDetailView', () => {
     expect(view.references[0].items[0].href).toBe('/documents/doc_010');
   });
 
+  // The group heading used to be `citation_type` verbatim. Production carries
+  // `sr` (4,334 rows), `article` (3,625), `ch_paragraph` (234) and three more,
+  // so a German-language legal UI printed headings reading "sr" and "article".
+  it.each([
+    ['sr', 'Systematische Rechtssammlung (SR)'],
+    ['article', 'Artikel'],
+    ['ch_paragraph', 'Paragraph (Schweiz)'],
+    ['eu_regulation', 'EU-Verordnung'],
+  ])('names the %s citation group in German', (citationType, expected) => {
+    const view = mapDocumentToDetailView(lawDoc, sections, [
+      { ...citations[0], citation_type: citationType },
+    ]);
+    expect(view.references[0].label).toBe(expected);
+  });
+
+  it('leaves an unmapped citation type visible rather than absorbing it', () => {
+    // A new upstream type must look wrong on screen, not quietly become
+    // "Verweise" — an unrecognised code hidden behind the generic word is a
+    // silent abstention (ADR-0052: unknown is not the same as none).
+    const view = mapDocumentToDetailView(lawDoc, sections, [
+      { ...citations[0], citation_type: 'zz_new_upstream_type' },
+    ]);
+    expect(view.references[0].label).toBe('zz_new_upstream_type');
+  });
+
+  it('falls back to the shared word only when the type is absent', () => {
+    const { citation_type: _omitted, ...typeless } = citations[0];
+    const view = mapDocumentToDetailView(lawDoc, sections, [typeless]);
+    expect(view.references[0].label).toBe('Verweise');
+  });
+
   it('should carry the target document id beside the href on a resolved citation', () => {
     // The reader navigates by `?item=<document_id>`, not by URL path, so the
     // id is what it needs. Before #1040 it had only `href`, read it as a
