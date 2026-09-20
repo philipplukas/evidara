@@ -6,19 +6,19 @@ import type { MetadataField } from "@/lib/types";
 // English label regexes that could never match one. Nothing in this module
 // may read `label` again.
 const FIELDS: MetadataField[] = [
-  { label: "Zuständigkeit", value: "Schweiz", visibility: "always" },
+  { label: "Rechtsordnung", value: "Schweiz", visibility: "always" },
   { label: "Behörde", value: "Bundesrat", visibility: "default" },
   { label: "Quelle", value: "Amtliche Quelle", visibility: "expanded" },
 ];
 
 describe("filterByDensity", () => {
   it("keeps only 'always' rows at compact density", () => {
-    expect(filterByDensity(FIELDS, "compact").map((f) => f.label)).toEqual(["Zuständigkeit"]);
+    expect(filterByDensity(FIELDS, "compact").map((f) => f.label)).toEqual(["Rechtsordnung"]);
   });
 
   it("drops only 'expanded' rows at default density", () => {
     expect(filterByDensity(FIELDS, "default").map((f) => f.label)).toEqual([
-      "Zuständigkeit",
+      "Rechtsordnung",
       "Behörde",
     ]);
   });

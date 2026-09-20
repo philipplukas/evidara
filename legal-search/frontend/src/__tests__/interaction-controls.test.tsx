@@ -18,7 +18,7 @@ describe("High-impact interaction controls", () => {
     fireEvent.click(austriaChip);
     expect(austriaChip.className).toContain("bg-accent-core");
 
-    const decisionsTab = screen.getByRole("button", { name: /Court decisions|Urteile/ });
+    const decisionsTab = screen.getByRole("button", { name: /Court decisions|Gerichtsentscheide/ });
     fireEvent.click(decisionsTab);
     // Active state on scope/filter tabs now signals via the Evidara accent
     // (violet) instead of brand-navy, per the Sprint-1 accent contract.
@@ -69,7 +69,7 @@ describe("High-impact interaction controls", () => {
     fireEvent.click(pinButton!);
     expect(onPin).toHaveBeenCalledWith(articleDetail.id, articleDetail.title, articleDetail.type);
 
-    const copyButton = document.querySelector('button[title="Zitat kopieren"]');
+    const copyButton = document.querySelector('button[title="Fundstelle kopieren"]');
     expect(copyButton).toBeTruthy();
     fireEvent.click(copyButton!);
     expect(writeText).toHaveBeenCalledWith(`${articleDetail.title} - ${articleDetail.subtitle}`);

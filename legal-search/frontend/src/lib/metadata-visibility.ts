@@ -7,7 +7,7 @@ import type { MetadataField } from "./types";
  * `MetadataField` in `./types`. There is deliberately no client-side fallback:
  * this module used to carry label-matching rules (`/^(court|jurisdiction)$/i`)
  * that could never fire, because the BFF emits localized labels
- * ("Zuständigkeit", "In Kraft"). A display label is not a stable join key
+ * ("Rechtsordnung", "In Kraft"). A display label is not a stable join key
  * across a translation boundary; adding German patterns would only have moved
  * the same defect to French (#787).
  */

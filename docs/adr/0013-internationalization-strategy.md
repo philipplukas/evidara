@@ -146,7 +146,7 @@ Swiss legal materials may exist in multiple official language variants. This is 
 |------|-----------|
 | BFF label composition becomes complex with locale threading | Keep mappers as pure functions; locale is just another parameter |
 | Vocabulary label translations become stale | Vocabulary changes already require PR review (ADR-0012). Add locale labels to the review checklist |
-| Frontend and BFF translations diverge (same concept, different label) | Clear ownership boundary: BFF owns API-delivered labels, frontend owns UI-only labels |
+| Frontend and BFF translations diverge (same concept, different label) | **The ownership boundary alone was not enough — this risk materialised.** The boundary says which surface *emits* a label, not which word it uses, and the frontend has to write prose about the things the BFF labels. By 2026-09 the detail panel's tab strip read "Zitationen" (BFF) directly above a heading reading "Verweise" (frontend), with "Referenzen" (BFF) between them. Now enforced: `legal-search/api/src/core/i18n/terminology.ts` is the single source of truth for words that appear on both surfaces, and `terminology.spec.ts` is the single check — it reads *both* surfaces' message files and fails on disagreement. A copy of the check in each surface would be the same defect again |
 | New vocabulary values added without locale labels | Extend vocabulary contract spec tests to require `labels` for all supported locales |
 | Text expansion (German ~30% longer than English) breaks layouts | Already mitigated: the primary locale is German, which is typically the longest |
 

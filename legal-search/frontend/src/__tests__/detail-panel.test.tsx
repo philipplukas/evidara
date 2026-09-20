@@ -47,7 +47,7 @@ describe("DetailPanel", () => {
     expect(screen.getByText("Dokument ohne Titel")).toBeInTheDocument();
     expect(screen.getByText("Keine Zusammenfassung verfügbar")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTitle("Zitat kopieren"));
+    fireEvent.click(screen.getByTitle("Fundstelle kopieren"));
     expect(writeText).toHaveBeenCalledWith("Dokument ohne Titel");
   });
 
@@ -120,7 +120,7 @@ describe("DetailPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTitle("Zitat kopieren"));
+    fireEvent.click(screen.getByTitle("Fundstelle kopieren"));
     expect(writeText).toHaveBeenCalledWith(
       "Art. 754 OR - Verantwortlichkeit — Haftung der Verwaltung und der Geschäftsführung",
     );

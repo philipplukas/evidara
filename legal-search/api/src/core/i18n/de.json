@@ -9,7 +9,7 @@
 
   "counts.commentary": "Kommentare",
   "counts.courtDecisions": "Gerichtsentscheide",
-  "counts.citations": "Zitationen",
+  "counts.citations": "Verweise",
 
   "metadata.dateUnverified": "Datum (unbestätigt)",
   "metadata.inForce": "In Kraft",
@@ -17,7 +17,7 @@
   "metadata.citation": "Fundstelle",
   "metadata.source": "Quelle",
   "metadata.officialSource": "Offizielle Quelle",
-  "metadata.jurisdiction": "Zuständigkeit",
+  "metadata.jurisdiction": "Rechtsordnung",
   "metadata.language": "Sprache",
   "metadata.status": "Status",
   "contentLanguage.original": "Originalsprache",
@@ -26,10 +26,10 @@
 
   "tabs.content": "Inhalt",
   "tabs.sections": "Abschnitte",
-  "tabs.citations": "Zitationen",
+  "tabs.citations": "Verweise",
   "tabs.details": "Details",
 
-  "facets.jurisdiction": "Zuständigkeit",
+  "facets.jurisdiction": "Rechtsordnung",
   "facets.documentType": "Dokumenttyp",
   "facets.language": "Sprache",
   "facets.courtLevel": "Instanz",
@@ -37,8 +37,15 @@
 
   "labels.all": "Alle",
   "labels.document": "Dokument",
-  "labels.references": "Referenzen",
+  "labels.references": "Verweise",
   "labels.section": "Abschnitt",
+
+  "citationTypes.sr": "Systematische Rechtssammlung (SR)",
+  "citationTypes.article": "Artikel",
+  "citationTypes.ch_paragraph": "Paragraph (Schweiz)",
+  "citationTypes.de_paragraph": "Paragraph (Deutschland)",
+  "citationTypes.eu_directive": "EU-Richtlinie",
+  "citationTypes.eu_regulation": "EU-Verordnung",
 
   "statuses.active": "Aktiv",
   "statuses.superseded": "Ersetzt",
