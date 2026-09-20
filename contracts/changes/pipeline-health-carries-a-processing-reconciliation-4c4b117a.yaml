@@ -1,0 +1,4 @@
+bump: minor
+additive: true
+summary: >-
+  pipeline-health carries a processing reconciliation, so a completed run cannot report clean while holding documents that never terminated (#1038)

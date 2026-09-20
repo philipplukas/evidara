@@ -12,3 +12,8 @@ resources:
   - scrape-targets.yaml
   - alerts.yaml
   - dashboard-funnel.yaml
+  # Needs the Loki datasource, which research-platform installs. Applying this
+  # before that stack exists yields panels that say "datasource not found" —
+  # visibly broken rather than quietly empty, which is the right failure, but
+  # deploy the platform half first. See dashboard-run-logs.yaml.
+  - dashboard-run-logs.yaml

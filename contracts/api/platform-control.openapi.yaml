@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.34.0
+  version: 0.35.0
 paths:
   /health:
     get:
@@ -6623,6 +6623,23 @@ components:
         dead. The admin had been re-labelling those in the browser since #649. That is a
         correctness fix applied in one client, so every other consumer — the CLI, an
         agent, alerting — still saw the misleading answer (#908).
+    ProcessingReconciliationVerdict:
+      type: string
+      enum:
+      - reconciled
+      - unterminated
+      - nothing_observed
+      title: ProcessingReconciliationVerdict
+      description: |-
+        What a run's processing ledger says when accepted units are counted against
+        terminal ones (#1038).
+
+        There are three outcomes and deliberately no fourth. In particular there is no
+        "not applicable": the acquisition reconciler (`coverage_reconciliations`)
+        reported both of the runs that stranded 58 documents each as fully reconciled,
+        because it reconciles what *discovery* found against what the source publishes
+        and never looks at processing at all. A verdict that can decline the case it
+        exists for is decoration.
     ProcessingStatus:
       type: string
       enum:
@@ -7547,6 +7564,8 @@ components:
         document_lifecycle_event_count:
           type: integer
           title: Document Lifecycle Event Count
+        processing_reconciliation:
+          $ref: '#/components/schemas/RunProcessingReconciliation'
         decision_support:
           $ref: '#/components/schemas/RunDecisionSupport'
       type: object
@@ -7560,6 +7579,7 @@ components:
       - stages
       - processing_status_event_count
       - document_lifecycle_event_count
+      - processing_reconciliation
       - decision_support
       title: RunPipelineHealthResponse
     RunPipelineHealthStage:
@@ -7715,6 +7735,51 @@ components:
       - http_status
       - reason
       title: RunPreviewSummarySample
+    RunProcessingReconciliation:
+      properties:
+        observed_units:
+          type: integer
+          title: Observed Units
+        terminal_units:
+          type: integer
+          title: Terminal Units
+        unterminated_units:
+          type: integer
+          title: Unterminated Units
+        unterminated_units_past_deadline:
+          type: integer
+          title: Unterminated Units Past Deadline
+        oldest_unterminated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Oldest Unterminated At
+        verdict:
+          $ref: '#/components/schemas/ProcessingReconciliationVerdict'
+        unterminated:
+          items:
+            $ref: '#/components/schemas/RunUnterminatedUnit'
+          type: array
+          title: Unterminated
+      type: object
+      required:
+      - observed_units
+      - terminal_units
+      - unterminated_units
+      - unterminated_units_past_deadline
+      - oldest_unterminated_at
+      - verdict
+      - unterminated
+      title: RunProcessingReconciliation
+      description: |-
+        Started processing units counted against finished ones, for this run (#1038).
+
+        Required, never optional. An absent block and "nothing is stranded" must not be
+        the same wire value, for exactly the reason `blocked_stages` above is required:
+        a consumer cannot distinguish a server that did not say from a server that said
+        zero — and reading the first as the second is how 116 documents stayed invisible
+        for nine days while both their runs reported `completed`.
     RunReadinessCheck:
       properties:
         code:
@@ -8002,6 +8067,34 @@ components:
       - failed
       - cancelled
       title: RunStatus
+    RunUnterminatedUnit:
+      properties:
+        processing_manifest_id:
+          type: string
+          title: Processing Manifest Id
+        document_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Document Id
+        last_status:
+          $ref: '#/components/schemas/ProcessingStatus'
+        last_seen_at:
+          type: string
+          format: date-time
+          title: Last Seen At
+        past_deadline:
+          type: boolean
+          title: Past Deadline
+      type: object
+      required:
+      - processing_manifest_id
+      - document_id
+      - last_status
+      - last_seen_at
+      - past_deadline
+      title: RunUnterminatedUnit
+      description: One processing unit that started and never reached a terminal status.
     ScheduleListResponse:
       properties:
         data:

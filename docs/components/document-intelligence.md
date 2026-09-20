@@ -114,9 +114,19 @@ The matrix is asserted, not described:
 provider's capture path stops matching its recorded decision, and when a provider is
 registered with no decision at all.
 
-**Visibility.** `di_quarantined_documents_total{reason}` (Prometheus, on the consumers'
-existing `/metrics`), a `document_quarantined` structured log line, the consumer outcome
-label `quarantined` in `di_messages_total`, and the `processing_manifests` row itself.
+**Visibility.** A terminal `document.processing_status.updated` event with
+`status: quarantined`, carrying the reason slug as `error_code` and the verdict's sentence
+as `error_summary`; `di_quarantined_documents_total{reason}` (Prometheus, on the consumers'
+existing `/metrics`); a `document_quarantined` structured log line; the consumer outcome
+label `quarantined` in `di_messages_total`; and the `processing_manifests` row itself.
+
+That status event landed with #1045 and is the one the **control plane** sees — the others
+are all DI-local. Without it the flow stopped at `processing`, which is also the fingerprint
+of a worker that died mid-document, so platform-control could not tell a refusal from a
+corpse and `quarantined_documents` on `GET /v1/acquisition-coverage` could not leave
+zero. Measured
+2026-09-20: 117 units held `{accepted, processing}` and every one had a `quarantined`
+manifest row beside it.
 
 **Not a failure, not a DLQ item.** Processing completed; the output is what we should not
 trust. The message is acked, not naked — replay changes nothing until the missing class is

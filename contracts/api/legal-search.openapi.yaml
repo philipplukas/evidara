@@ -16,7 +16,7 @@ info:
     See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
     See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
     particular, for what a coverage answer may and may not be read to mean.
-  version: 0.11.0
+  version: 0.12.0
   contact:
     name: Evidara Team
   license:
@@ -1120,7 +1120,7 @@ components:
 
     ReferenceItem:
       type: object
-      required: [id, title, citation]
+      required: [id, title, citation, resolved]
       properties:
         id:
           type: string
@@ -1129,6 +1129,34 @@ components:
         citation:
           type: string
         href:
+          description: Link to the cited document. Present only when the corpus holds it.
+          type: string
+        targetDocumentId:
+          description: |
+            The document this citation resolves to. Present exactly when `href`
+            is, and carried separately because the reader navigates by document
+            id (`?item=`) rather than by URL path — re-deriving the id by
+            parsing a display href is the coupling this field removes.
+          type: string
+        resolved:
+          description: |
+            Whether the corpus holds the cited norm. REQUIRED, and `false` is a
+            real answer: an unresolved citation must render as a dead reference
+            rather than as a link that 404s (ADR-0052 — unknown is not zero).
+            Derived from `target_document_id` AFTER the read-time join in
+            `DocumentsService`, never from the index's write-time `resolved`
+            flag alone, which goes stale in both directions.
+          type: boolean
+        unresolvedReason:
+          description: |
+            Why the target is absent, when `resolved` is false and the index
+            recorded a reason. One of `not_normalizable` (the citation names no
+            identifier we can key on), `no_target_in_corpus` (well-formed key,
+            norm not ingested) or `ambiguous` (several different documents
+            answer to the key) — the three states
+            `modules/citations/citation-resolution.ts` keeps distinct. Omitted
+            when no reason was recorded: the row is still marked unresolved,
+            only the explanation is withheld.
           type: string
 
     CitedByResponse:
@@ -1477,6 +1505,14 @@ components:
           type: integer
         active:
           type: boolean
+        text:
+          description: |
+            The section's own text, as the `sections` index holds it
+            (`content_preview`). Omitted when the section carries none — an
+            empty string would have the reader draw a paragraph around nothing.
+            This is what makes the outline an outline rather than a list of
+            labels.
+          type: string
 
     SectionSummary:
       type: object

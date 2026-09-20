@@ -1,3 +1,5 @@
+import type { CitationUnresolvedReason } from '../../citations/citation-resolution';
+
 /**
  * Internal entity representing a document from OpenSearch.
  * This is NOT exposed via the API — the service layer transforms
@@ -77,4 +79,21 @@ export interface CitationEntity {
   /** DI's canonical key (`sr:210`, `abbrev_art:BV/36`). The order-independent join. */
   normalized_reference?: string;
   resolved: boolean;
+  /**
+   * Why the projection could not resolve this citation, as the citation-graph
+   * index recorded it (`unresolved_reason`, mapped at
+   * `core/opensearch/citation-graph-index.mapping.ts:83` and written by
+   * `projections.service.ts:1341`).
+   *
+   * The three values are kept distinct on purpose — see
+   * `modules/citations/citation-resolution.ts`. This entity dropped the field
+   * entirely, so every citation on the ZH Hundegesetz reached the reader as a
+   * row indistinguishable from a working link although all four carry
+   * `no_target_in_corpus` (#1040).
+   *
+   * Absent is a third state and not an error: a row indexed before the field
+   * existed carries no reason, and the reader must then say "unresolved"
+   * without inventing a cause.
+   */
+  unresolved_reason?: CitationUnresolvedReason;
 }

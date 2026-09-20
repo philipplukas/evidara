@@ -11,7 +11,7 @@ interface DetailTabsProps {
 }
 
 export function DetailTabs({ tabs }: DetailTabsProps) {
-  const [activeTab, setActiveTab] = useQueryState("tab", searchParamsParsers.tab);
+  const [activeTab, setActiveTab] = useDetailTab();
 
   return (
     <div className="border-b border-border/60 px-3 py-2">
@@ -58,7 +58,15 @@ export function DetailTabs({ tabs }: DetailTabsProps) {
   );
 }
 
-export function useActiveTab(): string {
-  const [tab] = useQueryState("tab", searchParamsParsers.tab);
-  return tab;
+/**
+ * The active detail tab and the setter that moves it.
+ *
+ * Returned as a pair because the panel now changes tabs itself: choosing a
+ * section in the outline has to bring the reader to the body, which lives in
+ * a different tab (#1040). Both readers and the writer go through this one
+ * hook so `searchParamsParsers.tab` stays the only parser for the param
+ * (#822) — `search-params-single-source.test.ts` enforces that.
+ */
+export function useDetailTab() {
+  return useQueryState("tab", searchParamsParsers.tab);
 }

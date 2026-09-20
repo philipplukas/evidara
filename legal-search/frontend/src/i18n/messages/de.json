@@ -45,7 +45,7 @@
     "resetAll": "Alles zur\u00fccksetzen",
     "resetToast": "Filter zur\u00fcckgesetzt",
     "resetUndoAction": "R\u00fcckg\u00e4ngig",
-    "sheetDescription": "Suchergebnisse nach Gerichtsbarkeit, Sprache, Instanz und weiteren Kriterien einschr\u00e4nken.",
+    "sheetDescription": "Suchergebnisse nach Rechtsordnung, Sprache, Instanz und weiteren Kriterien einschr\u00e4nken.",
     "empty": {
       "title": "Keine Filter verf\u00fcgbar",
       "description": "Die aktuelle Ergebnismenge bietet noch keine Verfeinerungsm\u00f6glichkeiten.",
@@ -87,10 +87,19 @@
     },
     "descriptions": {
       "details": "Metadaten stehen zuerst, danach folgt der Dokumenttext f\u00fcr schnelleres Erfassen.",
-      "references": "Eingehende und ausgehende Verweise sind getrennt, damit Sie Zitierpfade gezielt verfolgen k\u00f6nnen.",
+      "references": "Verweise sind nach Verweistyp gruppiert. Nicht aufl\u00f6sbare Verweise sind gekennzeichnet und f\u00fchren nirgendwohin.",
       "related": "Verkn\u00fcpfte Treffer sind thematisch gruppiert, damit die st\u00e4rksten Zusammenh\u00e4nge zuerst sichtbar werden.",
       "annotations": "Anmerkungen sind thematisch geb\u00fcndelt, damit Sie Hinweise schnell erfassen, ohne den Kontext zu verlieren.",
       "structure": "Spr\u00fcnge durch die Gliederung halten den Lesekontext im aktuellen Dokument verankert."
+    },
+    "references": {
+      "unresolved": "Nicht im Bestand",
+      "reasonUnrecorded": "Kein Grund erfasst.",
+      "reasons": {
+        "no_target_in_corpus": "Die zitierte Norm ist nicht im Bestand.",
+        "not_normalizable": "Die Fundstelle nennt keine auswertbare Kennung.",
+        "ambiguous": "Mehrere Dokumente beantworten diese Fundstelle."
+      }
     },
     "empty": {
       "noSelection": "Kein Ergebnis ausgew\u00e4hlt",
@@ -121,7 +130,7 @@
     "translatedContent": "\u00dcbersetzter Inhalt",
     "pin": "Anheften",
     "unpin": "L\u00f6sen",
-    "copyCitation": "Zitat kopieren",
+    "copyCitation": "Fundstelle kopieren",
     "print": "Drucken"
   },
   "results": {
@@ -148,7 +157,7 @@
     "sourceTypes": {
       "all": "Alle",
       "law": "Gesetze",
-      "decision": "Urteile",
+      "decision": "Gerichtsentscheide",
       "rechtssatz": "Rechtss\u00e4tze",
       "commentary": "Kommentare"
     },
@@ -189,7 +198,7 @@
       "noResultsFilteredHint": "Lockern Sie einen Filter oder setzen Sie alle Filter zur\u00fcck.",
       "resetFiltersAction": "Filter zur\u00fccksetzen",
       "startTitle": "Suche starten",
-      "startHint": "Geben Sie eine Anfrage ein, um Gesetze, Urteile und Kommentare zu durchsuchen.",
+      "startHint": "Geben Sie eine Anfrage ein, um Gesetze, Gerichtsentscheide und Kommentare zu durchsuchen.",
       "searchFailed": "Suche fehlgeschlagen",
       "searchFailedDescription": "Die Ergebnisse f\u00fcr diese Anfrage konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
       "searchFailedRetry": "Erneut versuchen"

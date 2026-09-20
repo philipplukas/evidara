@@ -142,6 +142,54 @@ class ProcessingStatus(StrEnum):
 STATUSES_REQUIRING_A_REASON = frozenset({ProcessingStatus.FAILED, ProcessingStatus.QUARANTINED})
 
 
+#: Statuses that END a document's processing. Nothing further is coming for a
+#: document that holds one of these, whatever the outcome was.
+#:
+#: The complement — `ACCEPTED` and `PROCESSING` — is where #1038 lives: those two
+#: mean *in flight*, and they also mean *the worker died holding this*, and until
+#: something writes a terminal row nothing in the stack can tell the two apart.
+#: That is #958's "absent is not broken" in the middle of the pipeline. The set is
+#: named here, beside the enum, so the reconciler and the reclaimer read the same
+#: definition rather than each carrying a literal list that can drift.
+TERMINAL_PROCESSING_STATUSES = frozenset(
+    {
+        ProcessingStatus.CANONICAL_READY,
+        ProcessingStatus.FAILED,
+        ProcessingStatus.WITHDRAWN,
+        ProcessingStatus.SKIPPED_DUPLICATE,
+        ProcessingStatus.QUARANTINED,
+    }
+)
+
+#: The two non-terminal statuses, derived rather than re-listed. A status added to
+#: `ProcessingStatus` and to neither set would be silently treated as in-flight
+#: forever; `test_every_processing_status_is_classified` fails when that happens.
+NON_TERMINAL_PROCESSING_STATUSES = frozenset(ProcessingStatus) - TERMINAL_PROCESSING_STATUSES
+
+
+class ProcessingReconciliationVerdict(StrEnum):
+    """What a run's processing ledger says when accepted units are counted against
+    terminal ones (#1038).
+
+    There are three outcomes and deliberately no fourth. In particular there is no
+    "not applicable": the acquisition reconciler (`coverage_reconciliations`)
+    reported both of the runs that stranded 58 documents each as fully reconciled,
+    because it reconciles what *discovery* found against what the source publishes
+    and never looks at processing at all. A verdict that can decline the case it
+    exists for is decoration.
+    """
+
+    #: Every processing unit this run started reached a terminal status.
+    RECONCILED = "reconciled"
+    #: At least one unit started and never terminated. Actionable, always.
+    UNTERMINATED = "unterminated"
+    #: The run has no processing rows at all. NOT the same as `RECONCILED`, and not
+    #: a pass: a run that published bundle events and produced no status row is a
+    #: worker that died before it said anything. Zero over zero is unknown, not
+    #: clean.
+    NOTHING_OBSERVED = "nothing_observed"
+
+
 class NormLevel(StrEnum):
     """Rank of a norm in the hierarchy of norms (ADR-0033).
 

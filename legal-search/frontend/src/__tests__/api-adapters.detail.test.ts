@@ -34,4 +34,65 @@ describe("mapDetail", () => {
   it("leaves the regeste undefined when the response carries none", () => {
     expect(mapDetail(base).regeste).toBeUndefined();
   });
+
+  // `depth` and `text` are the second hop of #1040. The BFF sent both; this
+  // mapper kept only `{id, label, active}`, so `StructureTab` had no depth to
+  // indent by and no text to show, however deep the document was.
+  it("carries section depth and text into the outline", () => {
+    const view = mapDetail({
+      ...base,
+      localStructure: {
+        items: [
+          { id: "sec_1", label: "I. Allgemeine Bestimmungen", depth: 0, text: "Dieses Gesetz…" },
+          { id: "sec_2", label: "§ 1 Meldepflicht", depth: 1 },
+        ],
+      },
+    });
+
+    expect(view.localStructure?.items).toEqual([
+      {
+        id: "sec_1",
+        label: "I. Allgemeine Bestimmungen",
+        active: false,
+        depth: 0,
+        text: "Dieses Gesetz…",
+      },
+      { id: "sec_2", label: "§ 1 Meldepflicht", active: false, depth: 1, text: undefined },
+    ]);
+  });
+
+  it("carries a citation's text, target and resolution state", () => {
+    const view = mapDetail({
+      ...base,
+      references: [
+        {
+          label: "SR",
+          items: [
+            {
+              id: "cit_1",
+              title: "Tierschutzgesetz",
+              citation: "SR 455.1",
+              resolved: true,
+              targetDocumentId: "doc_tschg",
+              href: "/documents/doc_tschg",
+            },
+            {
+              id: "cit_2",
+              title: "SR 210",
+              citation: "SR 210",
+              resolved: false,
+              unresolvedReason: "no_target_in_corpus",
+            },
+          ],
+        },
+      ],
+    });
+
+    const items = view.references[0].items;
+    expect(items[0].targetDocumentId).toBe("doc_tschg");
+    expect(items[0].citation).toBe("SR 455.1");
+    expect(items[1].resolved).toBe(false);
+    expect(items[1].unresolvedReason).toBe("no_target_in_corpus");
+    expect(items[1].targetDocumentId).toBeUndefined();
+  });
 });

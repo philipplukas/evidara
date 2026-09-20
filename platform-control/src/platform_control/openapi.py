@@ -104,7 +104,24 @@ API_TITLE = "Platform Control API"
 # because the endpoint had no caller and, with `wizard_orchestrator_backend` at
 # `in_memory` everywhere (ADR-0031), no effect. The gate's real path is unchanged:
 # `POST /v1/wizard/runs/{run_id}/approve` and `.../reject`.
-API_VERSION = "0.34.0"
+# 0.34.0: additive -- `acquisition_spec` on the source-version responses may now be
+# `null`, paired with a new `acquisition_spec_error` saying why it could not be
+# parsed (#953/#1041). `GET /v1/sources/{source_id}/versions` used to answer 500 for
+# a row whose stored spec did not validate against the discriminated union, and the
+# admin rendered that 500 as the same `-` two genuinely version-less rows carried.
+# The two keys are mutually exclusive and jointly exhaustive, so a null spec can
+# never stand alone. (This entry is written here by #1038 because #1041 moved the
+# constant without adding one, and a documented history that skips a number reads
+# as a lost version rather than an undocumented one.)
+# 0.35.0: additive -- `processing_reconciliation` on
+# `GET /v1/runs/{run_id}/pipeline-health`. The response reported the DI stage from
+# the run's single newest status row, so a run whose newest row was a
+# `canonical_ready` read as `ok` while holding documents that entered processing and
+# never came out -- 116 of them across two `completed` runs, measured 2026-09-19
+# (#1038). The block carries started-vs-finished unit counts, a verdict and a bounded
+# sample. Required rather than optional: an absent block and "nothing is stranded"
+# must not be the same wire value.
+API_VERSION = "0.35.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from platform_control.domain import (
     PipelineStageStatus,
+    ProcessingReconciliationVerdict,
+    ProcessingStatus,
     ProviderJobStatus,
     RunMode,
     RunRefusalCode,
@@ -396,6 +398,39 @@ class RunDecisionSupport(BaseModel):
     next_actions: list[RunStageAction]
 
 
+class RunUnterminatedUnit(BaseModel):
+    """One processing unit that started and never reached a terminal status."""
+
+    processing_manifest_id: str
+    document_id: str | None
+    last_status: ProcessingStatus
+    last_seen_at: datetime
+    past_deadline: bool
+
+
+class RunProcessingReconciliation(BaseModel):
+    """Started processing units counted against finished ones, for this run (#1038).
+
+    Required, never optional. An absent block and "nothing is stranded" must not be
+    the same wire value, for exactly the reason `blocked_stages` above is required:
+    a consumer cannot distinguish a server that did not say from a server that said
+    zero — and reading the first as the second is how 116 documents stayed invisible
+    for nine days while both their runs reported `completed`.
+    """
+
+    observed_units: int
+    terminal_units: int
+    #: The whole truth, with no time window applied.
+    unterminated_units: int
+    #: The actionable subset the reclaim sweep would terminate on its next pass.
+    unterminated_units_past_deadline: int
+    oldest_unterminated_at: datetime | None
+    verdict: ProcessingReconciliationVerdict
+    #: Bounded sample, oldest first. The counts above are computed over every unit,
+    #: so truncating this list cannot change them or the verdict.
+    unterminated: list[RunUnterminatedUnit]
+
+
 class RunPipelineHealthResponse(BaseModel):
     run_id: str
     source_id: str
@@ -406,4 +441,5 @@ class RunPipelineHealthResponse(BaseModel):
     stages: list[RunPipelineHealthStage]
     processing_status_event_count: int
     document_lifecycle_event_count: int
+    processing_reconciliation: RunProcessingReconciliation
     decision_support: RunDecisionSupport

@@ -5,7 +5,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, func, or_, select, update
@@ -80,9 +80,11 @@ from platform_control.schemas.run import (
     RunPreviewSummaryDriftCheck,
     RunPreviewSummaryResponse,
     RunPreviewSummarySample,
+    RunProcessingReconciliation,
     RunReadinessCheck,
     RunReadinessResponse,
     RunStageAction,
+    RunUnterminatedUnit,
 )
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
@@ -93,6 +95,10 @@ from platform_control.services.compliance_policy_service import (
 )
 from platform_control.services.coverage_reconciliation import parse_coverage_payload
 from platform_control.services.politeness import current_rate_limiter
+from platform_control.services.processing_reconciliation import (
+    ProcessingReconciliation,
+    reconcile_processing,
+)
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.replay_checkpoint import checkpoint_dict_from_parent
@@ -148,6 +154,37 @@ _TERMINAL_FAILURE_RUN_STATUSES: frozenset[RunStatus] = frozenset(
     {RunStatus.FAILED, RunStatus.CANCELLED}
 )
 
+#: The pipeline rollup for a run that ended and whose downstream never finished.
+#:
+#: A fourth outcome beside `ok`/`blocked`/`failed`/`in_progress`, because none of
+#: those is true of it. `in_progress` claims motion that stopped; `ok` is a false
+#: green over documents that never became searchable; `blocked` would say a stage
+#: reported blocked when none did, leaving `overall_status="blocked"` beside an
+#: empty `blocked_stages`.
+#:
+#: This is the CLI's own word for the condition — `diagnose_stall` already names
+#: `projection_stalled` and `publish_path_disabled` on exactly these runs
+#: (`tools/evidara-cli/src/evidara_cli/coverage.py:332-356`), so the server said
+#: "still moving" about a run the CLI had already diagnosed as stuck (#951).
+OVERALL_STATUS_STALLED = "stalled"
+
+#: How long after a run ends its downstream stages may still legitimately land.
+#:
+#: Acquisition completing is not the pipeline completing: platform-control marks a
+#: run `completed` when the provider is done, and DI, projection and search follow
+#: over NATS afterwards. So a terminal run with unfinished stages is normal for a
+#: while and stuck after that, and only elapsed time tells the two apart — the
+#: distinction `STALL_TOO_EARLY` describes but the CLI's snapshot cannot make.
+#:
+#: Measured against production on 2026-09-19 rather than guessed, because a floor
+#: tuned to one sample withholds the truth on the next (AGENTS.md). Across the 24
+#: runs that did project, the lag from `completed_at` to the last
+#: `document_lifecycle_events` row was under 90s for 22 of them, 49min for one, and
+#: **5h58m** for the largest (938 lifecycle events). The five genuinely stalled runs
+#: are 68-74 days old. A 24h window clears the slowest real run by 4x and the
+#: stalled ones miss it by 68x, so nothing sits near the boundary.
+_PIPELINE_STALL_GRACE = timedelta(hours=24)
+
 
 def _label(value: str) -> str:
     return value.replace("_", " ")
@@ -188,6 +225,13 @@ _OVERALL_SUMMARY: dict[str, RunDecisionNote] = {
         code="downstream_failed",
         text="A downstream stage failed and needs operator attention.",
     ),
+    OVERALL_STATUS_STALLED: RunDecisionNote(
+        code="pipeline_stalled_after_run_end",
+        text=(
+            "The run itself finished, but the pipeline stopped short: downstream stages "
+            "never reported and no further work is scheduled for them."
+        ),
+    ),
 }
 _OVERALL_SUMMARY_FALLBACK = RunDecisionNote(
     code="still_moving",
@@ -209,6 +253,13 @@ _IF_IGNORED: dict[str, RunDecisionNote] = {
     "failed": RunDecisionNote(
         code="failure_unresolved",
         text=("The failure remains unresolved and downstream progress will not clear itself."),
+    ),
+    OVERALL_STATUS_STALLED: RunDecisionNote(
+        code="stall_will_not_clear",
+        text=(
+            "Nothing clears this on its own - the run has already ended, so the stages "
+            "that never reported will not report later. Diagnose the stall and relaunch."
+        ),
     ),
 }
 
@@ -1082,8 +1133,16 @@ class RunService:
         latest_processing = processing_updates[0] if processing_updates else None
         latest_lifecycle = lifecycle_events[0] if lifecycle_events else None
 
+        # Reconciled from the rows already in memory — `processing_updates` holds
+        # every status row for the run, and until #1038 this method used exactly one
+        # of them (`[0]`) and threw the rest away. That is how a run whose newest row
+        # is `canonical_ready` reported `ok` while holding 58 documents that never
+        # terminated: the read model asked the latest row a question only the whole
+        # set can answer.
+        reconciliation = reconcile_processing(processing_updates)
+
         acquisition_stage = self._resolve_acquisition_stage(run)
-        di_stage = self._resolve_di_stage(run, latest_processing)
+        di_stage = self._resolve_di_stage(run, latest_processing, reconciliation)
         projection_stage = self._resolve_projection_stage(latest_processing, latest_lifecycle)
         search_stage = self._resolve_search_stage(latest_lifecycle)
 
@@ -1094,7 +1153,13 @@ class RunService:
         # The admin had been re-labelling them in the browser since #649, which meant
         # the CLI, alerting and any agent still got the misleading answer (#908).
         stages = self._project_unreachable_stages(stages, run.status)
-        overall_status = self._resolve_overall_pipeline_status(stages)
+        # The run, not just its stages: a terminal run whose downstream never landed
+        # must not keep reporting that the pipeline is advancing (#951). The stages
+        # themselves are left alone on purpose - the CLI's `diagnose_stall` keys
+        # `projection_stalled` off `projection.status in {pending, in_progress}`
+        # (`coverage.py:340-351`), so re-labelling them here would silence the one
+        # surface that already names this correctly.
+        overall_status = self._resolve_overall_pipeline_status(stages, run)
 
         return RunPipelineHealthResponse(
             run_id=run.run_id,
@@ -1106,6 +1171,7 @@ class RunService:
             stages=stages,
             processing_status_event_count=len(processing_updates),
             document_lifecycle_event_count=len(lifecycle_events),
+            processing_reconciliation=self._to_reconciliation_schema(reconciliation),
             decision_support=self._build_decision_support(
                 run=run,
                 stages=stages,
@@ -1358,7 +1424,103 @@ class RunService:
         )
 
     @staticmethod
+    def _to_reconciliation_schema(
+        reconciliation: ProcessingReconciliation,
+    ) -> RunProcessingReconciliation:
+        return RunProcessingReconciliation(
+            observed_units=reconciliation.observed_units,
+            terminal_units=reconciliation.terminal_units,
+            unterminated_units=reconciliation.unterminated_units,
+            unterminated_units_past_deadline=reconciliation.unterminated_units_past_deadline,
+            oldest_unterminated_at=reconciliation.oldest_unterminated_at,
+            verdict=reconciliation.verdict,
+            unterminated=[
+                RunUnterminatedUnit(
+                    processing_manifest_id=unit.processing_manifest_id,
+                    document_id=unit.document_id,
+                    last_status=unit.last_status,
+                    last_seen_at=unit.last_seen_at,
+                    past_deadline=unit.past_deadline,
+                )
+                for unit in reconciliation.unterminated
+            ],
+        )
+
+    @classmethod
     def _resolve_di_stage(
+        cls,
+        run: Run,
+        latest_processing: ProcessingStatusUpdate | None,
+        reconciliation: ProcessingReconciliation,
+    ) -> RunPipelineHealthStage:
+        stage = cls._resolve_di_stage_from_latest_row(run, latest_processing)
+        return cls._apply_unterminated_guard(stage, reconciliation)
+
+    @staticmethod
+    def _apply_unterminated_guard(
+        stage: RunPipelineHealthStage,
+        reconciliation: ProcessingReconciliation,
+    ) -> RunPipelineHealthStage:
+        """Refuse to call the DI stage `ok` while the run holds unterminated units.
+
+        The resolver below reads the run's **newest** status row. For a run of 1,000
+        documents where 58 stopped at `processing` and the rest finished, that row is
+        a `canonical_ready` and the stage reads `ok` — which is exactly what both of
+        the 2026-09-10 and 2026-09-17 runs reported while 58 documents each were
+        missing from search.
+
+        Two rules, and the split is the point:
+
+        * **past the deadline** demotes to `blocked`. Nothing more is coming; the
+          reclaim sweep will terminate these on its next pass.
+        * **within the deadline** demotes `ok` to `in_progress`, never to `blocked`.
+          Work still in flight is not a fault, and a guard that cried failure on
+          every healthy mid-flight run would be switched off within a week.
+
+        An already-`failed` or already-`blocked` stage keeps its status and gains the
+        sentence: replacing a reported DI failure with "58 units are stranded" would
+        hide the more actionable of the two.
+        """
+        if reconciliation.unterminated_units == 0:
+            return stage
+
+        oldest = reconciliation.oldest_unterminated_at
+        outstanding = (
+            f" {reconciliation.unterminated_units} of {reconciliation.observed_units} "
+            f"processing unit(s) started and never reached a terminal status"
+            f"{f' (oldest last seen {oldest.isoformat()})' if oldest else ''}."
+        )
+
+        if reconciliation.unterminated_units_past_deadline > 0:
+            detail = (
+                stage.detail
+                + outstanding
+                + f" {reconciliation.unterminated_units_past_deadline} of them are past"
+                " the reclaim deadline: no terminal status is coming, and nothing"
+                " downstream ever saw these documents."
+            )
+            # `failed` is the one status this does not overwrite. A reported DI
+            # failure names a cause an operator can act on; "some units are
+            # stranded" does not, and replacing the first with the second would
+            # trade a better answer for a worse one. The sentence is appended
+            # either way, so the count is never lost.
+            if stage.status is PipelineStageStatus.FAILED:
+                return stage.model_copy(update={"detail": detail})
+            return stage.model_copy(
+                update={"status": PipelineStageStatus.BLOCKED, "detail": detail}
+            )
+
+        if stage.status is PipelineStageStatus.OK:
+            return stage.model_copy(
+                update={
+                    "status": PipelineStageStatus.IN_PROGRESS,
+                    "detail": stage.detail + outstanding + " Still within the reclaim deadline.",
+                }
+            )
+        return stage.model_copy(update={"detail": stage.detail + outstanding})
+
+    @staticmethod
+    def _resolve_di_stage_from_latest_row(
         run: Run, latest_processing: ProcessingStatusUpdate | None
     ) -> RunPipelineHealthStage:
         if latest_processing is None:
@@ -1540,6 +1702,22 @@ class RunService:
                 code="stages_blocked",
                 text=f"Blocked stages: {', '.join(_label(s) for s in blocked)}.",
             )
+        elif overall_status == OVERALL_STATUS_STALLED:
+            # Same shape as `moving_no_block` - no stage reported blocked - but the
+            # opposite reading. Saying "still moving ... may need attention soon"
+            # about a run that ended is the sentence #951 opened on.
+            stalled_stages = [
+                s.stage
+                for s in stages
+                if s.status in (PipelineStageStatus.PENDING, PipelineStageStatus.IN_PROGRESS)
+            ]
+            blocked_note = RunDecisionNote(
+                code="stalled_no_block",
+                text=(
+                    "No stage reported blocked; these simply stopped reporting and the "
+                    f"run has already ended: {', '.join(_label(s) for s in stalled_stages)}."
+                ),
+            )
         else:
             blocked_note = RunDecisionNote(
                 code="moving_no_block",
@@ -1609,14 +1787,54 @@ class RunService:
         )
 
     @staticmethod
-    def _resolve_overall_pipeline_status(stages: list[RunPipelineHealthStage]) -> str:
+    def _resolve_overall_pipeline_status(
+        stages: list[RunPipelineHealthStage],
+        run: Run | None = None,
+        now: datetime | None = None,
+    ) -> str:
+        """Roll the stages up, and refuse to call a finished run's pipeline "moving".
+
+        The stage rollup alone cannot say that: every stage after acquisition is
+        `pending` on a run whose downstream never started, which is indistinguishable
+        from a run whose downstream has not started *yet*. That is #951 — a
+        `completed` run reporting `overall_status: in_progress` beside a panel saying
+        "no more work is scheduled", forever, because nothing ever re-reads it.
+
+        `run` is optional so the rollup stays callable on stages alone, but
+        `get_pipeline_health` always passes it: without the run there is no
+        `completed_at` and no terminality, so the stall can only be missed.
+        """
         if any(stage.status == "failed" for stage in stages):
             return "failed"
         if any(stage.status == "blocked" for stage in stages):
             return "blocked"
         if any(stage.status in {"pending", "in_progress"} for stage in stages):
+            if RunService._pipeline_has_stalled(run, now=now):
+                return OVERALL_STATUS_STALLED
             return "in_progress"
         return "ok"
+
+    @staticmethod
+    def _pipeline_has_stalled(run: Run | None, *, now: datetime | None = None) -> bool:
+        """True when a run has ended and its unfinished stages are out of time.
+
+        Deliberately scoped to `COMPLETED`. A `failed`/`cancelled` run already has its
+        unreached stages re-labelled `not_applicable` by `_project_unreachable_stages`
+        and its acquisition stage carries `failed`/`blocked`, so the rollup answers
+        those before reaching here - and *those* stages are dead by design, where
+        these were supposed to run and did not.
+
+        Returns False when `completed_at` is missing rather than assuming a stall:
+        an unknown age is not an old one (ADR-0052).
+        """
+        if run is None or run.status is not RunStatus.COMPLETED:
+            return False
+        completed_at = run.completed_at
+        if completed_at is None:
+            return False
+        if completed_at.tzinfo is None:
+            completed_at = completed_at.replace(tzinfo=UTC)
+        return (now or datetime.now(UTC)) - completed_at >= _PIPELINE_STALL_GRACE
 
     async def _dispatch_run(
         self,

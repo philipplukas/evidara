@@ -37,6 +37,7 @@ and preserved on re-runs — the same create-once pattern as `evidara-auth` in s
 | `infra/hetzner/observability/scrape-targets.yaml` | `ServiceMonitor` / `PodMonitor` per service |
 | `infra/hetzner/observability/alerts.yaml` | `PrometheusRule` — the day-one alerts |
 | `infra/hetzner/observability/dashboard-funnel.yaml` | The funnel dashboard, as a labelled ConfigMap |
+| `infra/hetzner/observability/dashboard-run-logs.yaml` | The run-scoped log dashboard (see [Logs](#logs)) |
 
 ## Reach the UIs
 
@@ -78,6 +79,102 @@ The `legal_search_search_errors_total` line on the search panel is what separate
 corpus genuinely has no match"* from *"OpenSearch is dead and the adapter is serving you
 an empty page"* — the API degrades a failed search into an empty result set, so without
 this counter those two are byte-identical.
+
+## Logs
+
+The funnel tells you **where** a run stopped. It never tells you **why**: that is in a
+pod's stdout, which until Loki exists is reachable only by `kubectl logs` against a pod
+that may already have been replaced. Twice on 2026-09-17 the line that diagnosed a
+failure was destroyed by a container restart before anyone read it —
+[ADR-0059](../adr/0059-an-event-is-a-fact-a-log-is-an-explanation.md) is that decision,
+and #892 is the ticket.
+
+**The stack is not deployed from this repository.** Loki and the Alloy collector live in
+[research-platform](https://github.com/philipplukas/research-platform) —
+`observability/loki/values.yaml`, `observability/alloy/values.yaml`, and the Grafana
+datasource ConfigMap beside them — and its `scripts/deploy-observability.sh` installs
+them into `monitoring` at the end of the same run that installs kube-prometheus-stack.
+An edit under `infra/hetzner/values/` does not reach the cluster; see
+[`infra/hetzner/OWNERSHIP.md`](../../infra/hetzner/OWNERSHIP.md).
+
+What this repository owns is the Evidara half, applied the same way as the funnel
+dashboard and in this order:
+
+```bash
+# 1. In the research-platform checkout: Loki, the datasource, Alloy.
+bash scripts/deploy-observability.sh
+
+# 2. Back here: scrape targets, alerts, both dashboards.
+kubectl apply -k infra/hetzner/observability
+```
+
+Applying step 2 first is not harmful — the run-logs panels render "datasource not found"
+until Loki exists, which is a visible failure rather than a quiet empty one.
+
+### Getting from a run to that run's logs
+
+Grafana → **Dashboards → Evidara → "Evidara — logs for one run"**, or the URL directly,
+which is the form the admin panel's run detail can link to once a Grafana base URL is
+configured:
+
+```
+/d/evidara-run-logs/evidara-run-logs?var-run=run_01jq7a3s9b7j4dndd9sgv6pb9d
+```
+
+The query patterns, the per-service coverage table, and the `| json` trap that turns a
+parser error into a convincing "this run logged nothing" are in
+[the event-tracing runbook](../runbooks/event-tracing-queries.md).
+
+### Retention, and the measurements behind it
+
+Upstream sets 14 days on a 20 GiB node-local PVC. Measured on this cluster on
+2026-09-19:
+
+| Measurement | Value | How |
+|---|---|---|
+| Container stdout, all namespaces that matter | **48 MiB/day** uncompressed | summed `kubectl logs --since=6h` over every Running pod in `evidara`, `monitoring`, `argocd`, `arc-systems` |
+| Loudest single pod | `zitadel`, 4.4 MiB/6h — 35% of the total | same |
+| 14 days at that rate | **0.66 GiB** uncompressed, less once chunks are compressed | — |
+| Free space on `/` (control-plane node, `/dev/md2`) | 664 GiB of 872 GiB | `node_filesystem_avail_bytes{mountpoint="/"}` |
+| Prometheus, for comparison | 7.5 GiB on disk at 15d / 18GB retention | `prometheus_tsdb_storage_blocks_bytes` |
+
+So 20 GiB is roughly thirty times the steady-state need, and the node has room for it.
+That headroom is the point rather than waste: the window this matters in is a crash loop
+or a large acquisition run, which are orders of magnitude louder than the quiet six hours
+measured above. **The caveat is real** — that window contained no acquisition run and no
+CI job, so treat 48 MiB/day as a floor, not a forecast.
+
+`local-path` is the only StorageClass on this cluster, so the PVC is pinned to the node
+that first bound it and dies with that node. It survives a pod restart, which is the
+failure that prompted it. It is a diagnostic store and must not be described as durable;
+MinIO is already running and is the upgrade path (`storage.type: s3`) when that stops
+being acceptable.
+
+### Verify after deploying it
+
+```bash
+kubectl -n monitoring get pods -l app.kubernetes.io/name=loki
+kubectl -n monitoring get ds alloy
+```
+
+`get ds alloy` reports `DESIRED` — check the number. The GPU node carries
+`gpu=true:NoSchedule` and the upstream Alloy values set no toleration for it, so the
+DaemonSet lands on the control-plane node only. Every Evidara workload runs there today,
+so no Evidara log is lost; anything scheduled onto the GPU node is not collected. Raised
+upstream as research-platform#4, together with the datasource `uid` and the verification
+query below.
+
+Then confirm a query actually parses, which is the step worth not skipping:
+
+```bash
+kubectl -n monitoring port-forward svc/kps-grafana 3000:80 &
+# Explore → Loki →
+#   {namespace="evidara"} | pattern "<_> <_> <_> <msg>" | line_format "{{.msg}}" | json
+```
+
+A result whose stream labels include `__error__: JSONParserErr` means the parse failed,
+not that the field is absent — and a field filter appended to a failed parse returns zero
+lines, which is indistinguishable from "nothing happened". The runbook has the detail.
 
 ## Alerts
 
@@ -216,4 +313,5 @@ selectors), so no Helm change is needed.
 
 On the single dedicated node, at 15d retention: Prometheus ~1–3 GiB RAM + 20 GiB disk,
 Grafana ~128–512 MiB + 2 GiB, Alertmanager ~128–256 MiB + 2 GiB, plus node-exporter and
-kube-state-metrics. Fixed, not usage-billed — consistent with ADR-0029.
+kube-state-metrics. With logs: Loki ~256 MiB–1 GiB + 20 GiB disk at 14d, and Alloy
+~128–512 MiB per node. Fixed, not usage-billed — consistent with ADR-0029.

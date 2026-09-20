@@ -9,7 +9,7 @@
 
   "counts.commentary": "Commentaires",
   "counts.courtDecisions": "Décisions judiciaires",
-  "counts.citations": "Citations",
+  "counts.citations": "Références",
 
   "metadata.dateUnverified": "Date (non vérifiée)",
   "metadata.inForce": "En vigueur",
@@ -17,7 +17,7 @@
   "metadata.citation": "Citation officielle",
   "metadata.source": "Source",
   "metadata.officialSource": "Source officielle",
-  "metadata.jurisdiction": "Juridiction",
+  "metadata.jurisdiction": "Ordre juridique",
   "metadata.language": "Langue",
   "metadata.status": "Statut",
   "contentLanguage.original": "Langue d'origine",
@@ -26,10 +26,10 @@
 
   "tabs.content": "Contenu",
   "tabs.sections": "Sections",
-  "tabs.citations": "Citations",
+  "tabs.citations": "Références",
   "tabs.details": "Détails",
 
-  "facets.jurisdiction": "Juridiction",
+  "facets.jurisdiction": "Ordre juridique",
   "facets.documentType": "Type de document",
   "facets.language": "Langue",
   "facets.courtLevel": "Instance",
@@ -39,6 +39,13 @@
   "labels.document": "Document",
   "labels.references": "Références",
   "labels.section": "Section",
+
+  "citationTypes.sr": "Recueil systématique (RS)",
+  "citationTypes.article": "Article",
+  "citationTypes.ch_paragraph": "Paragraphe (Suisse)",
+  "citationTypes.de_paragraph": "Paragraphe (Allemagne)",
+  "citationTypes.eu_directive": "Directive européenne",
+  "citationTypes.eu_regulation": "Règlement européen",
 
   "statuses.active": "Actif",
   "statuses.superseded": "Remplacé",

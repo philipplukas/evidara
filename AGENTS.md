@@ -261,6 +261,27 @@ on the boundary).
 Prefer a guard that cannot silently abstain over one that can. An assertion that reports "not
 applicable" is only honest if something else asserts the case it declined.
 
+### A classifier is tested against the surface it classifies
+
+A classifier, auditor or guard that decides **present / absent / indeterminate** ships with two
+things, and is not complete without either:
+
+1. **A fixture drawn from the real surface it classifies** — the actual rows, records or files the
+   tool runs against in production, not a surface that resembles them.
+2. **At least one case whose correct answer is established independently of the thing under test** —
+   by reading the producer, by querying the running system, by a hand-audited sample. A tool and its
+   test that share the same derivation share the same mistake.
+
+The incident: the canonical metadata audit built its key registry from `_build_document` and applied
+it to `published_sections`. It reported two keys DROPPED on all 57,128 rows and registered none of
+the eleven keys sections actually carry — wrong in both directions at once, with a green suite,
+because its tests were written against the same wrong registry. Nothing in that suite could have
+noticed, because nothing in it had ever looked at a `published_sections` row. PR #1043 fixed that
+tool; this rule is here to catch the next one.
+
+A classifier whose fixtures come only from its own author's model of the surface is not tested, it
+is echoed.
+
 ## Documentation policy
 
 Update docs when any of these change:
