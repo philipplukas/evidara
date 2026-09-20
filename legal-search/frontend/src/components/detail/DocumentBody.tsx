@@ -18,6 +18,16 @@ interface DocumentBodyProps {
    * where a section starts.
    */
   outline?: DocumentOutline;
+  /**
+   * How wide the text is set.
+   *
+   * `"panel"` is the historical measure: `text-sm` capped at `72ch`, which in
+   * the 445px detail panel rendered 51 characters per line because the panel
+   * bound first. `"reader"` is reading mode's own column (#1053) — the type
+   * size and the measure both come from tokens in `globals.css`, so the line
+   * length is a designed number rather than whatever the panel happened to be.
+   */
+  measure?: "panel" | "reader";
 }
 
 /** Heading size by outline depth. Deeper sections share the last step. */
@@ -28,6 +38,16 @@ const HEADING_CLASS = [
   "text-xs font-medium text-foreground/80",
   "text-xs font-medium text-foreground/75",
   "text-xs font-medium text-foreground/70",
+];
+
+/** The same steps, one size up, for the promoted reading column. */
+const READER_HEADING_CLASS = [
+  "text-lg font-semibold text-foreground",
+  "text-base font-semibold text-foreground",
+  "text-sm font-semibold text-foreground/90",
+  "text-sm font-semibold text-foreground/85",
+  "text-sm font-medium text-foreground/80",
+  "text-sm font-medium text-foreground/75",
 ];
 
 /**
@@ -45,23 +65,36 @@ const HEADING_CLASS = [
  * anchors, so "A. Allgemeine Bestimmungen" was a paragraph like any other and
  * the outline had nowhere to point.
  */
-export function DocumentBody({ text, outline }: DocumentBodyProps) {
+export function DocumentBody({ text, outline, measure = "panel" }: DocumentBodyProps) {
   const blocks: DocumentBlock[] =
     outline?.blocks ??
     toParagraphs(text).map((paragraph) => ({ kind: "paragraph", text: paragraph }));
 
   if (blocks.length === 0) return null;
 
+  const isReader = measure === "reader";
+  const headingSteps = isReader ? READER_HEADING_CLASS : HEADING_CLASS;
+
   return (
-    <div className="max-w-[72ch] space-y-3 font-document text-sm leading-7 text-foreground/88">
+    <div
+      data-testid={isReader ? "reader-body" : undefined}
+      className={
+        isReader
+          ? "max-w-[var(--reader-measure)] space-y-4 font-document text-foreground/88 text-[length:var(--reader-font-size)] leading-[var(--reader-line-height)]"
+          : "max-w-[72ch] space-y-3 font-document text-sm leading-7 text-foreground/88"
+      }
+    >
       {blocks.map((block, index) =>
         block.kind === "heading" ? (
           <h3
             key={block.sectionId}
             id={sectionAnchorId(block.sectionId)}
             data-section-id={block.sectionId}
-            style={{ marginInlineStart: `${block.depth * 0.75}rem`, scrollMarginTop: "0.5rem" }}
-            className={`pt-2 font-sans ${HEADING_CLASS[block.depth] ?? HEADING_CLASS[0]}`}
+            style={{
+              marginInlineStart: `${block.depth * 0.75}rem`,
+              scrollMarginTop: isReader ? "1.5rem" : "0.5rem",
+            }}
+            className={`pt-2 font-sans ${headingSteps[block.depth] ?? headingSteps[0]}`}
           >
             {block.label}
           </h3>

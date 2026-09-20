@@ -236,9 +236,99 @@ function buildRichDetail(documentId: string) {
   };
 }
 
+/**
+ * A statute the reading surface can actually be measured against (#1053).
+ *
+ * `buildDetail` and `buildRichDetail` both predate reading mode and neither
+ * carries what it needs: no `content` tab, and outlines whose titles do not
+ * occur in the body, so nothing anchors and there is nothing to scroll
+ * between. This one is shaped like the ZH Hundegesetz as the BFF sends it —
+ * a `content` tab, section titles that appear in the body as their own
+ * paragraphs (so `buildDocumentOutline` places them), nested depths, and one
+ * citation the corpus holds beside one it does not.
+ *
+ * The paragraphs are long on purpose: a characters-per-line measurement needs
+ * lines that wrap, and a two-sentence fixture measures the fixture rather than
+ * the column.
+ */
+function buildReaderDetail(documentId: string) {
+  const paragraph = (lead: string) =>
+    `${lead} Die zustaendige Behoerde beruecksichtigt dabei die oertlichen Verhaeltnisse, die Zahl der gehaltenen Tiere und die Sicherheit der uebrigen Bevoelkerung, und sie hoert die betroffenen Gemeinden an, bevor sie eine Anordnung trifft, die ueber den Einzelfall hinausreicht und allgemeine Geltung beansprucht.`;
+
+  return {
+    id: documentId,
+    type: "law",
+    title: "Hundegesetz",
+    subtitle: "Kanton Zuerich, in Kraft seit 01.01.2010",
+    breadcrumbs: ["Kanton Zuerich", "Ordnungsrecht", "Tierhaltung"],
+    metadata: [
+      { label: "Rechtsordnung", value: "Kanton Zuerich", iconKey: "ch", visibility: "always" },
+      { label: "In Kraft", value: "01.01.2010", visibility: "always" },
+      { label: "Fundstelle", value: "LS 554.5", visibility: "default" },
+    ],
+    content: [
+      "I. Allgemeine Bestimmungen",
+      paragraph("Dieses Gesetz regelt die Haltung von Hunden im Kanton Zuerich."),
+      "§ 1 Meldepflicht",
+      paragraph("Wer einen Hund haelt, meldet ihn innert zehn Tagen der Wohnsitzgemeinde."),
+      "§ 2 Leinenpflicht",
+      paragraph("Der Gemeinderat kann fuer bestimmte Gebiete eine Leinenpflicht anordnen."),
+      "II. Strafbestimmungen",
+      paragraph("Widerhandlungen gegen dieses Gesetz werden mit Busse bestraft."),
+      "§ 9 Vollzug",
+      paragraph("Der Regierungsrat erlaesst die Ausfuehrungsbestimmungen zu diesem Gesetz."),
+    ].join("\n\n"),
+    tabs: [
+      { key: "content", label: "Inhalt" },
+      { key: "sections", label: "Abschnitte", count: 6 },
+      { key: "citations", label: "Verweise", count: 2 },
+      { key: "details", label: "Details" },
+    ],
+    relatedGroups: [],
+    references: [
+      {
+        label: "SR",
+        items: [
+          {
+            id: "cit_tschg",
+            title: "Tierschutzgesetz",
+            citation: "SR 455.1",
+            resolved: true,
+            targetDocumentId: "decision-1",
+            href: "/documents/decision-1",
+          },
+          {
+            id: "cit_zgb",
+            title: "SR 210",
+            citation: "SR 210 Art. 641",
+            resolved: false,
+            unresolvedReason: "no_target_in_corpus",
+          },
+        ],
+      },
+    ],
+    annotations: [],
+    localStructure: {
+      items: [
+        { id: "sec_1", label: "I. Allgemeine Bestimmungen", active: false, depth: 0 },
+        { id: "sec_2", label: "§ 1 Meldepflicht", active: false, depth: 1 },
+        { id: "sec_3", label: "§ 2 Leinenpflicht", active: false, depth: 1 },
+        { id: "sec_4", label: "II. Strafbestimmungen", active: false, depth: 0 },
+        { id: "sec_5", label: "§ 9 Vollzug", active: false, depth: 1 },
+        // Published in the outline, absent from the body. It must render as
+        // text and not as a control — accepting a click and scrolling nowhere
+        // is indistinguishable from a jump that worked (#1040).
+        { id: "sec_6", label: "§ 10 Uebergangsrecht", active: false, depth: 1 },
+      ],
+    },
+  };
+}
+
 export interface MockSearchApiOptions {
   richFacets?: boolean;
   richDetail?: boolean;
+  /** The statute fixture reading mode is measured against. See above. */
+  readerDetail?: boolean;
   /**
    * Number of search results to fabricate per query. Defaults to 1. Set to 0
    * to render the empty state, or to a larger number (e.g. 5) for the
@@ -250,6 +340,7 @@ export interface MockSearchApiOptions {
 export async function mockSearchApi(page: Page, options?: MockSearchApiOptions) {
   const useFacets = options?.richFacets ?? false;
   const useRichDetail = options?.richDetail ?? false;
+  const useReaderDetail = options?.readerDetail ?? false;
   const resultCount = options?.resultCount ?? 1;
 
   await page.route("**/v1/search/context", async (route) => {
@@ -295,7 +386,11 @@ export async function mockSearchApi(page: Page, options?: MockSearchApiOptions) 
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(
-        useRichDetail ? buildRichDetail(documentId) : buildDetail(documentId),
+        useReaderDetail
+          ? buildReaderDetail(documentId)
+          : useRichDetail
+            ? buildRichDetail(documentId)
+            : buildDetail(documentId),
       ),
     });
   });

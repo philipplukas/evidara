@@ -133,6 +133,18 @@
     "copyCitation": "Fundstelle kopieren",
     "print": "Drucken"
   },
+  "reader": {
+    "outline": {
+      "heading": "Gliederung",
+      "expand": "Gliederung einblenden",
+      "position": "Abschnitt {position} von {total}"
+    },
+    "evidence": {
+      "heading": "Belege",
+      "expand": "Belege einblenden",
+      "placementHeading": "Einordnung"
+    }
+  },
   "results": {
     "exactMatches": {
       "title": "Exakte Treffer",

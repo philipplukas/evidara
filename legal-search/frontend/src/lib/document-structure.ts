@@ -59,6 +59,18 @@ const PREFIX_LENGTH = 24;
 /** Indent levels the outline renders. Deeper sections render at the deepest. */
 export const MAX_OUTLINE_DEPTH = 5;
 
+/**
+ * Indent per outline level, as static class names so Tailwind keeps them.
+ *
+ * Shared by every surface that renders the outline — the tab and the reading
+ * rail (#1053). Two copies would let the same document nest differently
+ * depending on which one you were looking at, which is the drift AGENTS.md
+ * names ("the same rule enforced in two clients rather than once behind them").
+ * Indexed by the depth `relativeDepths` returns, so it is exactly
+ * `MAX_OUTLINE_DEPTH + 1` long.
+ */
+export const OUTLINE_INDENT_CLASS = ["ps-0", "ps-4", "ps-8", "ps-12", "ps-16", "ps-20"];
+
 /** The DOM id a section heading carries, so the reader can be sent to it. */
 export function sectionAnchorId(sectionId: string): string {
   return `section-${sectionId}`;
