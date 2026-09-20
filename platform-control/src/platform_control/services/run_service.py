@@ -5,7 +5,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, func, or_, select, update
@@ -154,6 +154,37 @@ _TERMINAL_FAILURE_RUN_STATUSES: frozenset[RunStatus] = frozenset(
     {RunStatus.FAILED, RunStatus.CANCELLED}
 )
 
+#: The pipeline rollup for a run that ended and whose downstream never finished.
+#:
+#: A fourth outcome beside `ok`/`blocked`/`failed`/`in_progress`, because none of
+#: those is true of it. `in_progress` claims motion that stopped; `ok` is a false
+#: green over documents that never became searchable; `blocked` would say a stage
+#: reported blocked when none did, leaving `overall_status="blocked"` beside an
+#: empty `blocked_stages`.
+#:
+#: This is the CLI's own word for the condition — `diagnose_stall` already names
+#: `projection_stalled` and `publish_path_disabled` on exactly these runs
+#: (`tools/evidara-cli/src/evidara_cli/coverage.py:332-356`), so the server said
+#: "still moving" about a run the CLI had already diagnosed as stuck (#951).
+OVERALL_STATUS_STALLED = "stalled"
+
+#: How long after a run ends its downstream stages may still legitimately land.
+#:
+#: Acquisition completing is not the pipeline completing: platform-control marks a
+#: run `completed` when the provider is done, and DI, projection and search follow
+#: over NATS afterwards. So a terminal run with unfinished stages is normal for a
+#: while and stuck after that, and only elapsed time tells the two apart — the
+#: distinction `STALL_TOO_EARLY` describes but the CLI's snapshot cannot make.
+#:
+#: Measured against production on 2026-09-19 rather than guessed, because a floor
+#: tuned to one sample withholds the truth on the next (AGENTS.md). Across the 24
+#: runs that did project, the lag from `completed_at` to the last
+#: `document_lifecycle_events` row was under 90s for 22 of them, 49min for one, and
+#: **5h58m** for the largest (938 lifecycle events). The five genuinely stalled runs
+#: are 68-74 days old. A 24h window clears the slowest real run by 4x and the
+#: stalled ones miss it by 68x, so nothing sits near the boundary.
+_PIPELINE_STALL_GRACE = timedelta(hours=24)
+
 
 def _label(value: str) -> str:
     return value.replace("_", " ")
@@ -194,6 +225,13 @@ _OVERALL_SUMMARY: dict[str, RunDecisionNote] = {
         code="downstream_failed",
         text="A downstream stage failed and needs operator attention.",
     ),
+    OVERALL_STATUS_STALLED: RunDecisionNote(
+        code="pipeline_stalled_after_run_end",
+        text=(
+            "The run itself finished, but the pipeline stopped short: downstream stages "
+            "never reported and no further work is scheduled for them."
+        ),
+    ),
 }
 _OVERALL_SUMMARY_FALLBACK = RunDecisionNote(
     code="still_moving",
@@ -215,6 +253,13 @@ _IF_IGNORED: dict[str, RunDecisionNote] = {
     "failed": RunDecisionNote(
         code="failure_unresolved",
         text=("The failure remains unresolved and downstream progress will not clear itself."),
+    ),
+    OVERALL_STATUS_STALLED: RunDecisionNote(
+        code="stall_will_not_clear",
+        text=(
+            "Nothing clears this on its own - the run has already ended, so the stages "
+            "that never reported will not report later. Diagnose the stall and relaunch."
+        ),
     ),
 }
 
@@ -1108,7 +1153,13 @@ class RunService:
         # The admin had been re-labelling them in the browser since #649, which meant
         # the CLI, alerting and any agent still got the misleading answer (#908).
         stages = self._project_unreachable_stages(stages, run.status)
-        overall_status = self._resolve_overall_pipeline_status(stages)
+        # The run, not just its stages: a terminal run whose downstream never landed
+        # must not keep reporting that the pipeline is advancing (#951). The stages
+        # themselves are left alone on purpose - the CLI's `diagnose_stall` keys
+        # `projection_stalled` off `projection.status in {pending, in_progress}`
+        # (`coverage.py:340-351`), so re-labelling them here would silence the one
+        # surface that already names this correctly.
+        overall_status = self._resolve_overall_pipeline_status(stages, run)
 
         return RunPipelineHealthResponse(
             run_id=run.run_id,
@@ -1651,6 +1702,22 @@ class RunService:
                 code="stages_blocked",
                 text=f"Blocked stages: {', '.join(_label(s) for s in blocked)}.",
             )
+        elif overall_status == OVERALL_STATUS_STALLED:
+            # Same shape as `moving_no_block` - no stage reported blocked - but the
+            # opposite reading. Saying "still moving ... may need attention soon"
+            # about a run that ended is the sentence #951 opened on.
+            stalled_stages = [
+                s.stage
+                for s in stages
+                if s.status in (PipelineStageStatus.PENDING, PipelineStageStatus.IN_PROGRESS)
+            ]
+            blocked_note = RunDecisionNote(
+                code="stalled_no_block",
+                text=(
+                    "No stage reported blocked; these simply stopped reporting and the "
+                    f"run has already ended: {', '.join(_label(s) for s in stalled_stages)}."
+                ),
+            )
         else:
             blocked_note = RunDecisionNote(
                 code="moving_no_block",
@@ -1720,14 +1787,54 @@ class RunService:
         )
 
     @staticmethod
-    def _resolve_overall_pipeline_status(stages: list[RunPipelineHealthStage]) -> str:
+    def _resolve_overall_pipeline_status(
+        stages: list[RunPipelineHealthStage],
+        run: Run | None = None,
+        now: datetime | None = None,
+    ) -> str:
+        """Roll the stages up, and refuse to call a finished run's pipeline "moving".
+
+        The stage rollup alone cannot say that: every stage after acquisition is
+        `pending` on a run whose downstream never started, which is indistinguishable
+        from a run whose downstream has not started *yet*. That is #951 — a
+        `completed` run reporting `overall_status: in_progress` beside a panel saying
+        "no more work is scheduled", forever, because nothing ever re-reads it.
+
+        `run` is optional so the rollup stays callable on stages alone, but
+        `get_pipeline_health` always passes it: without the run there is no
+        `completed_at` and no terminality, so the stall can only be missed.
+        """
         if any(stage.status == "failed" for stage in stages):
             return "failed"
         if any(stage.status == "blocked" for stage in stages):
             return "blocked"
         if any(stage.status in {"pending", "in_progress"} for stage in stages):
+            if RunService._pipeline_has_stalled(run, now=now):
+                return OVERALL_STATUS_STALLED
             return "in_progress"
         return "ok"
+
+    @staticmethod
+    def _pipeline_has_stalled(run: Run | None, *, now: datetime | None = None) -> bool:
+        """True when a run has ended and its unfinished stages are out of time.
+
+        Deliberately scoped to `COMPLETED`. A `failed`/`cancelled` run already has its
+        unreached stages re-labelled `not_applicable` by `_project_unreachable_stages`
+        and its acquisition stage carries `failed`/`blocked`, so the rollup answers
+        those before reaching here - and *those* stages are dead by design, where
+        these were supposed to run and did not.
+
+        Returns False when `completed_at` is missing rather than assuming a stall:
+        an unknown age is not an old one (ADR-0052).
+        """
+        if run is None or run.status is not RunStatus.COMPLETED:
+            return False
+        completed_at = run.completed_at
+        if completed_at is None:
+            return False
+        if completed_at.tzinfo is None:
+            completed_at = completed_at.replace(tzinfo=UTC)
+        return (now or datetime.now(UTC)) - completed_at >= _PIPELINE_STALL_GRACE
 
     async def _dispatch_run(
         self,

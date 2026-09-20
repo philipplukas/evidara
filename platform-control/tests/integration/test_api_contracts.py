@@ -849,7 +849,10 @@ async def test_run_pipeline_health_endpoint_returns_stage_summary(
     assert pipeline.status_code == 200
     body = pipeline.json()
     assert body["run_id"] == run_id
-    assert body["overall_status"] in {"ok", "in_progress", "blocked", "failed"}
+    # `stalled` is the fifth value, for a run that ended with downstream stages that
+    # never reported (#951). The field is an open string in the contract, so this set
+    # is the only place the server states what it may actually send.
+    assert body["overall_status"] in {"ok", "in_progress", "blocked", "failed", "stalled"}
     assert isinstance(body["stages"], list)
     stage_names = {stage["stage"] for stage in body["stages"]}
     assert stage_names == {"acquisition", "document_intelligence", "projection", "search"}

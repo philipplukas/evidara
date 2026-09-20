@@ -74,6 +74,10 @@ export function pipelineHealthToLevel(status: string): AdminStatusLevel {
       return "critical";
     case "in_progress":
       return "info";
+    // The run ended and downstream stages never reported (#951). Degraded, not
+    // info: nothing is coming, so it needs an operator rather than patience.
+    case "stalled":
+      return "degraded";
     // Stages the admin marked dead on a terminally-failed run — see
     // `projectPipelineStages`. Neutral, not degraded: nothing is wrong with the
     // stage itself, it simply will never run.
