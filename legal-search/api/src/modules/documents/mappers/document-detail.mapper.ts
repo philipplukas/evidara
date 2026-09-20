@@ -137,7 +137,7 @@ function composeSubtitle(doc: DocumentEntity, locale: SupportedLocale, warn?: Wa
 
 /**
  * A detail metadata row. `visibility` is REQUIRED — the BFF owns the density
- * decision because `label` is localized ("Zuständigkeit", "In Kraft") and the
+ * decision because `label` is localized ("Rechtsordnung", "In Kraft") and the
  * frontend cannot key a rule off it across locales (#787). Making it required
  * here is what stops a new `rows.push` from silently reaching the reader with
  * no visibility, which `filterByDensity` would then hide at default density.

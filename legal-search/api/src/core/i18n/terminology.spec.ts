@@ -29,10 +29,7 @@ import { RETIRED_TERMS, SHARED_TERMS } from './terminology';
 
 // ─── Loading both surfaces ───
 
-const FRONTEND_MESSAGES_DIR = path.resolve(
-  __dirname,
-  '../../../../frontend/src/i18n/messages',
-);
+const FRONTEND_MESSAGES_DIR = path.resolve(__dirname, '../../../../frontend/src/i18n/messages');
 
 function loadFrontendMessages(locale: SupportedLocale): Record<string, unknown> {
   const file = path.join(FRONTEND_MESSAGES_DIR, `${locale}.json`);
@@ -89,9 +86,7 @@ describe('shared legal terminology', () => {
 
         for (const dotted of term.frontendKeys) {
           it(`frontend ${dotted} says "${word}" in ${locale}`, () => {
-            expect(readPath(FRONTEND_MESSAGES[locale], dotted), `${dotted} (${locale})`).toBe(
-              word,
-            );
+            expect(readPath(FRONTEND_MESSAGES[locale], dotted), `${dotted} (${locale})`).toBe(word);
           });
         }
 
@@ -175,9 +170,10 @@ describe('terminology guard coverage', () => {
   it('only defines a stem where a phrase binding uses it', () => {
     for (const term of SHARED_TERMS) {
       if (Object.keys(term.stems ?? {}).length > 0) {
-        expect(term.frontendPhrases.length, `${term.concept} defines an unused stem`).toBeGreaterThan(
-          0,
-        );
+        expect(
+          term.frontendPhrases.length,
+          `${term.concept} defines an unused stem`,
+        ).toBeGreaterThan(0);
       }
     }
   });
@@ -192,9 +188,7 @@ describe('terminology guard coverage', () => {
     const concepts = new Set(SHARED_TERMS.map((t) => t.concept));
     for (const retired of RETIRED_TERMS) {
       expect(retired.words.length, 'a retired entry lists no words').toBeGreaterThan(0);
-      expect(concepts, `${retired.words[0]} → ${retired.replacedBy}`).toContain(
-        retired.replacedBy,
-      );
+      expect(concepts, `${retired.words[0]} → ${retired.replacedBy}`).toContain(retired.replacedBy);
     }
   });
 

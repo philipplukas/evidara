@@ -122,7 +122,7 @@ export const SHARED_TERMS: SharedTerm[] = [
     concept: 'legalOrder',
     terms: { de: 'Rechtsordnung', fr: 'Ordre juridique' },
     evidence:
-      'The facet\'s values are polities (Schweiz, Kanton Zürich), i.e. a legal order. ' +
+      "The facet's values are polities (Schweiz, Kanton Zürich), i.e. a legal order. " +
       '"Zuständigkeit" occurs in 531 indexed documents and every sampled use is an authority\'s ' +
       'competence — "Zuständigkeit der Gemeinden", "Zuständigkeit des Kantonsrates" — which is ' +
       'a different thing. Of the candidates only "Rechtsordnung" (42 documents, used as "die ' +
@@ -221,7 +221,6 @@ export const RETIRED_TERMS: RetiredTerm[] = [
     words: ['Juridiction', 'juridictions'],
     locale: 'fr',
     replacedBy: 'legalOrder',
-    reason:
-      'Carries the same court/competence sense that made "Zuständigkeit" wrong in German.',
+    reason: 'Carries the same court/competence sense that made "Zuständigkeit" wrong in German.',
   },
 ];
