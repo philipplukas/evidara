@@ -3,7 +3,7 @@
 import { BookOpen } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { KeyboardEvent } from "react";
-import { relativeDepths } from "@/lib/document-structure";
+import { OUTLINE_INDENT_CLASS, relativeDepths } from "@/lib/document-structure";
 import type { LocalStructureItem } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 import { TabEmptyState } from "./TabEmptyState";
@@ -30,9 +30,6 @@ interface StructureTabProps {
   /** The section the reader was last sent to. */
   activeSectionId?: string | null;
 }
-
-/** Indent per outline level. Static strings so Tailwind keeps them. */
-const INDENT_CLASS = ["ps-0", "ps-4", "ps-8", "ps-12", "ps-16", "ps-20"];
 
 export function StructureTab({
   items,
@@ -72,7 +69,8 @@ export function StructureTab({
       <div className="space-y-1">
         {items.map((item) => {
           const depth = depths.get(item.id) ?? 0;
-          const indent = INDENT_CLASS[depth] ?? INDENT_CLASS[INDENT_CLASS.length - 1];
+          const indent =
+            OUTLINE_INDENT_CLASS[depth] ?? OUTLINE_INDENT_CLASS[OUTLINE_INDENT_CLASS.length - 1];
           const isActive = item.active || item.id === activeSectionId;
           const canJump = Boolean(onSelectSection && anchoredIds?.has(item.id));
 

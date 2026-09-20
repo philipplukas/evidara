@@ -133,6 +133,18 @@
     "confidenceSuffix": "confiance",
     "sourcesSuffix": "sources"
   },
+  "reader": {
+    "outline": {
+      "heading": "Plan du document",
+      "expand": "Afficher le plan",
+      "position": "Section {position} sur {total}"
+    },
+    "evidence": {
+      "heading": "Éléments probants",
+      "expand": "Afficher les éléments probants",
+      "placementHeading": "Situation dans le recueil"
+    }
+  },
   "results": {
     "exactMatches": {
       "title": "Correspondances exactes",

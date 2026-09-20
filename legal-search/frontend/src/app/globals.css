@@ -17,6 +17,27 @@
   /* Corner radius shared by the three workspace panels. */
   --radius-panel: 1.35rem;
 
+  /* ─── The reading column (#1053) ──────────────────────────────────────
+   * The measure is a designed number, not whatever a panel happened to be.
+   * Before reading mode the body was `text-sm` capped at `72ch` — 504px of
+   * declared measure inside a 445px panel, so the panel bound first and the
+   * product whose job is reading law set its text at 51 characters per line.
+   *
+   * These three are tuned together against a measurement, not a rule of
+   * thumb: Source Serif 4 at `--reader-font-size` averages ~0.55em per
+   * rendered character in German legal prose, so `--reader-measure` is the
+   * width at which a line holds ~70 of them. The 65-75 band is the target
+   * #1053 states; `e2e/workspace-panels.spec.ts` measures the rendered lines
+   * and fails outside it, so changing one of these without the others goes
+   * red rather than quietly setting a 90-character line.
+   *
+   * `--reader-measure` is a cap, not a width: from ~1400px up the token
+   * binds, and below it the reader panel does, which is why the collapse
+   * order in `lib/reading-layout.ts` exists. */
+  --reader-font-size: 1.0625rem;
+  --reader-line-height: 1.75;
+  --reader-measure: 41rem;
+
   /* ─── Keyboard focus (#696) ───────────────────────────────────────────
    * Selection in this workspace is drawn in `--accent-core` (violet): the tab
    * underline, the active chip fill, the active-tab ring. A focus indicator
