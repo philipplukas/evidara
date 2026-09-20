@@ -121,6 +121,38 @@ resources:
 #   - #1023: the NATS DLQ has a reader. Scripts only.
 #   - #1020/#1021/#1022: evidence bundles and ADR-0058. Docs only.
 #
+# WHAT THIS PIN ADDS over 2d964ef4. Six merged PRs, five of them user-visible:
+#   - #1037 (#975): a question naming a canton moves the ranking. `jurisdiction_ids` was
+#     indexed, filterable and faceted and contributed nothing to scoring, so "Kanton Bern"
+#     returned a ZURICH document whose title merely contains the word Bern, above Bern's
+#     own Hundegesetz (9.76 vs 8.99, measured on this corpus). The signal carries the whole
+#     governing-scope chain, not the canton alone: boosting the canton by itself pushed the
+#     federal Tierschutzgesetz out of the dog question's top 20.
+#   - #1046 (#1040): the reader's structure is real. Section depth and text were dropped
+#     twice on the way to the screen, and every section and citation click sent an id to
+#     the document endpoint and 404ed. An unresolved citation now renders as unresolved
+#     rather than as a working link.
+#   - #1044 (#984): a failed body read stops meaning "no such document". 404, 500 and #983's
+#     503 all became `undefined` one hop above the service that had just distinguished them.
+#   - #1041 (#953): `/v1/sources/{id}/versions` reports an unreadable spec instead of 500ing,
+#     and the panel says `— unavailable` where it used to say `—`.
+#   - #1043 (#871): each canonical surface is audited against its OWN producer, and a write
+#     that would drop a nested key is refused by name. The audit previously applied the
+#     document registry to `published_sections`, reporting two keys as dropped on all 57,128
+#     rows while registering none of the eleven keys sections carry.
+#   - #1042 (#1038): documents stranded mid-processing get a terminal status, and a run can
+#     no longer report clean while holding unterminated units. See the CronJob note below.
+#
+# THE RECLAIM CRONJOB SHIPS SUSPENDED, deliberately. #1042 adds an hourly sweep that writes
+# a terminal `failed` row with `processing_deadline_exceeded` for units past a 24h deadline.
+# Its first production pass would act on the existing backlog of 116 units — and #1045
+# establishes that those are almost certainly QUARANTINES, not dead workers: the pipeline
+# emits only `accepted`, `processing` and `canonical_ready`, and the quarantine path records
+# the first two and nothing terminal. Stamping them `processing_deadline_exceeded` would
+# record a cause we know to be wrong, in rows that are hard to correct afterwards. The
+# reconciler and the manual backfill command are live and useful immediately; only the
+# automatic writer waits. Unsuspend after #1045 lands — it is a one-line revert.
+#
 # ── prior pins, newest first ──
 #
 # f5bff6dd (#1010) is `main`'s tip at the time of this pin. runtime-images.yml is green
@@ -130,7 +162,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"2d964ef4d435e072707af37d7048df22df3769fa\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"f2611301a0d2e91511d3b3981152e57874f5017d\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 444115ad. Four merged PRs:
@@ -164,6 +196,38 @@ resources:
 # migrate-job.yaml is bumped to this same SHA in this change; keep the two in lockstep,
 # since the `images:` transformer below deliberately does not reach it.
 #
+# WHAT THIS PIN ADDS over 2d964ef4. Six merged PRs, five of them user-visible:
+#   - #1037 (#975): a question naming a canton moves the ranking. `jurisdiction_ids` was
+#     indexed, filterable and faceted and contributed nothing to scoring, so "Kanton Bern"
+#     returned a ZURICH document whose title merely contains the word Bern, above Bern's
+#     own Hundegesetz (9.76 vs 8.99, measured on this corpus). The signal carries the whole
+#     governing-scope chain, not the canton alone: boosting the canton by itself pushed the
+#     federal Tierschutzgesetz out of the dog question's top 20.
+#   - #1046 (#1040): the reader's structure is real. Section depth and text were dropped
+#     twice on the way to the screen, and every section and citation click sent an id to
+#     the document endpoint and 404ed. An unresolved citation now renders as unresolved
+#     rather than as a working link.
+#   - #1044 (#984): a failed body read stops meaning "no such document". 404, 500 and #983's
+#     503 all became `undefined` one hop above the service that had just distinguished them.
+#   - #1041 (#953): `/v1/sources/{id}/versions` reports an unreadable spec instead of 500ing,
+#     and the panel says `— unavailable` where it used to say `—`.
+#   - #1043 (#871): each canonical surface is audited against its OWN producer, and a write
+#     that would drop a nested key is refused by name. The audit previously applied the
+#     document registry to `published_sections`, reporting two keys as dropped on all 57,128
+#     rows while registering none of the eleven keys sections carry.
+#   - #1042 (#1038): documents stranded mid-processing get a terminal status, and a run can
+#     no longer report clean while holding unterminated units. See the CronJob note below.
+#
+# THE RECLAIM CRONJOB SHIPS SUSPENDED, deliberately. #1042 adds an hourly sweep that writes
+# a terminal `failed` row with `processing_deadline_exceeded` for units past a 24h deadline.
+# Its first production pass would act on the existing backlog of 116 units — and #1045
+# establishes that those are almost certainly QUARANTINES, not dead workers: the pipeline
+# emits only `accepted`, `processing` and `canonical_ready`, and the quarantine path records
+# the first two and nothing terminal. Stamping them `processing_deadline_exceeded` would
+# record a cause we know to be wrong, in rows that are hard to correct afterwards. The
+# reconciler and the manual backfill command are live and useful immediately; only the
+# automatic writer waits. Unsuspend after #1045 lands — it is a one-line revert.
+#
 # ── prior pins, newest first ──
 #
 # 444115ad (#1000) is `main`'s tip at the time of this pin. runtime-images.yml is green
@@ -173,7 +237,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"2d964ef4d435e072707af37d7048df22df3769fa\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"f2611301a0d2e91511d3b3981152e57874f5017d\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 63bd639e. Four merged PRs:
@@ -209,6 +273,38 @@ resources:
 #
 # migrate-job.yaml is bumped to this same SHA in this change; keep the two in lockstep,
 # since the `images:` transformer below deliberately does not reach it.
+#
+# WHAT THIS PIN ADDS over 2d964ef4. Six merged PRs, five of them user-visible:
+#   - #1037 (#975): a question naming a canton moves the ranking. `jurisdiction_ids` was
+#     indexed, filterable and faceted and contributed nothing to scoring, so "Kanton Bern"
+#     returned a ZURICH document whose title merely contains the word Bern, above Bern's
+#     own Hundegesetz (9.76 vs 8.99, measured on this corpus). The signal carries the whole
+#     governing-scope chain, not the canton alone: boosting the canton by itself pushed the
+#     federal Tierschutzgesetz out of the dog question's top 20.
+#   - #1046 (#1040): the reader's structure is real. Section depth and text were dropped
+#     twice on the way to the screen, and every section and citation click sent an id to
+#     the document endpoint and 404ed. An unresolved citation now renders as unresolved
+#     rather than as a working link.
+#   - #1044 (#984): a failed body read stops meaning "no such document". 404, 500 and #983's
+#     503 all became `undefined` one hop above the service that had just distinguished them.
+#   - #1041 (#953): `/v1/sources/{id}/versions` reports an unreadable spec instead of 500ing,
+#     and the panel says `— unavailable` where it used to say `—`.
+#   - #1043 (#871): each canonical surface is audited against its OWN producer, and a write
+#     that would drop a nested key is refused by name. The audit previously applied the
+#     document registry to `published_sections`, reporting two keys as dropped on all 57,128
+#     rows while registering none of the eleven keys sections carry.
+#   - #1042 (#1038): documents stranded mid-processing get a terminal status, and a run can
+#     no longer report clean while holding unterminated units. See the CronJob note below.
+#
+# THE RECLAIM CRONJOB SHIPS SUSPENDED, deliberately. #1042 adds an hourly sweep that writes
+# a terminal `failed` row with `processing_deadline_exceeded` for units past a 24h deadline.
+# Its first production pass would act on the existing backlog of 116 units — and #1045
+# establishes that those are almost certainly QUARANTINES, not dead workers: the pipeline
+# emits only `accepted`, `processing` and `canonical_ready`, and the quarantine path records
+# the first two and nothing terminal. Stamping them `processing_deadline_exceeded` would
+# record a cause we know to be wrong, in rows that are hard to correct afterwards. The
+# reconciler and the manual backfill command are live and useful immediately; only the
+# automatic writer waits. Unsuspend after #1045 lands — it is a one-line revert.
 #
 # ── prior pins, newest first ──
 #
@@ -293,6 +389,38 @@ resources:
 # is the authority on why and on what must be true before it comes off. Rolling this
 # pin does NOT make the page public and is not the decision that should.
 #
+# WHAT THIS PIN ADDS over 2d964ef4. Six merged PRs, five of them user-visible:
+#   - #1037 (#975): a question naming a canton moves the ranking. `jurisdiction_ids` was
+#     indexed, filterable and faceted and contributed nothing to scoring, so "Kanton Bern"
+#     returned a ZURICH document whose title merely contains the word Bern, above Bern's
+#     own Hundegesetz (9.76 vs 8.99, measured on this corpus). The signal carries the whole
+#     governing-scope chain, not the canton alone: boosting the canton by itself pushed the
+#     federal Tierschutzgesetz out of the dog question's top 20.
+#   - #1046 (#1040): the reader's structure is real. Section depth and text were dropped
+#     twice on the way to the screen, and every section and citation click sent an id to
+#     the document endpoint and 404ed. An unresolved citation now renders as unresolved
+#     rather than as a working link.
+#   - #1044 (#984): a failed body read stops meaning "no such document". 404, 500 and #983's
+#     503 all became `undefined` one hop above the service that had just distinguished them.
+#   - #1041 (#953): `/v1/sources/{id}/versions` reports an unreadable spec instead of 500ing,
+#     and the panel says `— unavailable` where it used to say `—`.
+#   - #1043 (#871): each canonical surface is audited against its OWN producer, and a write
+#     that would drop a nested key is refused by name. The audit previously applied the
+#     document registry to `published_sections`, reporting two keys as dropped on all 57,128
+#     rows while registering none of the eleven keys sections carry.
+#   - #1042 (#1038): documents stranded mid-processing get a terminal status, and a run can
+#     no longer report clean while holding unterminated units. See the CronJob note below.
+#
+# THE RECLAIM CRONJOB SHIPS SUSPENDED, deliberately. #1042 adds an hourly sweep that writes
+# a terminal `failed` row with `processing_deadline_exceeded` for units past a 24h deadline.
+# Its first production pass would act on the existing backlog of 116 units — and #1045
+# establishes that those are almost certainly QUARANTINES, not dead workers: the pipeline
+# emits only `accepted`, `processing` and `canonical_ready`, and the quarantine path records
+# the first two and nothing terminal. Stamping them `processing_deadline_exceeded` would
+# record a cause we know to be wrong, in rows that are hard to correct afterwards. The
+# reconciler and the manual backfill command are live and useful immediately; only the
+# automatic writer waits. Unsuspend after #1045 lands — it is a one-line revert.
+#
 # ── prior pins, newest first ──
 #
 # 4932ec2c (#883, 2026-09-06) was the first pin taken after the marketing GHCR
@@ -346,16 +474,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
+    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
+    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
+    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
+    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
+    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
+    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: 2d964ef4d435e072707af37d7048df22df3769fa
+    newTag: f2611301a0d2e91511d3b3981152e57874f5017d

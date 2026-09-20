@@ -31,6 +31,15 @@ spec:
   # stranded document's invisibility at ~25h rather than the ~48h a daily cron
   # would allow. The pass is a single indexed query over units holding no terminal
   # status, so it costs nothing on a clean estate.
+  # SUSPENDED on first deploy (#1045). The sweep is correct; its first pass would be
+  # applied to a backlog it would describe wrongly. #1045 establishes that the 116 units
+  # holding no terminal status are almost certainly quarantines — the quarantine path
+  # records `accepted` and `processing` and nothing else, because nothing in the pipeline
+  # ever emits `quarantined`. Writing `processing_deadline_exceeded` over them would put a
+  # cause we know to be wrong into a terminal row. Flip to false once #1045 emits a real
+  # quarantine status; the reconciler and `scripts/reclaim-stuck-processing.sh` need no
+  # change and are useful now.
+  suspend: true
   schedule: "20 * * * *"
   timeZone: "Etc/UTC"
   # Two concurrent passes would race on the same units. They could not corrupt
