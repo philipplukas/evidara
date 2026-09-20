@@ -1,8 +1,8 @@
 # Processing reclaim — terminating documents that never came out
 
 Owner: Platform team  
-Last reviewed: 2026-09-19  
-Last verified: 2026-09-19 (#1038 — 116 documents measured stranded across two `completed` runs)  
+Last reviewed: 2026-09-20  
+Last verified: 2026-09-20 (#1045 — the 116 were quarantines; see below)  
 Applies to: the Hetzner k3s cluster (`evidara` namespace)
 
 ## What this is for
@@ -26,6 +26,11 @@ Measured against production on 2026-09-19:
 
 The arithmetic closing exactly is what makes this a silent loss rather than a
 backlog: the documents are absent from search and nothing said so.
+
+Those counts are **documents**. Counted as processing *units*
+(`processing_manifest_id`, which is what the reconciler and the sweep both key on)
+the same population is **117**, split 58 / 59 — one document was attempted twice.
+Re-measured 2026-09-20 and unchanged since; nothing new has stranded.
 
 ## The two halves
 
@@ -119,7 +124,8 @@ otherwise. The operator has two options and they are not equivalent:
 
 1. Reclaim them as `failed` / `processing_deadline_exceeded` anyway. Cheap, and it
    ends the silence, but it files 117 refusals under a deadline slug and
-   `/v1/coverage` will still report `quarantined_documents: 0` for `jur_ch_zh`.
+   `/v1/acquisition-coverage` will still report `quarantined_documents: 0` for
+   `jur_ch_zh`.
 2. Write the 117 `quarantined` rows from DI's `processing_manifests` table, where
    the reason slug and evidence already sit, then let the sweep run. The join key is
    `processing_manifest_id`; the two sets were verified equal on 2026-09-20.

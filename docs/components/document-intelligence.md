@@ -123,7 +123,8 @@ label `quarantined` in `di_messages_total`; and the `processing_manifests` row i
 That status event landed with #1045 and is the one the **control plane** sees — the others
 are all DI-local. Without it the flow stopped at `processing`, which is also the fingerprint
 of a worker that died mid-document, so platform-control could not tell a refusal from a
-corpse and `/v1/coverage`'s `quarantined_documents` could not leave zero. Measured
+corpse and `quarantined_documents` on `GET /v1/acquisition-coverage` could not leave
+zero. Measured
 2026-09-20: 117 units held `{accepted, processing}` and every one had a `quarantined`
 manifest row beside it.
 

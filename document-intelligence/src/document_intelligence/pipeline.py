@@ -457,9 +457,9 @@ class ProcessingPipeline:
         worker that died mid-document, so the control plane could not tell a refusal from
         a corpse: 117 units measured on 2026-09-20 held ``{accepted, processing}`` and
         nothing else, and every one of them had a ``quarantined`` manifest row beside it.
-        It also left ``/v1/coverage``'s ``quarantined_documents`` structurally at zero —
-        a counter that cannot leave zero cannot distinguish *we hold nothing here* from
-        *we refused everything here* (#958, #986).
+        It also left ``quarantined_documents`` on ``GET /v1/acquisition-coverage``
+        structurally at zero — a counter that cannot leave zero cannot distinguish *we
+        hold nothing here* from *we refused everything here* (#958, #986).
         """
         selected_profiles = resolve_selected_profiles(
             source_origin_kind=selected_bundle.manifest.source_origin_kind,

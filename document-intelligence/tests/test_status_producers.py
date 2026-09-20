@@ -3,7 +3,8 @@
 `quarantined` was declared on five surfaces — the event contract's enum,
 `ProcessingStatus`, `STATUSES_REQUIRING_A_REASON`, the coverage read models and
 `CoverageService._quarantined_by_jurisdiction` — and emitted by nothing, from #731
-until #1045. Nine months in which `/v1/coverage` reported `quarantined_documents: 0`
+until #1045. Nine months in which `GET /v1/acquisition-coverage` reported
+`quarantined_documents: 0`
 for a corpus that had refused 117 manifestations, and in which the only number a
 reader could get out of the ledger was the one that cannot be true.
 
