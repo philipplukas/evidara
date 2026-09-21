@@ -153,6 +153,50 @@ resources:
 # reconciler and the manual backfill command are live and useful immediately; only the
 # automatic writer waits. Unsuspend after #1045 lands — it is a one-line revert.
 #
+# WHAT THIS PIN ADDS over f2611301. Ten merged PRs; four change what a user or
+# operator sees, and one changes the licence the whole thing ships under:
+#   - #1051: the repository is **AGPL-3.0-only** as of 2f010a27, with a CLA so
+#     dual-licensing stays possible. `LICENSE-HISTORY.md` records that everything
+#     up to 36a07ceb stays available under Apache-2.0 — that grant is irrevocable
+#     and is not being revoked. AGPL §13 needs a source offer on every
+#     network-facing surface, so admin and marketing gain the link search already
+#     had (#995); that is a compliance obligation, not decoration.
+#   - #1059 (#1053): reading is a mode, not a 445px panel. The reader moves to the
+#     centre at 69.1 characters per line (was 52.5), the outline nests by real
+#     depth with a scroll-spy, and an evidence rail replaces the tab that used to
+#     REPLACE the document. Collapse order is a stated rule, not a media query.
+#   - #1055 (#1053's predecessor in the same surface): one legal vocabulary for
+#     both surfaces. "Zitationen" was the wrong German — the corpus's own
+#     publisher says Verweisung (ZH PublG 170.5 §8) — and "Zuständigkeit" named a
+#     competence, not a legal order. Worse: reference group headings printed the
+#     raw `citation_type` over 7,959 of 8,234 citations, so a German legal UI read
+#     "sr" and "article".
+#   - #1056 (#1045): a quarantined document emits a terminal status. Nothing ever
+#     did, so `/v1/acquisition-coverage`'s `quarantined_documents` was structurally
+#     always zero — a declared counter that could not leave it.
+#   - #1048 (#951/#952): a finished run stops claiming the pipeline advances.
+#     `stalled` is a fourth rollup outcome; five production runs 68-74 days old
+#     reported `in_progress` forever.
+#
+# Not user-visible, and the reason the last three of those could be trusted:
+#   - #1054: the admin e2e suite meets a production build instead of `next dev`.
+#     Two Cancel-row assertions had been failing ~50% at a 5s budget while
+#     compilation happened inside it; the suite went 3m24s/1-failed to 19s/63-pass.
+#   - #1057: a visual baseline captured from a superseded base is refused. #1051
+#     carried exactly that shape and would have silently reverted #1054's baseline.
+#   - #1050: six process guards for six failures from one day, including a gate
+#     wrapper that reports the command's own exit status rather than a pager's.
+#   - #1049: run-scoped log queries, with the ownership boundary established —
+#     the stack itself belongs to `research-platform`.
+#
+# THE RECLAIM CRONJOB IS STILL SUSPENDED. #1056 established that the 117
+# quarantined manifests and the 117 unterminated units are the SAME set, so the
+# sweep's first pass would stamp them `processing_deadline_exceeded` — honest
+# about who wrote it, wrong about a cause we now know. Once a unit holds a
+# terminal status the sweep stops selecting it, so unsuspending before
+# backfilling forecloses writing them as `quarantined`. Operator's call;
+# `docs/runbooks/processing-reclaim.md` states both options.
+#
 # ── prior pins, newest first ──
 #
 # f5bff6dd (#1010) is `main`'s tip at the time of this pin. runtime-images.yml is green
@@ -162,7 +206,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"f2611301a0d2e91511d3b3981152e57874f5017d\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"ca51b19966a6ffe7d52a42a28617f4161c858669\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 444115ad. Four merged PRs:
@@ -228,6 +272,50 @@ resources:
 # reconciler and the manual backfill command are live and useful immediately; only the
 # automatic writer waits. Unsuspend after #1045 lands — it is a one-line revert.
 #
+# WHAT THIS PIN ADDS over f2611301. Ten merged PRs; four change what a user or
+# operator sees, and one changes the licence the whole thing ships under:
+#   - #1051: the repository is **AGPL-3.0-only** as of 2f010a27, with a CLA so
+#     dual-licensing stays possible. `LICENSE-HISTORY.md` records that everything
+#     up to 36a07ceb stays available under Apache-2.0 — that grant is irrevocable
+#     and is not being revoked. AGPL §13 needs a source offer on every
+#     network-facing surface, so admin and marketing gain the link search already
+#     had (#995); that is a compliance obligation, not decoration.
+#   - #1059 (#1053): reading is a mode, not a 445px panel. The reader moves to the
+#     centre at 69.1 characters per line (was 52.5), the outline nests by real
+#     depth with a scroll-spy, and an evidence rail replaces the tab that used to
+#     REPLACE the document. Collapse order is a stated rule, not a media query.
+#   - #1055 (#1053's predecessor in the same surface): one legal vocabulary for
+#     both surfaces. "Zitationen" was the wrong German — the corpus's own
+#     publisher says Verweisung (ZH PublG 170.5 §8) — and "Zuständigkeit" named a
+#     competence, not a legal order. Worse: reference group headings printed the
+#     raw `citation_type` over 7,959 of 8,234 citations, so a German legal UI read
+#     "sr" and "article".
+#   - #1056 (#1045): a quarantined document emits a terminal status. Nothing ever
+#     did, so `/v1/acquisition-coverage`'s `quarantined_documents` was structurally
+#     always zero — a declared counter that could not leave it.
+#   - #1048 (#951/#952): a finished run stops claiming the pipeline advances.
+#     `stalled` is a fourth rollup outcome; five production runs 68-74 days old
+#     reported `in_progress` forever.
+#
+# Not user-visible, and the reason the last three of those could be trusted:
+#   - #1054: the admin e2e suite meets a production build instead of `next dev`.
+#     Two Cancel-row assertions had been failing ~50% at a 5s budget while
+#     compilation happened inside it; the suite went 3m24s/1-failed to 19s/63-pass.
+#   - #1057: a visual baseline captured from a superseded base is refused. #1051
+#     carried exactly that shape and would have silently reverted #1054's baseline.
+#   - #1050: six process guards for six failures from one day, including a gate
+#     wrapper that reports the command's own exit status rather than a pager's.
+#   - #1049: run-scoped log queries, with the ownership boundary established —
+#     the stack itself belongs to `research-platform`.
+#
+# THE RECLAIM CRONJOB IS STILL SUSPENDED. #1056 established that the 117
+# quarantined manifests and the 117 unterminated units are the SAME set, so the
+# sweep's first pass would stamp them `processing_deadline_exceeded` — honest
+# about who wrote it, wrong about a cause we now know. Once a unit holds a
+# terminal status the sweep stops selecting it, so unsuspending before
+# backfilling forecloses writing them as `quarantined`. Operator's call;
+# `docs/runbooks/processing-reclaim.md` states both options.
+#
 # ── prior pins, newest first ──
 #
 # 444115ad (#1000) is `main`'s tip at the time of this pin. runtime-images.yml is green
@@ -237,7 +325,7 @@ resources:
 #   for i in platform-control platform-control-admin legal-search-api legal-search-frontend \
 #            document-intelligence-document-service document-intelligence-consumer marketing; do
 #     gh api "user/packages/container/evidara-$i/versions?per_page=100" \
-#       --jq "[.[]|select(.metadata.container.tags[]? == \"f2611301a0d2e91511d3b3981152e57874f5017d\")]|length"
+#       --jq "[.[]|select(.metadata.container.tags[]? == \"ca51b19966a6ffe7d52a42a28617f4161c858669\")]|length"
 #   done   # all returned 1
 #
 # WHAT THIS PIN ADDS over 63bd639e. Four merged PRs:
@@ -305,6 +393,50 @@ resources:
 # record a cause we know to be wrong, in rows that are hard to correct afterwards. The
 # reconciler and the manual backfill command are live and useful immediately; only the
 # automatic writer waits. Unsuspend after #1045 lands — it is a one-line revert.
+#
+# WHAT THIS PIN ADDS over f2611301. Ten merged PRs; four change what a user or
+# operator sees, and one changes the licence the whole thing ships under:
+#   - #1051: the repository is **AGPL-3.0-only** as of 2f010a27, with a CLA so
+#     dual-licensing stays possible. `LICENSE-HISTORY.md` records that everything
+#     up to 36a07ceb stays available under Apache-2.0 — that grant is irrevocable
+#     and is not being revoked. AGPL §13 needs a source offer on every
+#     network-facing surface, so admin and marketing gain the link search already
+#     had (#995); that is a compliance obligation, not decoration.
+#   - #1059 (#1053): reading is a mode, not a 445px panel. The reader moves to the
+#     centre at 69.1 characters per line (was 52.5), the outline nests by real
+#     depth with a scroll-spy, and an evidence rail replaces the tab that used to
+#     REPLACE the document. Collapse order is a stated rule, not a media query.
+#   - #1055 (#1053's predecessor in the same surface): one legal vocabulary for
+#     both surfaces. "Zitationen" was the wrong German — the corpus's own
+#     publisher says Verweisung (ZH PublG 170.5 §8) — and "Zuständigkeit" named a
+#     competence, not a legal order. Worse: reference group headings printed the
+#     raw `citation_type` over 7,959 of 8,234 citations, so a German legal UI read
+#     "sr" and "article".
+#   - #1056 (#1045): a quarantined document emits a terminal status. Nothing ever
+#     did, so `/v1/acquisition-coverage`'s `quarantined_documents` was structurally
+#     always zero — a declared counter that could not leave it.
+#   - #1048 (#951/#952): a finished run stops claiming the pipeline advances.
+#     `stalled` is a fourth rollup outcome; five production runs 68-74 days old
+#     reported `in_progress` forever.
+#
+# Not user-visible, and the reason the last three of those could be trusted:
+#   - #1054: the admin e2e suite meets a production build instead of `next dev`.
+#     Two Cancel-row assertions had been failing ~50% at a 5s budget while
+#     compilation happened inside it; the suite went 3m24s/1-failed to 19s/63-pass.
+#   - #1057: a visual baseline captured from a superseded base is refused. #1051
+#     carried exactly that shape and would have silently reverted #1054's baseline.
+#   - #1050: six process guards for six failures from one day, including a gate
+#     wrapper that reports the command's own exit status rather than a pager's.
+#   - #1049: run-scoped log queries, with the ownership boundary established —
+#     the stack itself belongs to `research-platform`.
+#
+# THE RECLAIM CRONJOB IS STILL SUSPENDED. #1056 established that the 117
+# quarantined manifests and the 117 unterminated units are the SAME set, so the
+# sweep's first pass would stamp them `processing_deadline_exceeded` — honest
+# about who wrote it, wrong about a cause we now know. Once a unit holds a
+# terminal status the sweep stops selecting it, so unsuspending before
+# backfilling forecloses writing them as `quarantined`. Operator's call;
+# `docs/runbooks/processing-reclaim.md` states both options.
 #
 # ── prior pins, newest first ──
 #
@@ -421,6 +553,50 @@ resources:
 # reconciler and the manual backfill command are live and useful immediately; only the
 # automatic writer waits. Unsuspend after #1045 lands — it is a one-line revert.
 #
+# WHAT THIS PIN ADDS over f2611301. Ten merged PRs; four change what a user or
+# operator sees, and one changes the licence the whole thing ships under:
+#   - #1051: the repository is **AGPL-3.0-only** as of 2f010a27, with a CLA so
+#     dual-licensing stays possible. `LICENSE-HISTORY.md` records that everything
+#     up to 36a07ceb stays available under Apache-2.0 — that grant is irrevocable
+#     and is not being revoked. AGPL §13 needs a source offer on every
+#     network-facing surface, so admin and marketing gain the link search already
+#     had (#995); that is a compliance obligation, not decoration.
+#   - #1059 (#1053): reading is a mode, not a 445px panel. The reader moves to the
+#     centre at 69.1 characters per line (was 52.5), the outline nests by real
+#     depth with a scroll-spy, and an evidence rail replaces the tab that used to
+#     REPLACE the document. Collapse order is a stated rule, not a media query.
+#   - #1055 (#1053's predecessor in the same surface): one legal vocabulary for
+#     both surfaces. "Zitationen" was the wrong German — the corpus's own
+#     publisher says Verweisung (ZH PublG 170.5 §8) — and "Zuständigkeit" named a
+#     competence, not a legal order. Worse: reference group headings printed the
+#     raw `citation_type` over 7,959 of 8,234 citations, so a German legal UI read
+#     "sr" and "article".
+#   - #1056 (#1045): a quarantined document emits a terminal status. Nothing ever
+#     did, so `/v1/acquisition-coverage`'s `quarantined_documents` was structurally
+#     always zero — a declared counter that could not leave it.
+#   - #1048 (#951/#952): a finished run stops claiming the pipeline advances.
+#     `stalled` is a fourth rollup outcome; five production runs 68-74 days old
+#     reported `in_progress` forever.
+#
+# Not user-visible, and the reason the last three of those could be trusted:
+#   - #1054: the admin e2e suite meets a production build instead of `next dev`.
+#     Two Cancel-row assertions had been failing ~50% at a 5s budget while
+#     compilation happened inside it; the suite went 3m24s/1-failed to 19s/63-pass.
+#   - #1057: a visual baseline captured from a superseded base is refused. #1051
+#     carried exactly that shape and would have silently reverted #1054's baseline.
+#   - #1050: six process guards for six failures from one day, including a gate
+#     wrapper that reports the command's own exit status rather than a pager's.
+#   - #1049: run-scoped log queries, with the ownership boundary established —
+#     the stack itself belongs to `research-platform`.
+#
+# THE RECLAIM CRONJOB IS STILL SUSPENDED. #1056 established that the 117
+# quarantined manifests and the 117 unterminated units are the SAME set, so the
+# sweep's first pass would stamp them `processing_deadline_exceeded` — honest
+# about who wrote it, wrong about a cause we now know. Once a unit holds a
+# terminal status the sweep stops selecting it, so unsuspending before
+# backfilling forecloses writing them as `quarantined`. Operator's call;
+# `docs/runbooks/processing-reclaim.md` states both options.
+#
 # ── prior pins, newest first ──
 #
 # 4932ec2c (#883, 2026-09-06) was the first pin taken after the marketing GHCR
@@ -474,16 +650,16 @@ resources:
 # delta.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
+    newTag: ca51b19966a6ffe7d52a42a28617f4161c858669
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
+    newTag: ca51b19966a6ffe7d52a42a28617f4161c858669
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
+    newTag: ca51b19966a6ffe7d52a42a28617f4161c858669
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
+    newTag: ca51b19966a6ffe7d52a42a28617f4161c858669
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
+    newTag: ca51b19966a6ffe7d52a42a28617f4161c858669
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
+    newTag: ca51b19966a6ffe7d52a42a28617f4161c858669
   - name: ghcr.io/philipplukas/evidara-marketing
-    newTag: f2611301a0d2e91511d3b3981152e57874f5017d
+    newTag: ca51b19966a6ffe7d52a42a28617f4161c858669
